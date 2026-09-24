@@ -11,3 +11,8 @@ PLAN*.md
 
 # Release zips built by tools/release.py
 dist/
+
+# Logo source and old logo generator, kept locally only
+media/logo-codex-1b.png
+media/logo.svg
+media/make_logo.py
