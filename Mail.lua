@@ -82,13 +82,11 @@ function ns.PrintMailWarnings(within)
     return true
 end
 
--- "Name" means this realm; "Name-Other Realm" is normalised to how we store keys.
+-- The full name typed in the To box. Forever has no realms; a "-Realm" suffix, in
+-- case the client still accepts one, is ignored.
 function ns.RecipientKey(recipient)
-    local name, realm = recipient:match("^%s*([^%-]+)%-(.+)$")
-    if not name then
-        name, realm = recipient:match("^%s*(.-)%s*$"), ns.realm
-    end
-    return ns.FindChar(name .. "-" .. realm:gsub("[%s%-]", ""))
+    local name = recipient:gsub("%-.*$", ""):match("^%s*(.-)%s*$")
+    return ns.FindChar(name)
 end
 
 function ns.StartMail()

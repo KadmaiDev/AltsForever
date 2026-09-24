@@ -200,7 +200,6 @@ end
 
 local function BuildRows(p)
     rows = 0
-    local db = ns.db
     local function Add(key, c)
         local status, skill = Status(c, p)
         if not status then return end
@@ -209,8 +208,8 @@ local function BuildRows(p)
     end
     Add(ns.charKey, ns.char)
     local first = rows -- the current character stays on top
-    for key, c in pairs(db.chars) do
-        if key ~= ns.charKey and (not db.realmOnly or c.realm == ns.realm) then Add(key, c) end
+    for key, c in pairs(ns.db.chars) do
+        if key ~= ns.charKey then Add(key, c) end
     end
     -- Insertion sort of everyone after the current character.
     for i = first + 2, rows do
@@ -276,7 +275,7 @@ local function BuildCrafters()
     wipe(sortedKeys)
     local db = ns.db
     for key, c in pairs(db.chars) do
-        if key ~= ns.charKey and (not db.realmOnly or c.realm == ns.realm) then sortedKeys[#sortedKeys + 1] = key end
+        if key ~= ns.charKey then sortedKeys[#sortedKeys + 1] = key end
     end
     table.sort(sortedKeys)
     AddCrafter(ns.charKey, ns.char) -- you first, then by name

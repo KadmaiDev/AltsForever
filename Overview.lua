@@ -103,10 +103,10 @@ end
 -- Character keys in display order: you first, then by level, then by name.
 local order = {}
 function ns.OverviewOrder()
-    local db, chars = ns.db, ns.db.chars
+    local chars = ns.db.chars
     for i = #order, 1, -1 do order[i] = nil end
     for key, c in pairs(chars) do
-        if key ~= ns.charKey and (not db.realmOnly or c.realm == ns.realm) then order[#order + 1] = key end
+        if key ~= ns.charKey then order[#order + 1] = key end
     end
     table.sort(order, function(a, b)
         local la, lb = chars[a].level or 0, chars[b].level or 0

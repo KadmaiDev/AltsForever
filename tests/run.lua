@@ -26,9 +26,9 @@ local function R(breakdown, n)
     return "|cffc0c0c0" .. breakdown .. "|r    " .. n
 end
 
--- A saved character on another realm/char, in the stored shape.
-local function alt(name, realm, class, data)
-    data.name, data.realm, data.class = name, realm, class
+-- A saved character, in the stored shape.
+local function alt(name, class, data)
+    data.name, data.class = name, class
     return data
 end
 
@@ -36,23 +36,56 @@ end
 test("fresh install creates an empty database", function()
     local ns = wow.load(FILES)
     wow.login(nil)
-    eq(AltsForeverDB.v, 1)
+    eq(AltsForeverDB.v, 2)
     eq(ns.db, AltsForeverDB)
-    eq(ns.charKey, "Aldric-Realm")
-    eq(type(AltsForeverDB.chars["Aldric-Realm"].bags), "table")
+    eq(ns.charKey, "Aldric")
+    eq(type(AltsForeverDB.chars["Aldric"].bags), "table")
 end)
 
 test("saved data from an older format is replaced, not crashed on", function()
     wow.load(FILES)
     wow.login({ v = 0, chars = "junk" })
-    eq(AltsForeverDB.v, 1)
+    eq(AltsForeverDB.v, 2)
     eq(type(AltsForeverDB.chars), "table")
+end)
+
+test("version 1 data (Name-Realm keys) is upgraded to full-name keys", function()
+    local ns = wow.load(FILES)
+    wow.player.name = "Kadra Stormfield"
+    wow.login({ v = 1, realmOnly = true, chars = {
+        ["Kadra Stormfield-BetaRealm1"] = { name = "Kadra Stormfield", realm = "BetaRealm1",
+            class = "HUNTER", bank = { [100] = 3 }, played = 500 },
+        ["Brakka-BetaRealm1"] = { realm = "BetaRealm1", class = "WARRIOR", bank = { [100] = 7 } },
+    } })
+    eq(AltsForeverDB.v, 2)
+    eq(AltsForeverDB.realmOnly, nil)
+    eq(ns.charKey, "Kadra Stormfield")
+    local c = AltsForeverDB.chars["Kadra Stormfield"]
+    eq(c, ns.char, "you are matched to your upgraded entry, not a new one")
+    eq(c.bank[100], 3); eq(c.played, 500); eq(c.realm, nil); eq(c.class, "MAGE")
+    eq(AltsForeverDB.chars["Brakka"].bank[100], 7, "a name missing from the entry comes from its key")
+    eq(AltsForeverDB.chars["Brakka"].name, "Brakka")
+    local n = 0
+    for _ in pairs(AltsForeverDB.chars) do n = n + 1 end
+    eq(n, 2)
+end)
+
+test("upgrading two entries with one name keeps the most recently updated", function()
+    wow.load(FILES)
+    wow.login({ v = 1, chars = {
+        ["Brakka-OldRealm"] = { name = "Brakka", realm = "OldRealm", class = "WARRIOR", updated = 100, money = 1 },
+        ["Brakka-NewRealm"] = { name = "Brakka", realm = "NewRealm", class = "WARRIOR", updated = 200, money = 2 },
+        ["Sorrel-OldRealm"] = { name = "Sorrel", realm = "OldRealm", class = "WARLOCK", seen = 300, money = 3 },
+        ["Sorrel-NewRealm"] = { name = "Sorrel", realm = "NewRealm", class = "WARLOCK", updated = 50, money = 4 },
+    } })
+    eq(AltsForeverDB.chars["Brakka"].money, 2)
+    eq(AltsForeverDB.chars["Sorrel"].money, 3, "falls back to when last seen")
 end)
 
 test("existing characters are kept on login", function()
     wow.load(FILES)
-    wow.login({ v = 1, chars = { ["Alt-Realm"] = alt("Alt", "Realm", "WARRIOR", { bags = { [100] = 3 } }) } })
-    eq(AltsForeverDB.chars["Alt-Realm"].bags[100], 3)
+    wow.login({ v = 2, chars = { ["Alt"] = alt("Alt", "WARRIOR", { bags = { [100] = 3 } }) } })
+    eq(AltsForeverDB.chars["Alt"].bags[100], 3)
 end)
 
 test("saved file loaded as addon code (the Forever workaround) survives login", function()
@@ -150,11 +183,11 @@ end)
 test("tooltip: total first, current character next, others by count", function()
     wow.load(FILES)
     wow.setBag(0, 16, { [1] = { 100, 2 } })
-    wow.login({ v = 1, chars = {
-        ["Small-Realm"] = alt("Small", "Realm", "ROGUE", { bags = { [100] = 1 } }),
-        ["Big-Realm"] = alt("Big", "Realm", "PRIEST", { bags = { [100] = 30 }, mail = { [100] = 10 } }),
-        ["Mid-Other"] = alt("Mid", "Other", "DRUID", { bank = { [100] = 5 } }),
-        ["None-Realm"] = alt("None", "Realm", "MAGE", { bags = { [999] = 1 } }),
+    wow.login({ v = 2, chars = {
+        ["Small"] = alt("Small", "ROGUE", { bags = { [100] = 1 } }),
+        ["Big"] = alt("Big", "PRIEST", { bags = { [100] = 30 }, mail = { [100] = 10 } }),
+        ["Mid"] = alt("Mid", "DRUID", { bank = { [100] = 5 } }),
+        ["None"] = alt("None", "MAGE", { bags = { [999] = 1 } }),
     } })
     local lines = wow.hover(GameTooltip, 100)
     eq(#lines, 6)
@@ -162,7 +195,7 @@ test("tooltip: total first, current character next, others by count", function()
     eq(lines[2][1], "Total"); eq(lines[2][2], 48)
     eq(lines[3][1], "[MAGE]Aldric"); eq(lines[3][2], R("Bags 2", 2))
     eq(lines[4][1], "[PRIEST]Big"); eq(lines[4][2], R("Bags 30 · Mail 10", 40))
-    eq(lines[5][1], "[DRUID]Mid-Other", "other realms get a suffix"); eq(lines[5][2], R("Bank 5", 5))
+    eq(lines[5][1], "[DRUID]Mid"); eq(lines[5][2], R("Bank 5", 5))
     eq(lines[6][1], "[ROGUE]Small")
 end)
 
@@ -291,42 +324,45 @@ end)
 
 test("mailing an alt credits their mail once the send succeeds", function()
     wow.load(FILES)
-    wow.login({ v = 1, chars = {
-        ["Alt-Realm"] = alt("Alt", "Realm", "WARRIOR", { bags = { [100] = 1 } }),
-        ["Mid-OtherRealm"] = alt("Mid", "OtherRealm", "DRUID", {}),
+    wow.login({ v = 2, chars = {
+        ["Alt"] = alt("Alt", "WARRIOR", { bags = { [100] = 1 } }),
+        ["Mid Thornwood"] = alt("Mid Thornwood", "DRUID", {}),
     } })
     eq(#wow.hover(GameTooltip, 100), 2, "one character: spacer and their line, no total")
     wow.outbox = { { 100, 20 }, [3] = { 100, 5 } }
     SendMail("alt", "subject", "")
-    eq(AltsForeverDB.chars["Alt-Realm"].mail, nil, "not before the server confirms")
+    eq(AltsForeverDB.chars["Alt"].mail, nil, "not before the server confirms")
     wow.fire("MAIL_SEND_SUCCESS")
-    eq(AltsForeverDB.chars["Alt-Realm"].mail[100], 25)
+    eq(AltsForeverDB.chars["Alt"].mail[100], 25)
     eq(wow.hover(GameTooltip, 100)[2][2], R("Bags 1 · Mail 25", 26), "tooltip cache was refreshed")
-    SendMail("Mid-Other Realm", "", "")
+    SendMail("mid thornwood", "", "")
     wow.fire("MAIL_SEND_SUCCESS")
-    eq(AltsForeverDB.chars["Mid-OtherRealm"].mail[100], 25)
+    eq(AltsForeverDB.chars["Mid Thornwood"].mail[100], 25, "full names with a space, any case")
+    SendMail("Mid Thornwood-SomeRealm", "", "")
+    wow.fire("MAIL_SEND_SUCCESS")
+    eq(AltsForeverDB.chars["Mid Thornwood"].mail[100], 50, "a realm suffix is ignored")
 end)
 
 test("failed sends and mail to strangers credit nobody", function()
     wow.load(FILES)
-    wow.login({ v = 1, chars = { ["Alt-Realm"] = alt("Alt", "Realm", "WARRIOR", {}) } })
+    wow.login({ v = 2, chars = { ["Alt"] = alt("Alt", "WARRIOR", {}) } })
     wow.outbox = { { 100, 20 } }
     SendMail("Alt", "", "")
     wow.fire("MAIL_FAILED")
     wow.fire("MAIL_SEND_SUCCESS")
-    eq(AltsForeverDB.chars["Alt-Realm"].mail, nil)
+    eq(AltsForeverDB.chars["Alt"].mail, nil)
     SendMail("Stranger", "", "")
     wow.fire("MAIL_SEND_SUCCESS")
-    eq(AltsForeverDB.chars["Stranger-Realm"], nil)
+    eq(AltsForeverDB.chars["Stranger"], nil)
 end)
 
 ---------------------------------------------------------------------------
 local function moneyChars()
-    return { v = 1, chars = {
-        ["Rich-Realm"] = alt("Rich", "Realm", "PRIEST", { money = 50000 }),
-        ["Poor-Realm"] = alt("Poor", "Realm", "ROGUE", { money = 20 }),
-        ["Broke-Realm"] = alt("Broke", "Realm", "DRUID", { money = 0 }),
-        ["Far-Other"] = alt("Far", "Other", "MAGE", { money = 700 }),
+    return { v = 2, chars = {
+        ["Rich"] = alt("Rich", "PRIEST", { money = 50000 }),
+        ["Poor"] = alt("Poor", "ROGUE", { money = 20 }),
+        ["Broke"] = alt("Broke", "DRUID", { money = 0 }),
+        ["Far"] = alt("Far", "MAGE", { money = 700 }),
     } }
 end
 
@@ -363,22 +399,13 @@ test("hovering bag money lists total, you, then others by amount", function()
     eq(lines[2][1], "Total"); eq(lines[2][2], "51020c")
     eq(lines[3][1], "[MAGE]Aldric"); eq(lines[3][2], "300c")
     eq(lines[4][1], "[PRIEST]Rich")
-    eq(lines[5][1], "[MAGE]Far-Other")
+    eq(lines[5][1], "[MAGE]Far")
     eq(lines[6][1], "[ROGUE]Poor")
     eq(wow.coinHeight, 13, "coin icons sized to the tooltip text")
     eq(GameTooltip.point[1], "BOTTOMRIGHT")
     eq(GameTooltip.point[2], button:GetParent(), "anchored to the whole money display")
     button:Leave()
     eq(GameTooltip:IsShown(), false)
-end)
-
-test("money tooltip respects /it realm", function()
-    wow.load(FILES)
-    wow.login(moneyChars())
-    SlashCmdList.ALTSFOREVER("realm")
-    ContainerFrame1MoneyFrameCopperButton:Enter()
-    eq(GameTooltip.lines[2][2], "50020c")
-    eq(#GameTooltip.lines, 5, "title, total, you, Rich, Poor")
 end)
 
 test("an existing game tooltip on the money is added to, not replaced", function()
@@ -435,25 +462,17 @@ test("leaving the money doesn't hide someone else's tooltip", function()
 end)
 
 ---------------------------------------------------------------------------
-test("/it realm hides characters from other realms", function()
+test("/af delete removes a character by name, case-insensitively, but never yourself", function()
     wow.load(FILES)
-    wow.login({ v = 1, chars = { ["Mid-Other"] = alt("Mid", "Other", "DRUID", { bank = { [100] = 5 } }) } })
+    wow.login({ v = 2, chars = { ["Mid"] = alt("Mid", "DRUID", { bank = { [100] = 5 } }) } })
     eq(#wow.hover(GameTooltip, 100), 2)
-    SlashCmdList.ALTSFOREVER("realm")
-    eq(#wow.hover(GameTooltip, 100), 0)
-    SlashCmdList.ALTSFOREVER("realm")
-    eq(#wow.hover(GameTooltip, 100), 2)
-end)
-
-test("/it delete removes a character, case-insensitively, but never yourself", function()
-    wow.load(FILES)
-    wow.login({ v = 1, chars = { ["Mid-Other"] = alt("Mid", "Other", "DRUID", { bank = { [100] = 5 } }) } })
-    eq(#wow.hover(GameTooltip, 100), 2)
-    SlashCmdList.ALTSFOREVER("delete mid-other")
-    eq(AltsForeverDB.chars["Mid-Other"], nil)
+    SlashCmdList.ALTSFOREVER("delete mid")
+    eq(AltsForeverDB.chars["Mid"], nil)
     eq(#wow.hover(GameTooltip, 100), 0, "cache was cleared")
-    SlashCmdList.ALTSFOREVER("delete Aldric-Realm")
-    eq(type(AltsForeverDB.chars["Aldric-Realm"]), "table")
+    SlashCmdList.ALTSFOREVER("delete Aldric")
+    eq(type(AltsForeverDB.chars["Aldric"]), "table")
+    SlashCmdList.ALTSFOREVER("realm")
+    assert(table.concat(wow.printed, "\n"):find("/af opens the overview", 1, true), "/af realm is gone: shows help")
 end)
 
 test("the help message and overview credit Kadmai", function()
@@ -489,14 +508,14 @@ local function engineeringWindow(learnedNames)
 end
 
 local function recipeAlts()
-    return { v = 1, chars = {
-        ["Brakka-Realm"] = alt("Brakka", "Realm", "HUNTER", { profs = { Engineering = 107 },
+    return { v = 2, chars = {
+        ["Brakka"] = alt("Brakka", "HUNTER", { profs = { Engineering = 107 },
             recipes = { Engineering = { ["mechanical squirrel"] = true } } }),
-        ["Elowen-Realm"] = alt("Elowen", "Realm", "PRIEST", { profs = { Engineering = 110 },
+        ["Elowen"] = alt("Elowen", "PRIEST", { profs = { Engineering = 110 },
             recipes = { Engineering = {} } }),
-        ["Thessa-Realm"] = alt("Thessa", "Realm", "DRUID", { profs = { Engineering = 60 } }),
-        ["Sorrel-Realm"] = alt("Sorrel", "Realm", "WARLOCK", { profs = { Engineering = 200 } }),
-        ["Veyla-Realm"] = alt("Veyla", "Realm", "PALADIN", { profs = { Tailoring = 150 } }),
+        ["Thessa"] = alt("Thessa", "DRUID", { profs = { Engineering = 60 } }),
+        ["Sorrel"] = alt("Sorrel", "WARLOCK", { profs = { Engineering = 200 } }),
+        ["Veyla"] = alt("Veyla", "PALADIN", { profs = { Tailoring = 150 } }),
     } }
 end
 
@@ -614,17 +633,6 @@ test("recipe tooltip: nothing for non-recipes or when nobody has the profession"
     eq(#wow.hover(GameTooltip, SQUIRREL, text), 0)
 end)
 
-test("recipe tooltip respects /af realm", function()
-    wow.load(FILES)
-    local saved = recipeAlts()
-    saved.chars["Far-Other"] = alt("Far", "Other", "MAGE", { profs = { Engineering = 150 } })
-    local text = wow.recipeItem(SQUIRREL, "Schematic: Mechanical Squirrel", "Engineering", 75)
-    wow.login(saved)
-    eq(#wow.hover(GameTooltip, SQUIRREL, text), 7)
-    SlashCmdList.ALTSFOREVER("realm")
-    eq(#wow.hover(GameTooltip, SQUIRREL, text), 6)
-end)
-
 ---------------------------------------------------------------------------
 -- Character info, rested XP and the overview window
 
@@ -644,13 +652,13 @@ end
 local function cell(row, i) return row.cells[i].text end
 
 local function overviewAlts()
-    return { v = 1, chars = {
-        ["Low-Realm"] = alt("Low", "Realm", "ROGUE", { level = 12, xp = 100, xpMax = 1000, rested = 0,
+    return { v = 2, chars = {
+        ["Low"] = alt("Low", "ROGUE", { level = 12, xp = 100, xpMax = 1000, rested = 0,
             updated = NOW - 2 * DAY, money = 500 }),
-        ["High-Realm"] = alt("High", "Realm", "PRIEST", { level = 40, xp = 0, xpMax = 50000, rested = 75000,
+        ["High"] = alt("High", "PRIEST", { level = 40, xp = 0, xpMax = 50000, rested = 75000,
             resting = true, updated = NOW - 3 * HOUR, money = 10000, zone = "Orgrimmar",
             profs = { Tailoring = 200, Enchanting = 180 }, prof1 = "Tailoring", prof2 = "Enchanting" }),
-        ["Far-Other"] = alt("Far", "Other", "MAGE", { level = 60, money = 7 }),
+        ["Far"] = alt("Far", "MAGE", { level = 60, money = 7 }),
     } }
 end
 
@@ -741,7 +749,7 @@ end
 
 test("results of the removed rested XP check are cleared from saved data", function()
     wow.load(FILES)
-    wow.login({ v = 1, chars = {}, restedChecks = { { observed = 5 } }, restCheckOff = true })
+    wow.login({ v = 2, chars = {}, restedChecks = { { observed = 5 } }, restCheckOff = true })
     eq(AltsForeverDB.restedChecks, nil)
     eq(AltsForeverDB.restCheckOff, nil)
     SlashCmdList.ALTSFOREVER("restcheck")
@@ -800,16 +808,12 @@ test("overview rows: you first, then by level; totals gold", function()
     eq(cell(rows[1], 1), "[MAGE]Aldric"); eq(cell(rows[1], 12), "|cff20ff20Online|r")
     eq(cell(rows[1], 5), "|cffc0c0c0Engineering|r"); eq(cell(rows[1], 6), "107")
     eq(cell(rows[1], 7), "|cffc0c0c0Mining|r"); eq(cell(rows[1], 8), "99")
-    eq(cell(rows[2], 1), "[MAGE]Far-Other"); eq(cell(rows[2], 2), "60"); eq(cell(rows[2], 3), G .. "-|r")
+    eq(cell(rows[2], 1), "[MAGE]Far"); eq(cell(rows[2], 2), "60"); eq(cell(rows[2], 3), G .. "-|r")
     eq(cell(rows[3], 1), "[PRIEST]High")
     eq(cell(rows[3], 3), "|cff4da6ff150%|r", "was already full")
     eq(cell(rows[3], 10), "Orgrimmar"); eq(cell(rows[3], 12), "3h ago")
     eq(cell(rows[4], 1), "[ROGUE]Low"); eq(cell(rows[4], 2), "12  " .. G .. "10%|r")
     eq(cell(rows[4], 12), "2d ago")
-    SlashCmdList.ALTSFOREVER("realm")
-    SlashCmdList.ALTSFOREVER("")
-    SlashCmdList.ALTSFOREVER("")
-    eq(#overviewRows(), 3, "/af realm hides other realms here too")
 end)
 
 test("an open overview updates when your money changes", function()
@@ -893,37 +897,37 @@ end)
 test("mail sent to an alt expires in 30 days, unless they have sooner mail", function()
     wow.load(FILES)
     wow.now = NOW
-    wow.login({ v = 1, chars = {
-        ["Alt-Realm"] = alt("Alt", "Realm", "WARRIOR", {}),
-        ["Busy-Realm"] = alt("Busy", "Realm", "ROGUE", { mail = {}, mailExpires = NOW + DAY, mailDeletes = true }),
+    wow.login({ v = 2, chars = {
+        ["Alt"] = alt("Alt", "WARRIOR", {}),
+        ["Busy"] = alt("Busy", "ROGUE", { mail = {}, mailExpires = NOW + DAY, mailDeletes = true }),
     } })
     wow.outbox = { { 100, 5 } }
     SendMail("Alt", "", "")
     wow.fire("MAIL_SEND_SUCCESS")
-    eq(AltsForeverDB.chars["Alt-Realm"].mailExpires, NOW + 30 * DAY)
+    eq(AltsForeverDB.chars["Alt"].mailExpires, NOW + 30 * DAY)
     SendMail("Busy", "", "")
     wow.fire("MAIL_SEND_SUCCESS")
-    eq(AltsForeverDB.chars["Busy-Realm"].mailExpires, NOW + DAY, "the sooner one still counts")
-    eq(AltsForeverDB.chars["Busy-Realm"].mailDeletes, true)
+    eq(AltsForeverDB.chars["Busy"].mailExpires, NOW + DAY, "the sooner one still counts")
+    eq(AltsForeverDB.chars["Busy"].mailDeletes, true)
 end)
 
 test("gold alone mailed to an alt counts as mail", function()
     wow.load(FILES)
     wow.now = NOW
-    wow.login({ v = 1, chars = { ["Alt-Realm"] = alt("Alt", "Realm", "WARRIOR", {}) } })
+    wow.login({ v = 2, chars = { ["Alt"] = alt("Alt", "WARRIOR", {}) } })
     wow.outbox, wow.outboxMoney = {}, 10000
     SendMail("Alt", "", "")
     wow.fire("MAIL_SEND_SUCCESS")
-    eq(AltsForeverDB.chars["Alt-Realm"].mailExpires, NOW + 30 * DAY)
+    eq(AltsForeverDB.chars["Alt"].mailExpires, NOW + 30 * DAY)
 end)
 
 test("login warns about mail expiring within 3 days, soonest first", function()
     wow.load(FILES)
     wow.now = NOW
-    wow.login({ v = 1, chars = {
-        ["Later-Realm"] = alt("Later", "Realm", "PRIEST", { mail = {}, mailExpires = NOW + 10 * DAY }),
-        ["Soon-Realm"] = alt("Soon", "Realm", "ROGUE", { mail = {}, mailExpires = NOW + 2 * DAY + 4 * HOUR }),
-        ["Urgent-Realm"] = alt("Urgent", "Realm", "DRUID", { mail = {}, mailExpires = NOW + 5 * HOUR, mailDeletes = true }),
+    wow.login({ v = 2, chars = {
+        ["Later"] = alt("Later", "PRIEST", { mail = {}, mailExpires = NOW + 10 * DAY }),
+        ["Soon"] = alt("Soon", "ROGUE", { mail = {}, mailExpires = NOW + 2 * DAY + 4 * HOUR }),
+        ["Urgent"] = alt("Urgent", "DRUID", { mail = {}, mailExpires = NOW + 5 * HOUR, mailDeletes = true }),
     } })
     eq(#wow.printed, 0, "nothing until the login spam has passed")
     for _, fn in ipairs(wow.timers) do fn() end
@@ -937,7 +941,7 @@ end)
 test("no login warning when nothing expires soon", function()
     wow.load(FILES)
     wow.now = NOW
-    wow.login({ v = 1, chars = { ["Later-Realm"] = alt("Later", "Realm", "PRIEST", { mail = {}, mailExpires = NOW + 10 * DAY }) } })
+    wow.login({ v = 2, chars = { ["Later"] = alt("Later", "PRIEST", { mail = {}, mailExpires = NOW + 10 * DAY }) } })
     for _, fn in ipairs(wow.timers) do fn() end
     eq(#wow.printed, 0)
 end)
@@ -945,7 +949,7 @@ end)
 test("/af mail lists everyone with mail, however far off", function()
     wow.load(FILES)
     wow.now = NOW
-    wow.login({ v = 1, chars = { ["Later-Realm"] = alt("Later", "Realm", "PRIEST", { mail = {}, mailExpires = NOW + 10 * DAY }) } })
+    wow.login({ v = 2, chars = { ["Later"] = alt("Later", "PRIEST", { mail = {}, mailExpires = NOW + 10 * DAY }) } })
     SlashCmdList.ALTSFOREVER("mail")
     assert(printedText():find("[PRIEST]Later: |cffffffff10d 0h|r", 1, true), printedText())
     wow.load(FILES)
@@ -1011,7 +1015,7 @@ end)
 
 test("gear still loading at login doesn't wipe what was recorded, and is retried", function()
     local ns = wow.load(FILES)
-    local saved = { v = 1, chars = { ["Aldric-Realm"] = alt("Aldric", "Realm", "MAGE", {
+    local saved = { v = 2, chars = { ["Aldric"] = alt("Aldric", "MAGE", {
         gear = { [1] = itemLink(3000, "Hunting Cap"), [5] = itemLink(3003, "Wolfmane Vest") }, dura = 60 }) } }
     -- The game knows what's worn (item IDs) but can't give links yet.
     wow.inventory[1], wow.inventory[5] = 3000, 3003
@@ -1029,7 +1033,7 @@ end)
 
 test("equipment not loaded at all at login keeps the recorded gear", function()
     local ns = wow.load(FILES)
-    local saved = { v = 1, chars = { ["Aldric-Realm"] = alt("Aldric", "Realm", "MAGE", {
+    local saved = { v = 2, chars = { ["Aldric"] = alt("Aldric", "MAGE", {
         gear = { [1] = itemLink(3000, "Hunting Cap") } }) } }
     wow.login(saved) -- no item IDs, no links
     eq(ns.char.gear[1], itemLink(3000, "Hunting Cap"))
@@ -1070,8 +1074,8 @@ end)
 
 test("clicking a character in the overview opens their gear", function()
     wow.load(FILES)
-    local saved = { v = 1, chars = {
-        ["Brakka-Realm"] = alt("Brakka", "Realm", "HUNTER", { level = 20, ilvl = 11,
+    local saved = { v = 2, chars = {
+        ["Brakka"] = alt("Brakka", "HUNTER", { level = 20, ilvl = 11,
             gear = { [1] = itemLink(3000, "Hunting Cap"), [16] = itemLink(3001, "Copper Claymore") },
             duraSlots = { [16] = 10 }, dura = 10 }),
     } }
@@ -1094,7 +1098,7 @@ end)
 
 test("gear panel for a character with nothing recorded says so", function()
     wow.load(FILES)
-    wow.login({ v = 1, chars = { ["New-Realm"] = alt("New", "Realm", "ROGUE", { level = 5 }) } })
+    wow.login({ v = 2, chars = { ["New"] = alt("New", "ROGUE", { level = 5 }) } })
     SlashCmdList.ALTSFOREVER("")
     clickRow("New")
     eq(AltsForeverGearFrame.empty.shown, true)
@@ -1144,7 +1148,7 @@ end)
 
 test("no saved-data hint when data loaded, from the game or the workaround file", function()
     wow.load(FILES)
-    wow.login({ v = 1, chars = {} })
+    wow.login({ v = 2, chars = {} })
     runTimers()
     assert(not printedText():find("No saved data", 1, true))
     wow.load({ "tests/fixtures/AltsForever.lua", unpack(FILES) })
@@ -1199,27 +1203,23 @@ test("opening a profession window records which items each learned recipe makes"
     eq(n, 2, "recipes that make no item are skipped")
 end)
 
-test("item tooltip lists who can craft it: you first, other realms per /af realm", function()
+test("item tooltip lists who can craft it: you first, then by name", function()
     wow.load(FILES)
-    wow.login({ v = 1, chars = {
-        ["Brakka-Realm"] = alt("Brakka", "Realm", "HUNTER", { crafts = { Engineering = { [SQUIRREL_ITEM] = true } } }),
-        ["Far-Other"] = alt("Far", "Other", "MAGE", { crafts = { Engineering = { [SQUIRREL_ITEM] = true } } }),
-        ["Veyla-Realm"] = alt("Veyla", "Realm", "PALADIN", { crafts = { Tailoring = { [2580] = true } } }),
+    wow.login({ v = 2, chars = {
+        ["Brakka"] = alt("Brakka", "HUNTER", { crafts = { Engineering = { [SQUIRREL_ITEM] = true } } }),
+        ["Far"] = alt("Far", "MAGE", { crafts = { Engineering = { [SQUIRREL_ITEM] = true } } }),
+        ["Veyla"] = alt("Veyla", "PALADIN", { crafts = { Tailoring = { [2580] = true } } }),
     } })
     craftingWindow({ squirrel = true })
     local lines = wow.hover(GameTooltip, SQUIRREL_ITEM)
-    eq(craftLine(lines), "[MAGE]Aldric, [HUNTER]Brakka, [MAGE]Far-Other", "you first, then by name, one per line")
-    local text = craftLine(lines)
+    eq(craftLine(lines), "[MAGE]Aldric, [HUNTER]Brakka, [MAGE]Far", "you first, then by name, one per line")
     eq(craftLine(wow.hover(GameTooltip, 9999)), nil, "nobody makes it: no line")
-    SlashCmdList.ALTSFOREVER("realm")
-    text = craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM))
-    assert(not text:find("Far", 1, true), text)
 end)
 
 test("a character is listed once even if two professions make the item", function()
     wow.load(FILES)
-    wow.login({ v = 1, chars = {
-        ["Brakka-Realm"] = alt("Brakka", "Realm", "HUNTER",
+    wow.login({ v = 2, chars = {
+        ["Brakka"] = alt("Brakka", "HUNTER",
             { crafts = { Engineering = { [100] = true }, Blacksmithing = { [100] = true } } }),
     } })
     eq(craftLine(wow.hover(GameTooltip, 100)), "[HUNTER]Brakka")
@@ -1241,7 +1241,7 @@ end)
 test("time played is requested quietly after login and recorded", function()
     local ns = wow.load(FILES)
     wow.now = NOW
-    wow.login({ v = 1, chars = {} })
+    wow.login({ v = 2, chars = {} })
     eq(wow.playedRequests, 0, "not during the login spam")
     runTimers()
     eq(wow.playedRequests, 1)
@@ -1280,7 +1280,7 @@ test("overview shows time played per character and in total", function()
     eq(ns.FormatPlayed(12 * DAY + 5 * HOUR + 59), "12d 5h")
     wow.now = NOW
     local saved = overviewAlts()
-    saved.chars["High-Realm"].played = 3 * DAY
+    saved.chars["High"].played = 3 * DAY
     wow.login(saved)
     wow.timePlayed(2 * HOUR)
     SlashCmdList.ALTSFOREVER("")

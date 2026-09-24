@@ -49,8 +49,7 @@ The bank and inbox are read when you open them; until then that character shows 
 | `/af` | Open or close the overview window |
 | `/af mail` | List every character's soonest mail expiry |
 | `/af list` | List stored characters |
-| `/af delete Name-Realm` | Forget a character |
-| `/af realm` | Toggle between all realms and this realm only |
+| `/af delete Full Name` | Forget a character, e.g. `/af delete Thessa Oakenbrook` |
 | `/af mem` | Show the addon's memory use |
 
 `/altsforever` and the old `/it` also work.

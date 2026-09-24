@@ -25,13 +25,12 @@ local function Coins(copper) return GetCoinTextureString(copper, iconSize) end
 -- A "Gold" title, then the same layout as item tooltips: total (only when more
 -- than one character has gold), the current character, then others by amount.
 function ns.AddMoneyLines(tt)
-    local db = ns.db
-    chars = db.chars
+    chars = ns.db.chars
     wipe(order)
     local n, total = 0, 0
     for key, c in pairs(chars) do
         local m = c.money
-        if m and m > 0 and key ~= ns.charKey and (not db.realmOnly or c.realm == ns.realm) then
+        if m and m > 0 and key ~= ns.charKey then
             n = n + 1
             order[n] = key
             total = total + m

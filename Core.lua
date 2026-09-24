@@ -1,16 +1,15 @@
 -- Alts Forever core: saved data, character identity, event dispatch, slash commands.
 local ADDON, ns = ...
 
-local DB_VERSION = 1
+local DB_VERSION = 2
 
 local pcall, type, pairs, print, time = pcall, type, pairs, print, time
 local UnitName, UnitClass, UnitFactionGroup = UnitName, UnitClass, UnitFactionGroup
-local GetNormalizedRealmName, GetRealmName = GetNormalizedRealmName, GetRealmName
 
 -- Bumped whenever the current character's data changes; the tooltip uses it to
 -- know when its cached line for the current character is stale.
 ns.version = 0
--- Bumped when anyone's craftable items may have changed, including /af realm and delete.
+-- Bumped when anyone's craftable items may have changed, including /af delete.
 ns.craftVersion = 0
 
 ---------------------------------------------------------------------------
@@ -45,7 +44,25 @@ end)
 ---------------------------------------------------------------------------
 -- Saved data
 ---------------------------------------------------------------------------
+-- Version 1 keyed characters "Name-Realm". Forever has no realms (a full name is
+-- unique in its region), so version 2 keys them by full name alone. If two entries
+-- share a name, the most recently updated one is kept.
+local function Upgrade(saved)
+    if saved.v ~= 1 or type(saved.chars) ~= "table" then return end
+    local chars = {}
+    for key, c in pairs(saved.chars) do
+        if type(c) == "table" then
+            local name = c.name or key:match("^(.*)%-[^%-]*$") or key
+            c.name, c.realm = name, nil
+            local old = chars[name]
+            if not old or (c.updated or c.seen or 0) > (old.updated or old.seen or 0) then chars[name] = c end
+        end
+    end
+    saved.chars, saved.realmOnly, saved.v = chars, nil, 2
+end
+
 function ns.InitDB(saved)
+    if type(saved) == "table" then Upgrade(saved) end
     if type(saved) ~= "table" or saved.v ~= DB_VERSION or type(saved.chars) ~= "table" then
         saved = { v = DB_VERSION, chars = {} }
     end
@@ -53,14 +70,15 @@ function ns.InitDB(saved)
 end
 
 -- Bank and mail stay nil until first seen, so "never scanned" differs from "empty".
-function ns.InitChar(db, name, realm, class, faction)
-    local key = name .. "-" .. realm
+-- Characters are keyed by full name ("First Last"), which is unique in a region.
+function ns.InitChar(db, name, class, faction)
+    local key = name
     local c = db.chars[key]
     if type(c) ~= "table" then
         c = {}
         db.chars[key] = c
     end
-    c.name, c.realm, c.class, c.faction = name, realm, class, faction
+    c.name, c.class, c.faction = name, class, faction
     c.bags = c.bags or {}
     c.equip = c.equip or {}
     return key, c
@@ -81,8 +99,7 @@ end)
 ns.On("PLAYER_LOGIN", function()
     ns.Off("PLAYER_LOGIN")
     local _, class = UnitClass("player")
-    ns.realm = GetNormalizedRealmName() or GetRealmName():gsub("[%s%-]", "")
-    ns.charKey, ns.char = ns.InitChar(ns.db, UnitName("player"), ns.realm, class, UnitFactionGroup("player"))
+    ns.charKey, ns.char = ns.InitChar(ns.db, UnitName("player"), class, UnitFactionGroup("player"))
     ns.StartScanner()
     ns.StartMail()
     ns.StartMoney()
@@ -119,7 +136,7 @@ function ns.SavedDataHint()
         .. "First time using Alts Forever? Ignore this.")
 end
 
--- Finds a stored character by "Name-Realm", ignoring case.
+-- Finds a stored character by full name, ignoring case.
 function ns.FindChar(input)
     input = input:lower()
     for key in pairs(ns.db.chars) do
@@ -145,12 +162,6 @@ function commands.delete(arg)
     Print("Deleted " .. key .. ".")
 end
 
-function commands.realm()
-    ns.db.realmOnly = not ns.db.realmOnly or nil
-    ns.InvalidateCache()
-    Print(ns.db.realmOnly and "Showing characters on this realm only." or "Showing characters on all realms.")
-end
-
 function commands.mail()
     -- Everyone with mail on record, however far off it expires.
     if not ns.PrintMailWarnings(math.huge) then Print("No mail with items or gold on record.") end
@@ -162,7 +173,7 @@ function commands.mem()
 end
 
 function commands.help()
-    Print("by Kadmai. /af opens the overview. Also: /af mail | list | delete Name-Realm | realm | mem")
+    Print("by Kadmai. /af opens the overview. Also: /af mail | list | delete Name | mem")
 end
 
 commands[""] = function() ns.ToggleOverview() end

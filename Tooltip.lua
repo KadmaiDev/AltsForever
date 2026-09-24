@@ -35,7 +35,6 @@ local function ColoredName(key, c)
     local s = names[key]
     if not s then
         s = c.name or key
-        if c.realm ~= ns.realm then s = s .. "-" .. (c.realm or "?") end
         local color = c.class and C_ClassColor.GetClassColor(c.class)
         if color then s = color:WrapTextInColorCode(s) end
         names[key] = s
@@ -66,9 +65,8 @@ end
 -- Rows are stored flat as count, left, right and kept sorted highest count first.
 local function BuildOthers(id)
     local e, n, total
-    local realmOnly = ns.db.realmOnly
     for key, c in pairs(ns.db.chars) do
-        if key ~= ns.charKey and (not realmOnly or c.realm == ns.realm) then
+        if key ~= ns.charKey then
             local count, text = ns.Describe(c, id)
             if count > 0 then
                 if not e then e, n, total = {}, 0, 0 end
