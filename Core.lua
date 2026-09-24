@@ -74,6 +74,8 @@ ns.On("ADDON_LOADED", function(name)
     ns.noSavedData = AltsForeverDB == nil
     AltsForeverDB = ns.InitDB(AltsForeverDB)
     ns.db = AltsForeverDB
+    -- Left over from the rested XP rate check, which has been removed.
+    ns.db.restedChecks, ns.db.restCheckOff = nil, nil
 end)
 
 ns.On("PLAYER_LOGIN", function()
@@ -152,12 +154,6 @@ end
 function commands.mail()
     -- Everyone with mail on record, however far off it expires.
     if not ns.PrintMailWarnings(math.huge) then Print("No mail with items or gold on record.") end
-end
-
-function commands.restcheck()
-    ns.db.restCheckOff = not ns.db.restCheckOff or nil
-    Print(ns.db.restCheckOff and "Rested XP check messages off (results are still saved)."
-        or "Rested XP check messages on.")
 end
 
 function commands.mem()

@@ -733,84 +733,19 @@ test("rested XP: none at max level, and no estimate for the character you're on"
     eq(ns.RestedNow(ns.char, NOW), 3000, "live value, not projected")
 end)
 
--- A character that logged out 8 hours ago with 1000 rested XP.
-local function loggedOut(resting)
-    return { v = 1, chars = { ["Aldric-Realm"] = alt("Aldric", "Realm", "MAGE", { level = 24, xp = 5700,
-        xpMax = 10000, rested = 1000, resting = resting, updated = NOW - 8 * HOUR }) } }
-end
-
 local function runTimers()
     local fns = wow.timers
     wow.timers = {}
     for _, fn in ipairs(fns) do fn() end
 end
 
-test("rested XP check: matching the inn rate is reported as a match", function()
+test("results of the removed rested XP check are cleared from saved data", function()
     wow.load(FILES)
-    wow.now = NOW
-    wow.stats.rested = 1500 -- +5% of a level in 8h
-    wow.login(loggedOut(true))
-    runTimers()
-    local text = table.concat(wow.printed, "\n")
-    assert(text:find("8h 0m logged out in an inn or city: +5% of a level per 8h (assumed 5%)", 1, true), text)
-    assert(text:find("matches", 1, true), text)
-    local r = AltsForeverDB.restedChecks[1]
-    eq(r.observed, 5); eq(r.expected, 5); eq(r.resting, true); eq(r.who, "Aldric-Realm")
-end)
-
-test("rested XP check: a different real rate is flagged", function()
-    wow.load(FILES)
-    wow.now = NOW
-    wow.stats.rested = 1500 -- +5%, but logged out away from an inn (assumed 1.25%)
-    wow.login(loggedOut(nil))
-    runTimers()
-    local text = table.concat(wow.printed, "\n")
-    assert(text:find("out in the world: +5% of a level per 8h (assumed 1.25%)", 1, true), text)
-    assert(text:find("differs - please report", 1, true), text)
-end)
-
-test("rested XP check: skipped when there's nothing reliable to measure", function()
-    local ns = wow.load(FILES)
-    wow.login(nil)
-    local before = { rested = 1000, resting = true, updated = NOW - 8 * HOUR, level = 24, xpMax = 10000 }
-    local now = { level = 24, xpMax = 10000, rested = 1500 }
-    eq(ns.CheckRested(before, now, NOW) ~= nil, true, "the normal case is measured")
-    eq(ns.CheckRested(before, now, NOW - 8 * HOUR + 600), nil, "only 10 minutes away")
-    eq(ns.CheckRested(before, { level = 25, xpMax = 11000, rested = 0 }, NOW), nil, "levelled up in between")
-    eq(ns.CheckRested({ updated = NOW - DAY }, now, NOW), nil, "no data from the last logout")
-    eq(ns.CheckRested({ rested = 15000, resting = true, updated = NOW - DAY, level = 24, xpMax = 10000 },
-        { level = 24, xpMax = 10000, rested = 15000 }, NOW), nil, "already full")
-    eq(ns.CheckRested({ rested = 0, updated = NOW - DAY, level = 60, xpMax = 10000 },
-        { level = 60, xpMax = 10000, rested = 0 }, NOW), nil, "max level")
-end)
-
-test("rested XP check: hitting the cap still matches if the assumed rate would", function()
-    local ns = wow.load(FILES)
-    wow.login(nil)
-    -- 200 short of full: 5% (500 XP) would have filled it, so a full bar fits the rule.
-    local r = ns.CheckRested({ rested = 14800, resting = true, updated = NOW - 8 * HOUR, level = 24, xpMax = 10000 },
-        { level = 24, xpMax = 10000, rested = 15000 }, NOW)
-    eq(r.capped, true)
-    eq(ns.RestedCheckMatches(r), true)
-    -- 1000 short: 5% would only reach 14500, so a full bar means it's really faster.
-    r = ns.CheckRested({ rested = 14000, resting = true, updated = NOW - 8 * HOUR, level = 24, xpMax = 10000 },
-        { level = 24, xpMax = 10000, rested = 15000 }, NOW)
-    eq(ns.RestedCheckMatches(r), false)
-end)
-
-test("rested XP check keeps the last 20 results and can be silenced", function()
-    wow.load(FILES)
-    wow.now = NOW
-    wow.stats.rested = 1500
-    local saved = loggedOut(true)
-    saved.restedChecks = {}
-    for i = 1, 20 do saved.restedChecks[i] = { old = i } end
-    saved.restCheckOff = true
-    wow.login(saved)
-    runTimers()
-    eq(#AltsForeverDB.restedChecks, 20)
-    eq(AltsForeverDB.restedChecks[1].observed, 5, "newest first")
-    eq(#wow.printed, 0, "silenced by /af restcheck")
+    wow.login({ v = 1, chars = {}, restedChecks = { { observed = 5 } }, restCheckOff = true })
+    eq(AltsForeverDB.restedChecks, nil)
+    eq(AltsForeverDB.restCheckOff, nil)
+    SlashCmdList.ALTSFOREVER("restcheck")
+    assert(table.concat(wow.printed, "\n"):find("/af opens the overview", 1, true), "unknown command shows help")
 end)
 
 test("overview text: time since, level, rested and professions", function()

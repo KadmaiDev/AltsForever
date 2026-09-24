@@ -48,7 +48,6 @@ The bank and inbox are read when you open them; until then that character shows 
 |---|---|
 | `/af` | Open or close the overview window |
 | `/af mail` | List every character's soonest mail expiry |
-| `/af restcheck` | Turn the rested XP check message on or off |
 | `/af list` | List stored characters |
 | `/af delete Name-Realm` | Forget a character |
 | `/af realm` | Toggle between all realms and this realm only |
