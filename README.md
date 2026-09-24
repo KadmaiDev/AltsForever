@@ -17,15 +17,21 @@ Locations are shown as icons: Red Linen Bag (bags), banker (bank), mailbox (mail
 
 The current character always comes first. Other characters are sorted by count.
 
+![Item tooltip showing Linen Cloth counts across five characters](media/item-tracking.png)
+
 Hovering the money at the bottom of your bags lists each character's gold and the total, laid out the same way.
 
 Type `/af` to open the **overview**: every character with level and XP, rested XP (including what they've built up since logging out), gold, main professions, zone, time played and when you last played them, with total gold and total time played at the bottom. Hover a row for details such as rested XP until full, hearthstone location and item level. **Click a row** to see that character's gear, laid out like the character panel: hover any item for its tooltip, shift-click to link it in chat. Nearly broken items are tinted red and the lowest durability is shown.
+
+![The overview window with a character's details and gear panel](media/alt-overview.png)
 
 **Mail expiry:** a few seconds after you log in, Alts Forever warns in chat if any character has mail with items or gold expiring within 3 days, and says whether it'll be returned to the sender or deleted. The overview's Mail column shows how long each character has; `/af mail` lists them all.
 
 Hovering a recipe (pattern, schematic, formula...) lists your characters who have that profession: **Known**, **Can learn**, **Needs 120 (107)** (required skill, their skill), or **Not scanned**. Open each profession window once on each character so Alts Forever knows which recipes they've learned.
 
 **Can craft:** hovering any item that one of your characters knows how to make adds a "Can craft" section listing them one per line (the current character first). This also comes from opening each profession window once.
+
+![Recipe tooltips showing Known, Can learn and Needs skill, and a Can craft line](media/professions.png)
 
 ## Status
 
