@@ -249,11 +249,12 @@ end
 ---------------------------------------------------------------------------
 -- "Can craft" on item tooltips
 ---------------------------------------------------------------------------
--- itemID -> coloured names of everyone who can make it, built in one pass over all
--- characters the first time an item is hovered after crafts change.
+-- itemID -> list of coloured names of everyone who can make it, built in one pass
+-- over all characters the first time an item is hovered after crafts change.
 -- lastKey remembers who was added last, so a character whose two professions make
 -- the same item is listed once.
 local crafters, lastKey, craftersVer = {}, {}, nil
+local sortedKeys = {}
 
 local function AddCrafter(key, c)
     if not c.crafts then return end
@@ -262,8 +263,8 @@ local function AddCrafter(key, c)
         for id in pairs(items) do
             if lastKey[id] ~= key then
                 lastKey[id] = key
-                local text = crafters[id]
-                crafters[id] = text and (text .. ", " .. name) or name
+                local list = crafters[id]
+                if list then list[#list + 1] = name else crafters[id] = { name } end
             end
         end
     end
@@ -272,20 +273,25 @@ end
 local function BuildCrafters()
     wipe(crafters)
     wipe(lastKey)
+    wipe(sortedKeys)
     local db = ns.db
-    AddCrafter(ns.charKey, ns.char) -- you first
     for key, c in pairs(db.chars) do
-        if key ~= ns.charKey and (not db.realmOnly or c.realm == ns.realm) then AddCrafter(key, c) end
+        if key ~= ns.charKey and (not db.realmOnly or c.realm == ns.realm) then sortedKeys[#sortedKeys + 1] = key end
     end
+    table.sort(sortedKeys)
+    AddCrafter(ns.charKey, ns.char) -- you first, then by name
+    for _, key in ipairs(sortedKeys) do AddCrafter(key, db.chars[key]) end
 end
 
+-- A heading, then one character per line, so the tooltip never gets wide.
 function ns.AddCraftLines(tt, id)
     if craftersVer ~= ns.craftVersion then
         craftersVer = ns.craftVersion
         BuildCrafters()
     end
-    local text = crafters[id]
-    if not text then return end
+    local list = crafters[id]
+    if not list then return end
     tt:AddLine(" ")
-    tt:AddDoubleLine("Can craft", text, 1, 0.82, 0, 1, 1, 1)
+    tt:AddLine("Can craft", 1, 0.82, 0)
+    for i = 1, #list do tt:AddLine("  " .. list[i], 1, 1, 1) end
 end

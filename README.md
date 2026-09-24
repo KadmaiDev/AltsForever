@@ -25,7 +25,7 @@ Type `/af` to open the **overview**: every character with level and XP, rested X
 
 Hovering a recipe (pattern, schematic, formula...) lists your characters who have that profession: **Known**, **Can learn**, **Needs 120 (107)** (required skill, their skill), or **Not scanned**. Open each profession window once on each character so Alts Forever knows which recipes they've learned.
 
-**Can craft:** hovering any item that one of your characters knows how to make adds a "Can craft" line naming them (the current character first). This also comes from opening each profession window once.
+**Can craft:** hovering any item that one of your characters knows how to make adds a "Can craft" section listing them one per line (the current character first). This also comes from opening each profession window once.
 
 ## Status
 

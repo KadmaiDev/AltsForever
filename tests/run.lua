@@ -1236,8 +1236,19 @@ local function craftingWindow(learned)
     wow.fire("TRADE_SKILL_SHOW")
 end
 
+-- The names under the "Can craft" heading, joined with ", ", or nil if there's none.
 local function craftLine(lines)
-    for _, l in ipairs(lines) do if l[1] == "Can craft" then return l[2] end end
+    for i, l in ipairs(lines) do
+        if l[1] == "Can craft" and not l[2] then
+            local names = {}
+            for j = i + 1, #lines do
+                local name = lines[j][1] and lines[j][1]:match("^  (.+)$")
+                if not name then break end
+                names[#names + 1] = name
+            end
+            return table.concat(names, ", ")
+        end
+    end
 end
 
 test("opening a profession window records which items each learned recipe makes", function()
@@ -1261,10 +1272,9 @@ test("item tooltip lists who can craft it: you first, other realms per /af realm
         ["Veyla-Realm"] = alt("Veyla", "Realm", "PALADIN", { crafts = { Tailoring = { [2580] = true } } }),
     } })
     craftingWindow({ squirrel = true })
-    local text = craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM))
-    assert(text and text:find("^%[MAGE%]Aldric, "), tostring(text))
-    assert(text:find("[HUNTER]Brakka", 1, true) and text:find("[MAGE]Far-Other", 1, true), text)
-    assert(not text:find("Veyla", 1, true), text)
+    local lines = wow.hover(GameTooltip, SQUIRREL_ITEM)
+    eq(craftLine(lines), "[MAGE]Aldric, [HUNTER]Brakka, [MAGE]Far-Other", "you first, then by name, one per line")
+    local text = craftLine(lines)
     eq(craftLine(wow.hover(GameTooltip, 9999)), nil, "nobody makes it: no line")
     SlashCmdList.ALTSFOREVER("realm")
     text = craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM))
