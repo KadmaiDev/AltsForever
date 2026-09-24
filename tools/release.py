@@ -1,7 +1,12 @@
-"""Builds the Alts Forever release zip and, with --upload, sends it to CurseForge.
+"""Builds the Alts Forever release zip and, with --upload, publishes it.
 
     python tools/release.py                         build dist/AltsForever-<version>.zip
-    python tools/release.py --upload CHANGELOG.md   build, then upload as a beta file
+    python tools/release.py --upload CHANGELOG.md   build, upload to CurseForge as a beta
+                                                    file, then tag v<version> and make a
+                                                    GitHub release with the same zip
+    python tools/release.py --github CHANGELOG.md   build, then only the GitHub part
+
+Publishing needs everything committed and pushed, so the tag matches the zip.
 
 Runs the tests first with `luajit` (or the LUAJIT environment variable).
 
@@ -32,6 +37,21 @@ RELEASE_TYPE = "beta"
 
 def fail(msg):
     sys.exit("release: " + msg)
+
+
+def run(*args):
+    r = subprocess.run(args, cwd=ROOT, capture_output=True, text=True)
+    if r.returncode != 0:
+        fail("%s failed: %s" % (" ".join(args[:3]), (r.stderr or r.stdout).strip()[:1000]))
+    return r.stdout.strip()
+
+
+def check_pushed():
+    if run("git", "status", "--porcelain", "--untracked-files=no"):
+        fail("commit your changes first; the release must match a pushed commit")
+    run("git", "fetch", "-q", "origin")
+    if run("git", "rev-parse", "HEAD") != run("git", "rev-parse", "@{u}"):
+        fail("push first; HEAD isn't on the remote branch")
 
 
 def read(path):
@@ -129,9 +149,33 @@ def upload(path, ver, changelog_path):
         fail("upload failed: HTTP %d %s" % (e.code, e.read().decode()[:1000]))
 
 
+def github_release(path, ver, changelog_path):
+    tag = "v" + ver
+    head = run("git", "rev-parse", "HEAD")
+    if run("git", "tag", "--list", tag):
+        if run("git", "rev-parse", tag + "^{commit}") != head:
+            fail("tag %s already exists on a different commit" % tag)
+    else:
+        run("git", "tag", "-a", tag, "-m", "Alts Forever %s" % ver)
+    run("git", "push", "-q", "origin", tag)
+    exists = subprocess.run(["gh", "release", "view", tag], cwd=ROOT, capture_output=True).returncode == 0
+    if exists:
+        fail("GitHub release %s already exists; not replacing it" % tag)
+    args = ["gh", "release", "create", tag, path, "--title", "Alts Forever " + ver,
+            "--notes-file", changelog_path, "--verify-tag"]
+    if RELEASE_TYPE != "release":
+        args.append("--prerelease")
+    print("github release: " + run(*args))
+
+
 if __name__ == "__main__":
-    path, ver = build()
-    if len(sys.argv) >= 2 and sys.argv[1] == "--upload":
+    mode = sys.argv[1] if len(sys.argv) >= 2 else None
+    if mode in ("--upload", "--github"):
         if len(sys.argv) < 3:
-            fail("--upload needs a changelog file")
+            fail(mode + " needs a changelog file")
+        check_pushed()
+    path, ver = build()
+    if mode == "--upload":
         upload(path, ver, sys.argv[2])
+    if mode in ("--upload", "--github"):
+        github_release(path, ver, sys.argv[2])
