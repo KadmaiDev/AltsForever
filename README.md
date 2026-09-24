@@ -1,3 +1,5 @@
+<p align="center"><img src="media/logo.png" alt="Alts Forever logo" width="200"></p>
+
 # Alts Forever
 
 By **Kadmai**.
