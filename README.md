@@ -6,18 +6,11 @@ By **Kadmai**.
 
 A World of Warcraft: Forever addon (interface 16001) that adds a total and a per-character breakdown of an item to its tooltip:
 
-```
-Total                                  48
-Aldric                  [bag] 2         2
-Big          [bag] 30 · [mail] 10      40
-Mid-Other              [bank] 5         5
-```
+![Item tooltip showing Linen Cloth counts across five characters](media/item-tracking.png)
 
 Locations are shown as icons: Red Linen Bag (bags), banker (bank), mailbox (mail) and white shirt (wearing).
 
 The current character always comes first. Other characters are sorted by count.
-
-![Item tooltip showing Linen Cloth counts across five characters](media/item-tracking.png)
 
 Hovering the money at the bottom of your bags lists each character's gold and the total, laid out the same way.
 
