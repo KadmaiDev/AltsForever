@@ -64,11 +64,13 @@ luajit tests/run.lua
 
 ## Design notes
 
-- Stores only `itemID -> count` per location per character. It doesn't store slot positions or item links.
+- Item counts are stored as `itemID -> count` per location per character, without slot positions or item links. The rest is small: each equipped item's link (for the gear panel), learned recipe names and the item IDs they make, and a few numbers such as level, gold and time played. Five characters take 17 KB on disk.
 - Scans only happen on events. `BAG_UPDATE_DELAYED` groups a batch of changes into one scan, and only when a carried bag changed. There are no OnUpdate handlers.
 - Scans refill the existing tables and read stacks through one reused `ItemLocation`, so a scan allocates nothing.
-- Other characters' tooltip lines are built once per item and cached, up to 500 items. The current character's line is recomputed only when their data changes.
+- Other characters' tooltip lines are built once per item and cached, up to 500 items. The current character's line is recomputed only when their data changes. Hovering an item again creates no garbage.
+- The overview and gear windows aren't created until you first open them.
+- Measured outside the game (`luajit tests/perf.lua`): about 100 KB for the addon, plus 8-9 KB per character. `/af mem` shows the real figure in game.
 
 ## Development
 
-Run the tests with `luajit tests/run.lua` from the project root (LuaJIT is Lua 5.1, the same as WoW). `tests/wow.lua` fakes just enough of the WoW API to load the addon outside the game. Run `tools/fetch-reference.ps1` to download the API references into `reference/`.
+Run the tests with `luajit tests/run.lua` and the memory and garbage measurements with `luajit tests/perf.lua [saved file]` from the project root (LuaJIT is Lua 5.1, the same as WoW). `tests/wow.lua` fakes just enough of the WoW API to load the addon outside the game. Run `tools/fetch-reference.ps1` to download the API references into `reference/`.
