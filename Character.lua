@@ -1,8 +1,8 @@
--- Alts Forever character: level, XP, rested XP, location and item level, plus an
--- estimate of the rested XP a character has gained since logging out.
+-- Alts Forever character: level, XP, rested XP, location, item level and time played,
+-- plus an estimate of the rested XP a character has gained since logging out.
 local _, ns = ...
 
-local floor, min, time = math.floor, math.min, time
+local floor, min, time, type = math.floor, math.min, time, type
 local issecretvalue = issecretvalue or function() return false end
 local UnitLevel, UnitXP, UnitXPMax = UnitLevel, UnitXP, UnitXPMax
 local GetXPExhaustion, IsResting = GetXPExhaustion, IsResting
@@ -53,6 +53,49 @@ function ns.RestedNow(c, now)
     local elapsed = (c ~= ns.char and c.updated) and (now - c.updated) or 0
     local rested = min(cap, c.rested + elapsed * rate)
     return rested, cap, rested < cap and (cap - rested) / rate or 0
+end
+
+---------------------------------------------------------------------------
+-- Played time: c.played is total seconds as of c.playedAt.
+---------------------------------------------------------------------------
+function ns.PlayedNow(c, now)
+    if not c.played then return nil end
+    if c == ns.char and c.playedAt then return c.played + (now - c.playedAt) end
+    return c.played
+end
+
+function ns.RecordPlayed(c, total, now)
+    if issecretvalue(total) or type(total) ~= "number" then return end
+    c.played, c.playedAt = total, now
+end
+
+-- The game answers RequestTimePlayed with TIME_PLAYED_MSG and also prints "Total time
+-- played" in chat; the chat frame's printer is wrapped so our login request stays quiet.
+-- A /played typed by the player still prints (and is recorded too).
+local hidePlayed = false
+
+local function StartPlayed(char)
+    ns.On("TIME_PLAYED_MSG", function(total)
+        ns.RecordPlayed(char, total, time())
+        -- Every chat frame showing system messages prints it, so stay quiet a moment longer.
+        if hidePlayed then C_Timer.After(1, function() hidePlayed = false end) end
+    end)
+    ns.On("PLAYER_LOGOUT", function()
+        local total = ns.PlayedNow(char, time())
+        if total then char.played, char.playedAt = total, time() end
+    end)
+    local show = ChatFrame_DisplayTimePlayed
+    if not (RequestTimePlayed and C_Timer) then return end
+    if show then
+        ChatFrame_DisplayTimePlayed = function(...)
+            if not hidePlayed then return show(...) end
+        end
+    end
+    C_Timer.After(3, function()
+        hidePlayed = true
+        RequestTimePlayed()
+        C_Timer.After(10, function() hidePlayed = false end) -- in case no answer comes
+    end)
 end
 
 ---------------------------------------------------------------------------
@@ -116,6 +159,7 @@ function ns.StartCharacter()
     -- is where the offline rested XP estimate starts from.
     ns.On("PLAYER_LOGOUT", function() char.updated = time() end)
     Scan()
+    StartPlayed(char)
 
     -- Give the game a moment to report rested XP, then compare.
     if C_Timer then

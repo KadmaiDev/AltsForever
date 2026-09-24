@@ -2,7 +2,9 @@
 -- It checks the addon's logic and wiring, not how anything looks on screen.
 local M = {}
 
-M.SECRET = setmetatable({}, { __tostring = function() return "<secret>" end })
+-- A secret value. Tests may swap in a plain number; load() puts this back.
+local SECRET = setmetatable({}, { __tostring = function() return "<secret>" end })
+M.SECRET = SECRET
 
 -- Events this fake client knows; registering anything else throws, like Forever does.
 local KNOWN_EVENTS = {
@@ -18,6 +20,7 @@ local KNOWN_EVENTS = {
     PLAYER_ENTERING_WORLD = true, UPDATE_INVENTORY_DURABILITY = true,
     SKILL_LINES_CHANGED = true, TRADE_SKILL_SHOW = true, TRADE_SKILL_LIST_UPDATE = true,
     TRADE_SKILL_DATA_SOURCE_CHANGED = true, TRADE_SKILL_CLOSE = true, NEW_RECIPE_LEARNED = true,
+    TIME_PLAYED_MSG = true,
 }
 
 -- Resets every global and loads the addon files fresh. Returns the addon namespace.
@@ -30,7 +33,8 @@ function M.load(files)
     M.profs = {}       -- { { name, skill }, ... } in GetProfessions() order
     M.itemClass = {}   -- [itemID] = classID (9 = recipe)
     M.itemNames = {}   -- [itemID] = name
-    -- The open profession window: which profession, and every recipe in it.
+    -- The open profession window: which profession, and every recipe in it. A recipe
+    -- is { name, learned, prof?, item? (what the schematic says it makes), link? }.
     M.tradeskill = { ready = true, linked = false, guild = false, prof = nil, recipes = {} }
     M.frames = {}
     M.printed = {}
@@ -38,6 +42,7 @@ function M.load(files)
     M.player = { name = "Aldric", realm = "Realm", class = "MAGE" }
 
     wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
+    M.SECRET = SECRET
     issecretvalue = function(v) return v == M.SECRET end
     M.now = nil -- set to freeze the clock
     time = function() return M.now or os.time() end
@@ -81,7 +86,21 @@ function M.load(files)
             local r = ts().recipes[id]
             return r and { professionName = r.prof or ts().prof }
         end,
+        GetRecipeSchematic = function(id)
+            local r = ts().recipes[id]
+            return { recipeID = id, outputItemID = r and r.item }
+        end,
+        GetRecipeItemLink = function(id)
+            local r = ts().recipes[id]
+            return r and r.link
+        end,
     }
+
+    -- /played: requests are counted; ChatFrame_DisplayTimePlayed stands in for the
+    -- chat frame printing "Total time played", and records what it would print.
+    M.playedRequests, M.playedShown = 0, {}
+    RequestTimePlayed = function() M.playedRequests = M.playedRequests + 1 end
+    ChatFrame_DisplayTimePlayed = function(_, total) M.playedShown[#M.playedShown + 1] = total end
 
     -- Frames: real behaviour for events, scripts, text and visibility; any other
     -- widget method (sizing, anchoring, fonts...) is accepted and ignored.
@@ -341,6 +360,13 @@ function M.setBag(bag, size, contents)
     local b = { size = size }
     for slot, item in pairs(contents or {}) do b[slot] = { id = item[1], count = item[2] } end
     M.bags[bag] = b
+end
+
+-- What the game does when time played arrives: the event, then each chat frame showing
+-- system messages prints it through the (possibly wrapped) global.
+function M.timePlayed(total, thisLevel)
+    M.fire("TIME_PLAYED_MSG", total, thisLevel or 0)
+    ChatFrame_DisplayTimePlayed(nil, total, thisLevel or 0)
 end
 
 return M

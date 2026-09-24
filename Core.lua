@@ -10,6 +10,8 @@ local GetNormalizedRealmName, GetRealmName = GetNormalizedRealmName, GetRealmNam
 -- Bumped whenever the current character's data changes; the tooltip uses it to
 -- know when its cached line for the current character is stale.
 ns.version = 0
+-- Bumped when anyone's craftable items may have changed, including /af realm and delete.
+ns.craftVersion = 0
 
 ---------------------------------------------------------------------------
 -- Events: one frame dispatches to every handler registered for an event
@@ -69,6 +71,7 @@ ns.On("ADDON_LOADED", function(name)
     ns.Off("ADDON_LOADED")
     -- On the Forever beta the client never loads this; the .toc loads it from the
     -- SavedData link instead (see tools\link-saved-data.ps1).
+    ns.noSavedData = AltsForeverDB == nil
     AltsForeverDB = ns.InitDB(AltsForeverDB)
     ns.db = AltsForeverDB
 end)
@@ -86,6 +89,8 @@ ns.On("PLAYER_LOGIN", function()
     ns.StartOverview()
     ns.StartGear()
     ns.StartTooltip()
+    -- A few seconds in, so it isn't lost among the login messages.
+    if ns.noSavedData and C_Timer then C_Timer.After(5, ns.SavedDataHint) end
 end)
 
 ns.On("PLAYER_LOGOUT", function()
@@ -99,6 +104,18 @@ local function Print(msg)
     print("|cff66ccffAlts Forever|r: " .. msg)
 end
 ns.Print = Print
+
+-- Shown at login when no saved data was loaded: either a first install, or the
+-- Forever beta bug where the game saves addon data but never loads it back.
+function ns.SavedDataHint()
+    Print("|cffffd100No saved data was loaded, so only this character is known this session.|r")
+    Print("If you've used Alts Forever before, this is a WoW Forever beta bug: the game saves "
+        .. "addon data when you log out but never loads it back. The addon's description explains "
+        .. "the workaround (updating the addon can undo it, so set it up again).")
+    Print("Logging out now saves over your other characters' data, but the game keeps the "
+        .. "previous save as AltsForever.lua.bak in your SavedVariables folder. "
+        .. "First time using Alts Forever? Ignore this.")
+end
 
 -- Finds a stored character by "Name-Realm", ignoring case.
 function ns.FindChar(input)

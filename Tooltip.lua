@@ -94,6 +94,7 @@ function ns.InvalidateCache()
     cacheSize = 0
     lastId = nil
     ns.version = ns.version + 1 -- also refreshes memoised recipe lines
+    ns.craftVersion = ns.craftVersion + 1
 end
 
 function ns.AddLines(tt, id)
@@ -138,6 +139,7 @@ local function OnItem(tt, data)
     end
     if id then
         ns.AddRecipeLines(tt, id, data)
+        ns.AddCraftLines(tt, id)
         ns.AddLines(tt, id)
     end
 end

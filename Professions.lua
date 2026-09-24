@@ -1,8 +1,9 @@
 -- Alts Forever professions: records each character's profession skill levels and
--- learned recipes, and shows on recipe items which characters know or can learn them.
+-- learned recipes, shows on recipe items which characters know or can learn them,
+-- and on craftable items which characters can make them.
 local _, ns = ...
 
-local pairs, ipairs, wipe = pairs, ipairs, wipe
+local pairs, ipairs, wipe, tonumber, type = pairs, ipairs, wipe, tonumber, type
 local issecretvalue = issecretvalue or function() return false end
 local GetProfessions, GetProfessionInfo = GetProfessions, GetProfessionInfo
 local GetItemInfoInstant, GetItemNameByID = C_Item.GetItemInfoInstant, C_Item.GetItemNameByID
@@ -52,20 +53,39 @@ local function ProfessionName(info)
     return info and (info.professionName or info.parentProfessionName)
 end
 
--- c.recipes = { [professionName] = { [lowercase recipe name] = true } }. A profession
--- only has an entry once its window has been opened, so "missing" means "not scanned".
+-- The item a recipe makes, or nil (enchants make none). The schematic's field name
+-- is the retail one, undocumented on Forever, so the recipe's item link is the fallback.
+local function OutputItem(recipeID)
+    local s = TS.GetRecipeSchematic and TS.GetRecipeSchematic(recipeID, false)
+    local id = s and s.outputItemID
+    if not id and TS.GetRecipeItemLink then
+        local link = TS.GetRecipeItemLink(recipeID)
+        id = type(link) == "string" and not issecretvalue(link) and tonumber(link:match("|Hitem:(%d+)"))
+    end
+    if id and not issecretvalue(id) and id > 0 then return id end
+end
+
+-- c.recipes = { [professionName] = { [lowercase recipe name] = true } } and
+-- c.crafts = { [professionName] = { [itemID] = true } }. A profession only has an
+-- entry once its window has been opened, so "missing" means "not scanned".
 function ns.ScanRecipes(c)
     if not TS.IsTradeSkillReady() or TS.IsTradeSkillLinked() or TS.IsTradeSkillGuild() then return false end
     local prof = ProfessionName(TS.GetBaseProfessionInfo())
     if not prof then return false end
-    c.recipes = c.recipes or {}
-    local learned = c.recipes[prof] or {}
+    c.recipes, c.crafts = c.recipes or {}, c.crafts or {}
+    local learned, crafts = c.recipes[prof] or {}, c.crafts[prof] or {}
     wipe(learned)
+    wipe(crafts)
     for _, id in ipairs(TS.GetAllRecipeIDs()) do
         local r = TS.GetRecipeInfo(id)
-        if r and r.learned and r.name then learned[r.name:lower()] = true end
+        if r and r.learned and r.name then
+            learned[r.name:lower()] = true
+            local item = OutputItem(id)
+            if item then crafts[item] = true end
+        end
     end
-    c.recipes[prof] = learned
+    c.recipes[prof], c.crafts[prof] = learned, crafts
+    ns.craftVersion = ns.craftVersion + 1
     return true
 end
 
@@ -74,7 +94,14 @@ function ns.RecipeLearned(c, recipeID)
     local prof = ProfessionName(TS.GetProfessionInfoByRecipeID(recipeID))
     local learned = prof and c.recipes and c.recipes[prof]
     -- Only add to a profession we've scanned; a partial list would read as "not learned".
-    if learned and r and r.name then learned[r.name:lower()] = true end
+    if not (learned and r and r.name) then return end
+    learned[r.name:lower()] = true
+    local crafts = c.crafts and c.crafts[prof]
+    local item = crafts and OutputItem(recipeID)
+    if item then
+        crafts[item] = true
+        ns.craftVersion = ns.craftVersion + 1
+    end
 end
 
 function ns.StartProfessions()
@@ -217,4 +244,48 @@ function ns.AddRecipeLines(tt, id, data)
             or ("|cffff2020Needs " .. p.req .. " (" .. rowSkill[i] .. ")|r")
         tt:AddDoubleLine(ns.ColoredName(key, chars[key]), text, 1, 1, 1, 1, 1, 1)
     end
+end
+
+---------------------------------------------------------------------------
+-- "Can craft" on item tooltips
+---------------------------------------------------------------------------
+-- itemID -> coloured names of everyone who can make it, built in one pass over all
+-- characters the first time an item is hovered after crafts change.
+-- lastKey remembers who was added last, so a character whose two professions make
+-- the same item is listed once.
+local crafters, lastKey, craftersVer = {}, {}, nil
+
+local function AddCrafter(key, c)
+    if not c.crafts then return end
+    local name = ns.ColoredName(key, c)
+    for _, items in pairs(c.crafts) do
+        for id in pairs(items) do
+            if lastKey[id] ~= key then
+                lastKey[id] = key
+                local text = crafters[id]
+                crafters[id] = text and (text .. ", " .. name) or name
+            end
+        end
+    end
+end
+
+local function BuildCrafters()
+    wipe(crafters)
+    wipe(lastKey)
+    local db = ns.db
+    AddCrafter(ns.charKey, ns.char) -- you first
+    for key, c in pairs(db.chars) do
+        if key ~= ns.charKey and (not db.realmOnly or c.realm == ns.realm) then AddCrafter(key, c) end
+    end
+end
+
+function ns.AddCraftLines(tt, id)
+    if craftersVer ~= ns.craftVersion then
+        craftersVer = ns.craftVersion
+        BuildCrafters()
+    end
+    local text = crafters[id]
+    if not text then return end
+    tt:AddLine(" ")
+    tt:AddDoubleLine("Can craft", text, 1, 0.82, 0, 1, 1, 1)
 end

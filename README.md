@@ -19,11 +19,13 @@ The current character always comes first. Other characters are sorted by count.
 
 Hovering the money at the bottom of your bags lists each character's gold and the total, laid out the same way.
 
-Type `/af` to open the **overview**: every character with level and XP, rested XP (including what they've built up since logging out), gold, main professions, zone and when you last played them. Hover a row for details such as rested XP until full, hearthstone location and item level. **Click a row** to see that character's gear, laid out like the character panel: hover any item for its tooltip, shift-click to link it in chat. Nearly broken items are tinted red and the lowest durability is shown.
+Type `/af` to open the **overview**: every character with level and XP, rested XP (including what they've built up since logging out), gold, main professions, zone, time played and when you last played them, with total gold and total time played at the bottom. Hover a row for details such as rested XP until full, hearthstone location and item level. **Click a row** to see that character's gear, laid out like the character panel: hover any item for its tooltip, shift-click to link it in chat. Nearly broken items are tinted red and the lowest durability is shown.
 
 **Mail expiry:** a few seconds after you log in, Alts Forever warns in chat if any character has mail with items or gold expiring within 3 days, and says whether it'll be returned to the sender or deleted. The overview's Mail column shows how long each character has; `/af mail` lists them all.
 
 Hovering a recipe (pattern, schematic, formula...) lists your characters who have that profession: **Known**, **Can learn**, **Needs 120 (107)** (required skill, their skill), or **Not scanned**. Open each profession window once on each character so Alts Forever knows which recipes they've learned.
+
+**Can craft:** hovering any item that one of your characters knows how to make adds a "Can craft" line naming them (the current character first). This also comes from opening each profession window once.
 
 ## Status
 
@@ -38,6 +40,8 @@ The bank and inbox are read when you open them; until then that character shows 
    .\tools\link-saved-data.ps1 -WowDir "C:\Program Files (x86)\World of Warcraft\_classic_beta_"
    ```
    It links `SavedData` to your account's `WTF\Account\<account>\SavedVariables` folder. The `.toc` lists `SavedData\AltsForever.lua`, so the game runs the saved file as ordinary addon code. Once Blizzard fixes the bug, remove that line from both `.toc` files.
+
+   If no saved data loads, Alts Forever says so in chat a few seconds after login, explains the bug and points to `AltsForever.lua.bak`, the game's copy of the previous save.
 
 ## Commands
 

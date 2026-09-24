@@ -862,15 +862,15 @@ test("overview rows: you first, then by level; totals gold", function()
     SlashCmdList.ALTSFOREVER("")
     local rows = overviewRows()
     eq(#rows, 4)
-    eq(cell(rows[1], 1), "[MAGE]Aldric"); eq(cell(rows[1], 11), "|cff20ff20Online|r")
+    eq(cell(rows[1], 1), "[MAGE]Aldric"); eq(cell(rows[1], 12), "|cff20ff20Online|r")
     eq(cell(rows[1], 5), "|cffc0c0c0Engineering|r"); eq(cell(rows[1], 6), "107")
     eq(cell(rows[1], 7), "|cffc0c0c0Mining|r"); eq(cell(rows[1], 8), "99")
     eq(cell(rows[2], 1), "[MAGE]Far-Other"); eq(cell(rows[2], 2), "60"); eq(cell(rows[2], 3), G .. "-|r")
     eq(cell(rows[3], 1), "[PRIEST]High")
     eq(cell(rows[3], 3), "|cff4da6ff150%|r", "was already full")
-    eq(cell(rows[3], 10), "Orgrimmar"); eq(cell(rows[3], 11), "3h ago")
+    eq(cell(rows[3], 10), "Orgrimmar"); eq(cell(rows[3], 12), "3h ago")
     eq(cell(rows[4], 1), "[ROGUE]Low"); eq(cell(rows[4], 2), "12  " .. G .. "10%|r")
-    eq(cell(rows[4], 11), "2d ago")
+    eq(cell(rows[4], 12), "2d ago")
     SlashCmdList.ALTSFOREVER("realm")
     SlashCmdList.ALTSFOREVER("")
     SlashCmdList.ALTSFOREVER("")
@@ -1193,6 +1193,157 @@ test("an open gear panel for you updates when you change gear", function()
     wow.gearLinks[1], wow.inventory[1] = itemLink(3005, "Better Hat"), 3005
     wow.fire("PLAYER_EQUIPMENT_CHANGED", 1)
     eq(gearPanelSlots()[1].name.text, "|cff1eff00Better Hat|r")
+end)
+
+---------------------------------------------------------------------------
+test("login with no saved data explains the Forever saved-data bug", function()
+    wow.load(FILES)
+    wow.login(nil)
+    eq(#wow.printed, 0, "not during the login spam")
+    runTimers()
+    local text = printedText()
+    assert(text:find("No saved data was loaded", 1, true), text)
+    assert(text:find("WoW Forever beta bug", 1, true), text)
+    assert(text:find("AltsForever.lua.bak", 1, true), text)
+end)
+
+test("no saved-data hint when data loaded, from the game or the workaround file", function()
+    wow.load(FILES)
+    wow.login({ v = 1, chars = {} })
+    runTimers()
+    assert(not printedText():find("No saved data", 1, true))
+    wow.load({ "tests/fixtures/AltsForever.lua", unpack(FILES) })
+    wow.fire("ADDON_LOADED", "AltsForever")
+    wow.fire("PLAYER_LOGIN")
+    runTimers()
+    assert(not printedText():find("No saved data", 1, true))
+end)
+
+---------------------------------------------------------------------------
+local SQUIRREL_ITEM, DYNAMITE_ITEM, GOGGLES_ITEM = 4401, 4378, 4368
+
+-- Engineering window where recipes make items: squirrel and goggles via the
+-- schematic, dynamite only via its item link, and one with no item at all.
+local function craftingWindow(learned)
+    wow.tradeskill.prof = "Engineering"
+    wow.tradeskill.recipes = {
+        [1001] = { name = "Mechanical Squirrel", learned = learned.squirrel or false, item = SQUIRREL_ITEM },
+        [1002] = { name = "Rough Dynamite", learned = learned.dynamite or false,
+            link = "|cffffffff|Hitem:" .. DYNAMITE_ITEM .. "::::::::60:::::|h[Rough Dynamite]|h|r" },
+        [1003] = { name = "Shadow Goggles", learned = learned.goggles or false, item = GOGGLES_ITEM },
+        [1004] = { name = "Enchant Something", learned = true },
+    }
+    wow.fire("TRADE_SKILL_SHOW")
+end
+
+local function craftLine(lines)
+    for _, l in ipairs(lines) do if l[1] == "Can craft" then return l[2] end end
+end
+
+test("opening a profession window records which items each learned recipe makes", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    craftingWindow({ squirrel = true, dynamite = true })
+    local crafts = ns.char.crafts.Engineering
+    eq(crafts[SQUIRREL_ITEM], true)
+    eq(crafts[DYNAMITE_ITEM], true, "read from the item link when the schematic has none")
+    eq(crafts[GOGGLES_ITEM], nil, "not learned")
+    local n = 0
+    for _ in pairs(crafts) do n = n + 1 end
+    eq(n, 2, "recipes that make no item are skipped")
+end)
+
+test("item tooltip lists who can craft it: you first, other realms per /af realm", function()
+    wow.load(FILES)
+    wow.login({ v = 1, chars = {
+        ["Brakka-Realm"] = alt("Brakka", "Realm", "HUNTER", { crafts = { Engineering = { [SQUIRREL_ITEM] = true } } }),
+        ["Far-Other"] = alt("Far", "Other", "MAGE", { crafts = { Engineering = { [SQUIRREL_ITEM] = true } } }),
+        ["Veyla-Realm"] = alt("Veyla", "Realm", "PALADIN", { crafts = { Tailoring = { [2580] = true } } }),
+    } })
+    craftingWindow({ squirrel = true })
+    local text = craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM))
+    assert(text and text:find("^%[MAGE%]Aldric, "), tostring(text))
+    assert(text:find("[HUNTER]Brakka", 1, true) and text:find("[MAGE]Far-Other", 1, true), text)
+    assert(not text:find("Veyla", 1, true), text)
+    eq(craftLine(wow.hover(GameTooltip, 9999)), nil, "nobody makes it: no line")
+    SlashCmdList.ALTSFOREVER("realm")
+    text = craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM))
+    assert(not text:find("Far", 1, true), text)
+end)
+
+test("a character is listed once even if two professions make the item", function()
+    wow.load(FILES)
+    wow.login({ v = 1, chars = {
+        ["Brakka-Realm"] = alt("Brakka", "Realm", "HUNTER",
+            { crafts = { Engineering = { [100] = true }, Blacksmithing = { [100] = true } } }),
+    } })
+    eq(craftLine(wow.hover(GameTooltip, 100)), "[HUNTER]Brakka")
+end)
+
+test("can-craft line updates when you learn a recipe", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    craftingWindow({})
+    wow.fire("TRADE_SKILL_CLOSE")
+    eq(craftLine(wow.hover(GameTooltip, GOGGLES_ITEM)), nil)
+    wow.tradeskill.recipes[1003].learned = true
+    wow.fire("NEW_RECIPE_LEARNED", 1003)
+    eq(ns.char.crafts.Engineering[GOGGLES_ITEM], true)
+    eq(craftLine(wow.hover(GameTooltip, GOGGLES_ITEM)), "[MAGE]Aldric")
+end)
+
+---------------------------------------------------------------------------
+test("time played is requested quietly after login and recorded", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.login({ v = 1, chars = {} })
+    eq(wow.playedRequests, 0, "not during the login spam")
+    runTimers()
+    eq(wow.playedRequests, 1)
+    wow.timePlayed(5 * DAY)
+    eq(#wow.playedShown, 0, "the chat message for our request is hidden")
+    eq(ns.char.played, 5 * DAY); eq(ns.char.playedAt, NOW)
+    runTimers()
+    wow.timePlayed(5 * DAY + 60) -- the player types /played
+    eq(#wow.playedShown, 1, "the player's own /played still prints")
+    eq(ns.char.played, 5 * DAY + 60)
+end)
+
+test("time played keeps counting while online and is saved at logout", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.login(nil)
+    wow.timePlayed(2 * HOUR)
+    eq(ns.PlayedNow(ns.char, NOW + HOUR), 3 * HOUR)
+    wow.now = NOW + HOUR
+    wow.fire("PLAYER_LOGOUT")
+    eq(ns.char.played, 3 * HOUR); eq(ns.char.playedAt, NOW + HOUR)
+    eq(ns.PlayedNow({ played = 100, playedAt = NOW }, NOW + DAY), 100, "logged-out characters don't count up")
+end)
+
+test("secret time played is never stored", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    wow.SECRET = 12345 -- a secret number still looks like a number
+    wow.timePlayed(12345)
+    eq(ns.char.played, nil)
+end)
+
+test("overview shows time played per character and in total", function()
+    local ns = wow.load(FILES)
+    eq(ns.FormatPlayed(20 * 60), "20m"); eq(ns.FormatPlayed(5 * HOUR + 20 * 60), "5h 20m")
+    eq(ns.FormatPlayed(12 * DAY + 5 * HOUR + 59), "12d 5h")
+    wow.now = NOW
+    local saved = overviewAlts()
+    saved.chars["High-Realm"].played = 3 * DAY
+    wow.login(saved)
+    wow.timePlayed(2 * HOUR)
+    SlashCmdList.ALTSFOREVER("")
+    local rows = overviewRows()
+    eq(cell(rows[1], 11), "2h 0m")
+    eq(cell(rows[3], 1), "[PRIEST]High"); eq(cell(rows[3], 11), "3d 0h")
+    eq(cell(rows[4], 11), G .. "?|r", "not recorded yet")
+    eq(AltsForeverFrame.footer.text, "Total played: 3d 2h     Total gold: 10507c")
 end)
 
 ---------------------------------------------------------------------------

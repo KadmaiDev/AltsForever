@@ -1,6 +1,6 @@
 -- Alts Forever overview: a window (/af) listing every character with level, rested
--- XP, gold, professions, location and when they were last played. It's only built
--- the first time it's opened, and only refreshes while it's showing.
+-- XP, gold, professions, location, time played and when they were last played. It's
+-- only built the first time it's opened, and only refreshes while it's showing.
 local _, ns = ...
 
 local floor, max, pairs, time = math.floor, math.max, pairs, time
@@ -21,6 +21,7 @@ local COLUMNS = {
     { title = "", width = 34, right = true },
     { title = "Mail", width = 60, gap = 16 },
     { title = "Zone", width = 140 },
+    { title = "Played", width = 70, right = true },
     { title = "Last seen", width = 80, right = true },
 }
 local LIGHT = "|cffc0c0c0"
@@ -80,6 +81,19 @@ function ns.MailText(c, now)
     return ns.ExpiryColor(left) .. ns.ExpiryText(left) .. "|r"
 end
 
+-- Time played as "12d 5h", "5h 20m" or "20m"; "?" if not recorded yet.
+function ns.FormatPlayed(seconds)
+    local d, h, m = floor(seconds / 86400), floor(seconds % 86400 / 3600), floor(seconds % 3600 / 60)
+    if d > 0 then return d .. "d " .. h .. "h" end
+    if h > 0 then return h .. "h " .. m .. "m" end
+    return m .. "m"
+end
+
+function ns.PlayedText(c, now)
+    local played = ns.PlayedNow(c, now)
+    return played and ns.FormatPlayed(played) or (GREY .. "?|r")
+end
+
 function ns.SeenText(key, c, now)
     if key == ns.charKey then return "|cff20ff20Online|r" end
     local t = c.updated or c.seen
@@ -137,6 +151,7 @@ local function RowTooltip(row)
         tt:AddLine(GREY .. (c.mailDeletes and "The soonest will be deleted, not returned" or "The soonest goes back to its sender") .. "|r")
     end
     if c.hearth then tt:AddDoubleLine("Hearthstone", c.hearth, 1, 0.82, 0, 1, 1, 1) end
+    if c.played then tt:AddDoubleLine("Played", ns.PlayedText(c, now), 1, 0.82, 0, 1, 1, 1) end
     if c.ilvl then tt:AddDoubleLine("Item level", c.ilvl, 1, 0.82, 0, 1, 1, 1) end
     if c.money then tt:AddDoubleLine("Gold", GetCoinTextureString(c.money), 1, 0.82, 0, 1, 1, 1) end
     if c.profs and next(c.profs) then
@@ -185,7 +200,7 @@ local function Refresh()
     local now = time()
     local chars = ns.db.chars
     local keys = ns.OverviewOrder()
-    local total = 0
+    local total, played = 0, 0
     for i, key in ipairs(keys) do
         local c = chars[key]
         local row = rows[i] or CreateRow(i)
@@ -202,12 +217,14 @@ local function Refresh()
         cells[8]:SetText(s2)
         cells[9]:SetText(ns.MailText(c, now))
         cells[10]:SetText(c.zone or (GREY .. "?|r"))
-        cells[11]:SetText(ns.SeenText(key, c, now))
+        cells[11]:SetText(ns.PlayedText(c, now))
+        cells[12]:SetText(ns.SeenText(key, c, now))
         total = total + (c.money or 0)
+        played = played + (ns.PlayedNow(c, now) or 0)
         row:Show()
     end
     for i = #keys + 1, #rows do rows[i]:Hide() end
-    footer:SetText("Total gold: " .. GetCoinTextureString(total))
+    footer:SetText("Total played: " .. ns.FormatPlayed(played) .. "     Total gold: " .. GetCoinTextureString(total))
     frame:SetHeight(54 + #keys * ROW_HEIGHT + 32)
 end
 
@@ -252,6 +269,7 @@ local function CreateWindow()
     for i, fs in ipairs(CreateCells(header, "GameFontNormalSmall")) do fs:SetText(COLUMNS[i].title) end
 
     footer = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.footer = footer
     footer:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 12)
     f.credit = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     f.credit:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 12)
