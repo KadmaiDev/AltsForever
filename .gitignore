@@ -8,3 +8,6 @@ CLAUDE.md
 .claude/
 *.plan.md
 PLAN*.md
+
+# Release zips built by tools/release.py
+dist/

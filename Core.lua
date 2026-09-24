@@ -88,7 +88,7 @@ ns.On("ADDON_LOADED", function(name)
     if name ~= ADDON then return end
     ns.Off("ADDON_LOADED")
     -- On the Forever beta the client never loads this; the .toc loads it from the
-    -- SavedData link instead (see tools\link-saved-data.ps1).
+    -- SavedData folder link instead, if the player has made one.
     ns.noSavedData = AltsForeverDB == nil
     AltsForeverDB = ns.InitDB(AltsForeverDB)
     ns.db = AltsForeverDB
