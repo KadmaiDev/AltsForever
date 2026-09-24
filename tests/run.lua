@@ -1,0 +1,1235 @@
+-- Test runner. From the addon folder: lua tests/run.lua
+package.path = "tests/?.lua;" .. package.path
+local wow = require("wow")
+
+local FILES = { "Core.lua", "Scanner.lua", "Mail.lua", "Money.lua", "Professions.lua", "Character.lua", "Overview.lua", "Gear.lua", "Tooltip.lua" }
+local tests, passed, failed = {}, 0, 0
+
+local function test(name, fn) tests[#tests + 1] = { name = name, fn = fn } end
+
+local function eq(actual, expected, msg)
+    if actual ~= expected then
+        error((msg or "values differ") .. ": expected " .. tostring(expected) .. ", got " .. tostring(actual), 2)
+    end
+end
+
+-- Right-hand text as the tooltip builds it: grey breakdown, then the count.
+-- Tests write "Bags 12 · Bank 40"; the words are swapped for the real icons.
+local ICON = {
+    Bags = "|T133652:0:0:0:0:64:64:5:59:5:59|t",
+    Bank = "|TInterface\\Minimap\\Tracking\\Banker:0|t",
+    Mail = "|TInterface\\Minimap\\Tracking\\Mailbox:0|t",
+    Wearing = "|TInterface\\Icons\\INV_Shirt_White_01:0:0:0:0:64:64:5:59:5:59|t",
+}
+local function R(breakdown, n)
+    breakdown = breakdown:gsub("(%a+) ", function(word) return assert(ICON[word], word) .. " " end)
+    return "|cffc0c0c0" .. breakdown .. "|r    " .. n
+end
+
+-- A saved character on another realm/char, in the stored shape.
+local function alt(name, realm, class, data)
+    data.name, data.realm, data.class = name, realm, class
+    return data
+end
+
+---------------------------------------------------------------------------
+test("fresh install creates an empty database", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    eq(AltsForeverDB.v, 1)
+    eq(ns.db, AltsForeverDB)
+    eq(ns.charKey, "Aldric-Realm")
+    eq(type(AltsForeverDB.chars["Aldric-Realm"].bags), "table")
+end)
+
+test("saved data from an older format is replaced, not crashed on", function()
+    wow.load(FILES)
+    wow.login({ v = 0, chars = "junk" })
+    eq(AltsForeverDB.v, 1)
+    eq(type(AltsForeverDB.chars), "table")
+end)
+
+test("existing characters are kept on login", function()
+    wow.load(FILES)
+    wow.login({ v = 1, chars = { ["Alt-Realm"] = alt("Alt", "Realm", "WARRIOR", { bags = { [100] = 3 } }) } })
+    eq(AltsForeverDB.chars["Alt-Realm"].bags[100], 3)
+end)
+
+test("saved file loaded as addon code (the Forever workaround) survives login", function()
+    wow.load({ "tests/fixtures/AltsForever.lua", unpack(FILES) })
+    wow.player.name, wow.player.realm = "Thessa Oakenbrook", "TestRealm"
+    wow.setBag(0, 16, { [1] = { 6948, 1 } })
+    wow.fire("ADDON_LOADED", "AltsForever")
+    wow.fire("PLAYER_LOGIN")
+    local lines = wow.hover(GameTooltip, 6948)
+    eq(lines[2][2], 2)
+    eq(lines[3][1], "[MAGE]Thessa Oakenbrook")
+    eq(lines[4][1], "[PALADIN]Veyla Dawnmere")
+end)
+
+test("registering an unknown event returns false instead of throwing", function()
+    local ns = wow.load(FILES)
+    eq(ns.On("NOT_A_REAL_EVENT", function() end), false)
+end)
+
+---------------------------------------------------------------------------
+test("bag scan sums stacks across bags, keyring and reagent bag", function()
+    local ns = wow.load(FILES)
+    wow.setBag(0, 16, { [1] = { 100, 20 }, [2] = { 100, 5 }, [3] = { 200, 1 } })
+    wow.setBag(1, 10, { [4] = { 100, 10 } })
+    wow.setBag(5, 20, { [1] = { 300, 40 } })
+    wow.setBag(-2, 12, { [1] = { 400, 1 } })
+    wow.login(nil)
+    local bags = ns.char.bags
+    eq(bags[100], 35)
+    eq(bags[200], 1)
+    eq(bags[300], 40)
+    eq(bags[400], 1)
+end)
+
+test("rescans reuse the same table and drop items that left", function()
+    local ns = wow.load(FILES)
+    wow.setBag(0, 16, { [1] = { 100, 20 } })
+    wow.login(nil)
+    local before = ns.char.bags
+    wow.setBag(0, 16, { [1] = { 200, 2 } })
+    wow.fire("BAG_UPDATE", 0)
+    wow.fire("BAG_UPDATE_DELAYED")
+    eq(ns.char.bags, before, "same table")
+    eq(ns.char.bags[100], nil)
+    eq(ns.char.bags[200], 2)
+end)
+
+test("changes to bags we don't track don't trigger a rescan", function()
+    local ns = wow.load(FILES)
+    wow.setBag(0, 16, { [1] = { 100, 20 } })
+    wow.login(nil)
+    local ver = ns.version
+    wow.fire("BAG_UPDATE", 9)
+    wow.fire("BAG_UPDATE_DELAYED")
+    eq(ns.version, ver)
+end)
+
+test("secret stack counts are never stored", function()
+    local ns = wow.load(FILES)
+    wow.setBag(0, 16, { [1] = { 100, wow.SECRET }, [2] = { 200, 3 } })
+    wow.login(nil)
+    eq(ns.char.bags[100], nil)
+    eq(ns.char.bags[200], 3)
+end)
+
+test("equipped scan counts gear and equipped bags; two of the same ring count 2", function()
+    local ns = wow.load(FILES)
+    wow.inventory[11], wow.inventory[12] = 500, 500
+    wow.inventory[1] = 600
+    wow.inventory[31] = 700 -- Bag_1's inventory slot
+    wow.login(nil)
+    eq(ns.char.equip[500], 2)
+    eq(ns.char.equip[600], 1)
+    eq(ns.char.equip[700], 1)
+    wow.inventory[1] = nil
+    wow.fire("PLAYER_EQUIPMENT_CHANGED", 1)
+    eq(ns.char.equip[600], nil)
+end)
+
+---------------------------------------------------------------------------
+test("describe: one location shows just that location", function()
+    local ns = wow.load(FILES)
+    local total, text = ns.Describe({ bags = { [1] = 3 } }, 1)
+    eq(total, 3)
+    eq(text, R("Bags 3", 3))
+end)
+
+test("describe: several locations show the breakdown in fixed order, then the total", function()
+    local ns = wow.load(FILES)
+    local total, text = ns.Describe({ equip = { [1] = 1 }, bank = { [1] = 40 }, bags = { [1] = 12 } }, 1)
+    eq(total, 53)
+    eq(text, R("Bags 12 · Bank 40 · Wearing 1", 53))
+end)
+
+test("tooltip: total first, current character next, others by count", function()
+    wow.load(FILES)
+    wow.setBag(0, 16, { [1] = { 100, 2 } })
+    wow.login({ v = 1, chars = {
+        ["Small-Realm"] = alt("Small", "Realm", "ROGUE", { bags = { [100] = 1 } }),
+        ["Big-Realm"] = alt("Big", "Realm", "PRIEST", { bags = { [100] = 30 }, mail = { [100] = 10 } }),
+        ["Mid-Other"] = alt("Mid", "Other", "DRUID", { bank = { [100] = 5 } }),
+        ["None-Realm"] = alt("None", "Realm", "MAGE", { bags = { [999] = 1 } }),
+    } })
+    local lines = wow.hover(GameTooltip, 100)
+    eq(#lines, 6)
+    eq(lines[1][1], " ", "spacer above our lines"); eq(lines[1][2], nil)
+    eq(lines[2][1], "Total"); eq(lines[2][2], 48)
+    eq(lines[3][1], "[MAGE]Aldric"); eq(lines[3][2], R("Bags 2", 2))
+    eq(lines[4][1], "[PRIEST]Big"); eq(lines[4][2], R("Bags 30 · Mail 10", 40))
+    eq(lines[5][1], "[DRUID]Mid-Other", "other realms get a suffix"); eq(lines[5][2], R("Bank 5", 5))
+    eq(lines[6][1], "[ROGUE]Small")
+end)
+
+test("tooltip: no total line when only one character has the item", function()
+    wow.load(FILES)
+    wow.setBag(0, 16, { [1] = { 100, 2 } })
+    wow.login(nil)
+    local lines = wow.hover(GameTooltip, 100)
+    eq(#lines, 2)
+    eq(lines[2][1], "[MAGE]Aldric")
+end)
+
+test("tooltip: nothing is added for items nobody has", function()
+    wow.load(FILES)
+    wow.login(nil)
+    eq(#wow.hover(GameTooltip, 12345), 0)
+end)
+
+test("tooltip: current character's line updates after a bag change", function()
+    wow.load(FILES)
+    wow.setBag(0, 16, { [1] = { 100, 2 } })
+    wow.login(nil)
+    eq(wow.hover(GameTooltip, 100)[2][2], R("Bags 2", 2))
+    wow.setBag(0, 16, { [1] = { 100, 7 } })
+    wow.fire("BAG_UPDATE", 0)
+    wow.fire("BAG_UPDATE_DELAYED")
+    eq(wow.hover(GameTooltip, 100)[2][2], R("Bags 7", 7))
+end)
+
+test("tooltip: only the game and item-link tooltips are touched", function()
+    wow.load(FILES)
+    wow.setBag(0, 16, { [1] = { 100, 2 } })
+    wow.login(nil)
+    eq(#wow.hover(wow.tooltip(), 100), 0)
+    eq(#wow.hover(ItemRefTooltip, 100), 2)
+end)
+
+test("tooltip: falls back to the item link when data has no id", function()
+    wow.load(FILES)
+    wow.setBag(0, 16, { [1] = { 100, 2 } })
+    wow.login(nil)
+    GameTooltip.link = "|cffffffff|Hitem:100::::|h[Thing]|h|r"
+    GameTooltip.lines = {}
+    wow.postCalls[1].fn(GameTooltip, {})
+    eq(#GameTooltip.lines, 2)
+end)
+
+---------------------------------------------------------------------------
+local function bagsChanged(bag)
+    wow.fire("BAG_UPDATE", bag)
+    wow.fire("BAG_UPDATE_DELAYED")
+end
+
+test("bank stays 'not scanned' until the bank is opened", function()
+    local ns = wow.load(FILES)
+    wow.setBag(6, 98, { [1] = { 100, 20 } })
+    wow.login(nil)
+    eq(ns.char.bank, nil)
+end)
+
+test("opening the bank scans every bank tab, not the bags", function()
+    local ns = wow.load(FILES)
+    wow.setBag(0, 16, { [1] = { 100, 1 } })
+    wow.setBag(6, 98, { [1] = { 100, 20 } })
+    wow.setBag(8, 98, { [5] = { 100, 3 }, [6] = { 200, 1 } })
+    wow.login(nil)
+    wow.fire("BANKFRAME_OPENED")
+    eq(ns.char.bank[100], 23)
+    eq(ns.char.bank[200], 1)
+    eq(ns.char.bags[100], 1)
+end)
+
+test("moving items while the bank is open updates bank and bags", function()
+    local ns = wow.load(FILES)
+    wow.setBag(0, 16, {})
+    wow.setBag(6, 98, { [1] = { 100, 20 } })
+    wow.login(nil)
+    wow.fire("BANKFRAME_OPENED")
+    wow.setBag(6, 98, {})
+    wow.setBag(0, 16, { [1] = { 100, 20 } })
+    wow.fire("BAG_UPDATE", 6)
+    wow.fire("BAG_UPDATE", 0)
+    wow.fire("BAG_UPDATE_DELAYED")
+    eq(ns.char.bank[100], nil)
+    eq(ns.char.bags[100], 20)
+end)
+
+test("bank updates after closing the bank don't wipe what we saw", function()
+    local ns = wow.load(FILES)
+    wow.setBag(6, 98, { [1] = { 100, 20 } })
+    wow.login(nil)
+    wow.fire("BANKFRAME_OPENED")
+    wow.fire("BANKFRAME_CLOSED")
+    wow.setBag(6, 0, {})
+    bagsChanged(6)
+    eq(ns.char.bank[100], 20)
+end)
+
+test("tooltip shows bank alongside bags", function()
+    wow.load(FILES)
+    wow.setBag(0, 16, { [1] = { 100, 2 } })
+    wow.setBag(6, 98, { [1] = { 100, 40 } })
+    wow.login(nil)
+    wow.fire("BANKFRAME_OPENED")
+    eq(wow.hover(GameTooltip, 100)[2][2], R("Bags 2 · Bank 40", 42))
+end)
+
+test("inbox scan sums attachments across mails while the mailbox is open", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    wow.inbox = { { { 100, 5 }, [3] = { 100, 2 } }, {}, { { 200, 1 } } }
+    wow.fire("MAIL_INBOX_UPDATE")
+    eq(ns.char.mail, nil, "ignored before the mailbox opens")
+    wow.fire("MAIL_SHOW")
+    wow.fire("MAIL_INBOX_UPDATE")
+    eq(ns.char.mail[100], 7)
+    eq(ns.char.mail[200], 1)
+    wow.inbox = { { { 200, 1 } } }
+    wow.fire("MAIL_INBOX_UPDATE")
+    eq(ns.char.mail[100], nil, "taken out of the mail")
+    wow.fire("MAIL_CLOSED")
+    wow.inbox = {}
+    wow.fire("MAIL_INBOX_UPDATE")
+    eq(ns.char.mail[200], 1, "ignored after closing")
+end)
+
+test("mailing an alt credits their mail once the send succeeds", function()
+    wow.load(FILES)
+    wow.login({ v = 1, chars = {
+        ["Alt-Realm"] = alt("Alt", "Realm", "WARRIOR", { bags = { [100] = 1 } }),
+        ["Mid-OtherRealm"] = alt("Mid", "OtherRealm", "DRUID", {}),
+    } })
+    eq(#wow.hover(GameTooltip, 100), 2, "one character: spacer and their line, no total")
+    wow.outbox = { { 100, 20 }, [3] = { 100, 5 } }
+    SendMail("alt", "subject", "")
+    eq(AltsForeverDB.chars["Alt-Realm"].mail, nil, "not before the server confirms")
+    wow.fire("MAIL_SEND_SUCCESS")
+    eq(AltsForeverDB.chars["Alt-Realm"].mail[100], 25)
+    eq(wow.hover(GameTooltip, 100)[2][2], R("Bags 1 · Mail 25", 26), "tooltip cache was refreshed")
+    SendMail("Mid-Other Realm", "", "")
+    wow.fire("MAIL_SEND_SUCCESS")
+    eq(AltsForeverDB.chars["Mid-OtherRealm"].mail[100], 25)
+end)
+
+test("failed sends and mail to strangers credit nobody", function()
+    wow.load(FILES)
+    wow.login({ v = 1, chars = { ["Alt-Realm"] = alt("Alt", "Realm", "WARRIOR", {}) } })
+    wow.outbox = { { 100, 20 } }
+    SendMail("Alt", "", "")
+    wow.fire("MAIL_FAILED")
+    wow.fire("MAIL_SEND_SUCCESS")
+    eq(AltsForeverDB.chars["Alt-Realm"].mail, nil)
+    SendMail("Stranger", "", "")
+    wow.fire("MAIL_SEND_SUCCESS")
+    eq(AltsForeverDB.chars["Stranger-Realm"], nil)
+end)
+
+---------------------------------------------------------------------------
+local function moneyChars()
+    return { v = 1, chars = {
+        ["Rich-Realm"] = alt("Rich", "Realm", "PRIEST", { money = 50000 }),
+        ["Poor-Realm"] = alt("Poor", "Realm", "ROGUE", { money = 20 }),
+        ["Broke-Realm"] = alt("Broke", "Realm", "DRUID", { money = 0 }),
+        ["Far-Other"] = alt("Far", "Other", "MAGE", { money = 700 }),
+    } }
+end
+
+test("money is recorded at login and whenever it changes", function()
+    local ns = wow.load(FILES)
+    wow.money = 1234
+    wow.login(nil)
+    eq(ns.char.money, 1234)
+    wow.money = 99
+    wow.fire("PLAYER_MONEY")
+    eq(ns.char.money, 99)
+end)
+
+test("secret money is never stored", function()
+    local ns = wow.load(FILES)
+    wow.money = 500
+    wow.login(nil)
+    wow.money = wow.SECRET
+    wow.fire("PLAYER_MONEY")
+    eq(ns.char.money, 500)
+end)
+
+test("hovering bag money lists total, you, then others by amount", function()
+    wow.load(FILES)
+    wow.money = 300
+    wow.login(moneyChars())
+    local button = ContainerFrameCombinedBagsGoldButton
+    button:Enter()
+    local lines = GameTooltip.lines
+    eq(GameTooltip:GetOwner(), button)
+    eq(GameTooltip:IsShown(), true)
+    eq(#lines, 6, "characters with no money are left out")
+    eq(lines[1][1], "Gold", "title line")
+    eq(lines[2][1], "Total"); eq(lines[2][2], "51020c")
+    eq(lines[3][1], "[MAGE]Aldric"); eq(lines[3][2], "300c")
+    eq(lines[4][1], "[PRIEST]Rich")
+    eq(lines[5][1], "[MAGE]Far-Other")
+    eq(lines[6][1], "[ROGUE]Poor")
+    eq(wow.coinHeight, 13, "coin icons sized to the tooltip text")
+    eq(GameTooltip.point[1], "BOTTOMRIGHT")
+    eq(GameTooltip.point[2], button:GetParent(), "anchored to the whole money display")
+    button:Leave()
+    eq(GameTooltip:IsShown(), false)
+end)
+
+test("money tooltip respects /it realm", function()
+    wow.load(FILES)
+    wow.login(moneyChars())
+    SlashCmdList.ALTSFOREVER("realm")
+    ContainerFrame1MoneyFrameCopperButton:Enter()
+    eq(GameTooltip.lines[2][2], "50020c")
+    eq(#GameTooltip.lines, 5, "title, total, you, Rich, Poor")
+end)
+
+test("an existing game tooltip on the money is added to, not replaced", function()
+    wow.load(FILES)
+    wow.login(moneyChars())
+    local button = ContainerFrameCombinedBagsGoldButton
+    GameTooltip:SetOwner(button)
+    GameTooltip:AddLine("Blizzard's own text")
+    GameTooltip:Show()
+    button:Enter()
+    eq(GameTooltip.lines[1][1], "Blizzard's own text")
+    eq(GameTooltip.lines[2][1], " ")
+    eq(GameTooltip.lines[3][1], "Gold")
+end)
+
+test("money tooltip with only you: title and your line, no total", function()
+    wow.load(FILES)
+    wow.money = 3674
+    wow.login(nil)
+    ContainerFrameCombinedBagsGoldButton:Enter()
+    eq(#GameTooltip.lines, 2)
+    eq(GameTooltip.lines[1][1], "Gold")
+    eq(GameTooltip.lines[2][1], "[MAGE]Aldric"); eq(GameTooltip.lines[2][2], "3674c")
+end)
+
+test("bank money shows the tooltip, even if the bank window is created late", function()
+    wow.load(FILES)
+    wow.money = 300
+    wow.login(moneyChars())
+    local button = wow.button("BankPanelGoldButton") -- appears on first bank visit
+    wow.fire("BANKFRAME_OPENED")
+    wow.fire("BANKFRAME_CLOSED")
+    wow.fire("BANKFRAME_OPENED") -- a second visit must not hook it twice
+    button:Enter()
+    eq(GameTooltip:GetOwner(), button)
+    eq(#GameTooltip.lines, 6, "one set of lines, not two")
+end)
+
+test("the bank opening still scans the bank when money also listens", function()
+    local ns = wow.load(FILES)
+    wow.setBag(6, 98, { [1] = { 100, 20 } })
+    wow.login(nil)
+    wow.fire("BANKFRAME_OPENED")
+    eq(ns.char.bank[100], 20)
+end)
+
+test("leaving the money doesn't hide someone else's tooltip", function()
+    wow.load(FILES)
+    wow.login(moneyChars())
+    GameTooltip:SetOwner("somewhere else")
+    GameTooltip:Show()
+    ContainerFrameCombinedBagsGoldButton:Leave()
+    eq(GameTooltip:IsShown(), true)
+end)
+
+---------------------------------------------------------------------------
+test("/it realm hides characters from other realms", function()
+    wow.load(FILES)
+    wow.login({ v = 1, chars = { ["Mid-Other"] = alt("Mid", "Other", "DRUID", { bank = { [100] = 5 } }) } })
+    eq(#wow.hover(GameTooltip, 100), 2)
+    SlashCmdList.ALTSFOREVER("realm")
+    eq(#wow.hover(GameTooltip, 100), 0)
+    SlashCmdList.ALTSFOREVER("realm")
+    eq(#wow.hover(GameTooltip, 100), 2)
+end)
+
+test("/it delete removes a character, case-insensitively, but never yourself", function()
+    wow.load(FILES)
+    wow.login({ v = 1, chars = { ["Mid-Other"] = alt("Mid", "Other", "DRUID", { bank = { [100] = 5 } }) } })
+    eq(#wow.hover(GameTooltip, 100), 2)
+    SlashCmdList.ALTSFOREVER("delete mid-other")
+    eq(AltsForeverDB.chars["Mid-Other"], nil)
+    eq(#wow.hover(GameTooltip, 100), 0, "cache was cleared")
+    SlashCmdList.ALTSFOREVER("delete Aldric-Realm")
+    eq(type(AltsForeverDB.chars["Aldric-Realm"]), "table")
+end)
+
+test("the help message and overview credit Kadmai", function()
+    wow.load(FILES)
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("help")
+    assert(table.concat(wow.printed, "\n"):find("by Kadmai", 1, true))
+    SlashCmdList.ALTSFOREVER("")
+    eq(AltsForeverFrame.credit.text, "Alts Forever by Kadmai")
+end)
+
+test("logout stamps when the character was last seen", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    wow.fire("PLAYER_LOGOUT")
+    eq(type(ns.char.seen), "number")
+end)
+
+---------------------------------------------------------------------------
+-- Professions and recipes
+
+local SQUIRREL = 4408 -- Schematic: Mechanical Squirrel
+
+local function engineeringWindow(learnedNames)
+    local recipes = {}
+    local id = 1000
+    for _, name in ipairs({ "Mechanical Squirrel", "EZ-Thro Dynamite", "Shadow Goggles", "Rough Dynamite" }) do
+        id = id + 1
+        recipes[id] = { name = name, learned = learnedNames[name] or false }
+    end
+    wow.tradeskill.prof, wow.tradeskill.recipes = "Engineering", recipes
+    wow.fire("TRADE_SKILL_SHOW")
+end
+
+local function recipeAlts()
+    return { v = 1, chars = {
+        ["Brakka-Realm"] = alt("Brakka", "Realm", "HUNTER", { profs = { Engineering = 107 },
+            recipes = { Engineering = { ["mechanical squirrel"] = true } } }),
+        ["Elowen-Realm"] = alt("Elowen", "Realm", "PRIEST", { profs = { Engineering = 110 },
+            recipes = { Engineering = {} } }),
+        ["Thessa-Realm"] = alt("Thessa", "Realm", "DRUID", { profs = { Engineering = 60 } }),
+        ["Sorrel-Realm"] = alt("Sorrel", "Realm", "WARLOCK", { profs = { Engineering = 200 } }),
+        ["Veyla-Realm"] = alt("Veyla", "Realm", "PALADIN", { profs = { Tailoring = 150 } }),
+    } }
+end
+
+test("profession skills are recorded at login and when they change", function()
+    local ns = wow.load(FILES)
+    wow.profs = { { "Engineering", 107 }, { "Mining", 99 } }
+    wow.login(nil)
+    eq(ns.char.profs.Engineering, 107)
+    eq(ns.char.profs.Mining, 99)
+    wow.profs = { { "Engineering", 108 } }
+    wow.fire("SKILL_LINES_CHANGED")
+    eq(ns.char.profs.Engineering, 108)
+    eq(ns.char.profs.Mining, nil, "dropped professions are removed")
+end)
+
+test("opening a profession window records its learned recipes", function()
+    local ns = wow.load(FILES)
+    wow.profs = { { "Engineering", 107 } }
+    wow.login(nil)
+    eq(ns.char.recipes, nil, "nothing until a window opens")
+    engineeringWindow({ ["Mechanical Squirrel"] = true, ["EZ-Thro Dynamite"] = true })
+    local known = ns.char.recipes.Engineering
+    eq(known["mechanical squirrel"], true)
+    eq(known["ez-thro dynamite"], true, "stored lower-case")
+    eq(known["shadow goggles"], nil, "unlearned recipes aren't stored")
+end)
+
+test("the recipe list is read once it's ready, not before", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    wow.tradeskill.ready = false
+    engineeringWindow({ ["Mechanical Squirrel"] = true })
+    eq(ns.char.recipes, nil)
+    wow.tradeskill.ready = true
+    wow.fire("TRADE_SKILL_LIST_UPDATE")
+    eq(ns.char.recipes.Engineering["mechanical squirrel"], true)
+end)
+
+test("someone else's linked or guild profession is never recorded", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    wow.tradeskill.linked = true
+    engineeringWindow({ ["Mechanical Squirrel"] = true })
+    eq(ns.char.recipes, nil)
+    wow.tradeskill.linked, wow.tradeskill.guild = false, true
+    engineeringWindow({ ["Mechanical Squirrel"] = true })
+    eq(ns.char.recipes, nil)
+end)
+
+test("learning a recipe adds it, but only to a profession already scanned", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    engineeringWindow({})
+    wow.fire("TRADE_SKILL_CLOSE")
+    wow.tradeskill.recipes[1003].learned = true -- Shadow Goggles
+    wow.fire("NEW_RECIPE_LEARNED", 1003)
+    eq(ns.char.recipes.Engineering["shadow goggles"], true)
+    wow.tradeskill.recipes[2001] = { name = "Linen Robe", learned = true, prof = "Tailoring" }
+    wow.fire("NEW_RECIPE_LEARNED", 2001)
+    eq(ns.char.recipes.Tailoring, nil, "a partial list would wrongly say 'not learned'")
+end)
+
+test("recipe tooltip: only characters with the profession, you first, then by status", function()
+    wow.load(FILES)
+    wow.profs = { { "Engineering", 80 } }
+    local text = wow.recipeItem(SQUIRREL, "Schematic: Mechanical Squirrel", "Engineering", 75)
+    wow.login(recipeAlts())
+    local lines = wow.hover(GameTooltip, SQUIRREL, text)
+    eq(lines[1][1], " ")
+    eq(lines[2][1], "Engineering (75)")
+    eq(lines[3][1], "[MAGE]Aldric"); eq(lines[3][2], "|cff9d9d9dNot scanned|r")
+    eq(lines[4][1], "[HUNTER]Brakka"); eq(lines[4][2], "|cff20ff20Known|r")
+    eq(lines[5][1], "[PRIEST]Elowen"); eq(lines[5][2], "|cffffd100Can learn|r")
+    eq(lines[6][1], "[DRUID]Thessa"); eq(lines[6][2], "|cffff2020Needs 75 (60)|r")
+    eq(lines[7][1], "[WARLOCK]Sorrel"); eq(lines[7][2], "|cff9d9d9dNot scanned|r")
+    eq(#lines, 7, "Veyla has no Engineering, so she is left out")
+end)
+
+test("recipe tooltip: reads the recipe's own requirement, not the crafted item's", function()
+    wow.load(FILES)
+    wow.profs = { { "Engineering", 107 } }
+    local text = wow.recipeItem(5000, "Schematic: Shadow Goggles", "Engineering", 120, 115)
+    wow.login(nil)
+    local lines = wow.hover(GameTooltip, 5000, text)
+    eq(lines[2][1], "Engineering (120)")
+    eq(lines[3][2], "|cffff2020Needs 120 (107)|r")
+end)
+
+test("recipe tooltip: names match regardless of capitalisation", function()
+    wow.load(FILES)
+    wow.profs = { { "Engineering", 107 } }
+    local text = wow.recipeItem(5001, "Schematic: Ez-Thro Dynamite", "Engineering", 100)
+    wow.login(nil)
+    engineeringWindow({ ["EZ-Thro Dynamite"] = true })
+    eq(wow.hover(GameTooltip, 5001, text)[3][2], "|cff20ff20Known|r")
+end)
+
+test("recipe tooltip: updates when you learn the recipe", function()
+    wow.load(FILES)
+    wow.profs = { { "Engineering", 107 } }
+    local text = wow.recipeItem(SQUIRREL, "Schematic: Mechanical Squirrel", "Engineering", 75)
+    wow.login(nil)
+    engineeringWindow({})
+    eq(wow.hover(GameTooltip, SQUIRREL, text)[3][2], "|cffffd100Can learn|r")
+    wow.tradeskill.recipes[1001].learned = true
+    wow.fire("NEW_RECIPE_LEARNED", 1001)
+    eq(wow.hover(GameTooltip, SQUIRREL, text)[3][2], "|cff20ff20Known|r")
+end)
+
+test("recipe tooltip: nothing for non-recipes or when nobody has the profession", function()
+    wow.load(FILES)
+    wow.login(nil)
+    eq(#wow.hover(GameTooltip, 100, { "Linen Cloth" }), 0)
+    local text = wow.recipeItem(SQUIRREL, "Schematic: Mechanical Squirrel", "Engineering", 75)
+    eq(#wow.hover(GameTooltip, SQUIRREL, text), 0)
+end)
+
+test("recipe tooltip respects /af realm", function()
+    wow.load(FILES)
+    local saved = recipeAlts()
+    saved.chars["Far-Other"] = alt("Far", "Other", "MAGE", { profs = { Engineering = 150 } })
+    local text = wow.recipeItem(SQUIRREL, "Schematic: Mechanical Squirrel", "Engineering", 75)
+    wow.login(saved)
+    eq(#wow.hover(GameTooltip, SQUIRREL, text), 7)
+    SlashCmdList.ALTSFOREVER("realm")
+    eq(#wow.hover(GameTooltip, SQUIRREL, text), 6)
+end)
+
+---------------------------------------------------------------------------
+-- Character info, rested XP and the overview window
+
+local HOUR, DAY = 3600, 86400
+local NOW = 1790000000
+local G = "|cff9d9d9d"
+
+local function overviewRows()
+    local rows = {}
+    for _, f in ipairs(wow.frames) do
+        -- rawget: the fake frames answer any other name with a stand-in method.
+        if rawget(f, "cells") and f.shown then rows[#rows + 1] = f end
+    end
+    return rows
+end
+
+local function cell(row, i) return row.cells[i].text end
+
+local function overviewAlts()
+    return { v = 1, chars = {
+        ["Low-Realm"] = alt("Low", "Realm", "ROGUE", { level = 12, xp = 100, xpMax = 1000, rested = 0,
+            updated = NOW - 2 * DAY, money = 500 }),
+        ["High-Realm"] = alt("High", "Realm", "PRIEST", { level = 40, xp = 0, xpMax = 50000, rested = 75000,
+            resting = true, updated = NOW - 3 * HOUR, money = 10000, zone = "Orgrimmar",
+            profs = { Tailoring = 200, Enchanting = 180 }, prof1 = "Tailoring", prof2 = "Enchanting" }),
+        ["Far-Other"] = alt("Far", "Other", "MAGE", { level = 60, money = 7 }),
+    } }
+end
+
+test("character info is recorded at login and kept current", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.stats.rested = 2000
+    wow.stats.resting = true
+    wow.login(nil)
+    local c = ns.char
+    eq(c.level, 24); eq(c.xp, 5700); eq(c.xpMax, 10000)
+    eq(c.rested, 2000); eq(c.resting, true)
+    eq(c.zone, "Durotar"); eq(c.hearth, "Razor Hill")
+    eq(c.ilvl, 22, "equipped item level, rounded")
+    eq(c.updated, NOW)
+    wow.stats.xp, wow.stats.rested, wow.stats.resting = 6000, nil, false
+    wow.fire("PLAYER_XP_UPDATE", "player")
+    eq(c.xp, 6000)
+    eq(c.rested, 0, "no rested XP is stored as 0")
+    eq(c.resting, nil)
+end)
+
+test("logging out keeps the real stats, though the game reports zeros by then", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.stats.rested, wow.stats.resting = 2000, true
+    wow.login(nil)
+    -- What the game reports during logout:
+    wow.stats.xp, wow.stats.xpMax, wow.stats.rested, wow.stats.resting, wow.stats.ilvl = 0, 0, nil, false, 0
+    wow.now = NOW + 60
+    wow.fire("PLAYER_LOGOUT")
+    local c = ns.char
+    eq(c.xp, 5700); eq(c.xpMax, 10000); eq(c.rested, 2000); eq(c.resting, true); eq(c.ilvl, 22)
+    eq(c.updated, NOW + 60, "logout time is where the offline estimate starts")
+end)
+
+test("a zeroed reading at any other time is ignored too", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    wow.stats.xp, wow.stats.xpMax, wow.stats.ilvl = 0, 0, 0
+    wow.fire("PLAYER_ENTERING_WORLD")
+    eq(ns.char.xpMax, 10000)
+    eq(ns.char.ilvl, 22)
+end)
+
+test("secret values are never stored as character info", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    wow.stats.level = wow.SECRET
+    wow.fire("PLAYER_LEVEL_UP")
+    eq(ns.char.level, 24)
+end)
+
+test("rested XP builds while logged out: full rate resting, a quarter elsewhere", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    local inn = { level = 20, xpMax = 10000, rested = 1000, resting = true, updated = NOW - 8 * HOUR }
+    local field = { level = 20, xpMax = 10000, rested = 1000, resting = nil, updated = NOW - 8 * HOUR }
+    eq(ns.RestedNow(inn, NOW), 1500, "5% of a level per 8 hours")
+    eq(ns.RestedNow(field, NOW), 1125, "a quarter of that outside an inn or city")
+end)
+
+test("rested XP stops at 150% of a level and reports time until full", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    local long = { level = 20, xpMax = 10000, rested = 0, resting = true, updated = NOW - 400 * DAY }
+    local rested, cap, toFull = ns.RestedNow(long, NOW)
+    eq(rested, 15000); eq(cap, 15000); eq(toFull, 0)
+    local fresh = { level = 20, xpMax = 10000, rested = 0, resting = true, updated = NOW }
+    local _, _, secs = ns.RestedNow(fresh, NOW)
+    eq(secs, 240 * HOUR, "30 blocks of 8 hours from empty")
+end)
+
+test("rested XP: none at max level, and no estimate for the character you're on", function()
+    local ns = wow.load(FILES)
+    wow.stats.rested = 3000
+    wow.login(nil)
+    eq(ns.RestedNow({ level = 60, xpMax = 10000, rested = 0 }, NOW), nil)
+    ns.char.updated = NOW - 10 * DAY
+    eq(ns.RestedNow(ns.char, NOW), 3000, "live value, not projected")
+end)
+
+-- A character that logged out 8 hours ago with 1000 rested XP.
+local function loggedOut(resting)
+    return { v = 1, chars = { ["Aldric-Realm"] = alt("Aldric", "Realm", "MAGE", { level = 24, xp = 5700,
+        xpMax = 10000, rested = 1000, resting = resting, updated = NOW - 8 * HOUR }) } }
+end
+
+local function runTimers()
+    local fns = wow.timers
+    wow.timers = {}
+    for _, fn in ipairs(fns) do fn() end
+end
+
+test("rested XP check: matching the inn rate is reported as a match", function()
+    wow.load(FILES)
+    wow.now = NOW
+    wow.stats.rested = 1500 -- +5% of a level in 8h
+    wow.login(loggedOut(true))
+    runTimers()
+    local text = table.concat(wow.printed, "\n")
+    assert(text:find("8h 0m logged out in an inn or city: +5% of a level per 8h (assumed 5%)", 1, true), text)
+    assert(text:find("matches", 1, true), text)
+    local r = AltsForeverDB.restedChecks[1]
+    eq(r.observed, 5); eq(r.expected, 5); eq(r.resting, true); eq(r.who, "Aldric-Realm")
+end)
+
+test("rested XP check: a different real rate is flagged", function()
+    wow.load(FILES)
+    wow.now = NOW
+    wow.stats.rested = 1500 -- +5%, but logged out away from an inn (assumed 1.25%)
+    wow.login(loggedOut(nil))
+    runTimers()
+    local text = table.concat(wow.printed, "\n")
+    assert(text:find("out in the world: +5% of a level per 8h (assumed 1.25%)", 1, true), text)
+    assert(text:find("differs - please report", 1, true), text)
+end)
+
+test("rested XP check: skipped when there's nothing reliable to measure", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    local before = { rested = 1000, resting = true, updated = NOW - 8 * HOUR, level = 24, xpMax = 10000 }
+    local now = { level = 24, xpMax = 10000, rested = 1500 }
+    eq(ns.CheckRested(before, now, NOW) ~= nil, true, "the normal case is measured")
+    eq(ns.CheckRested(before, now, NOW - 8 * HOUR + 600), nil, "only 10 minutes away")
+    eq(ns.CheckRested(before, { level = 25, xpMax = 11000, rested = 0 }, NOW), nil, "levelled up in between")
+    eq(ns.CheckRested({ updated = NOW - DAY }, now, NOW), nil, "no data from the last logout")
+    eq(ns.CheckRested({ rested = 15000, resting = true, updated = NOW - DAY, level = 24, xpMax = 10000 },
+        { level = 24, xpMax = 10000, rested = 15000 }, NOW), nil, "already full")
+    eq(ns.CheckRested({ rested = 0, updated = NOW - DAY, level = 60, xpMax = 10000 },
+        { level = 60, xpMax = 10000, rested = 0 }, NOW), nil, "max level")
+end)
+
+test("rested XP check: hitting the cap still matches if the assumed rate would", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    -- 200 short of full: 5% (500 XP) would have filled it, so a full bar fits the rule.
+    local r = ns.CheckRested({ rested = 14800, resting = true, updated = NOW - 8 * HOUR, level = 24, xpMax = 10000 },
+        { level = 24, xpMax = 10000, rested = 15000 }, NOW)
+    eq(r.capped, true)
+    eq(ns.RestedCheckMatches(r), true)
+    -- 1000 short: 5% would only reach 14500, so a full bar means it's really faster.
+    r = ns.CheckRested({ rested = 14000, resting = true, updated = NOW - 8 * HOUR, level = 24, xpMax = 10000 },
+        { level = 24, xpMax = 10000, rested = 15000 }, NOW)
+    eq(ns.RestedCheckMatches(r), false)
+end)
+
+test("rested XP check keeps the last 20 results and can be silenced", function()
+    wow.load(FILES)
+    wow.now = NOW
+    wow.stats.rested = 1500
+    local saved = loggedOut(true)
+    saved.restedChecks = {}
+    for i = 1, 20 do saved.restedChecks[i] = { old = i } end
+    saved.restCheckOff = true
+    wow.login(saved)
+    runTimers()
+    eq(#AltsForeverDB.restedChecks, 20)
+    eq(AltsForeverDB.restedChecks[1].observed, 5, "newest first")
+    eq(#wow.printed, 0, "silenced by /af restcheck")
+end)
+
+test("overview text: time since, level, rested and professions", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    eq(ns.FormatAgo(1800), "<1h"); eq(ns.FormatAgo(7200), "2h ago"); eq(ns.FormatAgo(3 * DAY), "3d ago")
+    eq(ns.LevelText({ level = 24, xp = 5700, xpMax = 10000 }), "24  " .. G .. "57%|r")
+    eq(ns.LevelText({ level = 60, xp = 0, xpMax = 0 }), "60")
+    eq(ns.RestedText({ level = 20, xpMax = 10000, rested = 1500, updated = NOW }, NOW), "15%")
+    eq(ns.RestedText({ level = 20, xpMax = 10000, rested = 15000, updated = NOW }, NOW), "|cff4da6ff150%|r")
+    eq(ns.RestedText({ level = 60, xpMax = 10000, rested = 0 }, NOW), G .. "-|r")
+    eq(ns.RestedText({}, NOW), G .. "?|r", "not recorded yet")
+    local L = "|cffc0c0c0"
+    local n1, s1, n2, s2 = ns.ProfCells({ profs = { Engineering = 107, Mining = 99, Cooking = 35 },
+        prof1 = "Engineering", prof2 = "Mining" })
+    eq(n1, L .. "Engineering|r"); eq(s1, "107"); eq(n2, L .. "Mining|r"); eq(s2, "99")
+    eq((ns.ProfCells({})), G .. "?|r", "never recorded")
+    eq((ns.ProfCells({ profs = { Cooking = 35 } })), G .. "-|r", "no main professions")
+    n1, s1, n2, s2 = ns.ProfCells({ profs = { Mining = 99 }, prof1 = "Mining" })
+    eq(s1, "99"); eq(n2, ""); eq(s2, "", "only one main profession")
+end)
+
+test("main professions are the first two the game lists", function()
+    local ns = wow.load(FILES)
+    wow.profs = { { "Engineering", 107 }, { "Mining", 99 }, { "Cooking", 35 } }
+    wow.login(nil)
+    eq(ns.char.prof1, "Engineering"); eq(ns.char.prof2, "Mining")
+end)
+
+test("the overview window isn't built until /af is used", function()
+    wow.load(FILES)
+    wow.login(nil)
+    eq(AltsForeverFrame, nil)
+    SlashCmdList.ALTSFOREVER("")
+    eq(AltsForeverFrame:IsShown(), true)
+    SlashCmdList.ALTSFOREVER("")
+    eq(AltsForeverFrame:IsShown(), false, "/af again closes it")
+    local found = false
+    for _, name in ipairs(UISpecialFrames) do found = found or name == "AltsForeverFrame" end
+    eq(found, true, "Escape closes it")
+end)
+
+test("overview rows: you first, then by level; totals gold", function()
+    wow.load(FILES)
+    wow.now = NOW
+    wow.money = 1234
+    wow.profs = { { "Engineering", 107 }, { "Mining", 99 } }
+    wow.login(overviewAlts())
+    SlashCmdList.ALTSFOREVER("")
+    local rows = overviewRows()
+    eq(#rows, 4)
+    eq(cell(rows[1], 1), "[MAGE]Aldric"); eq(cell(rows[1], 11), "|cff20ff20Online|r")
+    eq(cell(rows[1], 5), "|cffc0c0c0Engineering|r"); eq(cell(rows[1], 6), "107")
+    eq(cell(rows[1], 7), "|cffc0c0c0Mining|r"); eq(cell(rows[1], 8), "99")
+    eq(cell(rows[2], 1), "[MAGE]Far-Other"); eq(cell(rows[2], 2), "60"); eq(cell(rows[2], 3), G .. "-|r")
+    eq(cell(rows[3], 1), "[PRIEST]High")
+    eq(cell(rows[3], 3), "|cff4da6ff150%|r", "was already full")
+    eq(cell(rows[3], 10), "Orgrimmar"); eq(cell(rows[3], 11), "3h ago")
+    eq(cell(rows[4], 1), "[ROGUE]Low"); eq(cell(rows[4], 2), "12  " .. G .. "10%|r")
+    eq(cell(rows[4], 11), "2d ago")
+    SlashCmdList.ALTSFOREVER("realm")
+    SlashCmdList.ALTSFOREVER("")
+    SlashCmdList.ALTSFOREVER("")
+    eq(#overviewRows(), 3, "/af realm hides other realms here too")
+end)
+
+test("an open overview updates when your money changes", function()
+    wow.load(FILES)
+    wow.money = 100
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("")
+    eq(cell(overviewRows()[1], 4), "100c")
+    wow.money = 250
+    wow.fire("PLAYER_MONEY")
+    eq(cell(overviewRows()[1], 4), "250c")
+end)
+
+test("hovering a row shows rested details, hearthstone and item level", function()
+    wow.load(FILES)
+    wow.now = NOW
+    wow.login(overviewAlts())
+    SlashCmdList.ALTSFOREVER("")
+    local row = overviewRows()[4] -- Low: level 12, not resting, logged out 2 days ago
+    row.scripts.OnEnter(row)
+    local text = {}
+    for _, l in ipairs(GameTooltip.lines) do text[#text + 1] = table.concat(l, " = ") end
+    text = table.concat(text, "\n")
+    assert(text:find("Level 12", 1, true), text)
+    -- 2 days away, not resting: 6 blocks of 8h x 1.25% x 1000 XP = 75 XP (8% of the level)
+    assert(text:find("Rested = 75 XP (8%)", 1, true), text)
+    assert(text:find("out in the world", 1, true), text)
+end)
+
+test("the window still opens if the client lacks Blizzard's frame template", function()
+    wow.load(FILES)
+    wow.missingTemplates.BasicFrameTemplateWithInset = true
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("")
+    eq(AltsForeverFrame:IsShown(), true)
+    eq(AltsForeverFrame.template, "BackdropTemplate")
+end)
+
+---------------------------------------------------------------------------
+-- Mail expiry
+
+local function printedText()
+    return table.concat(wow.printed, "\n")
+end
+
+test("reading the inbox records the soonest mail with items or gold", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.login(nil)
+    wow.inbox = {
+        { { 100, 1 }, days = 20 },
+        {},                                    -- text only: ignored
+        { money = 500, days = 2.5 },           -- gold counts
+        { { 200, 1 }, days = 10, returned = true },
+    }
+    wow.fire("MAIL_SHOW")
+    wow.fire("MAIL_INBOX_UPDATE")
+    eq(ns.char.mailExpires, NOW + 2.5 * DAY)
+    eq(ns.char.mailDeletes, nil, "from a player, not yet returned: goes back")
+    wow.inbox = { { { 100, 1 }, days = 20 } }
+    wow.fire("MAIL_INBOX_UPDATE")
+    eq(ns.char.mailExpires, NOW + 20 * DAY, "moves on once the soonest is collected")
+    wow.inbox = {}
+    wow.fire("MAIL_INBOX_UPDATE")
+    eq(ns.char.mailExpires, nil)
+end)
+
+test("mail already returned once, or from the auction house, gets deleted", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.login(nil)
+    wow.fire("MAIL_SHOW")
+    wow.inbox = { { { 100, 1 }, days = 1, returned = true } }
+    wow.fire("MAIL_INBOX_UPDATE")
+    eq(ns.char.mailDeletes, true)
+    wow.inbox = { { money = 900, days = 1, canReply = false } }
+    wow.fire("MAIL_INBOX_UPDATE")
+    eq(ns.char.mailDeletes, true)
+end)
+
+test("mail sent to an alt expires in 30 days, unless they have sooner mail", function()
+    wow.load(FILES)
+    wow.now = NOW
+    wow.login({ v = 1, chars = {
+        ["Alt-Realm"] = alt("Alt", "Realm", "WARRIOR", {}),
+        ["Busy-Realm"] = alt("Busy", "Realm", "ROGUE", { mail = {}, mailExpires = NOW + DAY, mailDeletes = true }),
+    } })
+    wow.outbox = { { 100, 5 } }
+    SendMail("Alt", "", "")
+    wow.fire("MAIL_SEND_SUCCESS")
+    eq(AltsForeverDB.chars["Alt-Realm"].mailExpires, NOW + 30 * DAY)
+    SendMail("Busy", "", "")
+    wow.fire("MAIL_SEND_SUCCESS")
+    eq(AltsForeverDB.chars["Busy-Realm"].mailExpires, NOW + DAY, "the sooner one still counts")
+    eq(AltsForeverDB.chars["Busy-Realm"].mailDeletes, true)
+end)
+
+test("gold alone mailed to an alt counts as mail", function()
+    wow.load(FILES)
+    wow.now = NOW
+    wow.login({ v = 1, chars = { ["Alt-Realm"] = alt("Alt", "Realm", "WARRIOR", {}) } })
+    wow.outbox, wow.outboxMoney = {}, 10000
+    SendMail("Alt", "", "")
+    wow.fire("MAIL_SEND_SUCCESS")
+    eq(AltsForeverDB.chars["Alt-Realm"].mailExpires, NOW + 30 * DAY)
+end)
+
+test("login warns about mail expiring within 3 days, soonest first", function()
+    wow.load(FILES)
+    wow.now = NOW
+    wow.login({ v = 1, chars = {
+        ["Later-Realm"] = alt("Later", "Realm", "PRIEST", { mail = {}, mailExpires = NOW + 10 * DAY }),
+        ["Soon-Realm"] = alt("Soon", "Realm", "ROGUE", { mail = {}, mailExpires = NOW + 2 * DAY + 4 * HOUR }),
+        ["Urgent-Realm"] = alt("Urgent", "Realm", "DRUID", { mail = {}, mailExpires = NOW + 5 * HOUR, mailDeletes = true }),
+    } })
+    eq(#wow.printed, 0, "nothing until the login spam has passed")
+    for _, fn in ipairs(wow.timers) do fn() end
+    local text = printedText()
+    local urgent = text:find("[DRUID]Urgent: |cffff20205h|r (will be |cffff2020deleted|r)", 1, true)
+    local soon = text:find("[ROGUE]Soon: |cffff80002d 4h|r (returned to sender)", 1, true)
+    assert(urgent and soon and urgent < soon, text)
+    assert(not text:find("Later", 1, true), text)
+end)
+
+test("no login warning when nothing expires soon", function()
+    wow.load(FILES)
+    wow.now = NOW
+    wow.login({ v = 1, chars = { ["Later-Realm"] = alt("Later", "Realm", "PRIEST", { mail = {}, mailExpires = NOW + 10 * DAY }) } })
+    for _, fn in ipairs(wow.timers) do fn() end
+    eq(#wow.printed, 0)
+end)
+
+test("/af mail lists everyone with mail, however far off", function()
+    wow.load(FILES)
+    wow.now = NOW
+    wow.login({ v = 1, chars = { ["Later-Realm"] = alt("Later", "Realm", "PRIEST", { mail = {}, mailExpires = NOW + 10 * DAY }) } })
+    SlashCmdList.ALTSFOREVER("mail")
+    assert(printedText():find("[PRIEST]Later: |cffffffff10d 0h|r", 1, true), printedText())
+    wow.load(FILES)
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("mail")
+    assert(printedText():find("No mail with items or gold on record.", 1, true), printedText())
+end)
+
+test("expiry text and the overview's mail column", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    eq(ns.ExpiryText(2 * DAY + 4 * HOUR), "2d 4h"); eq(ns.ExpiryText(5 * HOUR), "5h")
+    eq(ns.ExpiryText(600), "<1h"); eq(ns.ExpiryText(-5), "expired")
+    eq(ns.MailText({}, NOW), G .. "?|r", "mailbox never opened")
+    eq(ns.MailText({ mail = {} }, NOW), "", "no valuable mail")
+    eq(ns.MailText({ mail = {}, mailExpires = NOW + 5 * HOUR }, NOW), "|cffff20205h|r")
+end)
+
+---------------------------------------------------------------------------
+-- Gear
+
+local function itemLink(id, name, color)
+    return (color or "|cff1eff00") .. "|Hitem:" .. id .. "::::::|h[" .. name .. "]|h|r"
+end
+
+local function gearPanelSlots()
+    local slots = {}
+    for _, f in ipairs(wow.frames) do
+        local slot = rawget(f, "slot")
+        if slot then slots[slot] = f end
+    end
+    return slots
+end
+
+local function clickRow(name)
+    for _, row in ipairs(overviewRows()) do
+        if cell(row, 1):find(name, 1, true) then return row.scripts.OnClick(row) end
+    end
+    error("no row for " .. name)
+end
+
+test("gear is recorded per slot with lowest durability", function()
+    local ns = wow.load(FILES)
+    wow.gearLinks[1] = itemLink(3000, "Hunting Cap")
+    wow.gearLinks[16] = itemLink(3001, "Copper Claymore", "|cffffffff")
+    wow.gearLinks[2] = itemLink(3002, "Amulet") -- no durability
+    wow.inventory[1], wow.inventory[16], wow.inventory[2] = 3000, 3001, 3002
+    wow.durability[1] = { 40, 50 }
+    wow.durability[16] = { 9, 45 }
+    wow.login(nil)
+    local c = ns.char
+    eq(c.gear[1], wow.gearLinks[1]); eq(c.gear[16], wow.gearLinks[16]); eq(c.gear[5], nil)
+    eq(c.dura, 20, "lowest of 80% and 20%")
+    eq(c.duraSlots[1], 80); eq(c.duraSlots[16], 20); eq(c.duraSlots[2], nil)
+    wow.durability[16] = { 45, 45 }
+    wow.fire("UPDATE_INVENTORY_DURABILITY")
+    eq(c.dura, 80); eq(c.duraSlots[16], nil, "full items aren't listed")
+    wow.gearLinks[1] = nil
+    wow.inventory[1] = nil
+    wow.fire("PLAYER_EQUIPMENT_CHANGED", 1)
+    eq(c.gear[1], nil, "a slot that's really emptied is cleared")
+end)
+
+test("gear still loading at login doesn't wipe what was recorded, and is retried", function()
+    local ns = wow.load(FILES)
+    local saved = { v = 1, chars = { ["Aldric-Realm"] = alt("Aldric", "Realm", "MAGE", {
+        gear = { [1] = itemLink(3000, "Hunting Cap"), [5] = itemLink(3003, "Wolfmane Vest") }, dura = 60 }) } }
+    -- The game knows what's worn (item IDs) but can't give links yet.
+    wow.inventory[1], wow.inventory[5] = 3000, 3003
+    wow.login(saved)
+    eq(ns.char.gear[1], itemLink(3000, "Hunting Cap"), "kept, not wiped")
+    eq(ns.char.gear[5], itemLink(3003, "Wolfmane Vest"))
+    eq(ns.char.dura, 60, "durability isn't blanked either")
+    eq(#wow.timers >= 1, true, "a retry is scheduled")
+    -- Links arrive, with a new hat.
+    wow.gearLinks[1], wow.gearLinks[5] = itemLink(3009, "New Hat"), itemLink(3003, "Wolfmane Vest")
+    wow.inventory[1] = 3009
+    for _, fn in ipairs(wow.timers) do fn() end
+    eq(ns.char.gear[1], itemLink(3009, "New Hat"))
+end)
+
+test("equipment not loaded at all at login keeps the recorded gear", function()
+    local ns = wow.load(FILES)
+    local saved = { v = 1, chars = { ["Aldric-Realm"] = alt("Aldric", "Realm", "MAGE", {
+        gear = { [1] = itemLink(3000, "Hunting Cap") } }) } }
+    wow.login(saved) -- no item IDs, no links
+    eq(ns.char.gear[1], itemLink(3000, "Hunting Cap"))
+end)
+
+test("retries stop after five tries", function()
+    wow.load(FILES)
+    wow.inventory[1] = 3000 -- link never arrives
+    wow.login(nil)
+    local runs = 0
+    while #wow.timers > 0 and runs < 20 do
+        local fns = wow.timers
+        wow.timers = {}
+        for _, fn in ipairs(fns) do fn() end
+        runs = runs + 1
+    end
+    eq(runs, 5)
+end)
+
+test("logging out doesn't wipe the recorded gear", function()
+    local ns = wow.load(FILES)
+    wow.gearLinks[1] = itemLink(3000, "Hunting Cap")
+    wow.login(nil)
+    wow.gearLinks = {}
+    wow.fire("PLAYER_LOGOUT")
+    eq(ns.char.gear[1] ~= nil, true)
+end)
+
+test("item link names keep their quality colour but lose the brackets", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    eq(ns.LinkName(itemLink(1, "Hunting Cap")), "|cff1eff00Hunting Cap|r")
+    eq(ns.LinkName("|cnIQ3:|Hitem:5::|h[Blue Thing]|h|r"), "|cnIQ3:Blue Thing|r", "newer colour format")
+    eq(ns.LinkName("not a link"), "not a link")
+    eq(ns.DurabilityText(15), "|cffff202015%|r"); eq(ns.DurabilityText(45), "|cffff800045%|r")
+    eq(ns.DurabilityText(nil), "|cff9d9d9d-|r")
+end)
+
+test("clicking a character in the overview opens their gear", function()
+    wow.load(FILES)
+    local saved = { v = 1, chars = {
+        ["Brakka-Realm"] = alt("Brakka", "Realm", "HUNTER", { level = 20, ilvl = 11,
+            gear = { [1] = itemLink(3000, "Hunting Cap"), [16] = itemLink(3001, "Copper Claymore") },
+            duraSlots = { [16] = 10 }, dura = 10 }),
+    } }
+    wow.login(saved)
+    SlashCmdList.ALTSFOREVER("")
+    clickRow("Brakka")
+    local panel = AltsForeverGearFrame
+    eq(panel:IsShown(), true)
+    eq(panel.title.text, "[HUNTER]Brakka|cff9d9d9d  ilvl 11|r")
+    local slots = gearPanelSlots()
+    eq(slots[1].icon.texture, "icon:3000"); eq(slots[1].name.text, "|cff1eff00Hunting Cap|r")
+    eq(slots[5].icon.texture, "empty:ChestSlot", "empty slots show the slot art")
+    eq(slots[16].icon.tint[2], 0.3, "nearly broken items are tinted red")
+    eq(slots[1].icon.tint[2], 1)
+    eq(panel.footer.text, "Lowest durability: |cffff202010%|r")
+    eq(panel.empty.shown, false)
+    clickRow("Brakka")
+    eq(panel:IsShown(), false, "clicking the same character again closes it")
+end)
+
+test("gear panel for a character with nothing recorded says so", function()
+    wow.load(FILES)
+    wow.login({ v = 1, chars = { ["New-Realm"] = alt("New", "Realm", "ROGUE", { level = 5 }) } })
+    SlashCmdList.ALTSFOREVER("")
+    clickRow("New")
+    eq(AltsForeverGearFrame.empty.shown, true)
+    eq(gearPanelSlots()[1].icon.texture, "empty:HeadSlot")
+end)
+
+test("hovering a slot shows the item, shift-click links it, closing the overview closes gear", function()
+    wow.load(FILES)
+    wow.gearLinks[1] = itemLink(3000, "Hunting Cap")
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("")
+    clickRow("Aldric")
+    local head = gearPanelSlots()[1]
+    head.scripts.OnEnter(head)
+    eq(GameTooltip.hyperlink, wow.gearLinks[1])
+    head.scripts.OnClick(head)
+    eq(#wow.chatLinks, 0, "plain click does nothing")
+    wow.modified = true
+    head.scripts.OnClick(head)
+    eq(wow.chatLinks[1], wow.gearLinks[1])
+    SlashCmdList.ALTSFOREVER("")
+    eq(AltsForeverGearFrame:IsShown(), false)
+end)
+
+test("an open gear panel for you updates when you change gear", function()
+    wow.load(FILES)
+    wow.gearLinks[1], wow.inventory[1] = itemLink(3000, "Hunting Cap"), 3000
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("")
+    clickRow("Aldric")
+    wow.gearLinks[1], wow.inventory[1] = itemLink(3005, "Better Hat"), 3005
+    wow.fire("PLAYER_EQUIPMENT_CHANGED", 1)
+    eq(gearPanelSlots()[1].name.text, "|cff1eff00Better Hat|r")
+end)
+
+---------------------------------------------------------------------------
+local function tocFiles(path)
+    local files = {}
+    for line in io.lines(path) do
+        line = line:gsub("\r$", "")
+        if line ~= "" and not line:match("^#") and not line:match("^SavedData") then
+            files[#files + 1] = line
+        end
+    end
+    return files
+end
+
+test("both .toc files list exactly the files the tests load", function()
+    for _, toc in ipairs({ "AltsForever.toc", "AltsForever_Camelot.toc" }) do
+        local files = tocFiles(toc)
+        eq(table.concat(files, ","), table.concat(FILES, ","), toc)
+    end
+end)
+
+test("both .toc files are identical", function()
+    local a = assert(io.open("AltsForever.toc")):read("*a")
+    local b = assert(io.open("AltsForever_Camelot.toc")):read("*a")
+    eq(a, b)
+end)
+
+---------------------------------------------------------------------------
+for _, t in ipairs(tests) do
+    local ok, err = pcall(t.fn)
+    if ok then
+        passed = passed + 1
+        io.write("  ok    ", t.name, "\n")
+    else
+        failed = failed + 1
+        io.write("  FAIL  ", t.name, "\n        ", tostring(err), "\n")
+    end
+end
+io.write(("\n%d passed, %d failed\n"):format(passed, failed))
+os.exit(failed == 0 and 0 or 1)

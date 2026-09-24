@@ -1,0 +1,10 @@
+SavedData/
+reference/
+AGENTS.local.md
+
+# Agent instructions and plans stay local
+AGENTS.md
+CLAUDE.md
+.claude/
+*.plan.md
+PLAN*.md

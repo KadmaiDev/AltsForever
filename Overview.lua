@@ -1,0 +1,280 @@
+-- Alts Forever overview: a window (/af) listing every character with level, rested
+-- XP, gold, professions, location and when they were last played. It's only built
+-- the first time it's opened, and only refreshes while it's showing.
+local _, ns = ...
+
+local floor, max, pairs, time = math.floor, math.max, pairs, time
+local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
+
+local GREY = "|cff9d9d9d"
+local ROW_HEIGHT = 20
+local COLUMNS = {
+    { title = "Character", width = 180 },
+    { title = "Level", width = 80 },
+    { title = "Rested", width = 70 },
+    { title = "Gold", width = 120, right = true },
+    -- Each main profession gets a name column and a right-aligned skill column, so
+    -- the skill numbers line up. The gap separates it from the right-aligned gold.
+    { title = "Professions", width = 104, gap = 16 },
+    { title = "", width = 34, right = true },
+    { title = "", width = 104, gap = 16 },
+    { title = "", width = 34, right = true },
+    { title = "Mail", width = 60, gap = 16 },
+    { title = "Zone", width = 140 },
+    { title = "Last seen", width = 80, right = true },
+}
+local LIGHT = "|cffc0c0c0"
+
+---------------------------------------------------------------------------
+-- Text helpers (no UI, so they can be tested)
+---------------------------------------------------------------------------
+function ns.FormatAgo(seconds)
+    if seconds < 3600 then return "<1h" end
+    if seconds < 86400 then return floor(seconds / 3600) .. "h ago" end
+    return floor(seconds / 86400) .. "d ago"
+end
+
+local function Duration(seconds)
+    local d, h = floor(seconds / 86400), floor(seconds % 86400 / 3600)
+    if d > 0 then return d .. "d " .. h .. "h" end
+    return max(h, 1) .. "h"
+end
+
+function ns.LevelText(c)
+    if not c.level then return GREY .. "?|r" end
+    if c.level >= ns.MaxLevel() or not c.xpMax or c.xpMax == 0 then return tostring(c.level) end
+    -- Multiply first: 5700 / 10000 * 100 is 56.99... in floating point.
+    return c.level .. "  " .. GREY .. floor(c.xp * 100 / c.xpMax) .. "%|r"
+end
+
+-- Rested as a share of a level; blue when full, "-" at max level, "?" if not recorded yet.
+function ns.RestedText(c, now)
+    if not c.level then return GREY .. "?|r" end
+    local rested, cap = ns.RestedNow(c, now)
+    if not rested then return GREY .. "-|r" end
+    local pct = floor(rested / c.xpMax * 100 + 0.5)
+    if rested >= cap then return "|cff4da6ff" .. pct .. "%|r" end
+    return pct .. "%"
+end
+
+-- The four profession cells: name, skill, name, skill.
+function ns.ProfCells(c)
+    local p = c.profs
+    if not p then return GREY .. "?|r", "", "", "" end
+    if not c.prof1 and not c.prof2 then return GREY .. "-|r", "", "", "" end
+    local function Cell(name)
+        if not name then return "", "" end
+        return LIGHT .. name .. "|r", tostring(p[name] or "?")
+    end
+    local n1, s1 = Cell(c.prof1)
+    local n2, s2 = Cell(c.prof2)
+    return n1, s1, n2, s2
+end
+
+-- Time until the soonest valuable mail expires; blank if none, "?" if the mailbox
+-- has never been opened on that character.
+function ns.MailText(c, now)
+    if not c.mail then return GREY .. "?|r" end
+    if not c.mailExpires then return "" end
+    local left = c.mailExpires - now
+    return ns.ExpiryColor(left) .. ns.ExpiryText(left) .. "|r"
+end
+
+function ns.SeenText(key, c, now)
+    if key == ns.charKey then return "|cff20ff20Online|r" end
+    local t = c.updated or c.seen
+    return t and ns.FormatAgo(now - t) or (GREY .. "?|r")
+end
+
+-- Character keys in display order: you first, then by level, then by name.
+local order = {}
+function ns.OverviewOrder()
+    local db, chars = ns.db, ns.db.chars
+    for i = #order, 1, -1 do order[i] = nil end
+    for key, c in pairs(chars) do
+        if key ~= ns.charKey and (not db.realmOnly or c.realm == ns.realm) then order[#order + 1] = key end
+    end
+    table.sort(order, function(a, b)
+        local la, lb = chars[a].level or 0, chars[b].level or 0
+        if la ~= lb then return la > lb end
+        return a < b
+    end)
+    table.insert(order, 1, ns.charKey)
+    return order
+end
+
+---------------------------------------------------------------------------
+-- Window
+---------------------------------------------------------------------------
+local frame, rows, footer
+
+local function RowTooltip(row)
+    local key = row.key
+    local c = key and ns.db.chars[key]
+    if not c then return end
+    local now = time()
+    local tt = GameTooltip
+    tt:SetOwner(row, "ANCHOR_RIGHT")
+    tt:AddLine(ns.ColoredName(key, c))
+    if c.level then
+        local line = "Level " .. c.level
+        if c.xpMax and c.xpMax > 0 and c.level < ns.MaxLevel() then
+            line = line .. "  " .. GREY .. "(" .. c.xp .. " / " .. c.xpMax .. " XP)|r"
+        end
+        tt:AddLine(line, 1, 1, 1)
+    end
+    local rested, cap, toFull = ns.RestedNow(c, now)
+    if rested then
+        local where = c.resting and "in an inn or city" or "out in the world"
+        tt:AddDoubleLine("Rested", floor(rested) .. " XP (" .. ns.RestedText(c, now) .. ")", 1, 0.82, 0, 1, 1, 1)
+        if rested < cap then
+            tt:AddLine(GREY .. "Full in " .. Duration(toFull) .. ", logged out " .. where .. "|r")
+        end
+    end
+    if c.mailExpires then
+        local left = c.mailExpires - now
+        tt:AddDoubleLine("Mail expires", ns.ExpiryColor(left) .. ns.ExpiryText(left) .. "|r", 1, 0.82, 0, 1, 1, 1)
+        tt:AddLine(GREY .. (c.mailDeletes and "The soonest will be deleted, not returned" or "The soonest goes back to its sender") .. "|r")
+    end
+    if c.hearth then tt:AddDoubleLine("Hearthstone", c.hearth, 1, 0.82, 0, 1, 1, 1) end
+    if c.ilvl then tt:AddDoubleLine("Item level", c.ilvl, 1, 0.82, 0, 1, 1, 1) end
+    if c.money then tt:AddDoubleLine("Gold", GetCoinTextureString(c.money), 1, 0.82, 0, 1, 1, 1) end
+    if c.profs and next(c.profs) then
+        tt:AddLine(" ")
+        for name, skill in pairs(c.profs) do tt:AddDoubleLine(name, skill, 1, 1, 1, 1, 1, 1) end
+    end
+    tt:AddLine(" ")
+    tt:AddLine(GREY .. (c.bank and "Bank scanned" or "Bank not scanned yet - visit a banker") .. "|r")
+    if c.dura then tt:AddDoubleLine("Lowest durability", ns.DurabilityText(c.dura), 1, 0.82, 0, 1, 1, 1) end
+    tt:AddLine("|cff66ccffClick to see gear|r")
+    tt:Show()
+end
+
+local function CreateCells(parent, font)
+    local cells, x = {}, 12
+    for i, col in ipairs(COLUMNS) do
+        x = x + (col.gap or 0)
+        local fs = parent:CreateFontString(nil, "OVERLAY", font)
+        fs:SetPoint("LEFT", parent, "LEFT", x, 0)
+        fs:SetWidth(col.width - 8)
+        fs:SetJustifyH(col.right and "RIGHT" or "LEFT")
+        fs:SetWordWrap(false)
+        cells[i] = fs
+        x = x + col.width
+    end
+    return cells
+end
+
+local function CreateRow(i)
+    local row = CreateFrame("Button", nil, frame)
+    row:SetHeight(ROW_HEIGHT)
+    row:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -54 - (i - 1) * ROW_HEIGHT)
+    row:SetPoint("RIGHT", frame, "RIGHT", -4, 0)
+    local hl = row:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.08)
+    row.cells = CreateCells(row, "GameFontHighlightSmall")
+    row:SetScript("OnEnter", RowTooltip)
+    row:SetScript("OnClick", function(self) ns.ShowGear(self.key) end)
+    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    rows[i] = row
+    return row
+end
+
+local function Refresh()
+    local now = time()
+    local chars = ns.db.chars
+    local keys = ns.OverviewOrder()
+    local total = 0
+    for i, key in ipairs(keys) do
+        local c = chars[key]
+        local row = rows[i] or CreateRow(i)
+        local cells = row.cells
+        row.key = key
+        cells[1]:SetText(ns.ColoredName(key, c))
+        cells[2]:SetText(ns.LevelText(c))
+        cells[3]:SetText(ns.RestedText(c, now))
+        cells[4]:SetText(c.money and GetCoinTextureString(c.money) or (GREY .. "?|r"))
+        local n1, s1, n2, s2 = ns.ProfCells(c)
+        cells[5]:SetText(n1)
+        cells[6]:SetText(s1)
+        cells[7]:SetText(n2)
+        cells[8]:SetText(s2)
+        cells[9]:SetText(ns.MailText(c, now))
+        cells[10]:SetText(c.zone or (GREY .. "?|r"))
+        cells[11]:SetText(ns.SeenText(key, c, now))
+        total = total + (c.money or 0)
+        row:Show()
+    end
+    for i = #keys + 1, #rows do rows[i]:Hide() end
+    footer:SetText("Total gold: " .. GetCoinTextureString(total))
+    frame:SetHeight(54 + #keys * ROW_HEIGHT + 32)
+end
+
+local function CreateWindow()
+    -- Room for the left inset, every column, and the right border.
+    local width = 12 + 20
+    for _, col in ipairs(COLUMNS) do width = width + col.width + (col.gap or 0) end
+
+    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverFrame", UIParent, "BasicFrameTemplateWithInset")
+    if not ok then
+        -- Plain fallback if this client lacks the template: a dialog backdrop and a close button.
+        f = CreateFrame("Frame", "AltsForeverFrame", UIParent, "BackdropTemplate")
+        f:SetBackdrop({
+            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+            tile = true, tileSize = 32, edgeSize = 32,
+            insets = { left = 8, right = 8, top = 8, bottom = 8 },
+        })
+        local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+        close:SetPoint("TOPRIGHT", -4, -4)
+    end
+    frame = f
+    rows = {}
+    f:SetSize(width, 200)
+    f:SetPoint("CENTER")
+    f:SetFrameStrata("HIGH")
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    f:SetClampedToScreen(true)
+
+    local title = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    if not f.TitleText then title:SetPoint("TOP", 0, -6) end
+    title:SetText("Alts Forever")
+
+    local header = CreateFrame("Frame", nil, f)
+    header:SetHeight(ROW_HEIGHT)
+    header:SetPoint("TOPLEFT", f, "TOPLEFT", 4, -32)
+    header:SetPoint("RIGHT", f, "RIGHT", -4, 0)
+    for i, fs in ipairs(CreateCells(header, "GameFontNormalSmall")) do fs:SetText(COLUMNS[i].title) end
+
+    footer = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    footer:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 12)
+    f.credit = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    f.credit:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 12)
+    f.credit:SetText("Alts Forever by Kadmai")
+
+    f:SetScript("OnShow", Refresh)
+    f:SetScript("OnHide", function() if AltsForeverGearFrame then AltsForeverGearFrame:Hide() end end)
+    -- Escape closes it, like Blizzard's own windows.
+    if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverFrame" end
+    f:Hide()
+end
+
+function ns.ToggleOverview()
+    if not frame then CreateWindow() end
+    if frame:IsShown() then frame:Hide() else frame:Show() end
+end
+
+function ns.StartOverview()
+    -- Keep an open window current; a closed or never-opened one costs nothing.
+    local function Update()
+        if frame and frame:IsShown() then Refresh() end
+    end
+    for _, event in ipairs({ "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "PLAYER_MONEY", "ZONE_CHANGED_NEW_AREA", "SKILL_LINES_CHANGED" }) do
+        ns.On(event, Update)
+    end
+end
