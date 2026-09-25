@@ -175,7 +175,11 @@ local function RowTooltip(row)
     tt:AddLine(" ")
     tt:AddLine(GREY .. (c.bank and "Bank scanned" or "Bank not scanned yet - visit a banker") .. "|r")
     if c.dura then tt:AddDoubleLine("Lowest durability", ns.DurabilityText(c.dura), 1, 0.82, 0, 1, 1, 1) end
-    tt:AddLine("|cff66ccffClick to see gear, right-click for more|r")
+    if key == ns.charKey then
+        tt:AddLine("|cff66ccffClick to see gear|r")
+    else
+        tt:AddLine("|cff66ccffClick to see gear · Right-click to forget this character|r")
+    end
     tt:Show()
 end
 

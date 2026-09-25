@@ -841,6 +841,12 @@ test("hovering a row shows rested details, hearthstone and item level", function
     -- 2 days away, not resting: 6 blocks of 8h x 1.25% x 1000 XP = 75 XP (8% of the level)
     assert(text:find("Rested = 75 XP (8%)", 1, true), text)
     assert(text:find("out in the world", 1, true), text)
+    assert(text:find("Right-click to forget this character", 1, true), "how to forget them is shown")
+    local you = overviewRows()[1]
+    you.scripts.OnEnter(you)
+    local mine = {}
+    for _, l in ipairs(GameTooltip.lines) do mine[#mine + 1] = table.concat(l, " = ") end
+    assert(not table.concat(mine, "\n"):find("forget", 1, true), "not on your own row")
 end)
 
 test("the window still opens if the client lacks Blizzard's frame template", function()
