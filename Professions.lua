@@ -312,22 +312,10 @@ local function BuildRows(p)
         end
         rowKey[j + 1], rowStatus[j + 1], rowSkill[j + 1] = k, s, sk
     end
-    -- Texts are built here, once per item, so hovering again allocates nothing.
-    local grey = ns.SkillupsOn() and ns.RecipeGrey(p.prof, p.name)
-    local chars = ns.db.chars
+    -- Texts are built here, once per item, so hovering again allocates nothing. (No
+    -- skill-up levels here: the owner found them confusing on recipe items.)
     for i = 1, rows do
-        local status = rowStatus[i]
-        local text = STATUS_TEXT[status] or ("|cffff2020Needs " .. p.req .. " (" .. rowSkill[i] .. ")|r")
-        if grey then
-            local c = chars[rowKey[i]]
-            local skill = c.profs and c.profs[p.prof]
-            if status == KNOWN and skill and skill >= grey then
-                text = text .. LIGHT .. " · no skill-ups|r"
-            else
-                text = text .. LIGHT .. " · until " .. grey .. "|r"
-            end
-        end
-        rowText[i] = text
+        rowText[i] = STATUS_TEXT[rowStatus[i]] or ("|cffff2020Needs " .. p.req .. " (" .. rowSkill[i] .. ")|r")
     end
 end
 
@@ -372,7 +360,7 @@ local function AddCrafter(key, c, skillups)
                 -- Older saves stored true here, so the grey point is unknown for them.
                 local grey = skillups and type(lname) == "string" and ns.RecipeGrey(prof, lname)
                 if grey and skill and skill < grey then
-                    text = name .. LIGHT .. " · until " .. grey .. "|r"
+                    text = name .. LIGHT .. " · skill-ups to " .. grey .. "|r"
                 end
                 local list = crafters[id]
                 if list then list[#list + 1] = text else crafters[id] = { text } end
@@ -472,7 +460,7 @@ local function FindUses(id)
                 end
             end
             if l1 then
-                local who = ns.ShortName(key, c) .. LIGHT .. " · until "
+                local who = ns.ShortName(key, c) .. LIGHT .. " · to "
                 local block = { key = key, best = l1, "  " .. n1, who .. g1 .. "|r" }
                 if l2 then block[3], block[4] = "  " .. n2, who .. g2 .. "|r" end
                 blocks = blocks or {}

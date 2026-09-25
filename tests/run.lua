@@ -1364,7 +1364,8 @@ end)
 -- Skill-ups across alts (0.3.0): grey points and reagents from the live game
 local L = "|cffc0c0c0"
 local LINEN, COPPER_TUBE, BOLT = 2589, 4361, 4359
-local function until_(n) return L .. " · until " .. n .. "|r" end
+local function to(n) return L .. " · to " .. n .. "|r" end
+local function skillupsTo(n) return L .. " · skill-ups to " .. n .. "|r" end
 
 -- Engineering recipes with grey points and reagents, as a profession window lists them.
 local function greyWindow(learned)
@@ -1410,22 +1411,18 @@ test("learning a recipe records its reagents and what it makes", function()
     eq(ns.char.crafts.Engineering[GOGGLES_ITEM], "shadow goggles")
 end)
 
-test("recipe tooltip: how long each character keeps getting skill-ups", function()
+test("recipe item tooltips don't show skill-up levels", function()
     wow.load(FILES)
     wow.profs = { { "Engineering", 80 } }
     local text = wow.recipeItem(SQUIRREL, "Schematic: Mechanical Squirrel", "Engineering", 75)
     local saved = recipeAlts()
     saved.recipeInfo = { Engineering = { ["mechanical squirrel"] = "100;Mechanical Squirrel;" } }
-    saved.chars["Pim"] = alt("Pim", "MAGE", { profs = { Engineering = 90 },
-        recipes = { Engineering = { ["mechanical squirrel"] = true } } })
-    saved.chars["Brakka"].profs.Engineering = 100 -- exactly at the grey point
     wow.login(saved)
     local lines = wow.hover(GameTooltip, SQUIRREL, text)
-    eq(lines[3][1], "[MAGE]Aldric"); eq(lines[3][2], "|cff9d9d9dNot scanned|r" .. until_(100))
-    eq(lines[4][1], "[HUNTER]Brakka"); eq(lines[4][2], "|cff20ff20Known|r" .. L .. " · no skill-ups|r", "at grey 100: no more")
-    eq(lines[5][1], "[MAGE]Pim"); eq(lines[5][2], "|cff20ff20Known|r" .. until_(100))
-    eq(lines[6][1], "[PRIEST]Elowen"); eq(lines[6][2], "|cffffd100Can learn|r" .. until_(100))
-    eq(lines[7][1], "[DRUID]Thessa"); eq(lines[7][2], "|cffff2020Needs 75 (60)|r" .. until_(100))
+    eq(lines[3][2], "|cff9d9d9dNot scanned|r")
+    eq(lines[4][2], "|cff20ff20Known|r")
+    eq(lines[5][2], "|cffffd100Can learn|r")
+    eq(lines[6][2], "|cffff2020Needs 75 (60)|r")
 end)
 
 test("/af skillups turns every skill-up detail off and on", function()
@@ -1439,13 +1436,12 @@ test("/af skillups turns every skill-up detail off and on", function()
     wow.login(saved)
     SlashCmdList.ALTSFOREVER("skillups")
     eq(AltsForeverDB.skillupsOff, true)
-    local lines = wow.hover(GameTooltip, SQUIRREL, text)
-    eq(lines[4][2], "|cff20ff20Known|r", "recipe tooltip as in 0.2")
     eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)), "[HUNTER]Brakka", "can craft as in 0.2")
     assert(not textOf(wow.hover(GameTooltip, LINEN)):find("Skill-ups", 1, true), "no reagent section")
     SlashCmdList.ALTSFOREVER("skillups")
     eq(AltsForeverDB.skillupsOff, nil)
-    eq(wow.hover(GameTooltip, SQUIRREL, text)[4][2], "|cff20ff20Known|r" .. until_(100))
+    eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)), "[HUNTER]Brakka" .. skillupsTo(100))
+    assert(textOf(wow.hover(GameTooltip, LINEN)):find("Skill-ups", 1, true), "reagent section back")
 end)
 
 test("can craft: characters who'd still get a skill-up are marked", function()
@@ -1458,7 +1454,7 @@ test("can craft: characters who'd still get a skill-up are marked", function()
         ["Old"] = alt("Old", "ROGUE", { profs = { Engineering = 10 }, crafts = { Engineering = { [SQUIRREL_ITEM] = true } } }),
     } })
     eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)),
-        "[HUNTER]Brakka" .. until_(100) .. ", [MAGE]Far, [ROGUE]Old", "past grey, or saved before 0.3: unmarked")
+        "[HUNTER]Brakka" .. skillupsTo(100) .. ", [MAGE]Far, [ROGUE]Old", "past grey, or saved before 0.3: unmarked")
 end)
 
 -- Aldric (you) and two alts, with recipes that use Linen Cloth.
@@ -1485,9 +1481,9 @@ test("reagent tooltip lists the recipes that still give each character a skill-u
     wow.login(saved)
     local lines = wow.hover(GameTooltip, LINEN)
     eq(lines[1][1], " "); eq(lines[2][1], "Skill-ups")
-    eq(lines[3][1], "  Mechanical Squirrel"); eq(lines[3][2], "[MAGE]Aldric" .. until_(100))
-    eq(lines[4][1], "  Rough Dynamite"); eq(lines[4][2], "[MAGE]Aldric" .. until_(60))
-    eq(lines[5][1], "  Linen Bandage"); eq(lines[5][2], "[DRUID]Tarnia" .. until_(80))
+    eq(lines[3][1], "  Mechanical Squirrel"); eq(lines[3][2], "[MAGE]Aldric" .. to(100))
+    eq(lines[4][1], "  Rough Dynamite"); eq(lines[4][2], "[MAGE]Aldric" .. to(60))
+    eq(lines[5][1], "  Linen Bandage"); eq(lines[5][2], "[DRUID]Tarnia" .. to(80))
     eq(#lines, 5, "Brakka is past grey; nobody knows Heavy Linen Bandage")
     eq(textOf(wow.hover(GameTooltip, 9999)):find("Skill-ups", 1, true), nil, "unused item: no section")
     -- Skill goes up: Rough Dynamite (grey 60) stops counting.
@@ -1519,12 +1515,12 @@ test("reagent tooltip: 2 recipes per character with the most skill-ups left", fu
     } })
     local lines = wow.hover(GameTooltip, LINEN)
     eq(lines[2][1], "Skill-ups")
-    eq(lines[3][1], "  Shirt 7"); eq(lines[3][2], "[MAGE]Aldric" .. until_(120), "you first even though Zed has more left")
-    eq(lines[4][1], "  Shirt 6"); eq(lines[4][2], "[MAGE]Aldric" .. until_(110))
-    eq(lines[5][1], "  Bag"); eq(lines[5][2], "[ROGUE]Zed" .. until_(200), "then the alt with the most left, though Z")
-    eq(lines[6][1], "  Cap"); eq(lines[6][2], "[ROGUE]Zed" .. until_(70))
-    eq(lines[7][1], "  Vest"); eq(lines[7][2], "[DRUID]Amy" .. until_(95))
-    eq(lines[8][1], "  Cap"); eq(lines[8][2], "[DRUID]Amy" .. until_(70))
+    eq(lines[3][1], "  Shirt 7"); eq(lines[3][2], "[MAGE]Aldric" .. to(120), "you first even though Zed has more left")
+    eq(lines[4][1], "  Shirt 6"); eq(lines[4][2], "[MAGE]Aldric" .. to(110))
+    eq(lines[5][1], "  Bag"); eq(lines[5][2], "[ROGUE]Zed" .. to(200), "then the alt with the most left, though Z")
+    eq(lines[6][1], "  Cap"); eq(lines[6][2], "[ROGUE]Zed" .. to(70))
+    eq(lines[7][1], "  Vest"); eq(lines[7][2], "[DRUID]Amy" .. to(95))
+    eq(lines[8][1], "  Cap"); eq(lines[8][2], "[DRUID]Amy" .. to(70))
     eq(lines[9][1], "  +5 more", "your 5 other shirts; Old Timer is past grey")
 end)
 
@@ -1536,7 +1532,7 @@ test("reagent tooltip: never more than 6 recipe lines", function()
     end
     wow.login({ v = 2, recipeInfo = { Tailoring = info }, chars = chars })
     local lines = wow.hover(GameTooltip, LINEN)
-    eq(lines[7][2], "[PRIEST]Cy" .. until_(80)); eq(lines[8][2], "[PRIEST]Cy" .. until_(70), "three alts fill the 6 lines")
+    eq(lines[7][2], "[PRIEST]Cy" .. to(80)); eq(lines[8][2], "[PRIEST]Cy" .. to(70), "three alts fill the 6 lines")
     eq(lines[9][1], "  +2 more"); eq(#lines, 9)
 end)
 
