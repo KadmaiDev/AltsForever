@@ -2184,16 +2184,56 @@ test("hovering Blizzard's XP bar lists every character still levelling", functio
     wow.fire("PLAYER_ENTERING_WORLD")
     bar.scripts.OnEnter(bar)
     eq(GameTooltip:GetOwner(), bar); eq(GameTooltip:IsShown(), true)
-    eq(lineTexts(GameTooltip), "  | Your characters | [MAGE]Aldric | [PRIEST]High | [ROGUE]Low",
-        "you first, then by level; max level (Far) left out")
-    local low = GameTooltip.lines[5][2]
+    eq(lineTexts(GameTooltip), "  | Your characters | [PRIEST]High | [ROGUE]Low",
+        "by level; not you (the bar shows you), not max level (Far)")
+    local low = GameTooltip.lines[4][2]
     assert(low:find("^12  ") and low:find("10%%") and low:find("rested"), low)
     bar.scripts.OnLeave(bar)
     eq(GameTooltip:IsShown(), false)
     -- Hooked once, however many loading screens.
     wow.fire("PLAYER_ENTERING_WORLD")
     bar.scripts.OnEnter(bar)
-    eq(#GameTooltip.lines, 5)
+    eq(#GameTooltip.lines, 4)
+end)
+
+test("the XP bar's columns are lined up by measuring them in the tooltip's font", function()
+    wow.load(FILES)
+    wow.now = NOW
+    local bar = blizzardXPBar()
+    -- A tooltip whose lines have font strings, and text 6 units per visible character.
+    GameTooltip.GetName = function() return "GameTooltip" end
+    GameTooltip.NumLines = function(self) return #self.lines end
+    local rights = {}
+    for i = 1, 10 do
+        rights[i] = { GetFont = function() return "font", 12, "" end, SetText = function(self, t) self.text = t end }
+        _G["GameTooltipTextRight" .. i] = rights[i]
+    end
+    UIParent.CreateFontString = function()
+        return { Hide = function() end, SetFont = function() end,
+            SetText = function(self, t) self.text = t end,
+            GetStringWidth = function(self) return #self.text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") * 6 end }
+    end
+    wow.login(overviewAlts())
+    wow.fire("PLAYER_ENTERING_WORLD")
+    bar.scripts.OnEnter(bar)
+    -- High: level 40, 0%, rested 150% (full); Low: 12, 10%, rested ...
+    local high, low = rights[3].text, rights[4].text
+    assert(high and low, "rows 3 and 4 rewritten")
+    local function spacers(t)
+        local w = {}
+        for n in t:gmatch("blank%.tga:1:(%d+)|t") do w[#w + 1] = tonumber(n) end
+        return w
+    end
+    -- Same total width per row: each column padded to its widest value.
+    local function width(t)
+        local visible = t:gsub("|T.-|t", ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+        local sum = #visible * 6
+        for _, n in ipairs(spacers(t)) do sum = sum + n end
+        return sum
+    end
+    eq(width(high), width(low), "rows end up the same width")
+    assert(high:find("Interface\\AddOns\\AltsForever\\media\\blank.tga", 1, true), "our spacer texture")
+    for i = 1, 10 do _G["GameTooltipTextRight" .. i] = nil end
 end)
 
 test("the XP bar adds nothing when you're the only character levelling", function()
@@ -2220,7 +2260,7 @@ test("ElvUI's and EllesmereUI's XP bar tooltips get the lines added at the end",
         wow.login(overviewAlts())
         wow.fire("PLAYER_ENTERING_WORLD")
         bar.scripts.OnEnter(bar)
-        eq(lineTexts(GameTooltip), "Experience |   | Your characters | [MAGE]Aldric | [PRIEST]High | [ROGUE]Low", name)
+        eq(lineTexts(GameTooltip), "Experience |   | Your characters | [PRIEST]High | [ROGUE]Low", name)
         GameTooltip:Hide()
         ownTooltip = false
         bar.scripts.OnEnter(bar)
@@ -2295,7 +2335,7 @@ test("the minimap button and addon list use our logo, shipped with the addon", f
     eq(AltsForeverMinimapButton.icon.texture, "Interface\\AddOns\\AltsForever\\media\\minimap.tga")
     local toc = assert(io.open("AltsForever.toc")):read("*a")
     assert(toc:find("## IconTexture: Interface\\AddOns\\AltsForever\\media\\icon.tga", 1, true), "addon list icon")
-    for _, file in ipairs({ "media/icon.tga", "media/minimap.tga" }) do
+    for _, file in ipairs({ "media/icon.tga", "media/minimap.tga", "media/blank.tga" }) do
         local f = io.open(file, "rb")
         assert(f, file .. " exists")
         f:close()

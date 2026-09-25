@@ -1,7 +1,7 @@
 -- Alts Forever overview: a window (/af) listing every character with level, rested
 -- XP, gold, professions, location, time played and when they were last played. It's
 -- only built the first time it's opened, and only refreshes while it's showing.
-local _, ns = ...
+local ADDON, ns = ...
 
 local floor, max, pairs, time = math.floor, math.max, pairs, time
 local ipairs, select, type = ipairs, select, type
@@ -358,25 +358,79 @@ end
 -- (you first, then by level) with their level, XP and rested XP. Built only on hover.
 ---------------------------------------------------------------------------
 
--- Adds the lines; returns false (adding nothing) unless another character is levelling
--- too: the bar's own tooltip already covers you.
-function ns.AddXPLines(tt, now)
-    local chars, maxLevel = ns.db.chars, ns.MaxLevel()
-    local n = 0
-    for _, key in ipairs(ns.OverviewOrder()) do
-        local c = chars[key]
-        if c.level and c.level < maxLevel and key ~= ns.charKey then n = n + 1 end
+-- Tooltip text isn't monospaced, so the level, XP and rested columns are lined up by
+-- measuring each value in the tooltip's own font and padding it on the left with a
+-- transparent texture of exactly the missing width.
+local BLANK = "Interface\\AddOns\\" .. ADDON .. "\\media\\blank.tga"
+local GAP = 10
+local measure
+
+local function Spacer(width)
+    width = floor(width + 0.5)
+    if width < 1 then return "" end
+    return "|T" .. BLANK .. ":1:" .. width .. "|t"
+end
+
+-- The width of s in the given font, or nil if it can't be measured.
+local function Width(font, size, flags, s)
+    if not measure then
+        measure = UIParent:CreateFontString(nil, "BACKGROUND")
+        measure:Hide()
     end
-    if n == 0 then return false end
-    tt:AddLine(" ")
-    tt:AddLine("Your characters", 1, 0.82, 0)
-    for _, key in ipairs(ns.OverviewOrder()) do
-        local c = chars[key]
-        if c.level and c.level < maxLevel then
-            tt:AddDoubleLine(ns.ColoredName(key, c),
-                ns.LevelText(c) .. "   " .. GREY .. "rested|r " .. ns.RestedText(c, now), 1, 1, 1, 1, 1, 1)
+    measure:SetFont(font, size, flags)
+    measure:SetText(s)
+    local w = measure:GetStringWidth()
+    return type(w) == "number" and w or nil
+end
+
+-- One row per character: name, and the three right-hand values.
+local rows = {}
+
+-- Lines up the right-hand columns of the rows added from line `first` on; leaves the
+-- plain text if the tooltip's text can't be measured.
+local function Align(tt, first)
+    local name = tt.GetName and tt:GetName()
+    local fs = name and _G[name .. "TextRight" .. first]
+    local font, size, flags
+    if fs and fs.GetFont then font, size, flags = fs:GetFont() end
+    if not font then return end
+    local widths = { 0, 0, 0 }
+    for _, row in ipairs(rows) do
+        for col = 1, 3 do
+            local w = Width(font, size, flags, row[col + 1])
+            if not w then return end
+            row[col + 4] = w
+            if w > widths[col] then widths[col] = w end
         end
     end
+    for i, row in ipairs(rows) do
+        local right = _G[name .. "TextRight" .. (first + i - 1)]
+        if not right then return end
+        right:SetText(Spacer(widths[1] - row[5]) .. row[2] .. Spacer(GAP + widths[2] - row[6]) .. row[3]
+            .. Spacer(GAP) .. GREY .. "rested|r " .. Spacer(widths[3] - row[7]) .. row[4])
+    end
+end
+
+-- Adds your other characters still levelling (the bar's own tooltip already covers
+-- you); returns false, adding nothing, if there are none.
+function ns.AddXPLines(tt, now)
+    local chars, maxLevel = ns.db.chars, ns.MaxLevel()
+    for i = #rows, 1, -1 do rows[i] = nil end
+    for _, key in ipairs(ns.OverviewOrder()) do
+        local c = chars[key]
+        if key ~= ns.charKey and c.level and c.level < maxLevel then
+            local xp = (c.xpMax and c.xpMax > 0) and (GREY .. floor(c.xp * 100 / c.xpMax) .. "%|r") or ""
+            rows[#rows + 1] = { ns.ColoredName(key, c), tostring(c.level), xp, ns.RestedText(c, now) }
+        end
+    end
+    if #rows == 0 then return false end
+    tt:AddLine(" ")
+    tt:AddLine("Your characters", 1, 0.82, 0)
+    local first = tt.NumLines and tt:NumLines() + 1
+    for _, row in ipairs(rows) do
+        tt:AddDoubleLine(row[1], row[2] .. "  " .. row[3] .. "  " .. GREY .. "rested|r " .. row[4], 1, 1, 1, 1, 1, 1)
+    end
+    if first then Align(tt, first) end
     return true
 end
 
