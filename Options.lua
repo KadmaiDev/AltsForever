@@ -52,6 +52,8 @@ end
 ---------------------------------------------------------------------------
 local function SkillupsSelected() return ns.SkillupsOn() end
 local function ToggleSkillups() ns.SetSkillups(not ns.SkillupsOn()) end
+local function SendToAltSelected() return ns.SendToAltOn() end
+local function ToggleSendToAlt() ns.SetSendToAlt(not ns.SendToAltOn()) end
 
 -- The options menu: from the compartment's right-click and the overview's cog button.
 function ns.ShowOptionsMenu(owner)
@@ -62,8 +64,8 @@ function ns.ShowOptionsMenu(owner)
         if not ns.OverviewShown() then
             root:CreateButton("Open overview", function() ns.ToggleOverview(true) end)
         end
-        root:CreateButton("Reputation", function() ns.ToggleReputation() end)
         root:CreateCheckbox("Show skill-up details", SkillupsSelected, ToggleSkillups)
+        root:CreateCheckbox("Send mail to alts", SendToAltSelected, ToggleSendToAlt)
         root:CreateButton("Memory use", function() ns.RunCommand("mem") end)
     end)
 end

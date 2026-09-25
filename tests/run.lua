@@ -1725,7 +1725,7 @@ test("minimap compartment: click opens the overview, right-click the options men
     AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
     local texts = {}
     for _, item in ipairs(wow.menu.items) do texts[#texts + 1] = item.text end
-    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Reputation | Show skill-up details | Memory use")
+    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Show skill-up details | Send mail to alts | Memory use")
     wow.menuItem("Open overview").fn()
     eq(AltsForeverFrame:IsShown(), true)
     wow.menuItem("Open overview").fn()
@@ -1942,6 +1942,26 @@ test("send to alt: characters who can skill up with the attachments are marked a
     b.scripts.OnClick(b)
     eq(wow.menu.items[2].text, "[WARRIOR]Brak Stone", "skill-up details off: plain list, by level")
 end)
+test("send to alt can be turned off and on from the options menu", function()
+    wow.load(FILES)
+    wow.login(mailAlts())
+    AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
+    local box = wow.menuItem("Send mail to alts")
+    eq(box.kind, "checkbox"); eq(box.isSelected(), true)
+    box.setSelected()
+    eq(AltsForeverDB.sendToAltOff, true)
+    wow.fire("MAIL_SHOW")
+    eq(altsButton(), nil, "off: no arrow at the mailbox")
+    box.setSelected()
+    wow.fire("MAIL_CLOSED") wow.fire("MAIL_SHOW")
+    local b = altsButton()
+    eq(b:IsShown(), true, "on again")
+    box.setSelected()
+    eq(b:IsShown(), false, "turning it off hides an existing arrow")
+    box.setSelected()
+    eq(b:IsShown(), true)
+end)
+
 ---------------------------------------------------------------------------
 local function tocFiles(path)
     local files = {}

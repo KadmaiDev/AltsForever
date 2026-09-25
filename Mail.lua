@@ -143,9 +143,19 @@ local function AltsMenu(owner)
     end)
 end
 
+-- The mailbox arrow can be turned off from the options menu ("Send mail to alts").
+function ns.SendToAltOn()
+    return not ns.db.sendToAltOff
+end
+
 local altsButton
+function ns.SetSendToAlt(on)
+    ns.db.sendToAltOff = not on or nil
+    if altsButton then altsButton:SetShown(on) end
+end
+
 local function CreateAltsButton()
-    if altsButton or not (SendMailFrame and SendMailNameEditBox) then return end
+    if altsButton or not ns.SendToAltOn() or not (SendMailFrame and SendMailNameEditBox) then return end
     -- A small dropdown arrow inside the right end of the To box: there's no free space
     -- beside it (a button there covered "Postage").
     local b = CreateFrame("Button", nil, SendMailFrame)

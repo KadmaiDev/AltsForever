@@ -24,9 +24,9 @@ Hovering a recipe (pattern, schematic, formula...) lists your characters who hav
 
 **Can craft:** hovering any item that one of your characters knows how to make adds a "Can craft" section listing them one per line (the current character first). This also comes from opening each profession window once.
 
-**Reputation:** the reputation button in the overview's title bar (or "Reputation" in the options menu) opens a panel with every faction down the side and your characters across, e.g. "Honored 27%"; hover a faction for exact numbers.
+**Reputation:** the reputation button in the overview's title bar opens a panel with every faction down the side and your characters across, e.g. "Honored 27%"; hover a faction for exact numbers.
 
-**Send to alt:** at the mailbox, a small arrow at the right end of the To box lists your characters (same faction); picking one fills in their name. Characters who can still skill up with what you've attached are marked and listed first.
+**Send to alt:** at the mailbox, a small arrow at the right end of the To box lists your characters (same faction); picking one fills in their name. Characters who can still skill up with what you've attached are marked and listed first. Turn it off with "Send mail to alts" in the options menu.
 
 **Skill-ups across your alts:** "Can craft" marks characters who'd still get a skill-up from making the item ("Tarnia Moonwhisper · skill-ups to 115"), and hovering a material lists the recipes your characters can still skill up with it, under "Skill-ups" ("Heavy Linen Bandage   Tarnia · to 115"): you first, then your other characters, 2 recipes each with the most skill-ups left, up to 6 lines. The overview's row tooltip counts each profession's recipes that still give skill-ups, or says "train to skill up" for a character at their rank's maximum (e.g. 75/75), who is left out of the skill-up lines until they train. It all comes from the game when a profession window is opened; `/af skillups` turns it off.
 
