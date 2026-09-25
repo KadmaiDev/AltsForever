@@ -4,6 +4,7 @@
 local _, ns = ...
 
 local floor, max, pairs, time = math.floor, math.max, pairs, time
+local ipairs, select, type = ipairs, select, type
 local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
 
 local GREY = "|cff9d9d9d"
@@ -352,6 +353,83 @@ function ns.RefreshOverview()
     if frame and frame:IsShown() then Refresh() end
 end
 
+---------------------------------------------------------------------------
+-- XP bar tooltip: hovering the experience bar adds every character still levelling
+-- (you first, then by level) with their level, XP and rested XP. Built only on hover.
+---------------------------------------------------------------------------
+
+-- Adds the lines; returns false (adding nothing) unless another character is levelling
+-- too: the bar's own tooltip already covers you.
+function ns.AddXPLines(tt, now)
+    local chars, maxLevel = ns.db.chars, ns.MaxLevel()
+    local n = 0
+    for _, key in ipairs(ns.OverviewOrder()) do
+        local c = chars[key]
+        if c.level and c.level < maxLevel and key ~= ns.charKey then n = n + 1 end
+    end
+    if n == 0 then return false end
+    tt:AddLine(" ")
+    tt:AddLine("Your characters", 1, 0.82, 0)
+    for _, key in ipairs(ns.OverviewOrder()) do
+        local c = chars[key]
+        if c.level and c.level < maxLevel then
+            tt:AddDoubleLine(ns.ColoredName(key, c),
+                ns.LevelText(c) .. "   " .. GREY .. "rested|r " .. ns.RestedText(c, now), 1, 1, 1, 1, 1, 1)
+        end
+    end
+    return true
+end
+
+-- Blizzard's bar has no tooltip of its own, so we open one; ElvUI's and EllesmereUI's
+-- show theirs (unless the player made the bar click-through, or is at max level), and
+-- we add to it.
+local function HookXPBar(bar, ownTooltip)
+    if not bar or bar.altsForeverXP or not bar.HookScript then return end
+    bar.altsForeverXP = true
+    bar:HookScript("OnEnter", function(self)
+        local tt = GameTooltip
+        if tt:IsForbidden() then return end
+        if tt:IsShown() then
+            if ns.AddXPLines(tt, time()) then tt:Show() end
+        elseif ownTooltip then
+            tt:SetOwner(self, "ANCHOR_TOP")
+            if ns.AddXPLines(tt, time()) then tt:Show() else tt:Hide() end
+        end
+    end)
+    if ownTooltip then
+        bar:HookScript("OnLeave", function(self)
+            if GameTooltip:IsOwned(self) then GameTooltip:Hide() end
+        end)
+    end
+end
+
+-- Blizzard's experience bar sits in a status tracking container (with reputation etc.);
+-- it's the one with a rested (exhaustion) marker.
+local function BlizzardXPBars(container, found)
+    if not container then return end
+    if type(container.bars) == "table" then
+        for _, bar in pairs(container.bars) do
+            if type(bar) == "table" and bar.ExhaustionTick then found[#found + 1] = bar end
+        end
+    end
+    for i = 1, select("#", container:GetChildren()) do
+        local bar = select(i, container:GetChildren())
+        if bar and bar.ExhaustionTick then found[#found + 1] = bar end
+    end
+end
+
+-- Hooks each XP bar once. Other UIs make theirs during their own login setup, so this
+-- runs on entering the world (after every addon's login) and again after each loading
+-- screen, which costs nothing once hooked.
+local function HookXPBars()
+    local found = {}
+    BlizzardXPBars(MainStatusTrackingBarContainer, found)
+    BlizzardXPBars(SecondaryStatusTrackingBarContainer, found)
+    for _, bar in ipairs(found) do HookXPBar(bar, true) end
+    HookXPBar(ElvUI_ExperienceBarHolder, false)
+    HookXPBar(EllesmereEAB_XPBar, false)
+end
+
 function ns.StartOverview()
     -- Keep an open window current; a closed or never-opened one costs nothing.
     local function Update()
@@ -360,4 +438,5 @@ function ns.StartOverview()
     for _, event in ipairs({ "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "PLAYER_MONEY", "ZONE_CHANGED_NEW_AREA", "SKILL_LINES_CHANGED" }) do
         ns.On(event, Update)
     end
+    ns.On("PLAYER_ENTERING_WORLD", HookXPBars)
 end

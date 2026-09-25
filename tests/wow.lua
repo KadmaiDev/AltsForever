@@ -134,6 +134,14 @@ function M.load(files)
         self.scripts[script] = fn
         if script == "OnEvent" then self.onEvent = fn end
     end
+    function frameMethods:HookScript(script, fn)
+        local prev = self.scripts[script]
+        self.scripts[script] = function(...)
+            if prev then prev(...) end
+            fn(...)
+        end
+    end
+    function frameMethods:GetChildren() return unpack(self.children or {}) end
     function frameMethods:Show()
         local was = self.shown
         self.shown = true
@@ -417,6 +425,9 @@ function M.load(files)
     AltsForever_OnAddonCompartmentClick, AltsForever_OnAddonCompartmentEnter = nil, nil
     AltsForever_OnAddonCompartmentLeave = nil
     AltsForeverMinimapButton = nil
+    -- XP bars (Blizzard's, ElvUI's, EllesmereUI's) exist only if a test makes them.
+    MainStatusTrackingBarContainer, SecondaryStatusTrackingBarContainer = nil, nil
+    ElvUI_ExperienceBarHolder, EllesmereEAB_XPBar = nil, nil
     local ns = {}
     for _, file in ipairs(files) do
         assert(loadfile(file))("AltsForever", ns)
@@ -433,6 +444,7 @@ function M.tooltip()
         IsForbidden = function() return false end,
         SetOwner = function(self, owner) self.owner, self.lines, self.shown = owner, {}, false end,
         GetOwner = function(self) return self.owner end,
+        IsOwned = function(self, f) return self.shown and self.owner == f end,
         SetHyperlink = function(self, link) self.hyperlink = link end,
         IsShown = function(self) return self.shown end,
         Show = function(self) self.shown = true end,

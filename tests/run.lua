@@ -2159,6 +2159,76 @@ test("a live change to CUSTOM_CLASS_COLORS (ElvUI, !ClassColors) recolours names
 end)
 
 ---------------------------------------------------------------------------
+-- XP bar tooltip
+local function lineTexts(tt)
+    local t = {}
+    for _, l in ipairs(tt.lines) do t[#t + 1] = l[1] end
+    return table.concat(t, " | ")
+end
+
+-- Blizzard's XP bar: in a status tracking container, marked by its rested tick.
+local function blizzardXPBar()
+    MainStatusTrackingBarContainer = CreateFrame("Frame")
+    local rep, xp = CreateFrame("Frame"), CreateFrame("Frame")
+    xp.ExhaustionTick = CreateFrame("Frame")
+    MainStatusTrackingBarContainer.bars = { rep, xp }
+    MainStatusTrackingBarContainer.children = { rep, xp }
+    return xp
+end
+
+test("hovering Blizzard's XP bar lists every character still levelling", function()
+    wow.load(FILES)
+    wow.now = NOW
+    local bar = blizzardXPBar()
+    wow.login(overviewAlts())
+    wow.fire("PLAYER_ENTERING_WORLD")
+    bar.scripts.OnEnter(bar)
+    eq(GameTooltip:GetOwner(), bar); eq(GameTooltip:IsShown(), true)
+    eq(lineTexts(GameTooltip), "  | Your characters | [MAGE]Aldric | [PRIEST]High | [ROGUE]Low",
+        "you first, then by level; max level (Far) left out")
+    local low = GameTooltip.lines[5][2]
+    assert(low:find("^12  ") and low:find("10%%") and low:find("rested"), low)
+    bar.scripts.OnLeave(bar)
+    eq(GameTooltip:IsShown(), false)
+    -- Hooked once, however many loading screens.
+    wow.fire("PLAYER_ENTERING_WORLD")
+    bar.scripts.OnEnter(bar)
+    eq(#GameTooltip.lines, 5)
+end)
+
+test("the XP bar adds nothing when you're the only character levelling", function()
+    wow.load(FILES)
+    local bar = blizzardXPBar()
+    wow.login({ v = 2, chars = { ["Far"] = alt("Far", "MAGE", { level = 60 }) } })
+    wow.fire("PLAYER_ENTERING_WORLD")
+    bar.scripts.OnEnter(bar)
+    eq(GameTooltip:IsShown(), false)
+end)
+
+test("ElvUI's and EllesmereUI's XP bar tooltips get the lines added at the end", function()
+    for _, name in ipairs({ "ElvUI_ExperienceBarHolder", "EllesmereEAB_XPBar" }) do
+        wow.load(FILES)
+        wow.now = NOW
+        local bar = CreateFrame("Frame", name)
+        local ownTooltip = true
+        bar:SetScript("OnEnter", function(self)
+            if not ownTooltip then return end -- click-through, or at max level
+            GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+            GameTooltip:AddLine("Experience")
+            GameTooltip:Show()
+        end)
+        wow.login(overviewAlts())
+        wow.fire("PLAYER_ENTERING_WORLD")
+        bar.scripts.OnEnter(bar)
+        eq(lineTexts(GameTooltip), "Experience |   | Your characters | [MAGE]Aldric | [PRIEST]High | [ROGUE]Low", name)
+        GameTooltip:Hide()
+        ownTooltip = false
+        bar.scripts.OnEnter(bar)
+        eq(GameTooltip:IsShown(), false, name .. ": no tooltip of our own where theirs is off")
+    end
+end)
+
+---------------------------------------------------------------------------
 -- Minimap button
 test("a minimap button is made as soon as saved data loads (before login)", function()
     wow.load(FILES)

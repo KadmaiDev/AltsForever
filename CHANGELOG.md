@@ -1,3 +1,7 @@
+## Unreleased
+
+- **XP across your characters:** hover the experience bar to see every character that's still levelling, with their level, XP and rested XP (including what they've built up while logged out). Works with Blizzard's bar, ElvUI's and EllesmereUI's.
+
 ## Alts Forever 0.5.0
 
 - **Minimap button:** Alts Forever now has a normal minimap button: click for the overview, right-click for options, drag to move it. Hide it with "Show minimap button" in the options menu. With EllesmereUI it appears in its minimap button tray.
