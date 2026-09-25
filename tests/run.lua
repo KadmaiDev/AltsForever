@@ -2016,6 +2016,63 @@ test("if the player turned our skinning off in EllesmereUI, nothing is skinned",
 end)
 
 ---------------------------------------------------------------------------
+-- Class colours: EllesmereUI's, then CUSTOM_CLASS_COLORS, then Blizzard's
+-- With one character there's no Total line: the name is on line 2.
+local function tooltipName(itemID)
+    return wow.hover(GameTooltip, itemID)[2][1]
+end
+
+test("names use EllesmereUI's class colours when it's installed", function()
+    wow.withEllesmere = true
+    wow.load(FILES)
+    EllesmereUI.GetClassColor = function(class) return class == "MAGE" and { r = 1, g = 0.5, b = 0 } or EllesmereUI._COLOR_WHITE end
+    EllesmereUI._COLOR_WHITE = { r = 1, g = 1, b = 1 }
+    wow.setBag(0, 16, { [1] = { 100, 2 } })
+    wow.login(nil)
+    eq(tooltipName(100), "|cffff8000Aldric|r")
+end)
+
+test("anything unexpected from EllesmereUI falls back to Blizzard's colour", function()
+    for _, bad in ipairs({
+        function() error("changed API") end,
+        function() return "not a colour" end,
+        function() return EllesmereUI._COLOR_WHITE end, -- its "unknown class"
+    }) do
+        wow.withEllesmere = true
+        wow.load(FILES)
+        EllesmereUI._COLOR_WHITE = { r = 1, g = 1, b = 1 }
+        EllesmereUI.GetClassColor = bad
+        wow.setBag(0, 16, { [1] = { 100, 2 } })
+        wow.login(nil)
+        eq(tooltipName(100), "[MAGE]Aldric")
+    end
+end)
+
+test("names use CUSTOM_CLASS_COLORS (e.g. !ClassColors) when present", function()
+    wow.load(FILES)
+    CUSTOM_CLASS_COLORS = { MAGE = { r = 0, g = 1, b = 0 } }
+    wow.setBag(0, 16, { [1] = { 100, 2 } })
+    wow.login(nil)
+    eq(tooltipName(100), "|cff00ff00Aldric|r")
+end)
+
+test("a live EllesmereUI look change recolours names", function()
+    wow.withEllesmere = true
+    wow.load(FILES)
+    EllesmereUI._COLOR_WHITE = { r = 1, g = 1, b = 1 }
+    local colour = { r = 1, g = 0, b = 0 }
+    EllesmereUI.GetClassColor = function() return colour end
+    wow.setBag(0, 16, { [1] = { 100, 2 } })
+    wow.login(nil)
+    wow.skinCallback(wow.skinFacade)
+    eq(tooltipName(100), "|cffff0000Aldric|r")
+    colour = { r = 0, g = 0, b = 1 }
+    eq(tooltipName(100), "|cffff0000Aldric|r", "cached until told")
+    wow.looksChanged()
+    eq(tooltipName(100), "|cff0000ffAldric|r")
+end)
+
+---------------------------------------------------------------------------
 local function tocFiles(path)
     local files = {}
     for line in io.lines(path) do

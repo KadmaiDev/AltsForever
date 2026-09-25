@@ -370,7 +370,8 @@ function M.load(files)
     AltsForeverFrame = nil
     -- EllesmereUI's skinning API, only if a test asked for it (wow.withEllesmere) before
     -- loading. The callback is kept in M.skinCallback; the facade records every call.
-    EllesmereUI, M.skinCallback, M.skinned = nil, nil, {}
+    EllesmereUI, M.skinCallback, M.skinned, M.looksChanged = nil, nil, {}, nil
+    CUSTOM_CLASS_COLORS = nil
     if M.withEllesmere then
         M.withEllesmere = nil
         EllesmereUI = { RegisterSkin = function(name, fn) M.skinName, M.skinCallback = name, fn end }
@@ -380,6 +381,7 @@ function M.load(files)
                 M.skinned[#M.skinned + 1] = { fname, obj }
             end
         end
+        M.skinFacade.OnLooksChanged = function(fn) M.looksChanged = fn end
     end
     -- Globals the addon defines (named in the .toc); cleared so a previous load is freed.
     AltsForever_OnAddonCompartmentClick, AltsForever_OnAddonCompartmentEnter = nil, nil

@@ -5,7 +5,7 @@
 -- last item shown, which covers the tooltip refreshing while you hover.
 local _, ns = ...
 
-local pairs, wipe = pairs, wipe
+local pairs, wipe, type, pcall, floor = pairs, wipe, type, pcall, math.floor
 local issecretvalue = issecretvalue or function() return false end
 local GetItemInfoInstant = C_Item.GetItemInfoInstant
 
@@ -31,12 +31,46 @@ local cache, cacheSize = {}, 0
 local names, shortNames = {}, {}
 local lastId, lastVer, curCount, curText
 
+-- An { r, g, b } colour from another addon, if it's usable.
+local function Usable(c)
+    return type(c) == "table" and type(c.r) == "number" and type(c.g) == "number" and type(c.b) == "number"
+        and not issecretvalue(c.r)
+end
+
+local function Hex(v)
+    v = v < 0 and 0 or v > 1 and 1 or v
+    return ("%02x"):format(floor(v * 255 + 0.5))
+end
+
+-- A name in its class colour: the player's own class colours where their UI provides
+-- them, otherwise Blizzard's.
+--  1. EllesmereUI keeps its custom class colours to itself; EllesmereUI.GetClassColor is
+--     how its own frames read them. It isn't part of its official skinning API, so it's
+--     called guarded, and anything unexpected (an error, not a colour, or the plain white
+--     it gives for unknown classes) falls through.
+--  2. CUSTOM_CLASS_COLORS, the community standard (e.g. !ClassColors).
+--  3. Blizzard's class colours.
+local function InClassColor(class, s)
+    if not class then return s end
+    local eui = EllesmereUI and EllesmereUI.GetClassColor
+    if eui then
+        local ok, c = pcall(eui, class)
+        if ok and Usable(c) and c ~= EllesmereUI._COLOR_WHITE then
+            return "|cff" .. Hex(c.r) .. Hex(c.g) .. Hex(c.b) .. s .. "|r"
+        end
+    end
+    local custom = type(CUSTOM_CLASS_COLORS) == "table" and CUSTOM_CLASS_COLORS[class]
+    if Usable(custom) then
+        return "|cff" .. Hex(custom.r) .. Hex(custom.g) .. Hex(custom.b) .. s .. "|r"
+    end
+    local color = C_ClassColor.GetClassColor(class)
+    return color and color:WrapTextInColorCode(s) or s
+end
+
 local function ColoredName(key, c)
     local s = names[key]
     if not s then
-        s = c.name or key
-        local color = c.class and C_ClassColor.GetClassColor(c.class)
-        if color then s = color:WrapTextInColorCode(s) end
+        s = InClassColor(c.class, c.name or key)
         names[key] = s
     end
     return s
@@ -48,9 +82,7 @@ ns.ColoredName = ColoredName
 function ns.ShortName(key, c)
     local s = shortNames[key]
     if not s then
-        s = (c.name or key):match("^(%S+)") or key
-        local color = c.class and C_ClassColor.GetClassColor(c.class)
-        if color then s = color:WrapTextInColorCode(s) end
+        s = InClassColor(c.class, (c.name or key):match("^(%S+)") or key)
         shortNames[key] = s
     end
     return s

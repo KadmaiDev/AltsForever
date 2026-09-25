@@ -1,5 +1,6 @@
 ## Unreleased
 
+- **Your class colours:** character names use your custom class colours from EllesmereUI, or from addons like !ClassColors, instead of Blizzard's defaults.
 - **EllesmereUI look:** with EllesmereUI installed, Alts Forever's windows (overview, gear and reputation) take on your EllesmereUI theme, accent colour and font. Without it, nothing changes. You can turn it off for Alts Forever in EllesmereUI's options (Blizz UI Enhanced > Blizzard Window Skins > Third-Party Addons).
 
 ## Alts Forever 0.4.0

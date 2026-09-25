@@ -34,6 +34,14 @@ end
 if EllesmereUI and EllesmereUI.RegisterSkin then
     EllesmereUI.RegisterSkin(ADDON, function(S)
         skin = S
+        -- Names are coloured once and cached; when the player changes their EllesmereUI
+        -- look live, drop the cache so names pick up their class colours again.
+        if S.OnLooksChanged then
+            S.OnLooksChanged(function()
+                ns.InvalidateCache()
+                if ns.RefreshOverview then ns.RefreshOverview() end
+            end)
+        end
         -- Runs at login, before our windows exist; skin any that are already open.
         for _, name in ipairs({ "AltsForeverFrame", "AltsForeverGearFrame", "AltsForeverRepFrame" }) do
             if _G[name] then ns.SkinWindow(_G[name]) end
