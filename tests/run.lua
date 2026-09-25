@@ -1899,7 +1899,7 @@ end
 
 local function altsButton()
     for _, f in ipairs(wow.frames) do
-        if f.kind == "Button" and f.text == "Alts" then return f end
+        if f.kind == "Button" and f.alts then return f end
     end
 end
 
@@ -1912,7 +1912,7 @@ test("send to alt: an Alts button appears beside the To box when the mailbox ope
     assert(b, "button made")
     wow.fire("MAIL_CLOSED") wow.fire("MAIL_SHOW")
     local n = 0
-    for _, f in ipairs(wow.frames) do if f.text == "Alts" then n = n + 1 end end
+    for _, f in ipairs(wow.frames) do if f.alts then n = n + 1 end end
     eq(n, 1, "made once")
 end)
 

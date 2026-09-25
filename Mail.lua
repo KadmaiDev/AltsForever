@@ -146,11 +146,16 @@ end
 local altsButton
 local function CreateAltsButton()
     if altsButton or not (SendMailFrame and SendMailNameEditBox) then return end
-    local ok, b = pcall(CreateFrame, "Button", nil, SendMailFrame, "UIPanelButtonTemplate")
-    if not ok then b = CreateFrame("Button", nil, SendMailFrame) end
-    b:SetSize(52, 20)
-    b:SetPoint("LEFT", SendMailNameEditBox, "RIGHT", 6, 0)
-    b:SetText("Alts")
+    -- A small dropdown arrow inside the right end of the To box: there's no free space
+    -- beside it (a button there covered "Postage").
+    local b = CreateFrame("Button", nil, SendMailFrame)
+    b:SetSize(18, 18)
+    b:SetPoint("RIGHT", SendMailNameEditBox, "RIGHT", -2, 0)
+    b:SetFrameLevel(SendMailNameEditBox:GetFrameLevel() + 2)
+    b:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up")
+    b:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Down")
+    b:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+    b.alts = true
     b:SetScript("OnClick", AltsMenu)
     b:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
