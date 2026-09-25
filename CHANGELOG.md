@@ -1,6 +1,6 @@
 ## Unreleased
 
-- **Click instead of typing:** Alts Forever is in the minimap's addon menu, the small number at the top of the minimap (click: open the overview, right-click: options). The overview has an options button (skill-up details on/off, mail expiry, memory use), and right-clicking a character there lets you forget them, with a confirmation.
+- **Click instead of typing:** Alts Forever is in the minimap's addon menu, the small number at the top of the minimap (click: open the overview, right-click: options). The overview has an options button (skill-up details on/off, memory use), and right-clicking a character there lets you forget them, with a confirmation.
 
 ## Alts Forever 0.3.0
 

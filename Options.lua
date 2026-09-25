@@ -57,7 +57,6 @@ function ns.ShowOptionsMenu(owner)
             root:CreateButton("Open overview", function() ns.ToggleOverview(true) end)
         end
         root:CreateCheckbox("Show skill-up details", SkillupsSelected, ToggleSkillups)
-        root:CreateButton("Show mail expiry in chat", function() ns.RunCommand("mail") end)
         root:CreateButton("Memory use", function() ns.RunCommand("mem") end)
     end)
 end

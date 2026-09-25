@@ -1719,7 +1719,7 @@ test("minimap compartment: click opens the overview, right-click the options men
     AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
     local texts = {}
     for _, item in ipairs(wow.menu.items) do texts[#texts + 1] = item.text end
-    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Show skill-up details | Show mail expiry in chat | Memory use")
+    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Show skill-up details | Memory use")
     wow.menuItem("Open overview").fn()
     eq(AltsForeverFrame:IsShown(), true)
     wow.menuItem("Open overview").fn()
@@ -1733,9 +1733,9 @@ test("minimap compartment: click opens the overview, right-click the options men
     assert(GameTooltip.lines[3][1]:find("Right-click", 1, true))
 end)
 
-test("options menu: skill-up details tick box, mail and memory", function()
+test("options menu: skill-up details tick box and memory", function()
     wow.load(FILES)
-    wow.login({ v = 2, chars = { ["Soon"] = alt("Soon", "ROGUE", { mail = {}, mailExpires = os.time() + 3600 }) } })
+    wow.login(nil)
     SlashCmdList.ALTSFOREVER("")
     AltsForeverFrame.cog.scripts.OnClick(AltsForeverFrame.cog)
     local box = wow.menuItem("Show skill-up details")
@@ -1744,9 +1744,6 @@ test("options menu: skill-up details tick box, mail and memory", function()
     eq(AltsForeverDB.skillupsOff, true); eq(box.isSelected(), false)
     box.setSelected()
     eq(AltsForeverDB.skillupsOff, nil)
-    wow.printed = {}
-    wow.menuItem("Show mail expiry in chat").fn()
-    assert(table.concat(wow.printed, "\n"):find("Soon", 1, true), "same as /af mail")
     wow.printed = {}
     wow.menuItem("Memory use").fn()
     assert(table.concat(wow.printed, "\n"):find("Memory", 1, true), "same as /af mem")
