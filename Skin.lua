@@ -28,6 +28,11 @@ function ns.SkinWindow(f)
     skin.Shell(f)
     if f.CloseButton then skin.CloseButton(f.CloseButton) end
     if f.Inset then skin.Inset(f.Inset) end
+    -- Icon buttons (the overview's reputation and options buttons): EllesmereUI's flat
+    -- square icons with its thin border.
+    for _, b in ipairs({ f.cog, f.repButton }) do
+        if b and b.GetNormalTexture then skin.SquareIcon(b:GetNormalTexture(), b) end
+    end
     SkinRegions(f)
 end
 

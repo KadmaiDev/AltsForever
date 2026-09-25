@@ -159,6 +159,8 @@ ns.On("ADDON_LOADED", function(name)
     ns.db = AltsForeverDB
     -- Left over from the rested XP rate check, which has been removed.
     ns.db.restedChecks, ns.db.restCheckOff = nil, nil
+    -- Before login, so EllesmereUI's minimap finds it when it collects addon buttons.
+    ns.CreateMinimapButton()
 end)
 
 ns.On("PLAYER_LOGIN", function()

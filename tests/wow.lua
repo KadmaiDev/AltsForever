@@ -151,6 +151,9 @@ function M.load(files)
     function frameMethods:GetFrameLevel() return self.level or 1 end
     function frameMethods:SetFrameLevel(level) self.level = level end
     function frameMethods:SetText(text) self.text = text end
+    function frameMethods:SetPoint(point, rel, relPoint, x, y) self.point = { point, rel, relPoint, x, y } end
+    function frameMethods:GetNormalTexture() return self.normalTexture end
+    function frameMethods:SetNormalTexture(t) self.normalTexture = { texture = t } end
     function frameMethods:GetText() return self.text end
     function frameMethods:CreateFontString()
         local fs = newObject("FontString")
@@ -177,6 +180,12 @@ function M.load(files)
     chat:SetScript("OnEvent", function(_, _, total) M.playedShown[#M.playedShown + 1] = total end)
     CreateFrame("ScrollingMessageFrame", "ChatFrame2")
     UIParent = newObject("Frame")
+    Minimap = newObject("Frame", "Minimap")
+    Minimap.GetWidth = function() return 140 end
+    Minimap.GetCenter = function() return 1000, 600 end
+    Minimap.GetEffectiveScale = function() return 1 end
+    M.cursor = { 1000, 600 }
+    GetCursorPosition = function() return M.cursor[1], M.cursor[2] end
     UISpecialFrames = {}
 
     -- The logged-in character's level, XP and whereabouts.
@@ -376,7 +385,7 @@ function M.load(files)
         M.withEllesmere = nil
         EllesmereUI = { RegisterSkin = function(name, fn) M.skinName, M.skinCallback = name, fn end }
         M.skinFacade = {}
-        for _, fname in ipairs({ "Shell", "CloseButton", "Inset", "Font", "Button", "Panel" }) do
+        for _, fname in ipairs({ "Shell", "CloseButton", "Inset", "Font", "Button", "Panel", "SquareIcon" }) do
             M.skinFacade[fname] = function(obj)
                 M.skinned[#M.skinned + 1] = { fname, obj }
             end
@@ -386,6 +395,7 @@ function M.load(files)
     -- Globals the addon defines (named in the .toc); cleared so a previous load is freed.
     AltsForever_OnAddonCompartmentClick, AltsForever_OnAddonCompartmentEnter = nil, nil
     AltsForever_OnAddonCompartmentLeave = nil
+    AltsForeverMinimapButton = nil
     local ns = {}
     for _, file in ipairs(files) do
         assert(loadfile(file))("AltsForever", ns)
