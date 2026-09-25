@@ -1599,6 +1599,107 @@ test("overview: at a rank cap it says to train; at 300 it says nothing extra", f
 end)
 
 ---------------------------------------------------------------------------
+-- The game's recipe list can hold other professions' recipes (build 70009)
+local VEST, WOLF_MEAT = 2847, 2679
+
+-- A Blacksmithing window whose list also holds Cooking recipes, plus unlearned filler.
+local function mixedWindow(extra)
+    wow.tradeskill.prof = "Blacksmithing"
+    local recipes = {
+        [3001] = { name = "Rough Copper Vest", learned = true, item = VEST, grey = 55, reagents = { { 2840, 4 } } },
+        [3002] = { name = "Charred Wolf Meat", learned = true, prof = "Cooking", item = WOLF_MEAT, grey = 85,
+            reagents = { { 2672, 1 } } },
+        [3003] = { name = "Copper Bracers", learned = false, grey = 60 },
+    }
+    for i = 1, (extra or 0) do recipes[4000 + i] = { name = "Filler " .. i, learned = false, grey = 100 } end
+    wow.tradeskill.recipes = recipes
+    wow.fire("TRADE_SKILL_SHOW")
+end
+
+test("a scan only records recipes of the window's profession", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    mixedWindow()
+    eq(ns.char.recipes.Blacksmithing["rough copper vest"], true)
+    eq(ns.char.recipes.Blacksmithing["charred wolf meat"], nil, "a Cooking recipe in the list")
+    eq(ns.char.crafts.Blacksmithing[WOLF_MEAT], nil)
+    eq(AltsForeverDB.recipeInfo.Blacksmithing["charred wolf meat"], nil)
+    eq(AltsForeverDB.recipeInfo.Blacksmithing["rough copper vest"], "55;Rough Copper Vest;,2840:4")
+end)
+
+test("strays saved by 0.2.x are removed from every character, keeping the rest", function()
+    local ns = wow.load(FILES)
+    wow.login({ v = 2, recipeInfo = { Blacksmithing = {
+        ["rough copper vest"] = "50;Rough Copper Vest;,2840:4",
+        ["charred wolf meat"] = "85;Charred Wolf Meat;,2672:1",
+        ["herb baked egg"] = "85;Herb Baked Egg;,6889:1",
+    } }, chars = {
+        ["Vesp Ash"] = alt("Vesp Ash", "PALADIN", { profs = { Blacksmithing = 40 },
+            recipes = { Blacksmithing = { ["rough copper vest"] = true, ["charred wolf meat"] = true, ["herb baked egg"] = true } },
+            crafts = { Blacksmithing = { [VEST] = "rough copper vest", [WOLF_MEAT] = "charred wolf meat", [777] = true } } }),
+    } })
+    mixedWindow()
+    local v = AltsForeverDB.chars["Vesp Ash"]
+    eq(v.recipes.Blacksmithing["rough copper vest"], true, "their real recipe stays: still Known")
+    eq(v.recipes.Blacksmithing["charred wolf meat"], nil, "listed, but as Cooking")
+    eq(v.recipes.Blacksmithing["herb baked egg"], nil, "not in Blacksmithing's list at all")
+    eq(v.crafts.Blacksmithing[VEST], "rough copper vest")
+    eq(v.crafts.Blacksmithing[WOLF_MEAT], nil)
+    eq(v.crafts.Blacksmithing[777], true, "saved before 0.3.0: can't be checked, kept")
+    local info = AltsForeverDB.recipeInfo.Blacksmithing
+    eq(info["rough copper vest"], "55;Rough Copper Vest;,2840:4", "grey refreshed")
+    eq(info["charred wolf meat"], nil); eq(info["herb baked egg"], nil)
+end)
+
+test("a list without the window's profession changes nothing", function()
+    local ns = wow.load(FILES)
+    wow.login({ v = 2, chars = { ["Aldric"] = alt("Aldric", "MAGE", {
+        recipes = { Blacksmithing = { ["rough copper vest"] = true } } }) } })
+    wow.tradeskill.prof = "Blacksmithing"
+    wow.tradeskill.recipes = {
+        [3002] = { name = "Charred Wolf Meat", learned = true, prof = "Cooking", item = WOLF_MEAT, grey = 85 },
+        [3004] = { name = "Herb Baked Egg", learned = false, prof = "Cooking", grey = 85 },
+    }
+    wow.fire("TRADE_SKILL_SHOW")
+    eq(ns.char.recipes.Blacksmithing["rough copper vest"], true, "not wiped")
+    eq(ns.char.recipes.Blacksmithing["charred wolf meat"], nil)
+    -- The right list arrives with the next update.
+    mixedWindow()
+    wow.fire("TRADE_SKILL_LIST_UPDATE")
+    eq(ns.char.recipes.Blacksmithing["rough copper vest"], true)
+end)
+
+test("a new profession with nothing learned yet is still recorded as scanned", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    wow.tradeskill.prof = "Blacksmithing"
+    wow.tradeskill.recipes = { [3003] = { name = "Copper Bracers", learned = false, grey = 60 } }
+    wow.fire("TRADE_SKILL_SHOW")
+    eq(type(ns.char.recipes.Blacksmithing), "table", "scanned, just empty")
+end)
+
+test("the profession check stays cheap: only learned and stored recipes", function()
+    wow.load(FILES)
+    wow.login(nil)
+    wow.profLookups = 0
+    mixedWindow(300) -- 303 recipes listed, 2 learned
+    assert(wow.profLookups <= 3, "checked " .. wow.profLookups .. " of 303")
+end)
+
+test("/af delete also forgets recipes nobody else knows", function()
+    wow.load(FILES)
+    wow.login({ v = 2, recipeInfo = { Blacksmithing = {
+        ["rough copper vest"] = "55;Rough Copper Vest;", ["copper bracers"] = "60;Copper Bracers;" } }, chars = {
+        ["Mid"] = alt("Mid", "DRUID", { recipes = { Blacksmithing = { ["rough copper vest"] = true, ["copper bracers"] = true } } }),
+        ["Aldric"] = alt("Aldric", "MAGE", { recipes = { Blacksmithing = { ["copper bracers"] = true } } }),
+    } })
+    SlashCmdList.ALTSFOREVER("delete mid")
+    local info = AltsForeverDB.recipeInfo.Blacksmithing
+    eq(info["rough copper vest"], nil, "only Mid knew it")
+    eq(info["copper bracers"], "60;Copper Bracers;", "Aldric still knows it")
+end)
+
+---------------------------------------------------------------------------
 local function tocFiles(path)
     local files = {}
     for line in io.lines(path) do

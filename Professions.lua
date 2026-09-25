@@ -134,34 +134,107 @@ local function Record(info, r, lname, known)
     end
 end
 
+-- Every recipe name stored anywhere for a profession: any character's list or recipeInfo.
+local function StoredNames(prof)
+    local names = {}
+    for _, c in pairs(ns.db.chars) do
+        local known = c.recipes and c.recipes[prof]
+        if known then
+            for lname in pairs(known) do names[lname] = true end
+        end
+    end
+    local info = ns.db.recipeInfo and ns.db.recipeInfo[prof]
+    if info then
+        for lname in pairs(info) do names[lname] = true end
+    end
+    return names
+end
+
+-- Removes recipes that don't belong to the profession from every character's lists and
+-- from recipeInfo. `mine` is authoritative for every stored name (all were checked).
+-- Old `true` craft values can't be checked and are left alone.
+local function Repair(prof, mine)
+    for _, c in pairs(ns.db.chars) do
+        local known = c.recipes and c.recipes[prof]
+        if known then
+            for lname in pairs(known) do
+                if not mine[lname] then known[lname] = nil end
+            end
+        end
+        local crafts = c.crafts and c.crafts[prof]
+        if crafts then
+            for id, lname in pairs(crafts) do
+                if type(lname) == "string" and not mine[lname] then crafts[id] = nil end
+            end
+        end
+    end
+    local info = ns.db.recipeInfo and ns.db.recipeInfo[prof]
+    if info then
+        for lname in pairs(info) do
+            if not mine[lname] then info[lname] = nil end
+        end
+    end
+end
+
 -- c.recipes = { [professionName] = { [lowercase recipe name] = true } } and
 -- c.crafts = { [professionName] = { [itemID] = lowercase recipe name } }. A profession
 -- only has an entry once its window has been opened, so "missing" means "not scanned".
+--
+-- The game's recipe list sometimes holds other professions' recipes too (seen on build
+-- 70009, after switching professions in the window), so each recipe that matters is
+-- checked with GetProfessionInfoByRecipeID: learned ones, and ones already stored
+-- somewhere (so strays saved by 0.2.x can be removed). Unlearned recipes nobody has are
+-- skipped, which keeps this to tens of calls instead of the list's hundreds.
 function ns.ScanRecipes(c)
     if not TS.IsTradeSkillReady() or TS.IsTradeSkillLinked() or TS.IsTradeSkillGuild() then return false end
     local prof = ProfessionName(TS.GetBaseProfessionInfo())
     if not prof then return false end
-    c.recipes, c.crafts = c.recipes or {}, c.crafts or {}
-    local learned, crafts = c.recipes[prof] or {}, c.crafts[prof] or {}
-    local info = InfoTable(prof)
-    wipe(learned)
-    wipe(crafts)
-    for _, id in ipairs(TS.GetAllRecipeIDs()) do
+    local stored = StoredNames(prof)
+    local ids = TS.GetAllRecipeIDs()
+    local mine, found = {}, false
+    local learned, crafts, reagentsOf = {}, {}, {}
+    local unchecked
+    for _, id in ipairs(ids) do
         local r = TS.GetRecipeInfo(id)
         if r and r.name then
             local lname = r.name:lower()
-            local reagents
-            if r.learned then
-                learned[lname] = true
-                local s = TS.GetRecipeSchematic and TS.GetRecipeSchematic(id, false)
-                local item = OutputItem(id, s)
-                if item then crafts[item] = lname end
-                reagents = Reagents(s)
+            if r.learned or stored[lname] then
+                if ProfessionName(TS.GetProfessionInfoByRecipeID(id)) == prof then
+                    found, mine[lname] = true, true
+                    if r.learned then
+                        learned[lname] = r
+                        local s = TS.GetRecipeSchematic and TS.GetRecipeSchematic(id, false)
+                        local item = OutputItem(id, s)
+                        if item then crafts[item] = lname end
+                        reagentsOf[lname] = Reagents(s)
+                    else
+                        Record(InfoTable(prof), r, lname, nil) -- refresh the grey point
+                    end
+                end
+            elseif not found and not unchecked then
+                unchecked = id
             end
-            Record(info, r, lname, reagents)
         end
     end
-    c.recipes[prof], c.crafts[prof] = learned, crafts
+    -- Nothing of this profession checked yet (nothing learned or stored): make sure the
+    -- list really is this profession's before recording it as empty.
+    if not found and unchecked and ProfessionName(TS.GetProfessionInfoByRecipeID(unchecked)) == prof then
+        found = true
+    end
+    if not found then return false end -- the wrong list: try again on the next update
+
+    c.recipes, c.crafts = c.recipes or {}, c.crafts or {}
+    local known, made = c.recipes[prof] or {}, c.crafts[prof] or {}
+    wipe(known)
+    wipe(made)
+    local info = InfoTable(prof)
+    for lname, r in pairs(learned) do
+        known[lname] = true
+        Record(info, r, lname, reagentsOf[lname])
+    end
+    for item, lname in pairs(crafts) do made[item] = lname end
+    c.recipes[prof], c.crafts[prof] = known, made
+    Repair(prof, mine)
     ns.craftVersion = ns.craftVersion + 1
     return true
 end
@@ -356,61 +429,81 @@ function ns.AddRecipeLines(tt, id, data)
 end
 
 ---------------------------------------------------------------------------
+-- Character order for the item tooltips below: you first, then by name. Rebuilt only
+-- when recipes, skills or settings change (ns.craftVersion).
+---------------------------------------------------------------------------
+local order, orderVer = {}, nil
+
+local function Order()
+    if orderVer == ns.craftVersion then return order end
+    orderVer = ns.craftVersion
+    wipe(order)
+    for key in pairs(ns.db.chars) do
+        if key ~= ns.charKey then order[#order + 1] = key end
+    end
+    sort(order)
+    table.insert(order, 1, ns.charKey)
+    return order
+end
+
+---------------------------------------------------------------------------
 -- "Can craft" on item tooltips
 ---------------------------------------------------------------------------
--- itemID -> list of coloured names of everyone who can make it, built in one pass
--- over all characters the first time an item is hovered after crafts change.
--- lastKey remembers who was added last, so a character whose two professions make
--- the same item is listed once.
-local crafters, lastKey, craftersVer = {}, {}, nil
-local sortedKeys = {}
+-- Everyone who can make the hovered item, looked up directly (one table lookup per
+-- character and profession, ~0.1 us), with only the last item's lines kept. An index of
+-- every craftable item was slower overall: it cost ~14 us and ~20 KB of garbage each
+-- time any skill changed.
+local lastCraft, lastCraftId, lastCraftVer = false, nil, nil
 
-local function AddCrafter(key, c, skillups)
-    if not c.crafts then return end
-    local name = ns.ColoredName(key, c)
-    for prof, items in pairs(c.crafts) do
-        local skill = SkillFor(c, prof)
-        for id, lname in pairs(items) do
-            if lastKey[id] ~= key then
-                lastKey[id] = key
-                local text = name
-                -- Older saves stored true here, so the grey point is unknown for them.
-                local grey = skillups and type(lname) == "string" and ns.RecipeGrey(prof, lname)
-                if grey and skill and skill < grey then
-                    text = name .. LIGHT .. " · skill-ups to " .. grey .. "|r"
+local function FindCrafters(id)
+    local chars, skillups = ns.db.chars, ns.SkillupsOn()
+    local list = false
+    for _, key in ipairs(Order()) do
+        local c = chars[key]
+        if c and c.crafts then
+            for prof, items in pairs(c.crafts) do
+                local lname = items[id]
+                if lname then
+                    local text = ns.ColoredName(key, c)
+                    -- Saves from before 0.3.0 hold true here, so the grey point is unknown.
+                    local grey = skillups and type(lname) == "string" and ns.RecipeGrey(prof, lname)
+                    local skill = grey and SkillFor(c, prof)
+                    if skill and skill < grey then text = text .. LIGHT .. " · skill-ups to " .. grey .. "|r" end
+                    list = list or {}
+                    list[#list + 1] = "  " .. text
+                    break -- once per character, even if two professions make it
                 end
-                local list = crafters[id]
-                if list then list[#list + 1] = text else crafters[id] = { text } end
             end
         end
     end
-end
-
-local function BuildCrafters()
-    wipe(crafters)
-    wipe(lastKey)
-    wipe(sortedKeys)
-    local db = ns.db
-    for key, c in pairs(db.chars) do
-        if key ~= ns.charKey then sortedKeys[#sortedKeys + 1] = key end
-    end
-    table.sort(sortedKeys)
-    local skillups = ns.SkillupsOn()
-    AddCrafter(ns.charKey, ns.char, skillups) -- you first, then by name
-    for _, key in ipairs(sortedKeys) do AddCrafter(key, db.chars[key], skillups) end
+    return list
 end
 
 -- A heading, then one character per line, so the tooltip never gets wide.
 function ns.AddCraftLines(tt, id)
-    if craftersVer ~= ns.craftVersion then
-        craftersVer = ns.craftVersion
-        BuildCrafters()
+    if id ~= lastCraftId or lastCraftVer ~= ns.craftVersion then
+        lastCraftId, lastCraftVer, lastCraft = id, ns.craftVersion, FindCrafters(id)
     end
-    local list = crafters[id]
+    local list = lastCraft
     if not list then return end
     tt:AddLine(" ")
     tt:AddLine("Can craft", 1, 0.82, 0)
-    for i = 1, #list do tt:AddLine("  " .. list[i], 1, 1, 1) end
+    for i = 1, #list do tt:AddLine(list[i], 1, 1, 1) end
+end
+
+-- After /af delete: recipeInfo entries no remaining character knows.
+function ns.PruneRecipeInfo()
+    local info = ns.db.recipeInfo
+    if not info then return end
+    for prof, recipes in pairs(info) do
+        for lname in pairs(recipes) do
+            local known = false
+            for _, c in pairs(ns.db.chars) do
+                if c.recipes and c.recipes[prof] and c.recipes[prof][lname] then known = true break end
+            end
+            if not known then recipes[lname] = nil end
+        end
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -424,16 +517,6 @@ end
 -- index in memory; only the last item's result is kept, which covers the tooltip
 -- refreshing while you hover.
 local lastUse, lastUseId, usesVer = false, nil, nil
-local order = {}
-
-local function Order()
-    wipe(order)
-    for key in pairs(ns.db.chars) do
-        if key ~= ns.charKey then order[#order + 1] = key end
-    end
-    sort(order)
-    table.insert(order, 1, ns.charKey)
-end
 
 -- More skill-ups left first; the same number, by recipe name.
 local function Better(left, name, otherLeft, otherName)
@@ -449,7 +532,7 @@ local function FindUses(id)
     local info, chars = ns.db.recipeInfo, ns.db.chars
     local needle = "," .. id .. ":"
     local blocks, total = nil, 0
-    for _, key in ipairs(order) do
+    for _, key in ipairs(Order()) do
         local c = chars[key]
         if c and c.recipes then
             -- This character's two best recipes: left (skill-ups left), name, grey.
@@ -510,7 +593,6 @@ function ns.AddSkillupLines(tt, id)
     if not ns.SkillupsOn() or not ns.db.recipeInfo then return end
     if usesVer ~= ns.craftVersion then
         usesVer, lastUseId = ns.craftVersion, nil
-        Order()
     end
     if id ~= lastUseId then
         lastUseId, lastUse = id, FindUses(id)

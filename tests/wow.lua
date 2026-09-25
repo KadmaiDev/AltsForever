@@ -85,6 +85,7 @@ function M.load(files)
         end,
         GetProfessionInfoByRecipeID = function(id)
             local r = ts().recipes[id]
+            M.profLookups = (M.profLookups or 0) + 1
             return r and { professionName = r.prof or ts().prof }
         end,
         GetRecipeSchematic = function(id)

@@ -211,6 +211,7 @@ function commands.delete(arg)
     if not key then return Print("No character named '" .. arg .. "'. Use /af list.") end
     if key == ns.charKey then return Print("You can't delete the character you're logged in on.") end
     ns.db.chars[key] = nil
+    ns.PruneRecipeInfo()
     ns.InvalidateCache()
     Print("Deleted " .. key .. ".")
 end
