@@ -1296,15 +1296,15 @@ end)
 -- First name only at login (seen on build 70009)
 test("a first name at login is matched to the saved full name", function()
     local ns = wow.load(FILES)
-    wow.player.name, wow.player.class = "Vespera", "PALADIN"
+    wow.player.name, wow.player.class = "Mira", "PALADIN"
     wow.login({ v = 2, chars = {
-        ["Vespera Ashward"] = alt("Vespera Ashward", "PALADIN", { bank = { [100] = 4 } }),
-        ["Vespera Moonfall"] = alt("Vespera Moonfall", "DRUID", {}),
+        ["Mira Dawnfield"] = alt("Mira Dawnfield", "PALADIN", { bank = { [100] = 4 } }),
+        ["Mira Moonfall"] = alt("Mira Moonfall", "DRUID", {}),
     } })
-    eq(ns.charKey, "Vespera Ashward", "the paladin, not the druid")
-    eq(ns.char.name, "Vespera Ashward")
+    eq(ns.charKey, "Mira Dawnfield", "the paladin, not the druid")
+    eq(ns.char.name, "Mira Dawnfield")
     eq(ns.char.bank[100], 4)
-    eq(AltsForeverDB.chars["Vespera"], nil)
+    eq(AltsForeverDB.chars["Mira"], nil)
 end)
 
 test("a new character seen by first name is renamed when the full name arrives", function()
@@ -1350,16 +1350,16 @@ end)
 test("a first-name entry already saved is folded into the full name, newer data first", function()
     wow.load(FILES)
     wow.login({ v = 2, chars = {
-        ["Vespera"] = alt("Vespera", "PALADIN", { updated = 200, played = 26432, bags = { [100] = 2 } }),
-        ["Vespera Ashward"] = alt("Vespera Ashward", "PALADIN", { updated = 100, played = 26391,
+        ["Mira"] = alt("Mira", "PALADIN", { updated = 200, played = 500, bags = { [100] = 2 } }),
+        ["Mira Dawnfield"] = alt("Mira Dawnfield", "PALADIN", { updated = 100, played = 400,
             bags = { [100] = 9 }, bank = { [200] = 5 }, recipes = { Cooking = {} } }),
         ["Sorrel"] = alt("Sorrel", "WARLOCK", { updated = 50, played = 10, mail = { [300] = 1 } }),
         ["Sorrel Nightbloom"] = alt("Sorrel Nightbloom", "WARLOCK", { updated = 90, played = 20 }),
     } })
-    eq(AltsForeverDB.chars["Vespera"], nil)
-    local c = AltsForeverDB.chars["Vespera Ashward"]
-    eq(c.name, "Vespera Ashward")
-    eq(c.played, 26432); eq(c.bags[100], 2, "newer entry's data wins")
+    eq(AltsForeverDB.chars["Mira"], nil)
+    local c = AltsForeverDB.chars["Mira Dawnfield"]
+    eq(c.name, "Mira Dawnfield")
+    eq(c.played, 500); eq(c.bags[100], 2, "newer entry's data wins")
     eq(c.bank[200], 5); eq(type(c.recipes.Cooking), "table", "gaps filled from the older entry")
     local sorrel = AltsForeverDB.chars["Sorrel Nightbloom"]
     eq(AltsForeverDB.chars["Sorrel"], nil)

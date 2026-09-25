@@ -62,8 +62,8 @@ local function Upgrade(saved)
     saved.chars, saved.realmOnly, saved.v = chars, nil, 2
 end
 
--- Just after login the game can give only the first name ("Vespera" for "Vespera
--- Ashward"; seen on build 70009), and the surname arrives a moment later. Forever names
+-- Just after login the game can give only the first name ("Mira" for "Mira
+-- Dawnfield"; seen on build 70009), and the surname arrives a moment later. Forever names
 -- are always two words, so a one-word name with exactly one "First Last" entry of the
 -- same class is that character.
 local function FullNameMatch(chars, first, class)
