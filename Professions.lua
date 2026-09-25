@@ -28,7 +28,7 @@ local STATUS_TEXT = {
     "|cff9d9d9dNot scanned|r",
 }
 local LIGHT = "|cffc0c0c0"
-local MAX_SKILLUP_LINES = 5
+local MAX_SKILLUP_LINES = 6 -- reagent tooltip; each character shows at most 2
 
 -- Skill-up details (grey points) in tooltips; /af skillups turns them off.
 function ns.SkillupsOn()
@@ -412,12 +412,14 @@ end
 -- "Skill-ups" on reagent tooltips
 ---------------------------------------------------------------------------
 -- For the hovered item: the known recipes that use it and still give their character a
--- skill-up, as { recipe, who, recipe, who, ..., n = recipes, more = "+N more" } (false if
--- none). Found by searching the known recipes' reagent strings (about 0.02 ms), so
--- there's no index in memory; only the last item's result is kept, which covers the
--- tooltip refreshing while you hover.
+-- skill-up, as { recipe, who, recipe, who, ..., n = lines, more = "+N more" } (false if
+-- none). Each character shows their 2 recipes with the most skill-ups left (grey point
+-- minus skill); you come first, then the others by their best recipe, up to 6 lines.
+-- Found by searching the known recipes' reagent strings (about 0.02 ms), so there's no
+-- index in memory; only the last item's result is kept, which covers the tooltip
+-- refreshing while you hover.
 local lastUse, lastUseId, usesVer = false, nil, nil
-local order, names = {}, {}
+local order = {}
 
 local function Order()
     wipe(order)
@@ -425,40 +427,77 @@ local function Order()
         if key ~= ns.charKey then order[#order + 1] = key end
     end
     sort(order)
-    table.insert(order, 1, ns.charKey) -- you first, then by name
+    table.insert(order, 1, ns.charKey)
+end
+
+-- More skill-ups left first; the same number, by recipe name.
+local function Better(left, name, otherLeft, otherName)
+    return left > otherLeft or (left == otherLeft and name < otherName)
+end
+
+local function ByBest(a, b)
+    if a.best ~= b.best then return a.best > b.best end
+    return a.key < b.key
 end
 
 local function FindUses(id)
     local info, chars = ns.db.recipeInfo, ns.db.chars
     local needle = "," .. id .. ":"
-    local list = false
+    local blocks, total = nil, 0
     for _, key in ipairs(order) do
         local c = chars[key]
         if c and c.recipes then
+            -- This character's two best recipes: left (skill-ups left), name, grey.
+            local l1, n1, g1, l2, n2, g2
             for prof, known in pairs(c.recipes) do
                 local skill = c.profs and c.profs[prof]
                 local recipes = info[prof]
                 if skill and recipes then
-                    wipe(names)
                     for lname in pairs(known) do
                         local v = recipes[lname]
-                        if type(v) == "string" and v:find(needle, 1, true) then names[#names + 1] = lname end
-                    end
-                    sort(names)
-                    for i = 1, #names do
-                        local grey, name = ParseInfo(recipes[names[i]])
-                        if grey and skill < grey then
-                            list = list or { n = 0 }
-                            list.n = list.n + 1
-                            list[list.n * 2 - 1] = "  " .. name
-                            list[list.n * 2] = ns.ShortName(key, c) .. LIGHT .. " · until " .. grey .. "|r"
+                        if type(v) == "string" and v:find(needle, 1, true) then
+                            local grey, name = ParseInfo(v)
+                            if grey and skill < grey then
+                                total = total + 1
+                                local left = grey - skill
+                                if not l1 or Better(left, name, l1, n1) then
+                                    l2, n2, g2 = l1, n1, g1
+                                    l1, n1, g1 = left, name, grey
+                                elseif not l2 or Better(left, name, l2, n2) then
+                                    l2, n2, g2 = left, name, grey
+                                end
+                            end
                         end
                     end
                 end
             end
+            if l1 then
+                local who = ns.ShortName(key, c) .. LIGHT .. " · until "
+                local block = { key = key, best = l1, "  " .. n1, who .. g1 .. "|r" }
+                if l2 then block[3], block[4] = "  " .. n2, who .. g2 .. "|r" end
+                blocks = blocks or {}
+                blocks[#blocks + 1] = block
+            end
         end
     end
-    if list and list.n > MAX_SKILLUP_LINES then list.more = "  +" .. (list.n - MAX_SKILLUP_LINES) .. " more" end
+    if not blocks then return false end
+    -- You stay first; everyone else by their best recipe.
+    local first = blocks[1].key == ns.charKey and 2 or 1
+    if #blocks > first then
+        local rest = {}
+        for i = first, #blocks do rest[#rest + 1] = blocks[i] end
+        sort(rest, ByBest)
+        for i, block in ipairs(rest) do blocks[first + i - 1] = block end
+    end
+    local list = { n = 0 }
+    for _, block in ipairs(blocks) do
+        for i = 1, #block, 2 do
+            if list.n == MAX_SKILLUP_LINES then break end
+            list.n = list.n + 1
+            list[list.n * 2 - 1], list[list.n * 2] = block[i], block[i + 1]
+        end
+    end
+    if total > list.n then list.more = "  +" .. (total - list.n) .. " more" end
     return list
 end
 
@@ -475,8 +514,7 @@ function ns.AddSkillupLines(tt, id)
     if not list then return end
     tt:AddLine(" ")
     tt:AddLine("Skill-ups", 1, 0.82, 0)
-    local shown = list.n < MAX_SKILLUP_LINES and list.n or MAX_SKILLUP_LINES
-    for i = 1, shown do
+    for i = 1, list.n do
         tt:AddDoubleLine(list[i * 2 - 1], list[i * 2], 1, 1, 1, 1, 1, 1)
     end
     if list.more then tt:AddLine(list.more, 0.75, 0.75, 0.75) end

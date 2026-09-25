@@ -1498,19 +1498,46 @@ test("reagent tooltip lists the recipes that still give each character a skill-u
     eq(ns.SkillupCount(ns.char, "Engineering"), 1)
 end)
 
-test("reagent tooltip shows at most 5 recipes, then how many more", function()
+test("reagent tooltip: 2 recipes per character with the most skill-ups left", function()
     wow.load(FILES)
-    wow.profs = { { "Tailoring", 1 } }
-    local info, known = {}, {}
+    wow.profs = { { "Tailoring", 50 } }
+    -- Your recipes: 7 shirts, skill-ups left 10, 20, ... 70.
+    local info, mine = {}, {}
     for i = 1, 7 do
-        info["shirt " .. i] = "100;Shirt " .. i .. ";,2589:1"
-        known["shirt " .. i] = true
+        info["shirt " .. i] = (50 + i * 10) .. ";Shirt " .. i .. ";,2589:1"
+        mine["shirt " .. i] = true
     end
+    info["bag"] = "200;Bag;,2589:2"
+    info["cap"] = "70;Cap;,2589:1"
+    info["vest"] = "95;Vest;,2589:1"
     wow.login({ v = 2, recipeInfo = { Tailoring = info }, chars = {
-        ["Aldric"] = alt("Aldric", "MAGE", { recipes = { Tailoring = known } }) } })
+        ["Aldric"] = alt("Aldric", "MAGE", { recipes = { Tailoring = mine } }),
+        -- Zed's best: Bag, 200 - 60 = 140 left (more than any of yours). Amy's: Vest, 55 left.
+        ["Zed Moor"] = alt("Zed Moor", "ROGUE", { profs = { Tailoring = 60 }, recipes = { Tailoring = { bag = true, cap = true } } }),
+        ["Amy Ash"] = alt("Amy Ash", "DRUID", { profs = { Tailoring = 40 }, recipes = { Tailoring = { vest = true, cap = true } } }),
+        ["Old Timer"] = alt("Old Timer", "WARRIOR", { profs = { Tailoring = 300 }, recipes = { Tailoring = { bag = true } } }),
+    } })
     local lines = wow.hover(GameTooltip, LINEN)
-    eq(lines[7][1], "  Shirt 5")
-    eq(lines[8][1], "  +2 more")
+    eq(lines[2][1], "Skill-ups")
+    eq(lines[3][1], "  Shirt 7"); eq(lines[3][2], "[MAGE]Aldric" .. until_(120), "you first even though Zed has more left")
+    eq(lines[4][1], "  Shirt 6"); eq(lines[4][2], "[MAGE]Aldric" .. until_(110))
+    eq(lines[5][1], "  Bag"); eq(lines[5][2], "[ROGUE]Zed" .. until_(200), "then the alt with the most left, though Z")
+    eq(lines[6][1], "  Cap"); eq(lines[6][2], "[ROGUE]Zed" .. until_(70))
+    eq(lines[7][1], "  Vest"); eq(lines[7][2], "[DRUID]Amy" .. until_(95))
+    eq(lines[8][1], "  Cap"); eq(lines[8][2], "[DRUID]Amy" .. until_(70))
+    eq(lines[9][1], "  +5 more", "your 5 other shirts; Old Timer is past grey")
+end)
+
+test("reagent tooltip: never more than 6 recipe lines", function()
+    wow.load(FILES)
+    local info, chars = { ["cap"] = "70;Cap;,2589:1", ["hat"] = "80;Hat;,2589:1" }, {}
+    for _, name in ipairs({ "Ann Bee", "Bo Cee", "Cy Dee", "Di Eff" }) do
+        chars[name] = alt(name, "PRIEST", { profs = { Tailoring = 10 }, recipes = { Tailoring = { cap = true, hat = true } } })
+    end
+    wow.login({ v = 2, recipeInfo = { Tailoring = info }, chars = chars })
+    local lines = wow.hover(GameTooltip, LINEN)
+    eq(lines[7][2], "[PRIEST]Cy" .. until_(80)); eq(lines[8][2], "[PRIEST]Cy" .. until_(70), "three alts fill the 6 lines")
+    eq(lines[9][1], "  +2 more"); eq(#lines, 9)
 end)
 
 test("overview row tooltip counts recipes still giving skill-ups", function()
