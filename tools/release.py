@@ -1,8 +1,8 @@
 """Builds the Alts Forever release zip and, with --upload, publishes it.
 
     python tools/release.py                         build dist/AltsForever-<version>.zip
-    python tools/release.py --upload CHANGELOG.md   build, upload to CurseForge as a beta
-                                                    file, then tag v<version> and make a
+    python tools/release.py --upload CHANGELOG.md   build, upload to CurseForge as a
+                                                    RELEASE_TYPE file, then tag v<version> and make a
                                                     GitHub release with the same zip
     python tools/release.py --github CHANGELOG.md   build, then only the GitHub part
 
@@ -32,7 +32,7 @@ ALLOWED = (".toc", ".lua")
 PROJECT_ID = 1709551
 API = "https://wow.curseforge.com/api"
 GAME_VERSIONS = [17053]  # WoW Forever 1.60.1
-RELEASE_TYPE = "beta"
+RELEASE_TYPE = "release"  # "release", "beta" or "alpha"
 
 
 def fail(msg):
