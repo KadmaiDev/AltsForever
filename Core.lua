@@ -231,8 +231,7 @@ end
 
 commands[""] = function() ns.ToggleOverview() end
 
--- /it is kept from when the addon was called ItemTracker.
-SLASH_ALTSFOREVER1, SLASH_ALTSFOREVER2, SLASH_ALTSFOREVER3 = "/af", "/altsforever", "/it"
+SLASH_ALTSFOREVER1, SLASH_ALTSFOREVER2 = "/af", "/altsforever"
 SlashCmdList.ALTSFOREVER = function(msg)
     local cmd, arg = msg:match("^%s*(%S*)%s*(.-)%s*$")
     local fn = commands[cmd:lower()] or commands.help

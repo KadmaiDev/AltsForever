@@ -45,7 +45,7 @@ Install it from CurseForge, or link or copy this folder to `<WoW Forever>\Interf
 | `/af delete Full Name` | Forget a character, e.g. `/af delete Thessa Oakenbrook` |
 | `/af mem` | Show the addon's memory use |
 
-`/altsforever` and the old `/it` also work.
+`/altsforever` also works.
 
 ## Tests
 

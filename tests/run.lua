@@ -1354,6 +1354,12 @@ test("one-word names are left alone when the match isn't certain", function()
     assert(chars["Rook"] and chars["Rook Hollow"], "different class: nothing merged")
 end)
 
+test("the slash commands are /af and /altsforever; the old /it is gone", function()
+    wow.load(FILES)
+    eq(SLASH_ALTSFOREVER1, "/af"); eq(SLASH_ALTSFOREVER2, "/altsforever")
+    eq(SLASH_ALTSFOREVER3, nil)
+end)
+
 ---------------------------------------------------------------------------
 local function tocFiles(path)
     local files = {}
