@@ -20,7 +20,7 @@ local KNOWN_EVENTS = {
     PLAYER_ENTERING_WORLD = true, UPDATE_INVENTORY_DURABILITY = true,
     SKILL_LINES_CHANGED = true, TRADE_SKILL_SHOW = true, TRADE_SKILL_LIST_UPDATE = true,
     TRADE_SKILL_DATA_SOURCE_CHANGED = true, TRADE_SKILL_CLOSE = true, NEW_RECIPE_LEARNED = true,
-    TIME_PLAYED_MSG = true,
+    TIME_PLAYED_MSG = true, UNIT_NAME_UPDATE = true,
 }
 
 -- Resets every global and loads the addon files fresh. Returns the addon namespace.

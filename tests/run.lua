@@ -1042,6 +1042,7 @@ end)
 test("retries stop after five tries", function()
     wow.load(FILES)
     wow.inventory[1] = 3000 -- link never arrives
+    wow.player.name = "Aldric Vane" -- a full name, so only gear retries are scheduled
     wow.login(nil)
     local runs = 0
     while #wow.timers > 0 and runs < 20 do
@@ -1289,6 +1290,95 @@ test("overview shows time played per character and in total", function()
     eq(cell(rows[3], 1), "[PRIEST]High"); eq(cell(rows[3], 11), "3d 0h")
     eq(cell(rows[4], 11), G .. "?|r", "not recorded yet")
     eq(AltsForeverFrame.footer.text, "Total played: 3d 2h     Total gold: 10507c")
+end)
+
+---------------------------------------------------------------------------
+-- First name only at login (seen on build 70009)
+test("a first name at login is matched to the saved full name", function()
+    local ns = wow.load(FILES)
+    wow.player.name, wow.player.class = "Vespera", "PALADIN"
+    wow.login({ v = 2, chars = {
+        ["Vespera Ashward"] = alt("Vespera Ashward", "PALADIN", { bank = { [100] = 4 } }),
+        ["Vespera Moonfall"] = alt("Vespera Moonfall", "DRUID", {}),
+    } })
+    eq(ns.charKey, "Vespera Ashward", "the paladin, not the druid")
+    eq(ns.char.name, "Vespera Ashward")
+    eq(ns.char.bank[100], 4)
+    eq(AltsForeverDB.chars["Vespera"], nil)
+end)
+
+test("a new character seen by first name is renamed when the full name arrives", function()
+    local ns = wow.load(FILES)
+    wow.player.name = "Nyx"
+    wow.setBag(0, 16, { [1] = { 100, 3 } })
+    wow.login({ v = 2, chars = { ["Brakka Stone"] = alt("Brakka Stone", "WARRIOR", { bags = { [100] = 1 } }) } })
+    eq(ns.charKey, "Nyx")
+    ns.char.crafts = { Engineering = { [100] = true } }
+    ns.craftVersion = ns.craftVersion + 1
+    wow.hover(GameTooltip, 100)
+    wow.player.name = "Nyx Emberfall"
+    wow.fire("UNIT_NAME_UPDATE", "target")
+    eq(ns.charKey, "Nyx", "other units' names are ignored")
+    wow.fire("UNIT_NAME_UPDATE", "player")
+    eq(ns.charKey, "Nyx Emberfall")
+    eq(AltsForeverDB.chars["Nyx"], nil)
+    eq(AltsForeverDB.chars["Nyx Emberfall"], ns.char)
+    eq(ns.char.name, "Nyx Emberfall"); eq(ns.char.bags[100], 3)
+    local lines = wow.hover(GameTooltip, 100)
+    local text = {}
+    for _, l in ipairs(lines) do text[#text + 1] = tostring(l[1]) end
+    text = table.concat(text, "\n")
+    assert(text:find("  [MAGE]Nyx Emberfall", 1, true), "can-craft list uses the new name:\n" .. text)
+    assert(not text:find("Nyx\n", 1, true) and not text:find("Nyx$"), "no stale first-name line:\n" .. text)
+end)
+
+test("the rename is also retried on a timer", function()
+    local ns = wow.load(FILES)
+    wow.player.name = "Nyx"
+    wow.login(nil)
+    wow.player.name = "Nyx Emberfall"
+    local runs = 0
+    while #wow.timers > 0 and runs < 20 do
+        local fns = wow.timers
+        wow.timers = {}
+        for _, fn in ipairs(fns) do fn() end
+        runs = runs + 1
+    end
+    eq(ns.charKey, "Nyx Emberfall")
+end)
+
+test("a first-name entry already saved is folded into the full name, newer data first", function()
+    wow.load(FILES)
+    wow.login({ v = 2, chars = {
+        ["Vespera"] = alt("Vespera", "PALADIN", { updated = 200, played = 26432, bags = { [100] = 2 } }),
+        ["Vespera Ashward"] = alt("Vespera Ashward", "PALADIN", { updated = 100, played = 26391,
+            bags = { [100] = 9 }, bank = { [200] = 5 }, recipes = { Cooking = {} } }),
+        ["Sorrel"] = alt("Sorrel", "WARLOCK", { updated = 50, played = 10, mail = { [300] = 1 } }),
+        ["Sorrel Nightbloom"] = alt("Sorrel Nightbloom", "WARLOCK", { updated = 90, played = 20 }),
+    } })
+    eq(AltsForeverDB.chars["Vespera"], nil)
+    local c = AltsForeverDB.chars["Vespera Ashward"]
+    eq(c.name, "Vespera Ashward")
+    eq(c.played, 26432); eq(c.bags[100], 2, "newer entry's data wins")
+    eq(c.bank[200], 5); eq(type(c.recipes.Cooking), "table", "gaps filled from the older entry")
+    local sorrel = AltsForeverDB.chars["Sorrel Nightbloom"]
+    eq(AltsForeverDB.chars["Sorrel"], nil)
+    eq(sorrel.played, 20, "the full-name entry is newer here, so it wins")
+    eq(sorrel.mail[300], 1); eq(sorrel.name, "Sorrel Nightbloom")
+end)
+
+test("one-word names are left alone when the match isn't certain", function()
+    wow.load(FILES)
+    wow.login({ v = 2, chars = {
+        ["Ash"] = alt("Ash", "MAGE", {}),
+        ["Ash Fire"] = alt("Ash Fire", "MAGE", {}),
+        ["Ash Wood"] = alt("Ash Wood", "MAGE", {}),
+        ["Rook"] = alt("Rook", "ROGUE", {}),
+        ["Rook Hollow"] = alt("Rook Hollow", "PRIEST", {}),
+    } })
+    local chars = AltsForeverDB.chars
+    assert(chars["Ash"] and chars["Ash Fire"] and chars["Ash Wood"], "two candidates: nothing merged")
+    assert(chars["Rook"] and chars["Rook Hollow"], "different class: nothing merged")
 end)
 
 ---------------------------------------------------------------------------

@@ -3,7 +3,8 @@ local ADDON, ns = ...
 
 local DB_VERSION = 2
 
-local pcall, type, pairs, print, time = pcall, type, pairs, print, time
+local pcall, type, pairs, ipairs, print, time = pcall, type, pairs, ipairs, print, time
+local issecretvalue = issecretvalue or function() return false end
 local UnitName, UnitClass, UnitFactionGroup = UnitName, UnitClass, UnitFactionGroup
 
 -- Bumped whenever the current character's data changes; the tooltip uses it to
@@ -61,12 +62,80 @@ local function Upgrade(saved)
     saved.chars, saved.realmOnly, saved.v = chars, nil, 2
 end
 
+-- Just after login the game can give only the first name ("Vespera" for "Vespera
+-- Ashward"; seen on build 70009), and the surname arrives a moment later. Forever names
+-- are always two words, so a one-word name with exactly one "First Last" entry of the
+-- same class is that character.
+local function FullNameMatch(chars, first, class)
+    local match
+    for key, c in pairs(chars) do
+        if key:sub(1, #first + 1) == first .. " " and type(c) == "table" and c.class == class then
+            if match then return nil end -- two candidates: don't guess
+            match = key
+        end
+    end
+    return match
+end
+
+local function Newer(a, b)
+    return (a.updated or a.seen or 0) >= (b.updated or b.seen or 0)
+end
+
+-- Keeps everything in `keep` and fills in what it lacks (bank, mail, recipes...) from `other`.
+local function Merge(keep, other)
+    for k, v in pairs(other) do
+        if keep[k] == nil then keep[k] = v end
+    end
+end
+
+-- Folds entries saved under a first name only back into the full name, newer data first.
+local function FoldFirstNames(chars)
+    local short = {}
+    for key in pairs(chars) do
+        if not key:find(" ", 1, true) then short[#short + 1] = key end
+    end
+    for _, key in ipairs(short) do
+        local c = chars[key]
+        local full = type(c) == "table" and FullNameMatch(chars, key, c.class)
+        if full then
+            local keep, old = c, chars[full]
+            if not Newer(keep, old) then keep, old = old, keep end
+            Merge(keep, old)
+            keep.name = full
+            chars[full], chars[key] = keep, nil
+        end
+    end
+end
+
 function ns.InitDB(saved)
     if type(saved) == "table" then Upgrade(saved) end
     if type(saved) ~= "table" or saved.v ~= DB_VERSION or type(saved.chars) ~= "table" then
         saved = { v = DB_VERSION, chars = {} }
     end
+    FoldFirstNames(saved.chars)
     return saved
+end
+
+-- The name the character should be stored under: a first name alone is matched to its
+-- full-name entry when there is exactly one.
+function ns.PlayerKey(chars, name, class)
+    if name:find(" ", 1, true) then return name end
+    return FullNameMatch(chars, name, class) or name
+end
+
+-- A character first seen under a first name only is renamed once the game reports the
+-- full name. Returns true if it renamed.
+function ns.CheckName()
+    local name = UnitName("player")
+    local key = ns.charKey
+    if not name or issecretvalue(name) or name == key then return false end
+    if name:sub(1, #key + 1) ~= key .. " " then return false end
+    local chars, c = ns.db.chars, ns.char
+    if type(chars[name]) == "table" then Merge(c, chars[name]) end
+    chars[key], chars[name] = nil, c
+    c.name, ns.charKey = name, name
+    ns.InvalidateCache()
+    return true
 end
 
 -- Bank and mail stay nil until first seen, so "never scanned" differs from "empty".
@@ -99,7 +168,8 @@ end)
 ns.On("PLAYER_LOGIN", function()
     ns.Off("PLAYER_LOGIN")
     local _, class = UnitClass("player")
-    ns.charKey, ns.char = ns.InitChar(ns.db, UnitName("player"), class, UnitFactionGroup("player"))
+    local name = ns.PlayerKey(ns.db.chars, UnitName("player"), class)
+    ns.charKey, ns.char = ns.InitChar(ns.db, name, class, UnitFactionGroup("player"))
     ns.StartScanner()
     ns.StartMail()
     ns.StartMoney()
@@ -110,6 +180,22 @@ ns.On("PLAYER_LOGIN", function()
     ns.StartTooltip()
     -- A few seconds in, so it isn't lost among the login messages.
     if ns.noSavedData and C_Timer then C_Timer.After(5, ns.SavedDataHint) end
+
+    -- Only a first name so far: watch for the full one.
+    if not ns.charKey:find(" ", 1, true) then
+        ns.On("UNIT_NAME_UPDATE", function(unit)
+            if unit == "player" then ns.CheckName() end
+        end)
+        ns.On("PLAYER_ENTERING_WORLD", ns.CheckName)
+        local tries = 0
+        local function Retry()
+            tries = tries + 1
+            if not ns.CheckName() and not ns.charKey:find(" ", 1, true) and tries < 15 and C_Timer then
+                C_Timer.After(2, Retry)
+            end
+        end
+        if C_Timer then C_Timer.After(2, Retry) end
+    end
 end)
 
 ns.On("PLAYER_LOGOUT", function()
