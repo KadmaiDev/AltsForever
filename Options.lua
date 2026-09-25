@@ -140,13 +140,16 @@ function ns.CreateMinimapButton()
     b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     b:RegisterForDrag("LeftButton")
     b:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+    -- Icon and background are pinned to all four edges with an even margin, so they stay
+    -- centred when EllesmereUI's minimap tray resizes the button (a fixed top-left anchor
+    -- left the logo off centre there).
     local bg = b:CreateTexture(nil, "BACKGROUND")
-    bg:SetSize(24, 24)
-    bg:SetPoint("TOPLEFT", 3, -3)
+    bg:SetPoint("TOPLEFT", b, "TOPLEFT", 4, -4)
+    bg:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -4, 4)
     bg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
     local icon = b:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(20, 20)
-    icon:SetPoint("TOPLEFT", 6, -6)
+    icon:SetPoint("TOPLEFT", b, "TOPLEFT", 5, -5)
+    icon:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -5, 5)
     icon:SetTexture(ICON) -- round with transparent corners: no cropping needed
     local border = b:CreateTexture(nil, "OVERLAY")
     border:SetSize(53, 53)
