@@ -1557,6 +1557,47 @@ test("overview row tooltip counts recipes still giving skill-ups", function()
     assert(text:find("Tailoring = 200\n", 1, true) or text:find("Tailoring = 200$"), "toggle off: plain skill\n" .. text)
 end)
 
+test("each profession's rank maximum is recorded", function()
+    local ns = wow.load(FILES)
+    wow.profs = { { "Engineering", 75, 75 }, { "Mining", 99, 150 } }
+    wow.login(nil)
+    eq(ns.char.profMax.Engineering, 75); eq(ns.char.profMax.Mining, 150)
+    eq(ns.AtRankCap(ns.char, "Engineering"), true)
+    eq(ns.AtRankCap(ns.char, "Mining"), false)
+    eq(ns.AtRankCap({ profs = { Mining = 75 } }, "Mining"), false, "saved before 0.3.0: no maximum, not capped")
+end)
+
+test("a character at their rank cap gets no skill-up lines", function()
+    wow.load(FILES)
+    wow.login({ v = 2, recipeInfo = { Tailoring = { cap = "100;Cap;,2589:1" } }, chars = {
+        ["Ann Bee"] = alt("Ann Bee", "PRIEST", { profs = { Tailoring = 75 }, profMax = { Tailoring = 75 },
+            recipes = { Tailoring = { cap = true } }, crafts = { Tailoring = { [777] = "cap" } } }),
+        ["Bo Cee"] = alt("Bo Cee", "ROGUE", { profs = { Tailoring = 75 }, profMax = { Tailoring = 150 },
+            recipes = { Tailoring = { cap = true } }, crafts = { Tailoring = { [777] = "cap" } } }),
+    } })
+    local lines = wow.hover(GameTooltip, LINEN)
+    eq(lines[3][2], "[ROGUE]Bo" .. to(100)); eq(#lines, 3, "Ann at 75/75 can't skill up")
+    eq(craftLine(wow.hover(GameTooltip, 777)), "[PRIEST]Ann Bee, [ROGUE]Bo Cee" .. skillupsTo(100))
+end)
+
+test("overview: at a rank cap it says to train; at 300 it says nothing extra", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    local saved = overviewAlts()
+    saved.recipeInfo = { Tailoring = { a = "250;A;" }, Enchanting = { b = "300;B;" } }
+    saved.chars["High"].profs = { Tailoring = 225, Enchanting = 300 }
+    saved.chars["High"].profMax = { Tailoring = 225, Enchanting = 300 }
+    saved.chars["High"].recipes = { Tailoring = { a = true }, Enchanting = { b = true } }
+    wow.login(saved)
+    eq(ns.SkillupCount(saved.chars["High"], "Tailoring"), 0)
+    SlashCmdList.ALTSFOREVER("")
+    local row = overviewRows()[3] -- High
+    row.scripts.OnEnter(row)
+    local text = textOf(GameTooltip.lines)
+    assert(text:find("Tailoring = 225" .. G .. "  (train to skill up)|r", 1, true), text)
+    assert(text:find("Enchanting = 300\n", 1, true) or text:find("Enchanting = 300$"), text)
+end)
+
 ---------------------------------------------------------------------------
 local function tocFiles(path)
     local files = {}

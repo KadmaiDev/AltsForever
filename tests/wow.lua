@@ -30,7 +30,7 @@ function M.load(files)
     M.inbox = {}       -- [mailIndex] = { { itemID, count }, ... } (attachments by slot)
     M.outbox = {}      -- [attachSlot] = { itemID, count }
     M.money = 0        -- copper
-    M.profs = {}       -- { { name, skill }, ... } in GetProfessions() order
+    M.profs = {}       -- { { name, skill, max? (default 150) }, ... } in GetProfessions() order
     M.itemClass = {}   -- [itemID] = classID (9 = recipe)
     M.itemNames = {}   -- [itemID] = name
     -- The open profession window: which profession, and every recipe in it. A recipe
@@ -66,7 +66,7 @@ function M.load(files)
     end
     GetProfessionInfo = function(i)
         local p = M.profs[i]
-        return p[1], 136243, p[2], 150
+        return p[1], 136243, p[2], p[3] or 150
     end
     local ts = function() return M.tradeskill end
     C_TradeSkillUI = {

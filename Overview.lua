@@ -7,6 +7,7 @@ local floor, max, pairs, time = math.floor, math.max, pairs, time
 local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
 
 local GREY = "|cff9d9d9d"
+local MAX_PROFESSION = 300 -- the last rank's maximum on Forever (Classic ruleset)
 local ROW_HEIGHT = 20
 local COLUMNS = {
     { title = "Character", width = 180 },
@@ -158,8 +159,16 @@ local function RowTooltip(row)
         tt:AddLine(" ")
         local skillups = ns.SkillupsOn()
         for name, skill in pairs(c.profs) do
-            local n = skillups and ns.SkillupCount(c, name)
-            local right = n and (skill .. GREY .. "  (" .. n .. " skill-up recipe" .. (n == 1 and "" or "s") .. ")|r") or skill
+            local right = skill
+            if skillups then
+                local n = ns.SkillupCount(c, name)
+                if ns.AtRankCap(c, name) then
+                    -- At the final maximum there's nothing to train, so say nothing.
+                    if skill < MAX_PROFESSION then right = skill .. GREY .. "  (train to skill up)|r" end
+                elseif n then
+                    right = skill .. GREY .. "  (" .. n .. " skill-up recipe" .. (n == 1 and "" or "s") .. ")|r"
+                end
+            end
             tt:AddDoubleLine(name, right, 1, 1, 1, 1, 1, 1)
         end
     end

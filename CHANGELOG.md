@@ -3,7 +3,8 @@
 - **Skill-ups across your alts.** Alts Forever now shows how long each of your characters keeps getting skill-ups from a recipe, using the level where it turns grey (read from the game when a profession window opens):
   - **Can craft:** characters who'd still get a skill-up from making the item are marked "· skill-ups to 115".
   - **Reagents:** hovering a material lists the recipes your characters can still skill up with it ("Skill-ups: Heavy Linen Bandage, Tarnia · to 115"): you first, then your other characters, each with their 2 recipes that have the most skill-ups left, up to 6 lines.
-  - **Overview:** a character's row tooltip counts each profession's recipes that still give skill-ups.
+  - **Overview:** a character's row tooltip counts each profession's recipes that still give skill-ups, or says "train to skill up" when they're at their rank's maximum (e.g. 75/75).
+  - Characters at their rank's maximum aren't listed for skill-ups until they train (log in on each character once to record it).
   - Open each profession window once per character to fill these in. `/af skillups` turns it all off.
 - **Removed** the old `/it` command (use `/af`).
 

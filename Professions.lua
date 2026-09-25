@@ -38,17 +38,20 @@ end
 ---------------------------------------------------------------------------
 -- Recording
 ---------------------------------------------------------------------------
--- c.profs = { [professionName] = skillLevel }; c.prof1/c.prof2 name the two main
+-- c.profs = { [professionName] = skillLevel }, c.profMax = { [professionName] = the
+-- current rank's maximum (75, 150, 225 or 300) }; c.prof1/c.prof2 name the two main
 -- professions (GetProfessions lists those first, then the secondary ones).
 function ns.ScanSkills(c)
-    local profs = c.profs or {}
-    c.profs = profs
+    local profs, maxes = c.profs or {}, c.profMax or {}
+    c.profs, c.profMax = profs, maxes
     wipe(profs)
+    wipe(maxes)
     local function Add(index)
         if not index then return end
-        local name, _, skill = GetProfessionInfo(index)
+        local name, _, skill, max = GetProfessionInfo(index)
         if name and not issecretvalue(skill) and skill then
             profs[name] = skill
+            if max and not issecretvalue(max) and max > 0 then maxes[name] = max end
             return name
         end
     end
@@ -179,12 +182,26 @@ function ns.RecipeLearned(c, recipeID)
     ns.craftVersion = ns.craftVersion + 1
 end
 
+-- True when a character is at their rank's maximum (e.g. 75/75): nothing gives a
+-- skill-up until they train the next rank. Saves from before 0.3.0 have no maximum.
+function ns.AtRankCap(c, prof)
+    local skill, max = c.profs and c.profs[prof], c.profMax and c.profMax[prof]
+    return skill and max and skill >= max or false
+end
+
+-- The skill a character would gain from, or nil if nothing can give them a skill-up now.
+local function SkillFor(c, prof)
+    local skill = c.profs and c.profs[prof]
+    if skill and not ns.AtRankCap(c, prof) then return skill end
+end
+
 -- How many of a character's known recipes in a profession still give skill-ups, or nil
 -- if the profession hasn't been scanned.
 function ns.SkillupCount(c, prof)
     local known = c.recipes and c.recipes[prof]
     local skill = c.profs and c.profs[prof]
     if not known or not skill then return nil end
+    if ns.AtRankCap(c, prof) then return 0 end
     local n = 0
     for lname in pairs(known) do
         local grey = ns.RecipeGrey(prof, lname)
@@ -352,7 +369,7 @@ local function AddCrafter(key, c, skillups)
     if not c.crafts then return end
     local name = ns.ColoredName(key, c)
     for prof, items in pairs(c.crafts) do
-        local skill = c.profs and c.profs[prof]
+        local skill = SkillFor(c, prof)
         for id, lname in pairs(items) do
             if lastKey[id] ~= key then
                 lastKey[id] = key
@@ -438,7 +455,7 @@ local function FindUses(id)
             -- This character's two best recipes: left (skill-ups left), name, grey.
             local l1, n1, g1, l2, n2, g2
             for prof, known in pairs(c.recipes) do
-                local skill = c.profs and c.profs[prof]
+                local skill = SkillFor(c, prof)
                 local recipes = info[prof]
                 if skill and recipes then
                     for lname in pairs(known) do
