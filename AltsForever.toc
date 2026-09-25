@@ -3,7 +3,7 @@
 ## Author: Kadmai
 ## Notes: Keeps track of your alts: items, gold and more across all your characters.
 ## Version: 0.4.0
-## IconTexture: Interface\Icons\INV_Misc_GroupNeedMore
+## IconTexture: Interface\AddOns\AltsForever\media\icon.tga
 ## Category: Inventory
 ## Category-deDE: Inventar
 ## Category-esES: Inventario

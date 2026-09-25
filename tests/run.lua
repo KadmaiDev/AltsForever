@@ -2133,6 +2133,17 @@ test("with EllesmereUI, the overview's icon buttons get its square style", funct
     eq(squared, 2, "reputation and options buttons")
 end)
 
+test("the minimap button and addon list use our logo, shipped with the addon", function()
+    wow.load(FILES)
+    wow.login(nil)
+    eq(AltsForeverMinimapButton.icon.texture, "Interface\\AddOns\\AltsForever\\media\\icon.tga")
+    local toc = assert(io.open("AltsForever.toc")):read("*a")
+    assert(toc:find("## IconTexture: Interface\\AddOns\\AltsForever\\media\\icon.tga", 1, true), "addon list icon")
+    local f = io.open("media/icon.tga", "rb")
+    assert(f, "media/icon.tga exists")
+    f:close()
+end)
+
 ---------------------------------------------------------------------------
 local function tocFiles(path)
     local files = {}

@@ -4,7 +4,7 @@
 -- right-click menu.
 -- Menus and pop-ups are only built when clicked. (An Options > AddOns page was tried and
 -- removed: it was the likely source of a one-off taint error on Esc, see AGENTS.md.)
-local _, ns = ...
+local ADDON, ns = ...
 
 local GREY = "|cff9d9d9d"
 
@@ -97,7 +97,9 @@ end
 -- scan at login: it's made as soon as our saved data loads. Dragging moves it around
 -- the minimap's edge (the position is saved); the OnUpdate runs only while dragging.
 ---------------------------------------------------------------------------
-local ICON = "Interface\\Icons\\INV_Misc_GroupNeedMore"
+-- Our logo, shipped in the addon folder (built from the folder name, so a renamed test
+-- copy finds its own).
+local ICON = "Interface\\AddOns\\" .. ADDON .. "\\media\\icon.tga"
 local DEFAULT_ANGLE = 220
 local mmButton
 
@@ -145,8 +147,7 @@ function ns.CreateMinimapButton()
     local icon = b:CreateTexture(nil, "ARTWORK")
     icon:SetSize(20, 20)
     icon:SetPoint("TOPLEFT", 6, -6)
-    icon:SetTexture(ICON)
-    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    icon:SetTexture(ICON) -- round with transparent corners: no cropping needed
     local border = b:CreateTexture(nil, "OVERLAY")
     border:SetSize(53, 53)
     border:SetPoint("TOPLEFT")

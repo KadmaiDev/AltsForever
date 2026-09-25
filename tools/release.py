@@ -11,7 +11,8 @@ Publishing needs everything committed and pushed, so the tag matches the zip.
 Runs the tests first with `luajit` (or the LUAJIT environment variable).
 
 The zip holds one AltsForever/ folder with only the files the game loads (the .toc
-files and the .lua files they list) plus LICENSE. Anything else stops the build.
+files and the .lua files they list) plus LICENSE and the logo (media/icon.tga).
+Anything else stops the build.
 The CurseForge token comes from the CURSE_API_KEY environment variable (or the
 Windows user environment) and is never printed.
 """
@@ -26,7 +27,7 @@ import urllib.error
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOCS = ["AltsForever.toc", "AltsForever_Camelot.toc"]
-EXTRA = ["LICENSE"]
+EXTRA = ["LICENSE", "media/icon.tga"]  # the logo (minimap button, addon list)
 ALLOWED = (".toc", ".lua")
 
 PROJECT_ID = 1709551
