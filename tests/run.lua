@@ -1390,7 +1390,8 @@ end
 test("a profession scan records grey points, and reagents of known recipes, account-wide", function()
     wow.load(FILES)
     wow.profs = { { "Engineering", 55 } }
-    wow.login({ v = 2, chars = {}, recipeInfo = { Engineering = { ["shadow goggles"] = "140;Shadow Goggles;,4359:4" } } })
+    wow.login({ v = 2, recipeInfo = { Engineering = { ["shadow goggles"] = "140;Shadow Goggles;,4359:4" } }, chars = {
+        ["Tink Gear"] = alt("Tink Gear", "WARRIOR", { recipes = { Engineering = { ["shadow goggles"] = true } } }) } })
     wow.schematics = 0
     greyWindow({ squirrel = true })
     local info = AltsForeverDB.recipeInfo.Engineering
@@ -1633,7 +1634,11 @@ test("strays saved by 0.2.x are removed from every character, keeping the rest",
         ["rough copper vest"] = "50;Rough Copper Vest;,2840:4",
         ["charred wolf meat"] = "85;Charred Wolf Meat;,2672:1",
         ["herb baked egg"] = "85;Herb Baked Egg;,6889:1",
+    }, Leatherworking = {
+        ["light leather"] = "60;Light Leather;,2934:3",
+        ["pincer bites"] = "85;Pincer Bites;,2675:1", -- a stray nobody knows as Leatherworking
     } }, chars = {
+        ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { recipes = { Leatherworking = { ["light leather"] = true } } }),
         ["Vesp Ash"] = alt("Vesp Ash", "PALADIN", { profs = { Blacksmithing = 40 },
             recipes = { Blacksmithing = { ["rough copper vest"] = true, ["charred wolf meat"] = true, ["herb baked egg"] = true } },
             crafts = { Blacksmithing = { [VEST] = "rough copper vest", [WOLF_MEAT] = "charred wolf meat", [777] = true } } }),
@@ -1649,6 +1654,9 @@ test("strays saved by 0.2.x are removed from every character, keeping the rest",
     local info = AltsForeverDB.recipeInfo.Blacksmithing
     eq(info["rough copper vest"], "55;Rough Copper Vest;,2840:4", "grey refreshed")
     eq(info["charred wolf meat"], nil); eq(info["herb baked egg"], nil)
+    local lw = AltsForeverDB.recipeInfo.Leatherworking
+    eq(lw["pincer bites"], nil, "strays under professions nobody opened are cleared too")
+    eq(lw["light leather"], "60;Light Leather;,2934:3", "Tarn's real recipe stays")
 end)
 
 test("a list without the window's profession changes nothing", function()

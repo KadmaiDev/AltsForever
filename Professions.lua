@@ -235,6 +235,7 @@ function ns.ScanRecipes(c)
     for item, lname in pairs(crafts) do made[item] = lname end
     c.recipes[prof], c.crafts[prof] = known, made
     Repair(prof, mine)
+    ns.PruneRecipeInfo() -- other professions' strays too (a few hundred lookups, window open only)
     ns.craftVersion = ns.craftVersion + 1
     return true
 end
@@ -491,7 +492,9 @@ function ns.AddCraftLines(tt, id)
     for i = 1, #list do tt:AddLine(list[i], 1, 1, 1) end
 end
 
--- After /af delete: recipeInfo entries no remaining character knows.
+-- recipeInfo entries no character knows under that profession: after /af delete, and
+-- after each profession scan (which also clears strays saved by 0.2.x under professions
+-- nobody has opened since).
 function ns.PruneRecipeInfo()
     local info = ns.db.recipeInfo
     if not info then return end
