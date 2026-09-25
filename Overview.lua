@@ -354,13 +354,15 @@ function ns.RefreshOverview()
 end
 
 ---------------------------------------------------------------------------
--- XP bar tooltip: hovering the experience bar adds every character still levelling
--- (you first, then by level) with their level, XP and rested XP. Built only on hover.
+-- Status bar tooltips: hovering the experience bar adds your other characters still
+-- levelling (level, XP, rested); hovering the reputation bar adds your other characters'
+-- standing with the watched faction. You're left out: the bar already shows you. The
+-- lines are built only on hover.
 ---------------------------------------------------------------------------
 
--- Tooltip text isn't monospaced, so the level, XP and rested columns are lined up by
--- measuring each value in the tooltip's own font and padding it on the left with a
--- transparent texture of exactly the missing width.
+-- Tooltip text isn't monospaced, so the columns are lined up by measuring each value in
+-- the tooltip's own font and padding it on the left with a transparent texture of exactly
+-- the missing width.
 local BLANK = "Interface\\AddOns\\" .. ADDON .. "\\media\\blank.tga"
 local GAP = 10
 local measure
@@ -383,15 +385,13 @@ local function Width(font, size, flags, s)
     return type(w) == "number" and w or nil
 end
 
--- One row per character: name, and the three right-hand values.
-local rows = {}
-
 -- Lines up the right-hand columns of the rows added from line `first` on; leaves the
--- plain text if the tooltip's text can't be measured.
+-- plain text if the tooltip's text can't be measured. Each row is { name, value... };
+-- labels[col] is text shown before that column's value (e.g. "rested").
 -- Our lines take the font of the tooltip's second line (its body text): a line the
 -- tooltip hasn't needed before gets a new font string, which a UI addon that restyled
 -- the existing ones (EllesmereUI) hasn't reached, so it would show in the game's font.
-local function Align(tt, first)
+local function Align(tt, first, rows, labels)
     local name = tt.GetName and tt:GetName()
     local fs = name and _G[name .. "TextLeft2"]
     local font, size, flags
@@ -403,28 +403,57 @@ local function Align(tt, first)
             if text and text.SetFont then text:SetFont(font, size, flags) end
         end
     end
-    local widths = { 0, 0, 0 }
-    for _, row in ipairs(rows) do
-        for col = 1, 3 do
+    local columns, widths, measured = #rows[1] - 1, {}, {}
+    for col = 1, columns do widths[col] = 0 end
+    for i, row in ipairs(rows) do
+        measured[i] = {}
+        for col = 1, columns do
             local w = Width(font, size, flags, row[col + 1])
             if not w then return end
-            row[col + 4] = w
+            measured[i][col] = w
             if w > widths[col] then widths[col] = w end
         end
     end
     for i, row in ipairs(rows) do
         local right = _G[name .. "TextRight" .. (first + i - 1)]
         if not right then return end
-        right:SetText(Spacer(widths[1] - row[5]) .. row[2] .. Spacer(GAP + widths[2] - row[6]) .. row[3]
-            .. Spacer(GAP) .. GREY .. "rested|r " .. Spacer(widths[3] - row[7]) .. row[4])
+        local text = ""
+        for col = 1, columns do
+            local pad = col > 1 and GAP or 0
+            if labels[col] then
+                text = text .. Spacer(pad) .. labels[col]
+                pad = 0
+            end
+            text = text .. Spacer(pad + widths[col] - measured[i][col]) .. row[col + 1]
+        end
+        right:SetText(text)
     end
 end
 
--- Adds your other characters still levelling (the bar's own tooltip already covers
--- you); returns false, adding nothing, if there are none.
-function ns.AddXPLines(tt, now)
-    local chars, maxLevel = ns.db.chars, ns.MaxLevel()
-    for i = #rows, 1, -1 do rows[i] = nil end
+-- Adds a "Your characters" section; returns false, adding nothing, if there are no rows.
+-- `title` starts a tooltip we opened ourselves; otherwise a gap follows the bar's own.
+function ns.AddCharacterRows(tt, rows, labels, title)
+    if #rows == 0 then return false end
+    if title then tt:AddLine(title, 1, 1, 1) else tt:AddLine(" ") end
+    tt:AddLine("Your characters", 1, 0.82, 0)
+    local first = tt.NumLines and tt:NumLines() + 1
+    for _, row in ipairs(rows) do
+        local text = ""
+        for col = 2, #row do
+            text = text .. (col > 2 and "  " or "") .. (labels[col - 1] or "") .. row[col]
+        end
+        tt:AddDoubleLine(row[1], text, 1, 1, 1, 1, 1, 1)
+    end
+    if first then Align(tt, first, rows, labels) end
+    return true
+end
+
+local XP_LABELS = { nil, nil, GREY .. "rested|r " }
+
+-- Your other characters still levelling: level, XP and rested XP.
+function ns.AddXPLines(tt, fresh)
+    local chars, maxLevel, now = ns.db.chars, ns.MaxLevel(), time()
+    local rows = {}
     for _, key in ipairs(ns.OverviewOrder()) do
         local c = chars[key]
         if key ~= ns.charKey and c.level and c.level < maxLevel then
@@ -432,31 +461,23 @@ function ns.AddXPLines(tt, now)
             rows[#rows + 1] = { ns.ColoredName(key, c), tostring(c.level), xp, ns.RestedText(c, now) }
         end
     end
-    if #rows == 0 then return false end
-    tt:AddLine(" ")
-    tt:AddLine("Your characters", 1, 0.82, 0)
-    local first = tt.NumLines and tt:NumLines() + 1
-    for _, row in ipairs(rows) do
-        tt:AddDoubleLine(row[1], row[2] .. "  " .. row[3] .. "  " .. GREY .. "rested|r " .. row[4], 1, 1, 1, 1, 1, 1)
-    end
-    if first then Align(tt, first) end
-    return true
+    return ns.AddCharacterRows(tt, rows, XP_LABELS, fresh and "Experience")
 end
 
--- Blizzard's bar has no tooltip of its own, so we open one; ElvUI's and EllesmereUI's
--- show theirs (unless the player made the bar click-through, or is at max level), and
--- we add to it.
-local function HookXPBar(bar, ownTooltip)
-    if not bar or bar.altsForeverXP or not bar.HookScript then return end
-    bar.altsForeverXP = true
+-- Blizzard's bars show a tooltip only sometimes, so we open one if none is showing;
+-- ElvUI's and EllesmereUI's show theirs (unless the player made the bar click-through,
+-- or it has nothing to show), and we add to it.
+local function HookBar(bar, ownTooltip, add)
+    if not bar or bar.altsForeverHooked or not bar.HookScript then return end
+    bar.altsForeverHooked = true
     bar:HookScript("OnEnter", function(self)
         local tt = GameTooltip
         if tt:IsForbidden() then return end
         if tt:IsShown() then
-            if ns.AddXPLines(tt, time()) then tt:Show() end
+            if add(tt) then tt:Show() end
         elseif ownTooltip then
             tt:SetOwner(self, "ANCHOR_TOP")
-            if ns.AddXPLines(tt, time()) then tt:Show() else tt:Hide() end
+            if add(tt, true) then tt:Show() else tt:Hide() end
         end
     end)
     if ownTooltip then
@@ -466,31 +487,33 @@ local function HookXPBar(bar, ownTooltip)
     end
 end
 
--- Blizzard's experience bar sits in a status tracking container (with reputation etc.);
--- it's the one with a rested (exhaustion) marker.
-local function BlizzardXPBars(container, found)
-    if not container then return end
-    if type(container.bars) == "table" then
-        for _, bar in pairs(container.bars) do
-            if type(bar) == "table" and bar.ExhaustionTick then found[#found + 1] = bar end
-        end
-    end
-    for i = 1, select("#", container:GetChildren()) do
-        local bar = select(i, container:GetChildren())
-        if bar and bar.ExhaustionTick then found[#found + 1] = bar end
-    end
+local function AddRep(tt, fresh)
+    return ns.AddRepLines and ns.AddRepLines(tt, fresh) or false
 end
 
--- Hooks each XP bar once. Other UIs make theirs during their own login setup, so this
--- runs on entering the world (after every addon's login) and again after each loading
--- screen, which costs nothing once hooked.
-local function HookXPBars()
-    local found = {}
-    BlizzardXPBars(MainStatusTrackingBarContainer, found)
-    BlizzardXPBars(SecondaryStatusTrackingBarContainer, found)
-    for _, bar in ipairs(found) do HookXPBar(bar, true) end
-    HookXPBar(ElvUI_ExperienceBarHolder, false)
-    HookXPBar(EllesmereEAB_XPBar, false)
+-- Blizzard's bars sit in status tracking containers, in `bars` by kind (checked in game:
+-- 6 bars, experience 4th). The experience bar is the one with a rested (exhaustion)
+-- marker; reputation is the first kind, as in retail.
+local function HookBlizzardBars(container)
+    if not (container and type(container.bars) == "table") then return end
+    for _, bar in pairs(container.bars) do
+        if type(bar) == "table" and bar.ExhaustionTick then HookBar(bar, true, ns.AddXPLines) end
+    end
+    local enum = StatusTrackingBarInfo and StatusTrackingBarInfo.BarsEnum
+    local rep = container.bars[enum and enum.Reputation or 1]
+    if type(rep) == "table" and not rep.ExhaustionTick then HookBar(rep, true, AddRep) end
+end
+
+-- Hooks each bar once. Other UIs make theirs during their own login setup, so this runs
+-- on entering the world (after every addon's login) and again after each loading screen,
+-- which costs nothing once hooked.
+local function HookBars()
+    HookBlizzardBars(MainStatusTrackingBarContainer)
+    HookBlizzardBars(SecondaryStatusTrackingBarContainer)
+    HookBar(ElvUI_ExperienceBarHolder, false, ns.AddXPLines)
+    HookBar(EllesmereEAB_XPBar, false, ns.AddXPLines)
+    HookBar(ElvUI_ReputationBarHolder, false, AddRep)
+    HookBar(EllesmereEAB_RepBar, false, AddRep)
 end
 
 function ns.StartOverview()
@@ -501,5 +524,5 @@ function ns.StartOverview()
     for _, event in ipairs({ "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "PLAYER_MONEY", "ZONE_CHANGED_NEW_AREA", "SKILL_LINES_CHANGED" }) do
         ns.On(event, Update)
     end
-    ns.On("PLAYER_ENTERING_WORLD", HookXPBars)
+    ns.On("PLAYER_ENTERING_WORLD", HookBars)
 end

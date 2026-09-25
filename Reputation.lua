@@ -34,6 +34,36 @@ function ns.StandingText(value)
     return text .. "|r"
 end
 
+-- Your other characters' standing with the faction you're watching, for the
+-- reputation bar's tooltip: standing, how far into it, and the numbers.
+function ns.AddRepLines(tt, fresh)
+    local d = R and R.GetWatchedFactionData and R.GetWatchedFactionData()
+    local id = d and d.factionID
+    if not id or issecretvalue(id) or id == 0 then return false end
+    local rows = {}
+    for _, key in ipairs(ns.OverviewOrder()) do
+        local c = ns.db.chars[key]
+        local value = key ~= ns.charKey and c.reps and c.reps[id]
+        if value then
+            local level, low, high = ns.Standing(value)
+            local color = "|cff" .. COLORS[level]
+            local label = color .. (_G["FACTION_STANDING_LABEL" .. level] or LABELS[level]) .. "|r"
+            local pct, progress = "", ""
+            if level < 8 then
+                pct = color .. floor((value - low) * 100 / (high - low)) .. "%|r"
+                progress = GREY .. (value - low) .. " / " .. (high - low) .. "|r"
+            end
+            rows[#rows + 1] = { ns.ColoredName(key, c), label, pct, progress }
+        end
+    end
+    local title
+    if fresh then
+        title = ns.db.factions and ns.db.factions[id]
+        if not title and d.name and not issecretvalue(d.name) then title = d.name end
+    end
+    return ns.AddCharacterRows(tt, rows, {}, title or (fresh and "Reputation"))
+end
+
 ---------------------------------------------------------------------------
 -- Recording
 ---------------------------------------------------------------------------

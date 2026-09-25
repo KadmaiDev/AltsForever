@@ -112,7 +112,7 @@ function M.load(files)
     local frameMethods = {}
     local function ignored(self) return self end
     -- Child elements a template may or may not provide are nil unless set.
-    local CHILDREN = { TitleText = true, CloseButton = true, Inset = true }
+    local CHILDREN = { TitleText = true, CloseButton = true, Inset = true, ExhaustionTick = true }
     -- Widget methods are capitalised (SetText, Show); lower-case names are our own
     -- fields, which are nil unless set, as in the game.
     local frameMeta = { __index = function(_, k)
@@ -363,7 +363,7 @@ function M.load(files)
 
     -- Reputation: the visible list in order, as { id, name, standing, header? }, and
     -- factions under collapsed headers (not in the list, but readable by ID).
-    M.factions, M.hiddenFactions, M.factionReads = {}, {}, 0
+    M.factions, M.hiddenFactions, M.factionReads, M.watched = {}, {}, 0, nil
     local function factionData(f)
         return f and { factionID = f[1], name = f[2], currentStanding = f[3], isHeader = f[4] or false,
             isHeaderWithRep = false, reaction = 4 }
@@ -375,6 +375,8 @@ function M.load(files)
             for _, f in ipairs(M.factions) do if f[1] == id then return factionData(f) end end
             for _, f in ipairs(M.hiddenFactions) do if f[1] == id then return factionData(f) end end
         end,
+        -- The faction shown on the reputation bar (M.watched = { factionID, name }).
+        GetWatchedFactionData = function() return M.watched end,
         ExpandAllFactionHeaders = function() M.expanded = true end,
         ExpandFactionHeader = function() M.expanded = true end,
     }
@@ -428,6 +430,7 @@ function M.load(files)
     -- XP bars (Blizzard's, ElvUI's, EllesmereUI's) exist only if a test makes them.
     MainStatusTrackingBarContainer, SecondaryStatusTrackingBarContainer = nil, nil
     ElvUI_ExperienceBarHolder, EllesmereEAB_XPBar = nil, nil
+    ElvUI_ReputationBarHolder, EllesmereEAB_RepBar = nil, nil
     local ns = {}
     for _, file in ipairs(files) do
         assert(loadfile(file))("AltsForever", ns)

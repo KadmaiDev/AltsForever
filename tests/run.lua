@@ -2166,15 +2166,17 @@ local function lineTexts(tt)
     return table.concat(t, " | ")
 end
 
--- Blizzard's XP bar: in a status tracking container, marked by its rested tick.
-local function blizzardXPBar()
+-- Blizzard's bars: in a status tracking container by kind, reputation first and
+-- experience 4th (marked by its rested tick), as checked in game.
+local function blizzardBars()
     MainStatusTrackingBarContainer = CreateFrame("Frame")
-    local rep, xp = CreateFrame("Frame"), CreateFrame("Frame")
-    xp.ExhaustionTick = CreateFrame("Frame")
-    MainStatusTrackingBarContainer.bars = { rep, xp }
-    MainStatusTrackingBarContainer.children = { rep, xp }
-    return xp
+    local bars = {}
+    for i = 1, 6 do bars[i] = CreateFrame("Frame") end
+    bars[4].ExhaustionTick = CreateFrame("Frame")
+    MainStatusTrackingBarContainer.bars = bars
+    return bars[4], bars[1]
 end
+local function blizzardXPBar() return (blizzardBars()) end
 
 test("hovering Blizzard's XP bar lists every character still levelling", function()
     wow.load(FILES)
@@ -2184,7 +2186,7 @@ test("hovering Blizzard's XP bar lists every character still levelling", functio
     wow.fire("PLAYER_ENTERING_WORLD")
     bar.scripts.OnEnter(bar)
     eq(GameTooltip:GetOwner(), bar); eq(GameTooltip:IsShown(), true)
-    eq(lineTexts(GameTooltip), "  | Your characters | [PRIEST]High | [ROGUE]Low",
+    eq(lineTexts(GameTooltip), "Experience | Your characters | [PRIEST]High | [ROGUE]Low",
         "by level; not you (the bar shows you), not max level (Far)")
     local low = GameTooltip.lines[4][2]
     assert(low:find("^12  ") and low:find("10%%") and low:find("rested"), low)
@@ -2276,6 +2278,61 @@ test("ElvUI's and EllesmereUI's XP bar tooltips get the lines added at the end",
         ownTooltip = false
         bar.scripts.OnEnter(bar)
         eq(GameTooltip:IsShown(), false, name .. ": no tooltip of our own where theirs is off")
+    end
+end)
+
+local function repAlts()
+    return { v = 2, factions = { [530] = "Darkspear Trolls" }, chars = {
+        ["Aldric"] = alt("Aldric", "MAGE", { level = 24, reps = { [530] = 100 } }),
+        ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { level = 30, reps = { [530] = 3500 } }),
+        ["Brak Stone"] = alt("Brak Stone", "WARRIOR", { level = 20, reps = { [530] = 42500 } }),
+        ["Horde Guy"] = alt("Horde Guy", "ROGUE", { level = 10, reps = { [76] = 100 } }),
+    } }
+end
+
+test("hovering the reputation bar lists your other characters' standing with that faction", function()
+    wow.load(FILES)
+    local _, bar = blizzardBars()
+    wow.watched = { factionID = 530, name = "Darkspear Trolls" }
+    wow.login(repAlts())
+    wow.fire("PLAYER_ENTERING_WORLD")
+    bar.scripts.OnEnter(bar)
+    eq(GameTooltip:GetOwner(), bar)
+    eq(lineTexts(GameTooltip), "Darkspear Trolls | Your characters | [DRUID]Tarn Moon | [WARRIOR]Brak Stone",
+        "not you, not characters without it")
+    local tarn, brak = GameTooltip.lines[3][2], GameTooltip.lines[4][2]
+    assert(tarn:find("Friendly") and tarn:find("8%%") and tarn:find("500 / 6000"), tarn)
+    assert(brak:find("Exalted") and not brak:find("%%"), brak)
+    bar.scripts.OnLeave(bar)
+    eq(GameTooltip:IsShown(), false)
+end)
+
+test("the reputation bar adds nothing without a watched faction or another character with it", function()
+    wow.load(FILES)
+    local _, bar = blizzardBars()
+    wow.login(repAlts())
+    wow.fire("PLAYER_ENTERING_WORLD")
+    bar.scripts.OnEnter(bar)
+    eq(GameTooltip:IsShown(), false, "nothing watched")
+    wow.watched = { factionID = 999, name = "Nobody's" }
+    bar.scripts.OnEnter(bar)
+    eq(GameTooltip:IsShown(), false, "no one else has it")
+end)
+
+test("ElvUI's and EllesmereUI's reputation bar tooltips get the lines added at the end", function()
+    for _, name in ipairs({ "ElvUI_ReputationBarHolder", "EllesmereEAB_RepBar" }) do
+        wow.load(FILES)
+        local bar = CreateFrame("Frame", name)
+        bar:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+            GameTooltip:AddLine("Darkspear Trolls")
+            GameTooltip:Show()
+        end)
+        wow.watched = { factionID = 530, name = "Darkspear Trolls" }
+        wow.login(repAlts())
+        wow.fire("PLAYER_ENTERING_WORLD")
+        bar.scripts.OnEnter(bar)
+        eq(lineTexts(GameTooltip), "Darkspear Trolls |   | Your characters | [DRUID]Tarn Moon | [WARRIOR]Brak Stone", name)
     end
 end)
 
