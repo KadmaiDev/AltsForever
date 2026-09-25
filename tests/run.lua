@@ -1764,6 +1764,7 @@ test("right-click a character in the overview to forget them, after confirming",
     eq(low.key, "Low")
     low.scripts.OnClick(low, "RightButton")
     eq(wow.menu.items[1].text, "[ROGUE]Low")
+    eq(StaticPopupDialogs.ALTSFOREVER_FORGET, nil, "Blizzard's pop-up table untouched until needed")
     wow.menuItem("Forget Low...").fn()
     eq(wow.popup.which, "ALTSFOREVER_FORGET"); eq(wow.popup.text, "Low")
     eq(type(AltsForeverDB.chars["Low"]), "table", "nothing happens until confirmed")
@@ -1774,6 +1775,24 @@ test("right-click a character in the overview to forget them, after confirming",
     local you = overviewRows()[1]
     you.scripts.OnClick(you, "RightButton")
     eq(wow.menuItem("Forget Aldric...").enabled, false)
+end)
+
+test("no addon file assigns one of Blizzard's globals (that taints Blizzard's code)", function()
+    -- Writing e.g. StaticPopupDialogs = ... from addon code made Esc's SpellStopCasting
+    -- fail with ADDON_ACTION_FORBIDDEN. Adding keys to such tables is fine; replacing is not.
+    local blizzard = { "StaticPopupDialogs", "UISpecialFrames", "GameTooltip", "ItemRefTooltip", "SlashCmdList",
+        "UIParent", "MenuUtil", "Settings", "ChatFrame_DisplayTimePlayed", "SpellStopCasting", "ToggleGameMenu" }
+    for _, file in ipairs(FILES) do
+        local n = 0
+        for line in io.lines(file) do
+            n = n + 1
+            local code = line:gsub("%-%-.*$", "")
+            for _, name in ipairs(blizzard) do
+                assert(not code:match("^%s*" .. name .. "%s*="), file .. ":" .. n .. " assigns " .. name)
+                assert(not code:match("[,%s]" .. name .. "%s*=[^=]") or code:match("local"), file .. ":" .. n .. " assigns " .. name)
+            end
+        end
+    end
 end)
 
 ---------------------------------------------------------------------------

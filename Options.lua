@@ -25,21 +25,27 @@ function ns.ForgetCharacter(key)
     return true
 end
 
-StaticPopupDialogs = StaticPopupDialogs or {}
-StaticPopupDialogs.ALTSFOREVER_FORGET = {
-    text = "Forget %s?\n\nAlts Forever removes their items, gold, gear and recipes. They're recorded again next time you log in on them.",
-    button1 = YES or "Yes",
-    button2 = NO or "No",
-    OnAccept = function(_, key)
-        local ok, why = ns.ForgetCharacter(key)
-        ns.Print(ok and ("Forgot " .. key .. ".") or why)
-        if ns.RefreshOverview then ns.RefreshOverview() end
-    end,
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-    preferredIndex = 3,
-}
+-- The confirmation pop-up. Added to Blizzard's StaticPopupDialogs only the first time
+-- it's needed, and never by assigning the global itself: writing a Blizzard global from
+-- addon code taints every secure read of it, and Esc (ToggleGameMenu) reads this one
+-- before SpellStopCasting, which then got blocked (ADDON_ACTION_FORBIDDEN).
+local function ForgetDialog()
+    if StaticPopupDialogs.ALTSFOREVER_FORGET then return end
+    StaticPopupDialogs.ALTSFOREVER_FORGET = {
+        text = "Forget %s?\n\nAlts Forever removes their items, gold, gear and recipes. They're recorded again next time you log in on them.",
+        button1 = YES or "Yes",
+        button2 = NO or "No",
+        OnAccept = function(_, key)
+            local ok, why = ns.ForgetCharacter(key)
+            ns.Print(ok and ("Forgot " .. key .. ".") or why)
+            if ns.RefreshOverview then ns.RefreshOverview() end
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+    }
+end
 
 ---------------------------------------------------------------------------
 -- Menus
@@ -68,6 +74,7 @@ function ns.ShowCharacterMenu(owner, key)
     MenuUtil.CreateContextMenu(owner, function(_, root)
         root:CreateTitle(ns.ColoredName(key, c))
         local forget = root:CreateButton("Forget " .. (c.name or key) .. "...", function()
+            ForgetDialog()
             StaticPopup_Show("ALTSFOREVER_FORGET", c.name or key, nil, key)
         end)
         if key == ns.charKey then
