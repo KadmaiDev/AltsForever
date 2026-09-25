@@ -175,6 +175,7 @@ ns.On("PLAYER_LOGIN", function()
     ns.StartOverview()
     ns.StartGear()
     ns.StartTooltip()
+    ns.StartOptions()
 end)
 
 ns.On("PLAYER_LOGOUT", function()
@@ -210,9 +211,7 @@ function commands.delete(arg)
     local key = arg ~= "" and FindChar(arg)
     if not key then return Print("No character named '" .. arg .. "'. Use /af list.") end
     if key == ns.charKey then return Print("You can't delete the character you're logged in on.") end
-    ns.db.chars[key] = nil
-    ns.PruneRecipeInfo()
-    ns.InvalidateCache()
+    ns.ForgetCharacter(key)
     Print("Deleted " .. key .. ".")
 end
 
@@ -222,8 +221,7 @@ function commands.mail()
 end
 
 function commands.skillups()
-    ns.db.skillupsOff = not ns.db.skillupsOff or nil
-    ns.InvalidateCache()
+    ns.SetSkillups(not ns.SkillupsOn())
     Print(ns.db.skillupsOff and "Skill-up details in tooltips off." or "Skill-up details in tooltips on.")
 end
 
@@ -234,6 +232,13 @@ end
 
 function commands.help()
     Print("by Kadmai. /af opens the overview. Also: /af mail | list | delete Name | skillups | mem")
+    Print("Or click Alts Forever in the minimap's addon menu (right-click for options).")
+end
+ns.ShowHelp = commands.help
+
+-- For the menus: runs a slash command by name.
+function ns.RunCommand(name, arg)
+    commands[name](arg or "")
 end
 
 commands[""] = function() ns.ToggleOverview() end

@@ -175,7 +175,7 @@ local function RowTooltip(row)
     tt:AddLine(" ")
     tt:AddLine(GREY .. (c.bank and "Bank scanned" or "Bank not scanned yet - visit a banker") .. "|r")
     if c.dura then tt:AddDoubleLine("Lowest durability", ns.DurabilityText(c.dura), 1, 0.82, 0, 1, 1, 1) end
-    tt:AddLine("|cff66ccffClick to see gear|r")
+    tt:AddLine("|cff66ccffClick to see gear, right-click for more|r")
     tt:Show()
 end
 
@@ -204,7 +204,11 @@ local function CreateRow(i)
     hl:SetColorTexture(1, 1, 1, 0.08)
     row.cells = CreateCells(row, "GameFontHighlightSmall")
     row:SetScript("OnEnter", RowTooltip)
-    row:SetScript("OnClick", function(self) ns.ShowGear(self.key) end)
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    -- Left: gear. Right: the character's menu (Forget...).
+    row:SetScript("OnClick", function(self, button)
+        if button == "RightButton" then ns.ShowCharacterMenu(self, self.key) else ns.ShowGear(self.key) end
+    end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     rows[i] = row
     return row
@@ -285,6 +289,20 @@ local function CreateWindow()
     footer = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.footer = footer
     footer:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 12)
+    -- Options (cog) button in the title bar, left of the close button.
+    local cog = CreateFrame("Button", nil, f)
+    cog:SetSize(16, 16)
+    cog:SetPoint("TOPRIGHT", f, "TOPRIGHT", -28, -4)
+    cog:SetNormalTexture("Interface\\Icons\\INV_Misc_Gear_01")
+    cog:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    cog:SetScript("OnClick", function(self) ns.ShowOptionsMenu(self) end)
+    cog:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Options")
+        GameTooltip:Show()
+    end)
+    cog:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    f.cog = cog
     f.credit = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     f.credit:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 12)
     f.credit:SetText("Alts Forever by Kadmai")
@@ -296,9 +314,14 @@ local function CreateWindow()
     f:Hide()
 end
 
-function ns.ToggleOverview()
+-- Opens or closes the overview; `open` only ever opens it (menus, settings page).
+function ns.ToggleOverview(open)
     if not frame then CreateWindow() end
-    if frame:IsShown() then frame:Hide() else frame:Show() end
+    if frame:IsShown() and not open then frame:Hide() else frame:Show() end
+end
+
+function ns.RefreshOverview()
+    if frame and frame:IsShown() then Refresh() end
 end
 
 function ns.StartOverview()

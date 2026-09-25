@@ -310,8 +310,59 @@ function M.load(files)
     GameTooltip = M.tooltip()
     ItemRefTooltip = M.tooltip()
 
+    -- Blizzard's context menus: the last menu built is kept in M.menu, its items in
+    -- order as { kind, text, fn / isSelected, setSelected, enabled }.
+    M.menu = nil
+    MenuUtil = { CreateContextMenu = function(owner, generator)
+        local root = { owner = owner, items = {} }
+        local function add(kind, text, a, b)
+            local item = { kind = kind, text = text, fn = a, isSelected = a, setSelected = b, enabled = true }
+            function item:SetEnabled(v) self.enabled = v end
+            root.items[#root.items + 1] = item
+            return item
+        end
+        function root:CreateTitle(text) return add("title", text) end
+        function root:CreateButton(text, fn) return add("button", text, fn) end
+        function root:CreateCheckbox(text, isSelected, setSelected) return add("checkbox", text, isSelected, setSelected) end
+        generator(owner, root)
+        M.menu = root
+        return root
+    end }
+
+    -- Confirmation pop-ups: the last one shown.
+    M.popup = nil
+    StaticPopupDialogs = {}
+    StaticPopup_Show = function(which, text1, text2, data) M.popup = { which = which, text = text1, data = data } end
+    YES, NO = "Yes", "No"
+
+    -- The Options > AddOns settings API, recording what was registered.
+    M.settings, M.errors = {}, {}
+    Settings = {
+        VarType = { Boolean = "boolean" },
+        RegisterVerticalLayoutCategory = function(name)
+            local category = { name = name, initializers = {} }
+            M.settings.category = category
+            return category
+        end,
+        RegisterProxySetting = function(_, variable, _, name, default, get, set)
+            local setting = { variable = variable, name = name, default = default, get = get, set = set }
+            M.settings.setting = setting
+            return setting
+        end,
+        CreateCheckbox = function(_, setting, tooltip) M.settings.checkbox = { setting = setting, tooltip = tooltip } end,
+        RegisterAddOnCategory = function(category) M.settings.registered = category end,
+    }
+    SettingsPanel = { GetLayout = function(_, category)
+        return { AddInitializer = function(_, init) category.initializers[#category.initializers + 1] = init end }
+    end }
+    CreateSettingsButtonInitializer = function(name, text, fn) return { name = name, text = text, fn = fn } end
+    geterrorhandler = function() return function(err) M.errors[#M.errors + 1] = err end end
+
     AltsForeverDB = nil
     AltsForeverFrame = nil
+    -- Globals the addon defines (named in the .toc); cleared so a previous load is freed.
+    AltsForever_OnAddonCompartmentClick, AltsForever_OnAddonCompartmentEnter = nil, nil
+    AltsForever_OnAddonCompartmentLeave = nil
     local ns = {}
     for _, file in ipairs(files) do
         assert(loadfile(file))("AltsForever", ns)
@@ -386,6 +437,13 @@ end
 -- chat windows first (they exist before any addon).
 function M.timePlayed(total, thisLevel)
     M.fire("TIME_PLAYED_MSG", total, thisLevel or 0)
+end
+
+-- The item with this text in the last menu built.
+function M.menuItem(text)
+    for _, item in ipairs(M.menu and M.menu.items or {}) do
+        if item.text == text then return item end
+    end
 end
 
 return M

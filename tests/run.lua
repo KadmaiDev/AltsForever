@@ -2,7 +2,7 @@
 package.path = "tests/?.lua;" .. package.path
 local wow = require("wow")
 
-local FILES = { "Core.lua", "Scanner.lua", "Mail.lua", "Money.lua", "Professions.lua", "Character.lua", "Overview.lua", "Gear.lua", "Tooltip.lua" }
+local FILES = { "Core.lua", "Scanner.lua", "Mail.lua", "Money.lua", "Professions.lua", "Character.lua", "Overview.lua", "Gear.lua", "Tooltip.lua", "Options.lua" }
 local tests, passed, failed = {}, 0, 0
 
 local function test(name, fn) tests[#tests + 1] = { name = name, fn = fn } end
@@ -1705,6 +1705,94 @@ test("/af delete also forgets recipes nobody else knows", function()
     local info = AltsForeverDB.recipeInfo.Blacksmithing
     eq(info["rough copper vest"], nil, "only Mid knew it")
     eq(info["copper bracers"], "60;Copper Bracers;", "Aldric still knows it")
+end)
+
+---------------------------------------------------------------------------
+-- Options: minimap compartment, menus, forgetting a character, settings page
+test("minimap compartment: click opens the overview, right-click the options menu", function()
+    wow.load(FILES)
+    wow.login(nil)
+    AltsForever_OnAddonCompartmentClick("AltsForever", "LeftButton", UIParent)
+    eq(AltsForeverFrame:IsShown(), true)
+    AltsForever_OnAddonCompartmentClick("AltsForever", "LeftButton", UIParent)
+    eq(AltsForeverFrame:IsShown(), false, "click again closes it")
+    AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
+    local texts = {}
+    for _, item in ipairs(wow.menu.items) do texts[#texts + 1] = item.text end
+    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Show skill-up details | Show mail expiry in chat | Memory use")
+    wow.menuItem("Open overview").fn()
+    eq(AltsForeverFrame:IsShown(), true)
+    wow.menuItem("Open overview").fn()
+    eq(AltsForeverFrame:IsShown(), true, "the menu only opens it")
+    AltsForever_OnAddonCompartmentEnter("AltsForever", UIParent)
+    eq(GameTooltip.lines[1][1], "Alts Forever")
+    assert(GameTooltip.lines[3][1]:find("Right-click", 1, true))
+end)
+
+test("options menu: skill-up details tick box, mail and memory", function()
+    wow.load(FILES)
+    wow.login({ v = 2, chars = { ["Soon"] = alt("Soon", "ROGUE", { mail = {}, mailExpires = os.time() + 3600 }) } })
+    SlashCmdList.ALTSFOREVER("")
+    AltsForeverFrame.cog.scripts.OnClick(AltsForeverFrame.cog)
+    local box = wow.menuItem("Show skill-up details")
+    eq(box.kind, "checkbox"); eq(box.isSelected(), true)
+    box.setSelected()
+    eq(AltsForeverDB.skillupsOff, true); eq(box.isSelected(), false)
+    box.setSelected()
+    eq(AltsForeverDB.skillupsOff, nil)
+    wow.printed = {}
+    wow.menuItem("Show mail expiry in chat").fn()
+    assert(table.concat(wow.printed, "\n"):find("Soon", 1, true), "same as /af mail")
+    wow.printed = {}
+    wow.menuItem("Memory use").fn()
+    assert(table.concat(wow.printed, "\n"):find("Memory", 1, true), "same as /af mem")
+end)
+
+test("right-click a character in the overview to forget them, after confirming", function()
+    wow.load(FILES)
+    wow.now = NOW
+    wow.login(overviewAlts())
+    SlashCmdList.ALTSFOREVER("")
+    local low = overviewRows()[4]
+    eq(low.key, "Low")
+    low.scripts.OnClick(low, "RightButton")
+    eq(wow.menu.items[1].text, "[ROGUE]Low")
+    wow.menuItem("Forget Low...").fn()
+    eq(wow.popup.which, "ALTSFOREVER_FORGET"); eq(wow.popup.text, "Low")
+    eq(type(AltsForeverDB.chars["Low"]), "table", "nothing happens until confirmed")
+    StaticPopupDialogs.ALTSFOREVER_FORGET.OnAccept(nil, wow.popup.data)
+    eq(AltsForeverDB.chars["Low"], nil)
+    eq(#overviewRows(), 3, "gone from the open overview")
+    -- Your own row can't be forgotten.
+    local you = overviewRows()[1]
+    you.scripts.OnClick(you, "RightButton")
+    eq(wow.menuItem("Forget Aldric...").enabled, false)
+end)
+
+test("Options > AddOns page: skill-up tick box and an overview button", function()
+    wow.load(FILES)
+    wow.login(nil)
+    eq(wow.settings.registered.name, "Alts Forever")
+    local setting = wow.settings.setting
+    eq(setting.default, true); eq(setting.get(), true)
+    setting.set(false)
+    eq(AltsForeverDB.skillupsOff, true)
+    setting.set(true)
+    eq(AltsForeverDB.skillupsOff, nil)
+    local button = wow.settings.category.initializers[1]
+    eq(button.text, "Open overview")
+    button.fn()
+    eq(AltsForeverFrame:IsShown(), true)
+end)
+
+test("a settings page failure is reported, and the addon keeps working", function()
+    wow.load(FILES)
+    Settings.RegisterProxySetting = function() error("no such setting type") end
+    wow.setBag(0, 16, { [1] = { 100, 2 } })
+    wow.login(nil)
+    eq(#wow.errors, 1)
+    assert(tostring(wow.errors[1]):find("no such setting type", 1, true))
+    eq(wow.hover(GameTooltip, 100)[2][2], R("Bags 2", 2), "tooltips still work")
 end)
 
 ---------------------------------------------------------------------------

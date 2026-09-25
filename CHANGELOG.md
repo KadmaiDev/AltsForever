@@ -1,3 +1,7 @@
+## Unreleased
+
+- **Click instead of typing:** Alts Forever is in the minimap's addon menu (click: open the overview, right-click: options). The overview has an options button, and right-clicking a character there lets you forget them (with a confirmation). There's also an Alts Forever page under Options → AddOns with the skill-up setting.
+
 ## Alts Forever 0.3.0
 
 - **Skill-ups across your alts.** Alts Forever now knows the level at which each recipe your characters know stops giving skill-ups (read from the game when a profession window opens):

@@ -39,6 +39,8 @@ Install it from CurseForge, or link or copy this folder to `<WoW Forever>\Interf
 
 ## Commands
 
+Everything below can also be done by clicking: **click Alts Forever in the minimap's addon menu** to open the overview, **right-click it** (or the cog in the overview) for options, and **right-click a character in the overview** to forget them. There's also an Alts Forever page under Options → AddOns.
+
 | Command | What it does |
 |---|---|
 | `/af` | Open or close the overview window |

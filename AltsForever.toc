@@ -16,6 +16,9 @@
 ## Category-zhCN: 物品栏
 ## Category-zhTW: 物品欄
 ## SavedVariables: AltsForeverDB
+## AddonCompartmentFunc: AltsForever_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: AltsForever_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: AltsForever_OnAddonCompartmentLeave
 
 Core.lua
 Scanner.lua
@@ -26,3 +29,4 @@ Character.lua
 Overview.lua
 Gear.lua
 Tooltip.lua
+Options.lua
