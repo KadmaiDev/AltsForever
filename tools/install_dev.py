@@ -39,7 +39,7 @@ def main():
         with open(target, "w", encoding="utf-8", newline="\n") as f:
             f.write(toc.replace("## Title: Alts Forever", "## Title: Alts Forever (dev)", 1)
                     .replace("AddOns\\AltsForever\\", "AddOns\\AltsForeverDev\\"))
-    files = toc_files(toc) + ["LICENSE", "media/icon.tga"]
+    files = toc_files(toc) + ["LICENSE", "media/icon.tga", "media/minimap.tga"]
     os.makedirs(os.path.join(dev, "media"), exist_ok=True)
     for name in files:
         shutil.copy2(os.path.join(ROOT, name), os.path.join(dev, name))

@@ -97,9 +97,11 @@ end
 -- scan at login: it's made as soon as our saved data loads. Dragging moves it around
 -- the minimap's edge (the position is saved); the OnUpdate runs only while dragging.
 ---------------------------------------------------------------------------
--- Our logo, shipped in the addon folder (built from the folder name, so a renamed test
--- copy finds its own).
-local ICON = "Interface\\AddOns\\" .. ADDON .. "\\media\\icon.tga"
+-- Our logo without its outer gold ring (media/minimap.tga): the ring around the button
+-- comes from the minimap border or EllesmereUI's tray, and two rings showed any small
+-- misalignment between them. Built from the folder name, so a renamed test copy finds
+-- its own. (The addon list uses the full logo, media/icon.tga, via the .toc.)
+local ICON = "Interface\\AddOns\\" .. ADDON .. "\\media\\minimap.tga"
 local DEFAULT_ANGLE = 220
 local mmButton
 
