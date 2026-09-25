@@ -26,7 +26,7 @@ Hovering a recipe (pattern, schematic, formula...) lists your characters who hav
 
 **Reputation:** the reputation button in the overview's title bar opens a panel with every faction down the side and your characters across, e.g. "Honored 27%"; hover a faction for exact numbers.
 
-**EllesmereUI:** if you use EllesmereUI, Alts Forever's windows take on your EllesmereUI look (theme, accent colour and font) automatically, and character names use your EllesmereUI class colours. Custom class colours from addons like !ClassColors are used too. Everyone else gets the classic Warcraft look. EllesmereUI can turn this off per addon in its options.
+**EllesmereUI and ElvUI:** if you use EllesmereUI, Alts Forever's windows take on your EllesmereUI look (theme, accent colour and font) automatically, and character names use your EllesmereUI class colours. EllesmereUI can turn this off per addon in its options. With ElvUI, the windows get ElvUI's style and font instead. Custom class colours from ElvUI or addons like !ClassColors are used too. Everyone else gets the classic Warcraft look.
 
 **Send to alt:** at the mailbox, a small arrow next to the To box lists your characters (same faction); picking one fills in their name. Characters who can still skill up with what you've attached are marked and listed first. Turn it off with "Send mail to alts" in the options menu.
 

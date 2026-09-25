@@ -174,6 +174,7 @@ local function CreateAltsButton()
         GameTooltip:Show()
     end)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ns.SkinArrow(b, SendMailNameEditBox)
     altsButton = b
 end
 

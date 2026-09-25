@@ -153,7 +153,10 @@ function M.load(files)
     function frameMethods:SetText(text) self.text = text end
     function frameMethods:SetPoint(point, rel, relPoint, x, y) self.point = { point, rel, relPoint, x, y } end
     function frameMethods:GetNormalTexture() return self.normalTexture end
-    function frameMethods:SetNormalTexture(t) self.normalTexture = { texture = t } end
+    function frameMethods:SetNormalTexture(t)
+        self.normalTexture = newObject("Texture")
+        self.normalTexture.texture = t
+    end
     function frameMethods:GetText() return self.text end
     function frameMethods:CreateFontString()
         local fs = newObject("FontString")
@@ -391,6 +394,24 @@ function M.load(files)
             end
         end
         M.skinFacade.OnLooksChanged = function(fn) M.looksChanged = fn end
+    end
+    -- ElvUI, only if a test asked for it (wow.withElvUI): its engine (M.elv, initialised
+    -- as at login), its Skins module and the toolkit methods it adds to every widget. Each
+    -- call is recorded in M.skinned like EllesmereUI's.
+    ElvUI = nil
+    if M.withElvUI then
+        M.withElvUI = nil
+        local S = {}
+        for _, fname in ipairs({ "HandleFrame", "HandleNextPrevButton" }) do
+            S[fname] = function(_, obj) M.skinned[#M.skinned + 1] = { fname, obj } end
+        end
+        local E = { Initialized = true }
+        function E:GetModule(name) return name == "Skins" and S or nil end
+        M.elv, M.elvSkins = E, S
+        ElvUI = { E, {}, {}, {}, {} }
+        for _, fname in ipairs({ "FontTemplate", "CreateBackdrop", "StyleButton", "SetTexCoords" }) do
+            frameMethods[fname] = function(obj) M.skinned[#M.skinned + 1] = { fname, obj } end
+        end
     end
     -- Globals the addon defines (named in the .toc); cleared so a previous load is freed.
     AltsForever_OnAddonCompartmentClick, AltsForever_OnAddonCompartmentEnter = nil, nil

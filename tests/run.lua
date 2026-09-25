@@ -2073,6 +2073,92 @@ test("a live EllesmereUI look change recolours names", function()
 end)
 
 ---------------------------------------------------------------------------
+-- ElvUI look (its Skins module)
+test("with ElvUI, every window takes its look when first created", function()
+    wow.withElvUI = true
+    wow.load(FILES)
+    wow.now = NOW
+    wow.login(overviewAlts())
+    SlashCmdList.ALTSFOREVER("")
+    local f = AltsForeverFrame
+    assert(skinnedWith("HandleFrame", f), "overview: backdrop, inset, close button")
+    assert(skinnedWith("CreateBackdrop", f.cog) and skinnedWith("CreateBackdrop", f.repButton), "icon buttons")
+    assert(skinnedWith("SetTexCoords", f.cog:GetNormalTexture()), "icon edges cropped")
+    assert(skinnedWith("FontTemplate", overviewRows()[1].cells[1]), "row text in ElvUI's font")
+    assert(skinnedWith("FontTemplate", f.credit), "text the window already had")
+    local row = overviewRows()[1]
+    row.scripts.OnClick(row)
+    assert(skinnedWith("HandleFrame", AltsForeverGearFrame), "gear panel")
+    local slots = 0
+    for _, call in ipairs(wow.skinned) do
+        if call[1] == "CreateBackdrop" and call[2] ~= f.cog and call[2] ~= f.repButton then slots = slots + 1 end
+    end
+    eq(slots, 19, "every gear slot")
+    f.repButton.scripts.OnClick(f.repButton)
+    assert(skinnedWith("HandleFrame", AltsForeverRepFrame), "reputation panel")
+end)
+
+test("with ElvUI, the mail window's Alts arrow gets its arrow style, clear of the To box", function()
+    wow.withElvUI = true
+    wow.load(FILES)
+    wow.login(mailAlts())
+    wow.fire("MAIL_SHOW")
+    local b = altsButton()
+    assert(skinnedWith("HandleNextPrevButton", b))
+    eq(b.point[1], "LEFT"); eq(b.point[2], SendMailNameEditBox); eq(b.point[4], 3)
+end)
+
+test("before ElvUI has initialised nothing is skinned; afterwards it is", function()
+    wow.withElvUI = true
+    wow.load(FILES)
+    wow.elv.Initialized = nil
+    wow.setBag(0, 16, { [1] = { 100, 2 } })
+    wow.login(nil)
+    wow.hover(GameTooltip, 100)
+    eq(#wow.skinned, 0)
+    wow.elv.Initialized = true
+    SlashCmdList.ALTSFOREVER("")
+    assert(skinnedWith("HandleFrame", AltsForeverFrame))
+end)
+
+test("an error inside ElvUI's skinning never stops our windows opening", function()
+    wow.withElvUI = true
+    wow.load(FILES)
+    wow.elvSkins.HandleFrame = function() error("changed API") end
+    wow.elvSkins.HandleNextPrevButton = function() error("changed API") end
+    wow.login(mailAlts())
+    SlashCmdList.ALTSFOREVER("")
+    eq(AltsForeverFrame:IsShown(), true)
+    wow.fire("MAIL_SHOW")
+    assert(altsButton(), "Alts arrow still made")
+end)
+
+test("with both EllesmereUI and ElvUI installed, EllesmereUI's look wins", function()
+    wow.withEllesmere, wow.withElvUI = true, true
+    wow.load(FILES)
+    wow.login(nil)
+    wow.skinCallback(wow.skinFacade)
+    SlashCmdList.ALTSFOREVER("")
+    assert(skinnedWith("Shell", AltsForeverFrame))
+    eq(skinnedWith("HandleFrame", AltsForeverFrame), false)
+end)
+
+test("a live change to CUSTOM_CLASS_COLORS (ElvUI, !ClassColors) recolours names", function()
+    wow.load(FILES)
+    local listeners = {}
+    CUSTOM_CLASS_COLORS = { MAGE = { r = 0, g = 1, b = 0 },
+        RegisterCallback = function(self, fn) listeners[#listeners + 1] = fn end }
+    wow.setBag(0, 16, { [1] = { 100, 2 } })
+    wow.login(nil)
+    eq(tooltipName(100), "|cff00ff00Aldric|r")
+    CUSTOM_CLASS_COLORS.MAGE = { r = 1, g = 0, b = 0 }
+    eq(tooltipName(100), "|cff00ff00Aldric|r", "cached until told")
+    eq(#listeners, 1)
+    listeners[1]()
+    eq(tooltipName(100), "|cffff0000Aldric|r")
+end)
+
+---------------------------------------------------------------------------
 -- Minimap button
 test("a minimap button is made as soon as saved data loads (before login)", function()
     wow.load(FILES)

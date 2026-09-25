@@ -1,8 +1,10 @@
 ## Unreleased
 
 - **Minimap button:** Alts Forever now has a normal minimap button: click for the overview, right-click for options, drag to move it. Hide it with "Show minimap button" in the options menu. With EllesmereUI it appears in its minimap button tray.
-- **Your class colours:** character names use your custom class colours from EllesmereUI, or from addons like !ClassColors, instead of Blizzard's defaults.
+- **Your class colours:** character names use your custom class colours from EllesmereUI, ElvUI or addons like !ClassColors, instead of Blizzard's defaults, and follow them if you change them.
 - **EllesmereUI look:** with EllesmereUI installed, Alts Forever's windows (overview, gear and reputation) take on your EllesmereUI theme, accent colour and font, including its square icon buttons. Without it, nothing changes. You can turn it off for Alts Forever in EllesmereUI's options (Blizz UI Enhanced > Blizzard Window Skins > Third-Party Addons).
+- **ElvUI look:** with ElvUI installed, Alts Forever's windows get ElvUI's flat backdrop, close button and font, and the gear panel's item slots, the title-bar icon buttons and the mail window's Alts arrow match ElvUI's style. If you run both EllesmereUI and ElvUI, EllesmereUI's look is used.
+- **New icon:** the addon list icon is the logo without its outer ring, so it's easier to make out at that size.
 
 ## Alts Forever 0.4.0
 

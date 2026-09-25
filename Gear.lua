@@ -110,6 +110,7 @@ local function CreateSlot(slot, x, y, nameSide)
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.15)
+    ns.SkinSlot(b)
     if nameSide then
         b.name = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         ns.SkinText(b.name)
