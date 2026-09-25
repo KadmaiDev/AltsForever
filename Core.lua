@@ -175,7 +175,6 @@ ns.On("PLAYER_LOGIN", function()
     ns.StartOverview()
     ns.StartGear()
     ns.StartTooltip()
-    ns.StartOptions()
 end)
 
 ns.On("PLAYER_LOGOUT", function()

@@ -1708,7 +1708,7 @@ test("/af delete also forgets recipes nobody else knows", function()
 end)
 
 ---------------------------------------------------------------------------
--- Options: minimap compartment, menus, forgetting a character, settings page
+-- Options: minimap compartment, menus, forgetting a character
 test("minimap compartment: click opens the overview, right-click the options menu", function()
     wow.load(FILES)
     wow.login(nil)
@@ -1767,32 +1767,6 @@ test("right-click a character in the overview to forget them, after confirming",
     local you = overviewRows()[1]
     you.scripts.OnClick(you, "RightButton")
     eq(wow.menuItem("Forget Aldric...").enabled, false)
-end)
-
-test("Options > AddOns page: skill-up tick box and an overview button", function()
-    wow.load(FILES)
-    wow.login(nil)
-    eq(wow.settings.registered.name, "Alts Forever")
-    local setting = wow.settings.setting
-    eq(setting.default, true); eq(setting.get(), true)
-    setting.set(false)
-    eq(AltsForeverDB.skillupsOff, true)
-    setting.set(true)
-    eq(AltsForeverDB.skillupsOff, nil)
-    local button = wow.settings.category.initializers[1]
-    eq(button.text, "Open overview")
-    button.fn()
-    eq(AltsForeverFrame:IsShown(), true)
-end)
-
-test("a settings page failure is reported, and the addon keeps working", function()
-    wow.load(FILES)
-    Settings.RegisterProxySetting = function() error("no such setting type") end
-    wow.setBag(0, 16, { [1] = { 100, 2 } })
-    wow.login(nil)
-    eq(#wow.errors, 1)
-    assert(tostring(wow.errors[1]):find("no such setting type", 1, true))
-    eq(wow.hover(GameTooltip, 100)[2][2], R("Bags 2", 2), "tooltips still work")
 end)
 
 ---------------------------------------------------------------------------

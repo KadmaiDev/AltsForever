@@ -1,7 +1,8 @@
 -- Alts Forever options: everything the slash commands do, by clicking. The minimap's
 -- addon compartment entry (click: overview, right-click: options menu), the same menu
--- from the overview's cog button, "Forget" on a character row's right-click menu, and a
--- page under Options > AddOns. Menus and pop-ups are only built when clicked.
+-- from the overview's cog button, and "Forget" on a character row's right-click menu.
+-- Menus and pop-ups are only built when clicked. (An Options > AddOns page was tried and
+-- removed: it was the likely source of a one-off taint error on Esc, see AGENTS.md.)
 local _, ns = ...
 
 local GREY = "|cff9d9d9d"
@@ -95,28 +96,4 @@ end
 
 function AltsForever_OnAddonCompartmentLeave()
     GameTooltip:Hide()
-end
-
----------------------------------------------------------------------------
--- Options > AddOns page
----------------------------------------------------------------------------
-local function RegisterSettings()
-    local category = Settings.RegisterVerticalLayoutCategory("Alts Forever")
-    local setting = Settings.RegisterProxySetting(category, "ALTSFOREVER_SKILLUPS", Settings.VarType.Boolean,
-        "Show skill-up details", true, SkillupsSelected, ns.SetSkillups)
-    Settings.CreateCheckbox(category, setting,
-        "In Can craft, on materials (Skill-ups) and in the overview's row tooltips. Same as /af skillups.")
-    if CreateSettingsButtonInitializer and SettingsPanel and SettingsPanel.GetLayout then
-        SettingsPanel:GetLayout(category):AddInitializer(CreateSettingsButtonInitializer(
-            "Overview", "Open overview", function() ns.ToggleOverview(true) end,
-            "Every character at a glance. Right-click a character there to forget them. Same as /af.", true))
-    end
-    Settings.RegisterAddOnCategory(category)
-end
-
-function ns.StartOptions()
-    if not (Settings and Settings.RegisterVerticalLayoutCategory) then return end
-    -- The settings API is undocumented on Forever: report a failure, but keep the addon going.
-    local ok, err = pcall(RegisterSettings)
-    if not ok and geterrorhandler then geterrorhandler()(err) end
 end

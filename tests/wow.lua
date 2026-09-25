@@ -335,28 +335,6 @@ function M.load(files)
     StaticPopup_Show = function(which, text1, text2, data) M.popup = { which = which, text = text1, data = data } end
     YES, NO = "Yes", "No"
 
-    -- The Options > AddOns settings API, recording what was registered.
-    M.settings, M.errors = {}, {}
-    Settings = {
-        VarType = { Boolean = "boolean" },
-        RegisterVerticalLayoutCategory = function(name)
-            local category = { name = name, initializers = {} }
-            M.settings.category = category
-            return category
-        end,
-        RegisterProxySetting = function(_, variable, _, name, default, get, set)
-            local setting = { variable = variable, name = name, default = default, get = get, set = set }
-            M.settings.setting = setting
-            return setting
-        end,
-        CreateCheckbox = function(_, setting, tooltip) M.settings.checkbox = { setting = setting, tooltip = tooltip } end,
-        RegisterAddOnCategory = function(category) M.settings.registered = category end,
-    }
-    SettingsPanel = { GetLayout = function(_, category)
-        return { AddInitializer = function(_, init) category.initializers[#category.initializers + 1] = init end }
-    end }
-    CreateSettingsButtonInitializer = function(name, text, fn) return { name = name, text = text, fn = fn } end
-    geterrorhandler = function() return function(err) M.errors[#M.errors + 1] = err end end
 
     AltsForeverDB = nil
     AltsForeverFrame = nil
