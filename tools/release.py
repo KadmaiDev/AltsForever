@@ -63,8 +63,7 @@ def toc_files(toc):
     files = []
     for line in read(toc).splitlines():
         line = line.strip()
-        # SavedData\ is the player's own folder link, never shipped.
-        if line and not line.startswith("#") and not line.startswith("SavedData"):
+        if line and not line.startswith("#"):
             files.append(line.replace("\\", "/"))
     return files
 

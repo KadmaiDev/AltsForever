@@ -2,7 +2,7 @@
 ## Title: Alts Forever
 ## Author: Kadmai
 ## Notes: Keeps track of your alts: items, gold and more across all your characters.
-## Version: 0.2.0
+## Version: 0.2.1
 ## IconTexture: Interface\Icons\INV_Misc_GroupNeedMore
 ## Category: Inventory
 ## Category-deDE: Inventar
@@ -17,10 +17,6 @@
 ## Category-zhTW: 物品欄
 ## SavedVariables: AltsForeverDB
 
-# Forever beta workaround: the client never loads saved data, so load it as code.
-# SavedData is an optional folder link to your account's SavedVariables folder
-# (see the addon's description).
-SavedData\AltsForever.lua
 Core.lua
 Scanner.lua
 Mail.lua

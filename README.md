@@ -33,14 +33,7 @@ The bank and inbox are read when you open them; until then that character shows 
 
 ## Install
 
-1. Link or copy this folder to `<WoW Forever>\Interface\AddOns\AltsForever`. The folder in `AddOns` must be named `AltsForever`.
-2. **Forever beta only:** the client writes saved data on logout but never loads it back, so Alts Forever would forget your other characters every launch. Run this once to work around it:
-   ```
-   .\tools\link-saved-data.ps1 -WowDir "C:\Program Files (x86)\World of Warcraft\_classic_beta_"
-   ```
-   It links `SavedData` to your account's `WTF\Account\<account>\SavedVariables` folder. The `.toc` lists `SavedData\AltsForever.lua`, so the game runs the saved file as ordinary addon code. Once Blizzard fixes the bug, remove that line from both `.toc` files.
-
-   If no saved data loads, Alts Forever says so in chat a few seconds after login, explains the bug and points to `AltsForever.lua.bak`, the game's copy of the previous save.
+Install it from CurseForge, or link or copy this folder to `<WoW Forever>\Interface\AddOns\AltsForever`. The folder in `AddOns` must be named `AltsForever`.
 
 ## Commands
 

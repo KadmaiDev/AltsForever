@@ -88,7 +88,7 @@ test("existing characters are kept on login", function()
     eq(AltsForeverDB.chars["Alt"].bags[100], 3)
 end)
 
-test("saved file loaded as addon code (the Forever workaround) survives login", function()
+test("saved data loaded by the game before the addon is picked up at login", function()
     wow.load({ "tests/fixtures/AltsForever.lua", unpack(FILES) })
     wow.player.name, wow.player.realm = "Thessa Oakenbrook", "TestRealm"
     wow.setBag(0, 16, { [1] = { 6948, 1 } })
@@ -1136,29 +1136,6 @@ test("an open gear panel for you updates when you change gear", function()
 end)
 
 ---------------------------------------------------------------------------
-test("login with no saved data explains the Forever saved-data bug", function()
-    wow.load(FILES)
-    wow.login(nil)
-    eq(#wow.printed, 0, "not during the login spam")
-    runTimers()
-    local text = printedText()
-    assert(text:find("No saved data was loaded", 1, true), text)
-    assert(text:find("WoW Forever beta bug", 1, true), text)
-    assert(text:find("AltsForever.lua.bak", 1, true), text)
-end)
-
-test("no saved-data hint when data loaded, from the game or the workaround file", function()
-    wow.load(FILES)
-    wow.login({ v = 2, chars = {} })
-    runTimers()
-    assert(not printedText():find("No saved data", 1, true))
-    wow.load({ "tests/fixtures/AltsForever.lua", unpack(FILES) })
-    wow.fire("ADDON_LOADED", "AltsForever")
-    wow.fire("PLAYER_LOGIN")
-    runTimers()
-    assert(not printedText():find("No saved data", 1, true))
-end)
-
 ---------------------------------------------------------------------------
 local SQUIRREL_ITEM, DYNAMITE_ITEM, GOGGLES_ITEM = 4401, 4378, 4368
 
@@ -1399,7 +1376,7 @@ local function tocFiles(path)
     local files = {}
     for line in io.lines(path) do
         line = line:gsub("\r$", "")
-        if line ~= "" and not line:match("^#") and not line:match("^SavedData") then
+        if line ~= "" and not line:match("^#") then
             files[#files + 1] = line
         end
     end
