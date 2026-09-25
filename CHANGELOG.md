@@ -1,8 +1,12 @@
-## Unreleased
+## Alts Forever 0.4.0
 
-- **Reputation across your characters:** a Reputation panel (button in the overview's title bar) shows every character's standing with each faction side by side, e.g. "Honored 27%"; hover a faction for the exact numbers.
-- **Send to alt:** at the mailbox, a small arrow next to the To box lists your characters; picking one fills in their name. Characters who can still skill up with what you've attached are marked and listed first. Turn it off with "Send mail to alts" in the options menu.
-- **Click instead of typing:** Alts Forever is in the minimap's addon menu, the small number at the top of the minimap (click: open the overview, right-click: options). The overview has an options button (skill-up details on/off, send mail to alts on/off, memory use), and right-clicking a character there lets you forget them, with a confirmation.
+- **Reputation across your characters.** A new Reputation panel shows every character's standing with each faction side by side, e.g. "Honored 27%", coloured by standing. Hover a faction for the exact numbers. Open it with the reputation button in the overview's title bar. Standings are recorded as you play, without changing how your reputation window is expanded or collapsed.
+- **Send to alt.** At the mailbox, a small arrow next to the To box lists your characters (your faction). Picking one fills in their name; nothing is sent until you press Send. Characters who can still skill up with what you've attached are marked, e.g. "skill-ups with 1 item", and listed first. Turn it off with "Send mail to alts" in the options menu.
+- **Click instead of typing:**
+  - Alts Forever is in the minimap's addon menu, the small number at the top of the minimap: click to open the overview, right-click for options.
+  - The overview has an options button: skill-up details on/off, send mail to alts on/off, and memory use.
+  - Right-click a character in the overview to forget them (with a confirmation). The row's tooltip says so.
+- All the slash commands still work.
 
 ## Alts Forever 0.3.0
 
