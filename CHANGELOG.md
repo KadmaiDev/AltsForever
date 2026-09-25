@@ -1,11 +1,13 @@
 ## Alts Forever 0.3.0
 
-- **Skill-ups across your alts.** Alts Forever now shows how long each of your characters keeps getting skill-ups from a recipe, using the level where it turns grey (read from the game when a profession window opens):
+- **Skill-ups across your alts.** Alts Forever now knows the level at which each recipe your characters know stops giving skill-ups (read from the game when a profession window opens):
   - **Can craft:** characters who'd still get a skill-up from making the item are marked "· skill-ups to 115".
-  - **Reagents:** hovering a material lists the recipes your characters can still skill up with it ("Skill-ups: Heavy Linen Bandage, Tarnia · to 115"): you first, then your other characters, each with their 2 recipes that have the most skill-ups left, up to 6 lines.
-  - **Overview:** a character's row tooltip counts each profession's recipes that still give skill-ups, or says "train to skill up" when they're at their rank's maximum (e.g. 75/75).
-  - Characters at their rank's maximum aren't listed for skill-ups until they train (log in on each character once to record it).
-  - Open each profession window once per character to fill these in. `/af skillups` turns it all off.
+  - **Materials:** hovering a material adds a "Skill-ups" section listing the recipes your characters can still skill up with it, e.g. "Heavy Linen Bandage   Tarnia · to 115". You come first, then your other characters, each with their 2 recipes that have the most skill-ups left, up to 6 lines.
+  - **Overview:** a character's row tooltip counts each profession's recipes that still give skill-ups, or says "train to skill up" when they're at their rank's maximum (e.g. 75/75). Characters at their maximum aren't listed for skill-ups until they train.
+  - Open each profession window once per character to fill this in. `/af skillups` turns it all off.
+- **Fixed:** recipes could be saved under the wrong profession (the game's recipe list sometimes includes all of a character's professions). Recipes are now checked, and lists saved by earlier versions are repaired automatically when a profession window is opened; nothing is reset.
+- **Faster:** the "Can craft" lines are looked up when you hover an item instead of kept in memory for every craftable item.
+- `/af delete` now also forgets recipes no remaining character knows.
 - **Removed** the old `/it` command (use `/af`).
 
 ## Alts Forever 0.2.2
