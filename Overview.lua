@@ -388,12 +388,21 @@ local rows = {}
 
 -- Lines up the right-hand columns of the rows added from line `first` on; leaves the
 -- plain text if the tooltip's text can't be measured.
+-- Our lines take the font of the tooltip's second line (its body text): a line the
+-- tooltip hasn't needed before gets a new font string, which a UI addon that restyled
+-- the existing ones (EllesmereUI) hasn't reached, so it would show in the game's font.
 local function Align(tt, first)
     local name = tt.GetName and tt:GetName()
-    local fs = name and _G[name .. "TextRight" .. first]
+    local fs = name and _G[name .. "TextLeft2"]
     local font, size, flags
     if fs and fs.GetFont then font, size, flags = fs:GetFont() end
     if not font then return end
+    for line = first - 1, first + #rows - 1 do
+        for _, side in ipairs({ "TextLeft", "TextRight" }) do
+            local text = _G[name .. side .. line]
+            if text and text.SetFont then text:SetFont(font, size, flags) end
+        end
+    end
     local widths = { 0, 0, 0 }
     for _, row in ipairs(rows) do
         for col = 1, 3 do
