@@ -26,9 +26,13 @@ Hovering a recipe (pattern, schematic, formula...) lists your characters who hav
 
 **Reputation:** the reputation button in the overview's title bar opens a panel with every faction down the side and your characters across, e.g. "Honored 27%"; hover a faction for exact numbers.
 
+![The Reputation panel: factions down the side, characters across, with a faction tooltip](media/reputation-overview.png)
+
 **EllesmereUI and ElvUI:** if you use EllesmereUI, Alts Forever's windows take on your EllesmereUI look (theme, accent colour and font) automatically, and character names use your EllesmereUI class colours. EllesmereUI can turn this off per addon in its options. With ElvUI, the windows get ElvUI's style and font instead. Custom class colours from ElvUI or addons like !ClassColors are used too. Everyone else gets the classic Warcraft look.
 
 **Send to alt:** at the mailbox, a small arrow next to the To box lists your characters (same faction); picking one fills in their name. Characters who can still skill up with what you've attached are marked and listed first. Turn it off with "Send mail to alts" in the options menu.
+
+<img src="media/mail-alt.png" alt="The Send Mail window with the Alts arrow open, listing characters to send to" width="340">
 
 **Skill-ups across your alts:** "Can craft" marks characters who'd still get a skill-up from making the item ("Tarnia Moonwhisper · skill-ups to 115"), and hovering a material lists the recipes your characters can still skill up with it, under "Skill-ups" ("Heavy Linen Bandage   Tarnia · to 115"): you first, then your other characters, 2 recipes each with the most skill-ups left, up to 6 lines. The overview's row tooltip counts each profession's recipes that still give skill-ups, or says "train to skill up" for a character at their rank's maximum (e.g. 75/75), who is left out of the skill-up lines until they train. It all comes from the game when a profession window is opened; `/af skillups` turns it off.
 

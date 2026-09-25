@@ -1,4 +1,4 @@
-## Unreleased
+## Alts Forever 0.5.0
 
 - **Minimap button:** Alts Forever now has a normal minimap button: click for the overview, right-click for options, drag to move it. Hide it with "Show minimap button" in the options menu. With EllesmereUI it appears in its minimap button tray.
 - **Your class colours:** character names use your custom class colours from EllesmereUI, ElvUI or addons like !ClassColors, instead of Blizzard's defaults, and follow them if you change them.
