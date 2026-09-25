@@ -320,6 +320,10 @@ function ns.ToggleOverview(open)
     if frame:IsShown() and not open then frame:Hide() else frame:Show() end
 end
 
+function ns.OverviewShown()
+    return frame and frame:IsShown() or false
+end
+
 function ns.RefreshOverview()
     if frame and frame:IsShown() then Refresh() end
 end

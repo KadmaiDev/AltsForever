@@ -52,7 +52,10 @@ function ns.ShowOptionsMenu(owner)
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return ns.ShowHelp() end
     MenuUtil.CreateContextMenu(owner, function(_, root)
         root:CreateTitle("Alts Forever")
-        root:CreateButton("Open overview", function() ns.ToggleOverview(true) end)
+        -- Not when it's already open (e.g. from the overview's own cog button).
+        if not ns.OverviewShown() then
+            root:CreateButton("Open overview", function() ns.ToggleOverview(true) end)
+        end
         root:CreateCheckbox("Show skill-up details", SkillupsSelected, ToggleSkillups)
         root:CreateButton("Show mail expiry in chat", function() ns.RunCommand("mail") end)
         root:CreateButton("Memory use", function() ns.RunCommand("mem") end)
