@@ -1283,58 +1283,41 @@ test("overview shows time played per character and in total", function()
 end)
 
 ---------------------------------------------------------------------------
--- First name only at login (seen on build 70009)
-test("a first name at login is matched to the saved full name", function()
+-- Names on build 70009: UnitName returns the first name and surname separately
+test("the full name is built from UnitName's first name and surname", function()
     local ns = wow.load(FILES)
-    wow.player.name, wow.player.class = "Mira", "PALADIN"
-    wow.login({ v = 2, chars = {
-        ["Mira Dawnfield"] = alt("Mira Dawnfield", "PALADIN", { bank = { [100] = 4 } }),
-        ["Mira Moonfall"] = alt("Mira Moonfall", "DRUID", {}),
-    } })
-    eq(ns.charKey, "Mira Dawnfield", "the paladin, not the druid")
-    eq(ns.char.name, "Mira Dawnfield")
-    eq(ns.char.bank[100], 4)
-    eq(AltsForeverDB.chars["Mira"], nil)
-end)
-
-test("a new character seen by first name is renamed when the full name arrives", function()
-    local ns = wow.load(FILES)
-    wow.player.name = "Nyx"
-    wow.setBag(0, 16, { [1] = { 100, 3 } })
-    wow.login({ v = 2, chars = { ["Brakka Stone"] = alt("Brakka Stone", "WARRIOR", { bags = { [100] = 1 } }) } })
-    eq(ns.charKey, "Nyx")
-    ns.char.crafts = { Engineering = { [100] = true } }
-    ns.craftVersion = ns.craftVersion + 1
-    wow.hover(GameTooltip, 100)
     wow.player.name = "Nyx Emberfall"
-    wow.fire("UNIT_NAME_UPDATE", "target")
-    eq(ns.charKey, "Nyx", "other units' names are ignored")
-    wow.fire("UNIT_NAME_UPDATE", "player")
-    eq(ns.charKey, "Nyx Emberfall")
-    eq(AltsForeverDB.chars["Nyx"], nil)
-    eq(AltsForeverDB.chars["Nyx Emberfall"], ns.char)
-    eq(ns.char.name, "Nyx Emberfall"); eq(ns.char.bags[100], 3)
-    local lines = wow.hover(GameTooltip, 100)
-    local text = {}
-    for _, l in ipairs(lines) do text[#text + 1] = tostring(l[1]) end
-    text = table.concat(text, "\n")
-    assert(text:find("  [MAGE]Nyx Emberfall", 1, true), "can-craft list uses the new name:\n" .. text)
-    assert(not text:find("Nyx\n", 1, true) and not text:find("Nyx$"), "no stale first-name line:\n" .. text)
-end)
-
-test("the rename is also retried on a timer", function()
-    local ns = wow.load(FILES)
-    wow.player.name = "Nyx"
     wow.login(nil)
-    wow.player.name = "Nyx Emberfall"
-    local runs = 0
-    while #wow.timers > 0 and runs < 20 do
-        local fns = wow.timers
-        wow.timers = {}
-        for _, fn in ipairs(fns) do fn() end
-        runs = runs + 1
-    end
     eq(ns.charKey, "Nyx Emberfall")
+    eq(ns.char.name, "Nyx Emberfall")
+end)
+
+test("older builds that return the full name as one value still work", function()
+    local ns = wow.load(FILES)
+    wow.player.name, wow.oneValueNames = "Nyx Emberfall", true
+    wow.login(nil)
+    eq(ns.charKey, "Nyx Emberfall")
+end)
+
+test("an entry saved under the first name alone takes the full name at login", function()
+    local ns = wow.load(FILES)
+    wow.player.name, wow.player.class = "Mira Dawnfield", "PALADIN"
+    wow.login({ v = 2, chars = {
+        ["Mira"] = alt("Mira", "PALADIN", { bank = { [100] = 4 }, played = 500 }),
+        ["Rook"] = alt("Rook", "ROGUE", {}),
+    } })
+    eq(ns.charKey, "Mira Dawnfield")
+    eq(AltsForeverDB.chars["Mira"], nil)
+    eq(ns.char.name, "Mira Dawnfield"); eq(ns.char.bank[100], 4); eq(ns.char.played, 500)
+    eq(type(AltsForeverDB.chars["Rook"]), "table", "someone else's first-name entry is left alone")
+end)
+
+test("a first-name entry of another class isn't taken", function()
+    local ns = wow.load(FILES)
+    wow.player.name, wow.player.class = "Mira Dawnfield", "PALADIN"
+    wow.login({ v = 2, chars = { ["Mira"] = alt("Mira", "DRUID", { played = 500 }) } })
+    eq(type(AltsForeverDB.chars["Mira"]), "table")
+    eq(ns.char.played, nil)
 end)
 
 test("a first-name entry already saved is folded into the full name, newer data first", function()

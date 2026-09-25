@@ -189,7 +189,14 @@ function M.load(files)
     IsModifiedClick = function() return M.modified end
     HandleModifiedItemClick = function(link) M.chatLinks[#M.chatLinks + 1] = link end
 
-    UnitName = function() return M.player.name end
+    -- Like build 70009: first name and surname as two values. oneValueNames gives the
+    -- older behaviour, the full name as one value.
+    M.oneValueNames = false
+    UnitName = function()
+        local first, surname = M.player.name:match("^(%S+) (.+)$")
+        if first and not M.oneValueNames then return first, surname end
+        return M.player.name
+    end
     UnitClass = function() return "Mage", M.player.class end
     UnitFactionGroup = function() return "Alliance" end
     GetNormalizedRealmName = function() return M.player.realm end

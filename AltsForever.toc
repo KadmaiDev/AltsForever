@@ -2,7 +2,7 @@
 ## Title: Alts Forever
 ## Author: Kadmai
 ## Notes: Keeps track of your alts: items, gold and more across all your characters.
-## Version: 0.2.1
+## Version: 0.2.2
 ## IconTexture: Interface\Icons\INV_Misc_GroupNeedMore
 ## Category: Inventory
 ## Category-deDE: Inventar

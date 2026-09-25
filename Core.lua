@@ -62,10 +62,10 @@ local function Upgrade(saved)
     saved.chars, saved.realmOnly, saved.v = chars, nil, 2
 end
 
--- Just after login the game can give only the first name ("Mira" for "Mira
--- Dawnfield"; seen on build 70009), and the surname arrives a moment later. Forever names
--- are always two words, so a one-word name with exactly one "First Last" entry of the
--- same class is that character.
+-- Since build 70009, UnitName returns the first name and the surname as two values, and
+-- versions 0.2.0 and 0.2.1 saved characters under the first name alone ("Mira" for "Mira
+-- Dawnfield"). Forever names are always two words, so a one-word entry with exactly one
+-- "First Last" entry of the same class is that character.
 local function FullNameMatch(chars, first, class)
     local match
     for key, c in pairs(chars) do
@@ -116,26 +116,25 @@ function ns.InitDB(saved)
     return saved
 end
 
--- The name the character should be stored under: a first name alone is matched to its
--- full-name entry when there is exactly one.
-function ns.PlayerKey(chars, name, class)
-    if name:find(" ", 1, true) then return name end
-    return FullNameMatch(chars, name, class) or name
+-- The logged-in character's full name. Build 70009 returns it as UnitName's two values
+-- ("Mira", "Dawnfield"); earlier builds returned "Mira Dawnfield" as the first value.
+function ns.PlayerName()
+    local first, surname = UnitName("player")
+    if surname and not issecretvalue(surname) and surname ~= "" then
+        return first .. " " .. surname
+    end
+    return first
 end
 
--- A character first seen under a first name only is renamed once the game reports the
--- full name. Returns true if it renamed.
-function ns.CheckName()
-    local name = UnitName("player")
-    local key = ns.charKey
-    if not name or issecretvalue(name) or name == key then return false end
-    if name:sub(1, #key + 1) ~= key .. " " then return false end
-    local chars, c = ns.db.chars, ns.char
-    if type(chars[name]) == "table" then Merge(c, chars[name]) end
-    chars[key], chars[name] = nil, c
-    c.name, ns.charKey = name, name
-    ns.InvalidateCache()
-    return true
+-- An entry saved under this character's first name alone (by 0.2.0 or 0.2.1) takes the
+-- full name. Where both exist, InitDB has already folded them together.
+function ns.AdoptFirstName(chars, name, class)
+    local first = name:match("^(%S+) ")
+    local old = first and chars[first]
+    if type(old) == "table" and old.class == class and chars[name] == nil then
+        chars[name], chars[first] = old, nil
+        old.name = name
+    end
 end
 
 -- Bank and mail stay nil until first seen, so "never scanned" differs from "empty".
@@ -165,7 +164,8 @@ end)
 ns.On("PLAYER_LOGIN", function()
     ns.Off("PLAYER_LOGIN")
     local _, class = UnitClass("player")
-    local name = ns.PlayerKey(ns.db.chars, UnitName("player"), class)
+    local name = ns.PlayerName()
+    ns.AdoptFirstName(ns.db.chars, name, class)
     ns.charKey, ns.char = ns.InitChar(ns.db, name, class, UnitFactionGroup("player"))
     ns.StartScanner()
     ns.StartMail()
@@ -175,21 +175,6 @@ ns.On("PLAYER_LOGIN", function()
     ns.StartOverview()
     ns.StartGear()
     ns.StartTooltip()
-    -- Only a first name so far: watch for the full one.
-    if not ns.charKey:find(" ", 1, true) then
-        ns.On("UNIT_NAME_UPDATE", function(unit)
-            if unit == "player" then ns.CheckName() end
-        end)
-        ns.On("PLAYER_ENTERING_WORLD", ns.CheckName)
-        local tries = 0
-        local function Retry()
-            tries = tries + 1
-            if not ns.CheckName() and not ns.charKey:find(" ", 1, true) and tries < 15 and C_Timer then
-                C_Timer.After(2, Retry)
-            end
-        end
-        if C_Timer then C_Timer.After(2, Retry) end
-    end
 end)
 
 ns.On("PLAYER_LOGOUT", function()
