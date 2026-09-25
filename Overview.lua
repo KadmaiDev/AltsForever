@@ -307,12 +307,30 @@ local function CreateWindow()
     end)
     cog:SetScript("OnLeave", function() GameTooltip:Hide() end)
     f.cog = cog
+    -- Reputation panel button, left of the options button.
+    local rep = CreateFrame("Button", nil, f)
+    rep:SetSize(16, 16)
+    rep:SetPoint("RIGHT", cog, "LEFT", -6, 0)
+    rep:SetNormalTexture("Interface\\Icons\\Achievement_Reputation_01")
+    rep:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    rep:SetScript("OnClick", function() ns.ToggleReputation() end)
+    rep:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Reputation")
+        GameTooltip:AddLine("Every character's standing with each faction", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    rep:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    f.repButton = rep
     f.credit = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     f.credit:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 12)
     f.credit:SetText("Alts Forever by Kadmai")
 
     f:SetScript("OnShow", Refresh)
-    f:SetScript("OnHide", function() if AltsForeverGearFrame then AltsForeverGearFrame:Hide() end end)
+    f:SetScript("OnHide", function()
+        if AltsForeverGearFrame then AltsForeverGearFrame:Hide() end
+        if AltsForeverRepFrame then AltsForeverRepFrame:Hide() end
+    end)
     -- Escape closes it, like Blizzard's own windows.
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverFrame" end
     f:Hide()

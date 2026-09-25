@@ -2,7 +2,7 @@
 package.path = "tests/?.lua;" .. package.path
 local wow = require("wow")
 
-local FILES = { "Core.lua", "Scanner.lua", "Mail.lua", "Money.lua", "Professions.lua", "Character.lua", "Overview.lua", "Gear.lua", "Tooltip.lua", "Options.lua" }
+local FILES = { "Core.lua", "Scanner.lua", "Mail.lua", "Money.lua", "Professions.lua", "Character.lua", "Overview.lua", "Gear.lua", "Tooltip.lua", "Options.lua", "Reputation.lua" }
 local tests, passed, failed = {}, 0, 0
 
 local function test(name, fn) tests[#tests + 1] = { name = name, fn = fn } end
@@ -1725,7 +1725,7 @@ test("minimap compartment: click opens the overview, right-click the options men
     AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
     local texts = {}
     for _, item in ipairs(wow.menu.items) do texts[#texts + 1] = item.text end
-    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Show skill-up details | Memory use")
+    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Reputation | Show skill-up details | Memory use")
     wow.menuItem("Open overview").fn()
     eq(AltsForeverFrame:IsShown(), true)
     wow.menuItem("Open overview").fn()
@@ -1795,6 +1795,153 @@ test("no addon file assigns one of Blizzard's globals (that taints Blizzard's co
     end
 end)
 
+---------------------------------------------------------------------------
+-- Reputation across characters
+local function repWindow()
+    wow.factions = {
+        { 1, "Horde", 0, true },
+        { 530, "Darkspear Trolls", 2150 },
+        { 76, "Orgrimmar", 9500 },
+        { 2, "Other", 0, true },
+        { 87, "Bloodsail Buccaneers", -4000 },
+    }
+end
+
+test("reputation is recorded shortly after login, headers skipped", function()
+    local ns = wow.load(FILES)
+    repWindow()
+    wow.login(nil)
+    eq(ns.char.reps, nil, "not during the login rush")
+    for _, fn in ipairs(wow.timers) do fn() end
+    eq(ns.char.reps[530], 2150); eq(ns.char.reps[76], 9500); eq(ns.char.reps[87], -4000)
+    eq(ns.char.reps[1], nil, "headers aren't factions")
+    eq(AltsForeverDB.factions[530], "Darkspear Trolls")
+end)
+
+test("reputation changes are batched: one scan per burst, 10 seconds later", function()
+    local ns = wow.load(FILES)
+    repWindow()
+    wow.login(nil)
+    runTimers()
+    wow.timers = {}
+    wow.factions[2][3] = 2200
+    for _ = 1, 20 do wow.fire("UPDATE_FACTION") end -- a kill streak
+    eq(#wow.timers, 1, "one scan scheduled for the whole burst")
+    eq(ns.char.reps[530], 2150, "not yet")
+    runTimers()
+    eq(ns.char.reps[530], 2200)
+    wow.fire("UPDATE_FACTION")
+    eq(#wow.timers, 1, "the next burst schedules again")
+end)
+
+test("factions under a collapsed header stay current, without touching the player's window", function()
+    local ns = wow.load(FILES)
+    repWindow()
+    wow.login({ v = 2, chars = { ["Aldric"] = alt("Aldric", "MAGE", { reps = { [69] = 3000, [530] = 100 } }) } })
+    wow.hiddenFactions = { { 69, "Darnassus", 3500 } } -- its header is collapsed now
+    runTimers()
+    eq(ns.char.reps[69], 3500, "re-read by ID")
+    eq(ns.char.reps[530], 2150)
+    eq(wow.expanded, nil, "headers are never expanded")
+end)
+
+test("standing levels and text", function()
+    local ns = wow.load(FILES)
+    eq((ns.Standing(2150)), 4); eq((ns.Standing(3000)), 5); eq((ns.Standing(-1)), 3); eq((ns.Standing(42999)), 8)
+    eq(ns.StandingText(2150), "|cffffff00Neutral 71%|r")
+    eq(ns.StandingText(12000), "|cff00ff88Honored 25%|r")
+    eq(ns.StandingText(42500), "|cff00ffffExalted|r")
+    eq(ns.StandingText(-42000), "|cffcc2222Hated 0%|r")
+end)
+
+test("reputation panel: factions down, characters across, you first", function()
+    wow.load(FILES)
+    repWindow()
+    wow.login({ v = 2, factions = { [530] = "Darkspear Trolls", [76] = "Orgrimmar", [69] = "Darnassus" }, chars = {
+        ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { level = 30, reps = { [530] = 9000, [69] = 3000 } }),
+    } })
+    runTimers()
+    SlashCmdList.ALTSFOREVER("")
+    AltsForeverFrame.repButton.scripts.OnClick(AltsForeverFrame.repButton)
+    local f = AltsForeverRepFrame
+    eq(f:IsShown(), true)
+    -- Rows are the panel's frames with a faction; read their text.
+    local lines = {}
+    for _, row in ipairs(wow.frames) do
+        if row.faction then
+            local t = { row.name.text }
+            for j, cell in ipairs(row.cells) do t[j + 1] = cell.text end
+            lines[#lines + 1] = table.concat(t, " | ")
+        end
+    end
+    table.sort(lines)
+    eq(lines[1], "Bloodsail Buccaneers | |cffff0000Hostile 66%|r | " .. G .. "-|r")
+    eq(lines[2], "Darkspear Trolls | |cffffff00Neutral 71%|r | |cff00ff88Honored 0%|r", "you, then Tarn")
+    eq(lines[3], "Darnassus | " .. G .. "-|r | |cff00ff00Friendly 0%|r")
+    eq(lines[4], "Orgrimmar | |cff00ff88Honored 4%|r | " .. G .. "-|r")
+    AltsForeverFrame:Hide()
+    eq(f:IsShown(), false, "closing the overview closes it")
+end)
+
+---------------------------------------------------------------------------
+-- "Send to alt" at the mailbox
+-- Your alts: Tarn (First Aid 40, knows Linen Bandage, grey 80), Brak (First Aid 100, past
+-- grey), Ally (other faction), plus you.
+local function mailAlts()
+    return { v = 2, recipeInfo = { ["First Aid"] = { ["linen bandage"] = "80;Linen Bandage;,2589:1" } }, chars = {
+        ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { faction = "Alliance", level = 20, profs = { ["First Aid"] = 40 },
+            recipes = { ["First Aid"] = { ["linen bandage"] = true } } }),
+        ["Brak Stone"] = alt("Brak Stone", "WARRIOR", { faction = "Alliance", level = 30, profs = { ["First Aid"] = 100 },
+            recipes = { ["First Aid"] = { ["linen bandage"] = true } } }),
+        ["Horde Guy"] = alt("Horde Guy", "ROGUE", { faction = "Horde", level = 40 }),
+    } }
+end
+
+local function altsButton()
+    for _, f in ipairs(wow.frames) do
+        if f.kind == "Button" and f.text == "Alts" then return f end
+    end
+end
+
+test("send to alt: an Alts button appears beside the To box when the mailbox opens", function()
+    wow.load(FILES)
+    wow.login(mailAlts())
+    eq(altsButton(), nil, "not before the mailbox opens")
+    wow.fire("MAIL_SHOW")
+    local b = altsButton()
+    assert(b, "button made")
+    wow.fire("MAIL_CLOSED") wow.fire("MAIL_SHOW")
+    local n = 0
+    for _, f in ipairs(wow.frames) do if f.text == "Alts" then n = n + 1 end end
+    eq(n, 1, "made once")
+end)
+
+test("send to alt: picking a character fills in the To box; own faction only", function()
+    wow.load(FILES)
+    wow.login(mailAlts())
+    wow.fire("MAIL_SHOW")
+    local b = altsButton()
+    b.scripts.OnClick(b)
+    local texts = {}
+    for _, item in ipairs(wow.menu.items) do texts[#texts + 1] = item.text end
+    eq(table.concat(texts, " | "), "Send to | [WARRIOR]Brak Stone | [DRUID]Tarn Moon", "no Horde, not you")
+    wow.menuItem("[DRUID]Tarn Moon").fn()
+    eq(SendMailNameEditBox:GetText(), "Tarn Moon")
+end)
+
+test("send to alt: characters who can skill up with the attachments are marked and first", function()
+    wow.load(FILES)
+    wow.login(mailAlts())
+    wow.outbox = { { 2589, 20 }, [3] = { 4306, 5 } } -- Linen Cloth, Silk Cloth
+    wow.fire("MAIL_SHOW")
+    local b = altsButton()
+    b.scripts.OnClick(b)
+    eq(wow.menu.items[2].text, "[DRUID]Tarn Moon|cffc0c0c0 · skill-ups with 1 item|r", "Tarn first: can use the linen")
+    eq(wow.menu.items[3].text, "[WARRIOR]Brak Stone", "Brak is past grey 80")
+    SlashCmdList.ALTSFOREVER("skillups")
+    b.scripts.OnClick(b)
+    eq(wow.menu.items[2].text, "[WARRIOR]Brak Stone", "skill-up details off: plain list, by level")
+end)
 ---------------------------------------------------------------------------
 local function tocFiles(path)
     local files = {}

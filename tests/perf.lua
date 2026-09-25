@@ -5,7 +5,7 @@
 package.path = "tests/?.lua;" .. package.path
 local wow = require("wow")
 local SAVED = arg[1] or "tests/fixtures/AltsForever.lua"
-local FILES = { "Core.lua", "Scanner.lua", "Mail.lua", "Money.lua", "Professions.lua", "Character.lua", "Overview.lua", "Gear.lua", "Tooltip.lua", "Options.lua" }
+local FILES = { "Core.lua", "Scanner.lua", "Mail.lua", "Money.lua", "Professions.lua", "Character.lua", "Overview.lua", "Gear.lua", "Tooltip.lua", "Options.lua", "Reputation.lua" }
 
 local function out(fmt, ...) io.write(fmt:format(...), "\n") end
 local function settle()

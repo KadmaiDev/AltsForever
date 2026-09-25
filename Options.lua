@@ -62,6 +62,7 @@ function ns.ShowOptionsMenu(owner)
         if not ns.OverviewShown() then
             root:CreateButton("Open overview", function() ns.ToggleOverview(true) end)
         end
+        root:CreateButton("Reputation", function() ns.ToggleReputation() end)
         root:CreateCheckbox("Show skill-up details", SkillupsSelected, ToggleSkillups)
         root:CreateButton("Memory use", function() ns.RunCommand("mem") end)
     end)

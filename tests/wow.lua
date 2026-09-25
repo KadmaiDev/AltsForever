@@ -20,7 +20,7 @@ local KNOWN_EVENTS = {
     PLAYER_ENTERING_WORLD = true, UPDATE_INVENTORY_DURABILITY = true,
     SKILL_LINES_CHANGED = true, TRADE_SKILL_SHOW = true, TRADE_SKILL_LIST_UPDATE = true,
     TRADE_SKILL_DATA_SOURCE_CHANGED = true, TRADE_SKILL_CLOSE = true, NEW_RECIPE_LEARNED = true,
-    TIME_PLAYED_MSG = true, UNIT_NAME_UPDATE = true,
+    TIME_PLAYED_MSG = true, UNIT_NAME_UPDATE = true, UPDATE_FACTION = true,
 }
 
 -- Resets every global and loads the addon files fresh. Returns the addon namespace.
@@ -258,6 +258,9 @@ function M.load(files)
         if item then return "Item", item[1], nil, item[2] end
     end
     SendMail = function() end
+    -- The send-mail screen: the To box keeps its text.
+    SendMailFrame = CreateFrame("Frame", "SendMailFrame")
+    SendMailNameEditBox = CreateFrame("EditBox", "SendMailNameEditBox")
     M.outboxMoney = 0
     GetSendMailMoney = function() return M.outboxMoney end
     M.timers = {}
@@ -328,6 +331,24 @@ function M.load(files)
         M.menu = root
         return root
     end }
+
+    -- Reputation: the visible list in order, as { id, name, standing, header? }, and
+    -- factions under collapsed headers (not in the list, but readable by ID).
+    M.factions, M.hiddenFactions, M.factionReads = {}, {}, 0
+    local function factionData(f)
+        return f and { factionID = f[1], name = f[2], currentStanding = f[3], isHeader = f[4] or false,
+            isHeaderWithRep = false, reaction = 4 }
+    end
+    C_Reputation = {
+        GetNumFactions = function() return #M.factions end,
+        GetFactionDataByIndex = function(i) M.factionReads = M.factionReads + 1 return factionData(M.factions[i]) end,
+        GetFactionDataByID = function(id)
+            for _, f in ipairs(M.factions) do if f[1] == id then return factionData(f) end end
+            for _, f in ipairs(M.hiddenFactions) do if f[1] == id then return factionData(f) end end
+        end,
+        ExpandAllFactionHeaders = function() M.expanded = true end,
+        ExpandFactionHeader = function() M.expanded = true end,
+    }
 
     -- Confirmation pop-ups: the last one shown.
     M.popup = nil

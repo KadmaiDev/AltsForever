@@ -269,6 +269,27 @@ local function SkillFor(c, prof)
     if skill and not ns.AtRankCap(c, prof) then return skill end
 end
 
+-- True if one of the character's known recipes uses the item and still gives them a
+-- skill-up (not at their rank's maximum). For "Send to alt"; runs when its menu opens.
+function ns.CanSkillUpWith(c, itemID)
+    local info = ns.db.recipeInfo
+    if not (info and c.recipes and ns.SkillupsOn()) then return false end
+    local needle = "," .. itemID .. ":"
+    for prof, known in pairs(c.recipes) do
+        local skill, recipes = SkillFor(c, prof), info[prof]
+        if skill and recipes then
+            for lname in pairs(known) do
+                local v = recipes[lname]
+                if type(v) == "string" and v:find(needle, 1, true) then
+                    local grey = ParseInfo(v)
+                    if grey and skill < grey then return true end
+                end
+            end
+        end
+    end
+    return false
+end
+
 -- How many of a character's known recipes in a profession still give skill-ups, or nil
 -- if the profession hasn't been scanned.
 function ns.SkillupCount(c, prof)

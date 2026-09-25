@@ -1,6 +1,6 @@
 -- Alts Forever mail: reads the inbox while the mailbox is open, credits items you mail
--- to your own characters straight away, and warns when mail with items or gold is
--- about to expire.
+-- to your own characters straight away, warns when mail with items or gold is about to
+-- expire, and adds an "Alts" button to the send-mail screen.
 local _, ns = ...
 
 local wipe, pairs, next, floor, time = wipe, pairs, next, math.floor, time
@@ -89,6 +89,79 @@ function ns.RecipientKey(recipient)
     return ns.FindChar(name)
 end
 
+---------------------------------------------------------------------------
+-- "Alts" button beside the To box on the send-mail screen: picking one of your characters
+-- fills in their name (nothing is sent). Characters who can still skill up with an
+-- attached item are marked and listed first. Created the first time the mailbox opens;
+-- the menu is only built when clicked.
+---------------------------------------------------------------------------
+local LIGHT = "|cffc0c0c0"
+local attached, entries = {}, {}
+
+local function ByUse(a, b)
+    if a.n ~= b.n then return a.n > b.n end
+    return a.i < b.i
+end
+
+function ns.SendToAltEntries()
+    wipe(attached)
+    for i = 1, MAX_SEND do
+        local _, id = GetSendMailItem(i)
+        if id and not issecretvalue(id) then attached[#attached + 1] = id end
+    end
+    wipe(entries)
+    local chars, faction = ns.db.chars, ns.char.faction
+    for i, key in ipairs(ns.OverviewOrder()) do
+        local c = chars[key]
+        -- Mail only goes to your own faction.
+        if key ~= ns.charKey and (not c.faction or not faction or c.faction == faction) then
+            local n = 0
+            for _, id in ipairs(attached) do
+                if ns.CanSkillUpWith(c, id) then n = n + 1 end
+            end
+            entries[#entries + 1] = { key = key, n = n, i = i }
+        end
+    end
+    table.sort(entries, ByUse)
+    return entries
+end
+
+local function AltsMenu(owner)
+    if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+    MenuUtil.CreateContextMenu(owner, function(_, root)
+        root:CreateTitle("Send to")
+        local list = ns.SendToAltEntries()
+        if #list == 0 then root:CreateTitle("|cff9d9d9dNo other characters yet|r") end
+        for _, e in ipairs(list) do
+            local c = ns.db.chars[e.key]
+            local text = ns.ColoredName(e.key, c)
+            if e.n > 0 then
+                text = text .. LIGHT .. " · skill-ups with " .. e.n .. (e.n == 1 and " item" or " items") .. "|r"
+            end
+            root:CreateButton(text, function() SendMailNameEditBox:SetText(c.name or e.key) end)
+        end
+    end)
+end
+
+local altsButton
+local function CreateAltsButton()
+    if altsButton or not (SendMailFrame and SendMailNameEditBox) then return end
+    local ok, b = pcall(CreateFrame, "Button", nil, SendMailFrame, "UIPanelButtonTemplate")
+    if not ok then b = CreateFrame("Button", nil, SendMailFrame) end
+    b:SetSize(52, 20)
+    b:SetPoint("LEFT", SendMailNameEditBox, "RIGHT", 6, 0)
+    b:SetText("Alts")
+    b:SetScript("OnClick", AltsMenu)
+    b:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Send to one of your characters")
+        GameTooltip:AddLine("Characters who can still skill up with what you've attached are marked.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    altsButton = b
+end
+
 function ns.StartMail()
     local char = ns.char
     local pendingKey, pending, pendingMoney = nil, {}, 0
@@ -101,7 +174,10 @@ function ns.StartMail()
 
     -- The inbox can only be read while the mailbox is open.
     local mailOpen = false
-    ns.On("MAIL_SHOW", function() mailOpen = true end)
+    ns.On("MAIL_SHOW", function()
+        mailOpen = true
+        CreateAltsButton()
+    end)
     ns.On("MAIL_CLOSED", function() mailOpen = false end)
     ns.On("MAIL_INBOX_UPDATE", function()
         if mailOpen then ScanInbox() end

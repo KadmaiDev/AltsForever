@@ -30,3 +30,4 @@ Overview.lua
 Gear.lua
 Tooltip.lua
 Options.lua
+Reputation.lua
