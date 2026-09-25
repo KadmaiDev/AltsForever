@@ -1,9 +1,10 @@
 -- Alts Forever professions: records each character's profession skill levels and
 -- learned recipes, shows on recipe items which characters know or can learn them,
--- and on craftable items which characters can make them.
+-- on craftable items which characters can make them, and on reagents which of your
+-- characters can still skill up with them.
 local _, ns = ...
 
-local pairs, ipairs, wipe, tonumber, type = pairs, ipairs, wipe, tonumber, type
+local pairs, ipairs, wipe, tonumber, type, sort = pairs, ipairs, wipe, tonumber, type, table.sort
 local issecretvalue = issecretvalue or function() return false end
 local GetProfessions, GetProfessionInfo = GetProfessions, GetProfessionInfo
 local GetItemInfoInstant, GetItemNameByID = C_Item.GetItemInfoInstant, C_Item.GetItemNameByID
@@ -26,6 +27,13 @@ local STATUS_TEXT = {
     nil, -- built per row: "Needs 120 (107)"
     "|cff9d9d9dNot scanned|r",
 }
+local LIGHT = "|cffc0c0c0"
+local MAX_SKILLUP_LINES = 5
+
+-- Skill-up details (grey points) in tooltips; /af skillups turns them off.
+function ns.SkillupsOn()
+    return not ns.db.skillupsOff
+end
 
 ---------------------------------------------------------------------------
 -- Recording
@@ -55,8 +63,7 @@ end
 
 -- The item a recipe makes, or nil (enchants make none). The schematic's field name
 -- is the retail one, undocumented on Forever, so the recipe's item link is the fallback.
-local function OutputItem(recipeID)
-    local s = TS.GetRecipeSchematic and TS.GetRecipeSchematic(recipeID, false)
+local function OutputItem(recipeID, s)
     local id = s and s.outputItemID
     if not id and TS.GetRecipeItemLink then
         local link = TS.GetRecipeItemLink(recipeID)
@@ -65,23 +72,90 @@ local function OutputItem(recipeID)
     if id and not issecretvalue(id) and id > 0 then return id end
 end
 
+-- A recipe's reagents as ",itemID:qty,itemID:qty" from its schematic. The leading comma
+-- lets a plain find(",<itemID>:") check whether a recipe uses an item.
+local function Reagents(s)
+    local slots = s and s.reagentSlotSchematics
+    if type(slots) ~= "table" then return "" end
+    local out
+    for i = 1, #slots do
+        local slot = slots[i]
+        local r = slot.reagents and slot.reagents[1]
+        local id, qty = r and r.itemID, slot.quantityRequired
+        if id and qty and not issecretvalue(id) and not issecretvalue(qty) then
+            out = (out or "") .. "," .. id .. ":" .. qty
+        end
+    end
+    return out or ""
+end
+
+-- Account-wide facts about recipes any of your characters knows, gathered when they open
+-- a profession: db.recipeInfo[profession][lowercase name] = "grey;Name;,itemID:qty,...".
+-- The grey point (maxTrivialLevel) is where a recipe stops giving skill-ups. Recipes
+-- nobody knows aren't stored: their names alone would cost ~50 KB across professions.
+local function InfoTable(prof)
+    local all = ns.db.recipeInfo
+    if not all then
+        all = {}
+        ns.db.recipeInfo = all
+    end
+    local t = all[prof]
+    if not t then
+        t = {}
+        all[prof] = t
+    end
+    return t
+end
+
+-- grey (number or nil), display name, reagents string.
+local function ParseInfo(v)
+    if type(v) ~= "string" then return nil, nil, "" end
+    local grey, name, reagents = v:match("^(%d*);([^;]*);(.*)$")
+    return tonumber(grey), name, reagents or ""
+end
+
+function ns.RecipeGrey(prof, lname)
+    local all = ns.db.recipeInfo
+    local t = all and all[prof]
+    return t and (ParseInfo(t[lname]))
+end
+
+local function Record(info, r, lname, known)
+    local grey = r.maxTrivialLevel
+    if issecretvalue(grey) or type(grey) ~= "number" or grey <= 0 then grey = nil end
+    local old = info[lname]
+    -- Known here, or by another character (then keep the reagents they recorded).
+    if known or old then
+        local _, _, reagents = ParseInfo(old)
+        info[lname] = (grey or "") .. ";" .. r.name .. ";" .. (known or reagents)
+    end
+end
+
 -- c.recipes = { [professionName] = { [lowercase recipe name] = true } } and
--- c.crafts = { [professionName] = { [itemID] = true } }. A profession only has an
--- entry once its window has been opened, so "missing" means "not scanned".
+-- c.crafts = { [professionName] = { [itemID] = lowercase recipe name } }. A profession
+-- only has an entry once its window has been opened, so "missing" means "not scanned".
 function ns.ScanRecipes(c)
     if not TS.IsTradeSkillReady() or TS.IsTradeSkillLinked() or TS.IsTradeSkillGuild() then return false end
     local prof = ProfessionName(TS.GetBaseProfessionInfo())
     if not prof then return false end
     c.recipes, c.crafts = c.recipes or {}, c.crafts or {}
     local learned, crafts = c.recipes[prof] or {}, c.crafts[prof] or {}
+    local info = InfoTable(prof)
     wipe(learned)
     wipe(crafts)
     for _, id in ipairs(TS.GetAllRecipeIDs()) do
         local r = TS.GetRecipeInfo(id)
-        if r and r.learned and r.name then
-            learned[r.name:lower()] = true
-            local item = OutputItem(id)
-            if item then crafts[item] = true end
+        if r and r.name then
+            local lname = r.name:lower()
+            local reagents
+            if r.learned then
+                learned[lname] = true
+                local s = TS.GetRecipeSchematic and TS.GetRecipeSchematic(id, false)
+                local item = OutputItem(id, s)
+                if item then crafts[item] = lname end
+                reagents = Reagents(s)
+            end
+            Record(info, r, lname, reagents)
         end
     end
     c.recipes[prof], c.crafts[prof] = learned, crafts
@@ -95,13 +169,28 @@ function ns.RecipeLearned(c, recipeID)
     local learned = prof and c.recipes and c.recipes[prof]
     -- Only add to a profession we've scanned; a partial list would read as "not learned".
     if not (learned and r and r.name) then return end
-    learned[r.name:lower()] = true
+    local lname = r.name:lower()
+    learned[lname] = true
+    local s = TS.GetRecipeSchematic and TS.GetRecipeSchematic(recipeID, false)
+    Record(InfoTable(prof), r, lname, Reagents(s))
     local crafts = c.crafts and c.crafts[prof]
-    local item = crafts and OutputItem(recipeID)
-    if item then
-        crafts[item] = true
-        ns.craftVersion = ns.craftVersion + 1
+    local item = crafts and OutputItem(recipeID, s)
+    if item then crafts[item] = lname end
+    ns.craftVersion = ns.craftVersion + 1
+end
+
+-- How many of a character's known recipes in a profession still give skill-ups, or nil
+-- if the profession hasn't been scanned.
+function ns.SkillupCount(c, prof)
+    local known = c.recipes and c.recipes[prof]
+    local skill = c.profs and c.profs[prof]
+    if not known or not skill then return nil end
+    local n = 0
+    for lname in pairs(known) do
+        local grey = ns.RecipeGrey(prof, lname)
+        if grey and skill < grey then n = n + 1 end
     end
+    return n
 end
 
 function ns.StartProfessions()
@@ -121,6 +210,7 @@ function ns.StartProfessions()
 
     ns.On("SKILL_LINES_CHANGED", function()
         ns.ScanSkills(char)
+        ns.craftVersion = ns.craftVersion + 1 -- skill-up lines depend on skill levels
         Changed()
     end)
     -- The recipe list may not be ready when the window opens; LIST_UPDATE follows.
@@ -189,8 +279,8 @@ local function Status(c, p)
     return CAN_LEARN
 end
 
--- Rows are reused between hovers: keys, statuses and skills in parallel arrays.
-local rowKey, rowStatus, rowSkill = {}, {}, {}
+-- Rows are reused between hovers: keys, statuses, skills and texts in parallel arrays.
+local rowKey, rowStatus, rowSkill, rowText = {}, {}, {}, {}
 local lastId, lastVer, rows = nil, nil, 0
 
 local function Before(i, j)
@@ -222,6 +312,23 @@ local function BuildRows(p)
         end
         rowKey[j + 1], rowStatus[j + 1], rowSkill[j + 1] = k, s, sk
     end
+    -- Texts are built here, once per item, so hovering again allocates nothing.
+    local grey = ns.SkillupsOn() and ns.RecipeGrey(p.prof, p.name)
+    local chars = ns.db.chars
+    for i = 1, rows do
+        local status = rowStatus[i]
+        local text = STATUS_TEXT[status] or ("|cffff2020Needs " .. p.req .. " (" .. rowSkill[i] .. ")|r")
+        if grey then
+            local c = chars[rowKey[i]]
+            local skill = c.profs and c.profs[p.prof]
+            if status == KNOWN and skill and skill >= grey then
+                text = text .. LIGHT .. " · no skill-ups|r"
+            else
+                text = text .. LIGHT .. " · until " .. grey .. "|r"
+            end
+        end
+        rowText[i] = text
+    end
 end
 
 function ns.AddRecipeLines(tt, id, data)
@@ -238,10 +345,8 @@ function ns.AddRecipeLines(tt, id, data)
     tt:AddLine(p.prof .. " (" .. p.req .. ")", 1, 0.82, 0)
     local chars = ns.db.chars
     for i = 1, rows do
-        local key, status = rowKey[i], rowStatus[i]
-        local text = STATUS_TEXT[status]
-            or ("|cffff2020Needs " .. p.req .. " (" .. rowSkill[i] .. ")|r")
-        tt:AddDoubleLine(ns.ColoredName(key, chars[key]), text, 1, 1, 1, 1, 1, 1)
+        local key = rowKey[i]
+        tt:AddDoubleLine(ns.ColoredName(key, chars[key]), rowText[i], 1, 1, 1, 1, 1, 1)
     end
 end
 
@@ -255,15 +360,22 @@ end
 local crafters, lastKey, craftersVer = {}, {}, nil
 local sortedKeys = {}
 
-local function AddCrafter(key, c)
+local function AddCrafter(key, c, skillups)
     if not c.crafts then return end
     local name = ns.ColoredName(key, c)
-    for _, items in pairs(c.crafts) do
-        for id in pairs(items) do
+    for prof, items in pairs(c.crafts) do
+        local skill = c.profs and c.profs[prof]
+        for id, lname in pairs(items) do
             if lastKey[id] ~= key then
                 lastKey[id] = key
+                local text = name
+                -- Older saves stored true here, so the grey point is unknown for them.
+                local grey = skillups and type(lname) == "string" and ns.RecipeGrey(prof, lname)
+                if grey and skill and skill < grey then
+                    text = name .. LIGHT .. " · until " .. grey .. "|r"
+                end
                 local list = crafters[id]
-                if list then list[#list + 1] = name else crafters[id] = { name } end
+                if list then list[#list + 1] = text else crafters[id] = { text } end
             end
         end
     end
@@ -278,8 +390,9 @@ local function BuildCrafters()
         if key ~= ns.charKey then sortedKeys[#sortedKeys + 1] = key end
     end
     table.sort(sortedKeys)
-    AddCrafter(ns.charKey, ns.char) -- you first, then by name
-    for _, key in ipairs(sortedKeys) do AddCrafter(key, db.chars[key]) end
+    local skillups = ns.SkillupsOn()
+    AddCrafter(ns.charKey, ns.char, skillups) -- you first, then by name
+    for _, key in ipairs(sortedKeys) do AddCrafter(key, db.chars[key], skillups) end
 end
 
 -- A heading, then one character per line, so the tooltip never gets wide.
@@ -293,4 +406,78 @@ function ns.AddCraftLines(tt, id)
     tt:AddLine(" ")
     tt:AddLine("Can craft", 1, 0.82, 0)
     for i = 1, #list do tt:AddLine("  " .. list[i], 1, 1, 1) end
+end
+
+---------------------------------------------------------------------------
+-- "Skill-ups" on reagent tooltips
+---------------------------------------------------------------------------
+-- For the hovered item: the known recipes that use it and still give their character a
+-- skill-up, as { recipe, who, recipe, who, ..., n = recipes, more = "+N more" } (false if
+-- none). Found by searching the known recipes' reagent strings (about 0.02 ms), so
+-- there's no index in memory; only the last item's result is kept, which covers the
+-- tooltip refreshing while you hover.
+local lastUse, lastUseId, usesVer = false, nil, nil
+local order, names = {}, {}
+
+local function Order()
+    wipe(order)
+    for key in pairs(ns.db.chars) do
+        if key ~= ns.charKey then order[#order + 1] = key end
+    end
+    sort(order)
+    table.insert(order, 1, ns.charKey) -- you first, then by name
+end
+
+local function FindUses(id)
+    local info, chars = ns.db.recipeInfo, ns.db.chars
+    local needle = "," .. id .. ":"
+    local list = false
+    for _, key in ipairs(order) do
+        local c = chars[key]
+        if c and c.recipes then
+            for prof, known in pairs(c.recipes) do
+                local skill = c.profs and c.profs[prof]
+                local recipes = info[prof]
+                if skill and recipes then
+                    wipe(names)
+                    for lname in pairs(known) do
+                        local v = recipes[lname]
+                        if type(v) == "string" and v:find(needle, 1, true) then names[#names + 1] = lname end
+                    end
+                    sort(names)
+                    for i = 1, #names do
+                        local grey, name = ParseInfo(recipes[names[i]])
+                        if grey and skill < grey then
+                            list = list or { n = 0 }
+                            list.n = list.n + 1
+                            list[list.n * 2 - 1] = "  " .. name
+                            list[list.n * 2] = ns.ShortName(key, c) .. LIGHT .. " · until " .. grey .. "|r"
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if list and list.n > MAX_SKILLUP_LINES then list.more = "  +" .. (list.n - MAX_SKILLUP_LINES) .. " more" end
+    return list
+end
+
+function ns.AddSkillupLines(tt, id)
+    if not ns.SkillupsOn() or not ns.db.recipeInfo then return end
+    if usesVer ~= ns.craftVersion then
+        usesVer, lastUseId = ns.craftVersion, nil
+        Order()
+    end
+    if id ~= lastUseId then
+        lastUseId, lastUse = id, FindUses(id)
+    end
+    local list = lastUse
+    if not list then return end
+    tt:AddLine(" ")
+    tt:AddLine("Skill-ups", 1, 0.82, 0)
+    local shown = list.n < MAX_SKILLUP_LINES and list.n or MAX_SKILLUP_LINES
+    for i = 1, shown do
+        tt:AddDoubleLine(list[i * 2 - 1], list[i * 2], 1, 1, 1, 1, 1, 1)
+    end
+    if list.more then tt:AddLine(list.more, 0.75, 0.75, 0.75) end
 end

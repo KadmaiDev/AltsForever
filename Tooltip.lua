@@ -28,7 +28,7 @@ local SEP = " · "
 local EMPTY = { n = 0, total = 0 }
 
 local cache, cacheSize = {}, 0
-local names = {}
+local names, shortNames = {}, {}
 local lastId, lastVer, curCount, curText
 
 local function ColoredName(key, c)
@@ -43,6 +43,18 @@ local function ColoredName(key, c)
 end
 
 ns.ColoredName = ColoredName
+
+-- First name only, in class colour, for narrow columns.
+function ns.ShortName(key, c)
+    local s = shortNames[key]
+    if not s then
+        s = (c.name or key):match("^(%S+)") or key
+        local color = c.class and C_ClassColor.GetClassColor(c.class)
+        if color then s = color:WrapTextInColorCode(s) end
+        shortNames[key] = s
+    end
+    return s
+end
 
 -- Returns the character's total for an item and the right-hand text: a grey
 -- breakdown then the count, so counts line up at the tooltip's right edge.
@@ -89,6 +101,7 @@ end
 function ns.InvalidateCache()
     wipe(cache)
     wipe(names)
+    wipe(shortNames)
     cacheSize = 0
     lastId = nil
     ns.version = ns.version + 1 -- also refreshes memoised recipe lines
@@ -138,6 +151,7 @@ local function OnItem(tt, data)
     if id then
         ns.AddRecipeLines(tt, id, data)
         ns.AddCraftLines(tt, id)
+        ns.AddSkillupLines(tt, id)
         ns.AddLines(tt, id)
     end
 end

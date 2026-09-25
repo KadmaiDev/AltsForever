@@ -24,6 +24,8 @@ Hovering a recipe (pattern, schematic, formula...) lists your characters who hav
 
 **Can craft:** hovering any item that one of your characters knows how to make adds a "Can craft" section listing them one per line (the current character first). This also comes from opening each profession window once.
 
+**Skill-ups across your alts:** recipe tooltips show how long each character keeps getting skill-ups from a recipe ("Known · until 85", "Known · no skill-ups", "Can learn · until 85"), "Can craft" marks characters who'd still get a skill-up, and hovering a reagent lists the recipes your characters can still skill up with it ("Skill-ups: Heavy Linen Bandage, Tarnia · until 115"). The overview's row tooltip counts each profession's recipes that still give skill-ups. All of it comes from the game when a profession window is opened; `/af skillups` turns it off.
+
 ![Recipe tooltips showing Known, Can learn and Needs skill, and a Can craft line](media/professions.png)
 
 ## Status
@@ -42,6 +44,7 @@ Install it from CurseForge, or link or copy this folder to `<WoW Forever>\Interf
 | `/af` | Open or close the overview window |
 | `/af mail` | List every character's soonest mail expiry |
 | `/af list` | List stored characters |
+| `/af skillups` | Turn the skill-up details in tooltips on or off |
 | `/af delete Full Name` | Forget a character, e.g. `/af delete Thessa Oakenbrook` |
 | `/af mem` | Show the addon's memory use |
 
@@ -57,7 +60,7 @@ luajit tests/run.lua
 
 ## Design notes
 
-- Item counts are stored as `itemID -> count` per location per character, without slot positions or item links. The rest is small: each equipped item's link (for the gear panel), learned recipe names and the item IDs they make, and a few numbers such as level, gold and time played. Five characters take 17 KB on disk.
+- Item counts are stored as `itemID -> count` per location per character, without slot positions or item links. The rest is small: each equipped item's link (for the gear panel), learned recipe names with what they make, their grey point and reagents (one short string per recipe your characters know), and a few numbers such as level, gold and time played. Five characters take 17 KB on disk.
 - Scans only happen on events. `BAG_UPDATE_DELAYED` groups a batch of changes into one scan, and only when a carried bag changed. There are no OnUpdate handlers.
 - Scans refill the existing tables and read stacks through one reused `ItemLocation`, so a scan allocates nothing.
 - Other characters' tooltip lines are built once per item and cached, up to 500 items. The current character's line is recomputed only when their data changes. Hovering an item again creates no garbage.

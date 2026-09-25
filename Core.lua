@@ -220,13 +220,19 @@ function commands.mail()
     if not ns.PrintMailWarnings(math.huge) then Print("No mail with items or gold on record.") end
 end
 
+function commands.skillups()
+    ns.db.skillupsOff = not ns.db.skillupsOff or nil
+    ns.InvalidateCache()
+    Print(ns.db.skillupsOff and "Skill-up details in tooltips off." or "Skill-up details in tooltips on.")
+end
+
 function commands.mem()
     UpdateAddOnMemoryUsage()
     Print(("Memory: %.1f KB"):format(GetAddOnMemoryUsage(ADDON)))
 end
 
 function commands.help()
-    Print("by Kadmai. /af opens the overview. Also: /af mail | list | delete Name | mem")
+    Print("by Kadmai. /af opens the overview. Also: /af mail | list | delete Name | skillups | mem")
 end
 
 commands[""] = function() ns.ToggleOverview() end

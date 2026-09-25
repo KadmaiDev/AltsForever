@@ -83,7 +83,7 @@ C_Item.GetItemInfoInstant = function(id) return id, nil, nil, nil, 1, wow.itemCl
 local nop = { AddLine = function() end, AddDoubleLine = function() end, NumLines = function() return 0 end }
 local item = 2017
 garbage("tooltip: item already hovered", 5000, function()
-    ns.AddRecipeLines(nop, item) ns.AddCraftLines(nop, item) ns.AddLines(nop, item)
+    ns.AddRecipeLines(nop, item) ns.AddCraftLines(nop, item) ns.AddSkillupLines(nop, item) ns.AddLines(nop, item)
 end)
 local ids = {}
 for id in pairs(ns.char.bags) do ids[#ids + 1] = id end

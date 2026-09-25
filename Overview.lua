@@ -156,7 +156,12 @@ local function RowTooltip(row)
     if c.money then tt:AddDoubleLine("Gold", GetCoinTextureString(c.money), 1, 0.82, 0, 1, 1, 1) end
     if c.profs and next(c.profs) then
         tt:AddLine(" ")
-        for name, skill in pairs(c.profs) do tt:AddDoubleLine(name, skill, 1, 1, 1, 1, 1, 1) end
+        local skillups = ns.SkillupsOn()
+        for name, skill in pairs(c.profs) do
+            local n = skillups and ns.SkillupCount(c, name)
+            local right = n and (skill .. GREY .. "  (" .. n .. " skill-up recipe" .. (n == 1 and "" or "s") .. ")|r") or skill
+            tt:AddDoubleLine(name, right, 1, 1, 1, 1, 1, 1)
+        end
     end
     tt:AddLine(" ")
     tt:AddLine(GREY .. (c.bank and "Bank scanned" or "Bank not scanned yet - visit a banker") .. "|r")

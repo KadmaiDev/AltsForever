@@ -34,7 +34,8 @@ function M.load(files)
     M.itemClass = {}   -- [itemID] = classID (9 = recipe)
     M.itemNames = {}   -- [itemID] = name
     -- The open profession window: which profession, and every recipe in it. A recipe
-    -- is { name, learned, prof?, item? (what the schematic says it makes), link? }.
+    -- is { name, learned, prof?, item? (what the schematic says it makes), link?,
+    -- grey? (maxTrivialLevel), reagents? { { itemID, qty }, ... } }.
     M.tradeskill = { ready = true, linked = false, guild = false, prof = nil, recipes = {} }
     M.frames = {}
     M.printed = {}
@@ -80,7 +81,7 @@ function M.load(files)
         end,
         GetRecipeInfo = function(id)
             local r = ts().recipes[id]
-            return r and { recipeID = id, name = r.name, learned = r.learned }
+            return r and { recipeID = id, name = r.name, learned = r.learned, maxTrivialLevel = r.grey }
         end,
         GetProfessionInfoByRecipeID = function(id)
             local r = ts().recipes[id]
@@ -88,7 +89,12 @@ function M.load(files)
         end,
         GetRecipeSchematic = function(id)
             local r = ts().recipes[id]
-            return { recipeID = id, outputItemID = r and r.item }
+            M.schematics = (M.schematics or 0) + 1
+            local slots = {}
+            for i, x in ipairs(r and r.reagents or {}) do
+                slots[i] = { quantityRequired = x[2], reagents = { { itemID = x[1] } } }
+            end
+            return { recipeID = id, outputItemID = r and r.item, reagentSlotSchematics = slots }
         end,
         GetRecipeItemLink = function(id)
             local r = ts().recipes[id]

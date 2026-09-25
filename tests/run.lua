@@ -1173,8 +1173,8 @@ test("opening a profession window records which items each learned recipe makes"
     wow.login(nil)
     craftingWindow({ squirrel = true, dynamite = true })
     local crafts = ns.char.crafts.Engineering
-    eq(crafts[SQUIRREL_ITEM], true)
-    eq(crafts[DYNAMITE_ITEM], true, "read from the item link when the schematic has none")
+    eq(crafts[SQUIRREL_ITEM], "mechanical squirrel", "the recipe that makes it")
+    eq(crafts[DYNAMITE_ITEM], "rough dynamite", "read from the item link when the schematic has none")
     eq(crafts[GOGGLES_ITEM], nil, "not learned")
     local n = 0
     for _ in pairs(crafts) do n = n + 1 end
@@ -1211,7 +1211,7 @@ test("can-craft line updates when you learn a recipe", function()
     eq(craftLine(wow.hover(GameTooltip, GOGGLES_ITEM)), nil)
     wow.tradeskill.recipes[1003].learned = true
     wow.fire("NEW_RECIPE_LEARNED", 1003)
-    eq(ns.char.crafts.Engineering[GOGGLES_ITEM], true)
+    eq(ns.char.crafts.Engineering[GOGGLES_ITEM], "shadow goggles")
     eq(craftLine(wow.hover(GameTooltip, GOGGLES_ITEM)), "[MAGE]Aldric")
 end)
 
@@ -1358,6 +1358,180 @@ test("the slash commands are /af and /altsforever; the old /it is gone", functio
     wow.load(FILES)
     eq(SLASH_ALTSFOREVER1, "/af"); eq(SLASH_ALTSFOREVER2, "/altsforever")
     eq(SLASH_ALTSFOREVER3, nil)
+end)
+
+---------------------------------------------------------------------------
+-- Skill-ups across alts (0.3.0): grey points and reagents from the live game
+local L = "|cffc0c0c0"
+local LINEN, COPPER_TUBE, BOLT = 2589, 4361, 4359
+local function until_(n) return L .. " · until " .. n .. "|r" end
+
+-- Engineering recipes with grey points and reagents, as a profession window lists them.
+local function greyWindow(learned)
+    wow.tradeskill.prof = "Engineering"
+    wow.tradeskill.recipes = {
+        [1001] = { name = "Mechanical Squirrel", learned = learned.squirrel or false, item = SQUIRREL_ITEM,
+            grey = 100, reagents = { { COPPER_TUBE, 1 }, { LINEN, 2 } } },
+        [1002] = { name = "Rough Dynamite", learned = learned.dynamite or false, item = DYNAMITE_ITEM,
+            grey = 60, reagents = { { LINEN, 1 } } },
+        [1003] = { name = "Shadow Goggles", learned = learned.goggles or false, item = GOGGLES_ITEM,
+            grey = 150, reagents = { { BOLT, 4 } } },
+    }
+    wow.fire("TRADE_SKILL_SHOW")
+end
+
+local function textOf(lines)
+    local t = {}
+    for _, l in ipairs(lines) do t[#t + 1] = table.concat(l, " = ") end
+    return table.concat(t, "\n")
+end
+
+test("a profession scan records grey points, and reagents of known recipes, account-wide", function()
+    wow.load(FILES)
+    wow.profs = { { "Engineering", 55 } }
+    wow.login({ v = 2, chars = {}, recipeInfo = { Engineering = { ["shadow goggles"] = "140;Shadow Goggles;,4359:4" } } })
+    wow.schematics = 0
+    greyWindow({ squirrel = true })
+    local info = AltsForeverDB.recipeInfo.Engineering
+    eq(info["mechanical squirrel"], "100;Mechanical Squirrel;,4361:1,2589:2")
+    eq(info["rough dynamite"], nil, "nobody knows it: not stored")
+    eq(info["shadow goggles"], "150;Shadow Goggles;,4359:4", "known by another character: grey refreshed, reagents kept")
+    eq(wow.schematics, 1, "schematics are read only for learned recipes")
+end)
+
+test("learning a recipe records its reagents and what it makes", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    greyWindow({})
+    wow.fire("TRADE_SKILL_CLOSE")
+    wow.tradeskill.recipes[1003].learned = true
+    wow.fire("NEW_RECIPE_LEARNED", 1003)
+    eq(AltsForeverDB.recipeInfo.Engineering["shadow goggles"], "150;Shadow Goggles;,4359:4")
+    eq(ns.char.crafts.Engineering[GOGGLES_ITEM], "shadow goggles")
+end)
+
+test("recipe tooltip: how long each character keeps getting skill-ups", function()
+    wow.load(FILES)
+    wow.profs = { { "Engineering", 80 } }
+    local text = wow.recipeItem(SQUIRREL, "Schematic: Mechanical Squirrel", "Engineering", 75)
+    local saved = recipeAlts()
+    saved.recipeInfo = { Engineering = { ["mechanical squirrel"] = "100;Mechanical Squirrel;" } }
+    saved.chars["Pim"] = alt("Pim", "MAGE", { profs = { Engineering = 90 },
+        recipes = { Engineering = { ["mechanical squirrel"] = true } } })
+    saved.chars["Brakka"].profs.Engineering = 100 -- exactly at the grey point
+    wow.login(saved)
+    local lines = wow.hover(GameTooltip, SQUIRREL, text)
+    eq(lines[3][1], "[MAGE]Aldric"); eq(lines[3][2], "|cff9d9d9dNot scanned|r" .. until_(100))
+    eq(lines[4][1], "[HUNTER]Brakka"); eq(lines[4][2], "|cff20ff20Known|r" .. L .. " · no skill-ups|r", "at grey 100: no more")
+    eq(lines[5][1], "[MAGE]Pim"); eq(lines[5][2], "|cff20ff20Known|r" .. until_(100))
+    eq(lines[6][1], "[PRIEST]Elowen"); eq(lines[6][2], "|cffffd100Can learn|r" .. until_(100))
+    eq(lines[7][1], "[DRUID]Thessa"); eq(lines[7][2], "|cffff2020Needs 75 (60)|r" .. until_(100))
+end)
+
+test("/af skillups turns every skill-up detail off and on", function()
+    wow.load(FILES)
+    wow.profs = { { "Engineering", 80 } }
+    local text = wow.recipeItem(SQUIRREL, "Schematic: Mechanical Squirrel", "Engineering", 75)
+    local saved = recipeAlts()
+    saved.recipeInfo = { Engineering = { ["mechanical squirrel"] = "100;Mechanical Squirrel;,2589:2" } }
+    saved.chars["Brakka"].crafts = { Engineering = { [SQUIRREL_ITEM] = "mechanical squirrel" } }
+    saved.chars["Brakka"].profs.Engineering = 90
+    wow.login(saved)
+    SlashCmdList.ALTSFOREVER("skillups")
+    eq(AltsForeverDB.skillupsOff, true)
+    local lines = wow.hover(GameTooltip, SQUIRREL, text)
+    eq(lines[4][2], "|cff20ff20Known|r", "recipe tooltip as in 0.2")
+    eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)), "[HUNTER]Brakka", "can craft as in 0.2")
+    assert(not textOf(wow.hover(GameTooltip, LINEN)):find("Skill-ups", 1, true), "no reagent section")
+    SlashCmdList.ALTSFOREVER("skillups")
+    eq(AltsForeverDB.skillupsOff, nil)
+    eq(wow.hover(GameTooltip, SQUIRREL, text)[4][2], "|cff20ff20Known|r" .. until_(100))
+end)
+
+test("can craft: characters who'd still get a skill-up are marked", function()
+    wow.load(FILES)
+    wow.login({ v = 2, recipeInfo = { Engineering = { ["mechanical squirrel"] = "100;Mechanical Squirrel;" } }, chars = {
+        ["Brakka"] = alt("Brakka", "HUNTER", { profs = { Engineering = 90 },
+            crafts = { Engineering = { [SQUIRREL_ITEM] = "mechanical squirrel" } } }),
+        ["Far"] = alt("Far", "MAGE", { profs = { Engineering = 120 },
+            crafts = { Engineering = { [SQUIRREL_ITEM] = "mechanical squirrel" } } }),
+        ["Old"] = alt("Old", "ROGUE", { profs = { Engineering = 10 }, crafts = { Engineering = { [SQUIRREL_ITEM] = true } } }),
+    } })
+    eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)),
+        "[HUNTER]Brakka" .. until_(100) .. ", [MAGE]Far, [ROGUE]Old", "past grey, or saved before 0.3: unmarked")
+end)
+
+-- Aldric (you) and two alts, with recipes that use Linen Cloth.
+local function reagentAlts()
+    return { v = 2, recipeInfo = {
+        Engineering = {
+            ["mechanical squirrel"] = "100;Mechanical Squirrel;,4361:1,2589:2",
+            ["rough dynamite"] = "60;Rough Dynamite;,2589:1",
+        },
+        ["First Aid"] = { ["linen bandage"] = "80;Linen Bandage;,2589:1", ["heavy linen bandage"] = "115;Heavy Linen Bandage;,2589:2" },
+    }, chars = {
+        ["Brakka Stone"] = alt("Brakka Stone", "HUNTER", { profs = { Engineering = 107 },
+            recipes = { Engineering = { ["mechanical squirrel"] = true } } }),
+        ["Tarnia Moon"] = alt("Tarnia Moon", "DRUID", { profs = { ["First Aid"] = 40 },
+            recipes = { ["First Aid"] = { ["linen bandage"] = true } } }),
+    } }
+end
+
+test("reagent tooltip lists the recipes that still give each character a skill-up", function()
+    local ns = wow.load(FILES)
+    wow.profs = { { "Engineering", 55 } }
+    local saved = reagentAlts()
+    saved.chars["Aldric"] = alt("Aldric", "MAGE", { recipes = { Engineering = { ["mechanical squirrel"] = true, ["rough dynamite"] = true } } })
+    wow.login(saved)
+    local lines = wow.hover(GameTooltip, LINEN)
+    eq(lines[1][1], " "); eq(lines[2][1], "Skill-ups")
+    eq(lines[3][1], "  Mechanical Squirrel"); eq(lines[3][2], "[MAGE]Aldric" .. until_(100))
+    eq(lines[4][1], "  Rough Dynamite"); eq(lines[4][2], "[MAGE]Aldric" .. until_(60))
+    eq(lines[5][1], "  Linen Bandage"); eq(lines[5][2], "[DRUID]Tarnia" .. until_(80))
+    eq(#lines, 5, "Brakka is past grey; nobody knows Heavy Linen Bandage")
+    eq(textOf(wow.hover(GameTooltip, 9999)):find("Skill-ups", 1, true), nil, "unused item: no section")
+    -- Skill goes up: Rough Dynamite (grey 60) stops counting.
+    wow.profs = { { "Engineering", 60 } }
+    wow.fire("SKILL_LINES_CHANGED")
+    lines = wow.hover(GameTooltip, LINEN)
+    eq(lines[4][1], "  Linen Bandage", "updated when skill changes")
+    eq(ns.SkillupCount(ns.char, "Engineering"), 1)
+end)
+
+test("reagent tooltip shows at most 5 recipes, then how many more", function()
+    wow.load(FILES)
+    wow.profs = { { "Tailoring", 1 } }
+    local info, known = {}, {}
+    for i = 1, 7 do
+        info["shirt " .. i] = "100;Shirt " .. i .. ";,2589:1"
+        known["shirt " .. i] = true
+    end
+    wow.login({ v = 2, recipeInfo = { Tailoring = info }, chars = {
+        ["Aldric"] = alt("Aldric", "MAGE", { recipes = { Tailoring = known } }) } })
+    local lines = wow.hover(GameTooltip, LINEN)
+    eq(lines[7][1], "  Shirt 5")
+    eq(lines[8][1], "  +2 more")
+end)
+
+test("overview row tooltip counts recipes still giving skill-ups", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    local saved = overviewAlts()
+    saved.recipeInfo = { Tailoring = { a = "250;A;", b = "150;B;", c = "210;C;,1:1" } }
+    saved.chars["High"].recipes = { Tailoring = { a = true, b = true, c = true } }
+    wow.login(saved)
+    eq(ns.SkillupCount(saved.chars["High"], "Tailoring"), 2, "skill 200: a and c")
+    eq(ns.SkillupCount(saved.chars["High"], "Enchanting"), nil, "never scanned")
+    SlashCmdList.ALTSFOREVER("")
+    local row = overviewRows()[3] -- High
+    row.scripts.OnEnter(row)
+    local text = textOf(GameTooltip.lines)
+    assert(text:find("Tailoring = 200" .. G .. "  (2 skill-up recipes)|r", 1, true), text)
+    assert(text:find("Enchanting = 180\n", 1, true) or text:find("Enchanting = 180$"), text)
+    SlashCmdList.ALTSFOREVER("skillups")
+    row.scripts.OnEnter(row)
+    text = textOf(GameTooltip.lines)
+    assert(text:find("Tailoring = 200\n", 1, true) or text:find("Tailoring = 200$"), "toggle off: plain skill\n" .. text)
 end)
 
 ---------------------------------------------------------------------------

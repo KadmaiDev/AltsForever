@@ -1,3 +1,13 @@
+## Alts Forever 0.3.0
+
+- **Skill-ups across your alts.** Alts Forever now shows how long each of your characters keeps getting skill-ups from a recipe, using the level where it turns grey (read from the game when a profession window opens):
+  - **Recipe tooltips:** "Known · until 85", "Known · no skill-ups", "Can learn · until 85".
+  - **Can craft:** characters who'd still get a skill-up from making the item are marked "· until 115".
+  - **Reagents:** hovering a material lists the recipes your characters can still skill up with it ("Skill-ups: Heavy Linen Bandage, Tarnia · until 115").
+  - **Overview:** a character's row tooltip counts each profession's recipes that still give skill-ups.
+  - Open each profession window once per character to fill these in. `/af skillups` turns it all off.
+- **Removed** the old `/it` command (use `/af`).
+
 ## Alts Forever 0.2.2
 
 - **Fixed:** since WoW Forever build 70009, characters were saved under their first name only (e.g. "Mira" instead of "Mira Dawnfield"), because the game now gives the surname separately. Alts Forever now reads the full name, renames first-name entries and merges any duplicates.
