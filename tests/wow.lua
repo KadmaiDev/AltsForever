@@ -96,11 +96,9 @@ function M.load(files)
         end,
     }
 
-    -- /played: requests are counted; ChatFrame_DisplayTimePlayed stands in for the
-    -- chat frame printing "Total time played", and records what it would print.
+    -- /played: requests are counted. Chat windows are made below, once frames exist.
     M.playedRequests, M.playedShown = 0, {}
     RequestTimePlayed = function() M.playedRequests = M.playedRequests + 1 end
-    ChatFrame_DisplayTimePlayed = function(_, total) M.playedShown[#M.playedShown + 1] = total end
 
     -- Frames: real behaviour for events, scripts, text and visibility; any other
     -- widget method (sizing, anchoring, fonts...) is accepted and ignored.
@@ -124,6 +122,7 @@ function M.load(files)
         self.events[event] = true
     end
     function frameMethods:UnregisterEvent(event) self.events[event] = nil end
+    function frameMethods:IsEventRegistered(event) return self.events[event] == true end
     function frameMethods:SetScript(script, fn)
         self.scripts[script] = fn
         if script == "OnEvent" then self.onEvent = fn end
@@ -154,6 +153,13 @@ function M.load(files)
         return f
     end
     M.missingTemplates = {}
+
+    -- Chat windows: ChatFrame1 prints "Total time played" (recorded in playedShown)
+    -- when it gets TIME_PLAYED_MSG; ChatFrame2 doesn't listen for it.
+    local chat = CreateFrame("ScrollingMessageFrame", "ChatFrame1")
+    chat:RegisterEvent("TIME_PLAYED_MSG")
+    chat:SetScript("OnEvent", function(_, _, total) M.playedShown[#M.playedShown + 1] = total end)
+    CreateFrame("ScrollingMessageFrame", "ChatFrame2")
     UIParent = newObject("Frame")
     UISpecialFrames = {}
 
@@ -362,11 +368,10 @@ function M.setBag(bag, size, contents)
     M.bags[bag] = b
 end
 
--- What the game does when time played arrives: the event, then each chat frame showing
--- system messages prints it through the (possibly wrapped) global.
+-- Time played arriving from the server: every frame listening for it gets the event,
+-- chat windows first (they exist before any addon).
 function M.timePlayed(total, thisLevel)
     M.fire("TIME_PLAYED_MSG", total, thisLevel or 0)
-    ChatFrame_DisplayTimePlayed(nil, total, thisLevel or 0)
 end
 
 return M

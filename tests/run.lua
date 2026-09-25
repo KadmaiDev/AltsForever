@@ -1249,10 +1249,23 @@ test("time played is requested quietly after login and recorded", function()
     wow.timePlayed(5 * DAY)
     eq(#wow.playedShown, 0, "the chat message for our request is hidden")
     eq(ns.char.played, 5 * DAY); eq(ns.char.playedAt, NOW)
+    table.remove(wow.timers)() -- the answer's own timer, a second later
+    eq(ChatFrame1:IsEventRegistered("TIME_PLAYED_MSG"), true, "listening again once the answer is in")
     runTimers()
     wow.timePlayed(5 * DAY + 60) -- the player types /played
     eq(#wow.playedShown, 1, "the player's own /played still prints")
     eq(ns.char.played, 5 * DAY + 60)
+    eq(ChatFrame1:IsEventRegistered("TIME_PLAYED_MSG"), true)
+    eq(ChatFrame2:IsEventRegistered("TIME_PLAYED_MSG"), false, "a window that wasn't listening stays that way")
+end)
+
+test("chat listens for time played again even if no answer comes", function()
+    wow.load(FILES)
+    wow.login({ v = 2, chars = {} })
+    runTimers() -- the request: chat stops listening
+    eq(ChatFrame1:IsEventRegistered("TIME_PLAYED_MSG"), false)
+    runTimers() -- 10 seconds later, no answer
+    eq(ChatFrame1:IsEventRegistered("TIME_PLAYED_MSG"), true)
 end)
 
 test("time played keeps counting while online and is saved at logout", function()

@@ -70,32 +70,45 @@ function ns.RecordPlayed(c, total, now)
     c.played, c.playedAt = total, now
 end
 
--- The game answers RequestTimePlayed with TIME_PLAYED_MSG and also prints "Total time
--- played" in chat; the chat frame's printer is wrapped so our login request stays quiet.
--- A /played typed by the player still prints (and is recorded too).
-local hidePlayed = false
+-- The game answers RequestTimePlayed with TIME_PLAYED_MSG, and every chat window
+-- listening for that event prints "Total time played". To keep our login request out
+-- of chat, those windows stop listening until the answer has arrived. (Wrapping the
+-- global ChatFrame_DisplayTimePlayed didn't hide it on build 70009.) A /played typed
+-- by the player still prints, and is recorded too.
+local muted = {}
+
+local function MuteChat()
+    for i = 1, NUM_CHAT_WINDOWS or 10 do
+        local frame = _G["ChatFrame" .. i]
+        if frame and frame:IsEventRegistered("TIME_PLAYED_MSG") then
+            frame:UnregisterEvent("TIME_PLAYED_MSG")
+            muted[#muted + 1] = frame
+        end
+    end
+end
+
+local function UnmuteChat()
+    for i = #muted, 1, -1 do
+        muted[i]:RegisterEvent("TIME_PLAYED_MSG")
+        muted[i] = nil
+    end
+end
 
 local function StartPlayed(char)
     ns.On("TIME_PLAYED_MSG", function(total)
         ns.RecordPlayed(char, total, time())
-        -- Every chat frame showing system messages prints it, so stay quiet a moment longer.
-        if hidePlayed then C_Timer.After(1, function() hidePlayed = false end) end
+        -- Listen again a moment later, once every window has had its turn at the event.
+        if #muted > 0 then C_Timer.After(1, UnmuteChat) end
     end)
     ns.On("PLAYER_LOGOUT", function()
         local total = ns.PlayedNow(char, time())
         if total then char.played, char.playedAt = total, time() end
     end)
-    local show = ChatFrame_DisplayTimePlayed
     if not (RequestTimePlayed and C_Timer) then return end
-    if show then
-        ChatFrame_DisplayTimePlayed = function(...)
-            if not hidePlayed then return show(...) end
-        end
-    end
     C_Timer.After(3, function()
-        hidePlayed = true
+        MuteChat()
         RequestTimePlayed()
-        C_Timer.After(10, function() hidePlayed = false end) -- in case no answer comes
+        C_Timer.After(10, UnmuteChat) -- in case no answer comes
     end)
 end
 
