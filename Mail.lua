@@ -156,11 +156,11 @@ end
 
 local function CreateAltsButton()
     if altsButton or not ns.SendToAltOn() or not (SendMailFrame and SendMailNameEditBox) then return end
-    -- A small dropdown arrow inside the right end of the To box: there's no free space
-    -- beside it (a button there covered "Postage").
+    -- A small dropdown arrow just right of the To box. It fits the gap before "Postage"
+    -- (a 52 px button there covered it).
     local b = CreateFrame("Button", nil, SendMailFrame)
     b:SetSize(18, 18)
-    b:SetPoint("RIGHT", SendMailNameEditBox, "RIGHT", -2, 0)
+    b:SetPoint("LEFT", SendMailNameEditBox, "RIGHT", 4, 0)
     b:SetFrameLevel(SendMailNameEditBox:GetFrameLevel() + 2)
     b:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up")
     b:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Down")
