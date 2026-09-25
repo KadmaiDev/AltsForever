@@ -6,7 +6,7 @@ By **Kadmai**.
 
 A World of Warcraft: Forever addon (interface 16001) that adds a total and a per-character breakdown of an item to its tooltip:
 
-![Item tooltip showing Linen Cloth counts across five characters](media/item-tracking.png)
+![Item tooltip for Linen Cloth: skill-ups across characters, then counts per character](media/item-tracking.png)
 
 Locations are shown as icons: Red Linen Bag (bags), banker (bank), mailbox (mail) and white shirt (wearing).
 
