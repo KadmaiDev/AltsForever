@@ -112,6 +112,7 @@ local function CreateSlot(slot, x, y, nameSide)
     hl:SetColorTexture(1, 1, 1, 0.15)
     if nameSide then
         b.name = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        ns.SkinText(b.name)
         b.name:SetWidth(150)
         b.name:SetWordWrap(false)
         if nameSide == "RIGHT" then
@@ -158,6 +159,7 @@ local function CreatePanel()
     f.empty:SetText(GREY .. "No gear recorded yet.\nLog in on this character once.|r")
 
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverGearFrame" end
+    ns.SkinWindow(f)
     f:Hide()
 end
 

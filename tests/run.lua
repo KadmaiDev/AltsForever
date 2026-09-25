@@ -2,7 +2,7 @@
 package.path = "tests/?.lua;" .. package.path
 local wow = require("wow")
 
-local FILES = { "Core.lua", "Scanner.lua", "Mail.lua", "Money.lua", "Professions.lua", "Character.lua", "Overview.lua", "Gear.lua", "Tooltip.lua", "Options.lua", "Reputation.lua" }
+local FILES = { "Core.lua", "Scanner.lua", "Mail.lua", "Money.lua", "Professions.lua", "Character.lua", "Overview.lua", "Gear.lua", "Tooltip.lua", "Options.lua", "Reputation.lua", "Skin.lua" }
 local tests, passed, failed = {}, 0, 0
 
 local function test(name, fn) tests[#tests + 1] = { name = name, fn = fn } end
@@ -1960,6 +1960,59 @@ test("send to alt can be turned off and on from the options menu", function()
     eq(b:IsShown(), false, "turning it off hides an existing arrow")
     box.setSelected()
     eq(b:IsShown(), true)
+end)
+
+---------------------------------------------------------------------------
+-- EllesmereUI look (its public skinning API)
+local function skinnedWith(fname, obj)
+    for _, call in ipairs(wow.skinned) do
+        if call[1] == fname and call[2] == obj then return true end
+    end
+    return false
+end
+
+test("without EllesmereUI nothing is skinned: the classic look stays", function()
+    wow.load(FILES)
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("")
+    eq(#wow.skinned, 0); eq(EllesmereUI, nil)
+end)
+
+test("with EllesmereUI, every window takes its look when first created", function()
+    wow.withEllesmere = true
+    wow.load(FILES)
+    wow.now = NOW
+    eq(wow.skinName, "AltsForever", "registered under the addon's folder name")
+    wow.login(overviewAlts())
+    wow.skinCallback(wow.skinFacade) -- EllesmereUI calls this at login
+    SlashCmdList.ALTSFOREVER("")
+    local f = AltsForeverFrame
+    assert(skinnedWith("Shell", f), "overview backdrop")
+    local row = overviewRows()[1]
+    assert(skinnedWith("Font", row.cells[1]), "row text in the player's font")
+    row.scripts.OnClick(row) -- gear panel
+    assert(skinnedWith("Shell", AltsForeverGearFrame), "gear panel")
+    AltsForeverFrame.repButton.scripts.OnClick(AltsForeverFrame.repButton)
+    assert(skinnedWith("Shell", AltsForeverRepFrame), "reputation panel")
+end)
+
+test("a window opened before EllesmereUI's callback is skinned when it arrives", function()
+    wow.withEllesmere = true
+    wow.load(FILES)
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("")
+    eq(#wow.skinned, 0, "nothing until EllesmereUI hands over its style")
+    wow.skinCallback(wow.skinFacade)
+    assert(skinnedWith("Shell", AltsForeverFrame))
+end)
+
+test("if the player turned our skinning off in EllesmereUI, nothing is skinned", function()
+    wow.withEllesmere = true
+    wow.load(FILES)
+    wow.login(nil)
+    -- EllesmereUI never calls back when its third-party skinning is off for us.
+    SlashCmdList.ALTSFOREVER("")
+    eq(#wow.skinned, 0)
 end)
 
 ---------------------------------------------------------------------------

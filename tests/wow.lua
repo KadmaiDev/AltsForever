@@ -152,7 +152,14 @@ function M.load(files)
     function frameMethods:SetFrameLevel(level) self.level = level end
     function frameMethods:SetText(text) self.text = text end
     function frameMethods:GetText() return self.text end
-    function frameMethods:CreateFontString() return newObject("FontString") end
+    function frameMethods:CreateFontString()
+        local fs = newObject("FontString")
+        self.regions = self.regions or {}
+        self.regions[#self.regions + 1] = fs
+        return fs
+    end
+    function frameMethods:GetRegions() return unpack(self.regions or {}) end
+    function frameMethods:GetObjectType() return self.kind end
     function frameMethods:CreateTexture() return newObject("Texture") end
     CreateFrame = function(kind, name, parent, template)
         if template and M.missingTemplates[template] then error("Couldn't find inherited node \"" .. template .. "\"") end
@@ -361,6 +368,19 @@ function M.load(files)
 
     AltsForeverDB = nil
     AltsForeverFrame = nil
+    -- EllesmereUI's skinning API, only if a test asked for it (wow.withEllesmere) before
+    -- loading. The callback is kept in M.skinCallback; the facade records every call.
+    EllesmereUI, M.skinCallback, M.skinned = nil, nil, {}
+    if M.withEllesmere then
+        M.withEllesmere = nil
+        EllesmereUI = { RegisterSkin = function(name, fn) M.skinName, M.skinCallback = name, fn end }
+        M.skinFacade = {}
+        for _, fname in ipairs({ "Shell", "CloseButton", "Inset", "Font", "Button", "Panel" }) do
+            M.skinFacade[fname] = function(obj)
+                M.skinned[#M.skinned + 1] = { fname, obj }
+            end
+        end
+    end
     -- Globals the addon defines (named in the .toc); cleared so a previous load is freed.
     AltsForever_OnAddonCompartmentClick, AltsForever_OnAddonCompartmentEnter = nil, nil
     AltsForever_OnAddonCompartmentLeave = nil

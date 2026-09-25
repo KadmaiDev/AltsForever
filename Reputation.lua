@@ -117,6 +117,7 @@ end
 
 local function Cell(parent, x, width, justify)
     local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    ns.SkinText(fs)
     fs:SetPoint("LEFT", parent, "LEFT", x, 0)
     fs:SetWidth(width - 6)
     fs:SetJustifyH(justify or "LEFT")
@@ -206,6 +207,7 @@ local function CreatePanel()
     f.footer = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.footer:SetPoint("BOTTOM", f, "BOTTOM", 0, 10)
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverRepFrame" end
+    ns.SkinWindow(f)
     f:Hide()
 end
 

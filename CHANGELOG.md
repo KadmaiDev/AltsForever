@@ -1,3 +1,7 @@
+## Unreleased
+
+- **EllesmereUI look:** with EllesmereUI installed, Alts Forever's windows (overview, gear and reputation) take on your EllesmereUI theme, accent colour and font. Without it, nothing changes. You can turn it off for Alts Forever in EllesmereUI's options (Blizz UI Enhanced > Blizzard Window Skins > Third-Party Addons).
+
 ## Alts Forever 0.4.0
 
 - **Reputation across your characters.** A new Reputation panel shows every character's standing with each faction side by side, e.g. "Honored 27%", coloured by standing. Hover a faction for the exact numbers. Open it with the reputation button in the overview's title bar. Standings are recorded as you play, without changing how your reputation window is expanded or collapsed.

@@ -16,6 +16,7 @@
 ## Category-zhCN: 物品栏
 ## Category-zhTW: 物品欄
 ## SavedVariables: AltsForeverDB
+## OptionalDeps: EllesmereUI
 ## AddonCompartmentFunc: AltsForever_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: AltsForever_OnAddonCompartmentEnter
 ## AddonCompartmentFuncOnLeave: AltsForever_OnAddonCompartmentLeave
@@ -31,3 +32,4 @@ Gear.lua
 Tooltip.lua
 Options.lua
 Reputation.lua
+Skin.lua

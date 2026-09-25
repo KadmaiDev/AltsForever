@@ -188,6 +188,7 @@ local function CreateCells(parent, font)
     for i, col in ipairs(COLUMNS) do
         x = x + (col.gap or 0)
         local fs = parent:CreateFontString(nil, "OVERLAY", font)
+        ns.SkinText(fs)
         fs:SetPoint("LEFT", parent, "LEFT", x, 0)
         fs:SetWidth(col.width - 8)
         fs:SetJustifyH(col.right and "RIGHT" or "LEFT")
@@ -326,6 +327,7 @@ local function CreateWindow()
     f.credit:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 12)
     f.credit:SetText("Alts Forever by Kadmai")
 
+    ns.SkinWindow(f)
     f:SetScript("OnShow", Refresh)
     f:SetScript("OnHide", function()
         if AltsForeverGearFrame then AltsForeverGearFrame:Hide() end
