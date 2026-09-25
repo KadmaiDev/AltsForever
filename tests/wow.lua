@@ -148,6 +148,8 @@ function M.load(files)
     function frameMethods:SetTexture(t) self.texture = t end
     function frameMethods:SetVertexColor(r, g, b) self.tint = { r, g, b } end
     function frameMethods:IsShown() return self.shown end
+    function frameMethods:GetFrameLevel() return self.level or 1 end
+    function frameMethods:SetFrameLevel(level) self.level = level end
     function frameMethods:SetText(text) self.text = text end
     function frameMethods:GetText() return self.text end
     function frameMethods:CreateFontString() return newObject("FontString") end
