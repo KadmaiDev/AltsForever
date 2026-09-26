@@ -2490,6 +2490,29 @@ test("item tooltip: places and counts line up in columns, from the right", funct
     assert(edge > 0, rows[1])
     for i, t in ipairs(rows) do eq(beforeCount(t), edge, "row " .. i .. " last place") end
     assert(rows[1]:find("Interface\\AddOns\\AltsForever\\media\\blank.tga", 1, true), "our spacer")
+    -- Each place's icon starts the same distance from the right edge in every row that
+    -- has something in that column, whatever the numbers' widths.
+    local function iconsFromEnd(t)
+        local total, found = visibleWidth(t), {}
+        local pos = 1
+        while true do
+            local a, b = t:find("|T.-|t", pos)
+            if not a then break end
+            if not t:sub(a, b):find("blank.tga", 1, true) then
+                table.insert(found, 1, total - visibleWidth(t:sub(1, a - 1)))
+            end
+            pos = b + 1
+        end
+        return found -- nearest the count first
+    end
+    local columns = {}
+    for i, t in ipairs(rows) do
+        for col, x in ipairs(iconsFromEnd(t)) do
+            if columns[col] then eq(x, columns[col], "row " .. i .. ", icon " .. col .. " from the right")
+            else columns[col] = x end
+        end
+    end
+    eq(#columns, 3, "three place columns")
     -- Our lines are in the tooltip's body font (line 2's), not the default of new lines.
     for i = 3, #lines do eq(select(2, _G["GameTooltipTextRight" .. i]:GetFont()), 12, "line " .. i) end
     clearTooltipLines()

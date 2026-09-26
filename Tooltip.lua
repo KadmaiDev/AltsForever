@@ -92,8 +92,8 @@ function ns.ShortName(key, c)
 end
 
 -- Returns the character's total for an item, the right-hand text (a grey breakdown
--- then the count, e.g. "[bag] 12 · [bank] 40    52"), and the breakdown's parts
--- ("[bag] 12", "[bank] 40") for lining up in columns.
+-- then the count, e.g. "[bag] 12 · [bank] 40    52"), and the breakdown's parts as
+-- icon, number pairs ([bag], 12, [bank], 40) for lining up in columns.
 function ns.Describe(c, id)
     local total, text, parts = 0, nil, nil
     for i = 1, #LOCS do
@@ -104,7 +104,8 @@ function ns.Describe(c, id)
             local part = LABELS[i] .. " " .. n
             text = text and (text .. SEP .. part) or part
             parts = parts or {}
-            parts[#parts + 1] = part
+            parts[#parts + 1] = LABELS[i]
+            parts[#parts + 1] = n
         end
     end
     if text then text = GREY .. text .. "|r    " .. total end
@@ -164,20 +165,25 @@ local function LineText(tt, side, line)
     return t
 end
 
--- One row's right-hand text: every column padded to its widest entry.
-local function Row(parts, count, font, size, flags, widths, columns, countWidth)
+-- One row's right-hand text. Each place is an icon then its number: the icons sit at the
+-- same spot in every row and the numbers are right-aligned after them. `places` is the
+-- number of place columns; icon[col], num[col] their widest entries.
+local ICON_GAP = 3
+local function Row(parts, count, font, size, flags, icon, num, places, countWidth)
     local text, pending = "", 0
-    local offset = columns - (parts and #parts or 0)
-    for col = 1, columns do
-        local pad = col > 1 and GAP or 0
-        local part = col > offset and parts[col - offset]
-        if part then
-            local w = ns.TextWidth(font, size, flags, part)
-            if not w then return nil end
-            text = text .. ns.Spacer(pending + pad + widths[col] - w) .. GREY .. part .. "|r"
+    local offset = places - #parts / 2
+    for col = 1, places do
+        pending = pending + (col > 1 and GAP or 0)
+        if col > offset then
+            local k = (col - offset) * 2
+            local label, n = parts[k - 1], tostring(parts[k])
+            local wi, wn = ns.TextWidth(font, size, flags, label), ns.TextWidth(font, size, flags, n)
+            if not (wi and wn) then return nil end
+            text = text .. ns.Spacer(pending + icon[col] - wi) .. GREY .. label
+                .. ns.Spacer(ICON_GAP + num[col] - wn) .. n .. "|r"
             pending = 0
         else
-            pending = pending + pad + widths[col]
+            pending = pending + icon[col] + ICON_GAP + num[col]
         end
     end
     local w = ns.TextWidth(font, size, flags, tostring(count))
@@ -188,17 +194,19 @@ end
 -- Measures the rows (yours included) and stores their aligned text in e.aligned (others)
 -- and e.alignedCur. Returns false if the text can't be measured.
 local function Align(e, curParts, font, size, flags)
-    -- Columns counted from the right; a row with fewer places leaves the left ones empty.
-    local columns = curParts and #curParts or 0
-    for i = 1, e.n * 4, 4 do columns = max(columns, #e[i + 3]) end
-    local widths, countWidth = {}, 0
-    for col = 1, columns do widths[col] = 0 end
+    -- Place columns counted from the right; a row with fewer places leaves the left ones empty.
+    local places = curParts and #curParts / 2 or 0
+    for i = 1, e.n * 4, 4 do places = max(places, #e[i + 3] / 2) end
+    local icon, num, countWidth = {}, {}, 0
+    for col = 1, places do icon[col], num[col] = 0, 0 end
     local function Measure(parts, count)
-        local offset = columns - #parts
-        for i = 1, #parts do
-            local w = ns.TextWidth(font, size, flags, parts[i])
-            if not w then return false end
-            if w > widths[offset + i] then widths[offset + i] = w end
+        local offset = places - #parts / 2
+        for k = 2, #parts, 2 do
+            local col = offset + k / 2
+            local wi = ns.TextWidth(font, size, flags, parts[k - 1])
+            local wn = ns.TextWidth(font, size, flags, tostring(parts[k]))
+            if not (wi and wn) then return false end
+            icon[col], num[col] = max(icon[col], wi), max(num[col], wn)
         end
         local w = ns.TextWidth(font, size, flags, tostring(count))
         if not w then return false end
@@ -210,9 +218,9 @@ local function Align(e, curParts, font, size, flags)
         if not Measure(e[i + 3], e[i]) then return false end
     end
     e.aligned = e.aligned or {}
-    e.alignedCur = curParts and Row(curParts, curCount, font, size, flags, widths, columns, countWidth)
+    e.alignedCur = curParts and Row(curParts, curCount, font, size, flags, icon, num, places, countWidth)
     for i = 1, e.n * 4, 4 do
-        e.aligned[i] = Row(e[i + 3], e[i], font, size, flags, widths, columns, countWidth)
+        e.aligned[i] = Row(e[i + 3], e[i], font, size, flags, icon, num, places, countWidth)
         if not e.aligned[i] then return false end
     end
     e.font, e.size, e.flags, e.alignVer = font, size, flags, ns.version
