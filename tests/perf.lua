@@ -85,6 +85,16 @@ local item = 2017
 garbage("tooltip: item already hovered", 5000, function()
     ns.AddRecipeLines(nop, item) ns.AddCraftLines(nop, item) ns.AddSkillupLines(nop, item) ns.AddLines(nop, item)
 end)
+-- The game's tooltips have named lines, so their columns get lined up.
+local named = { AddLine = nop.AddLine, AddDoubleLine = nop.AddDoubleLine, NumLines = nop.NumLines,
+    GetName = function() return "PerfTooltip" end }
+local line = { GetFont = function() return "font", 12, "" end, SetFont = function() end }
+for i = 1, 40 do _G["PerfTooltipTextLeft" .. i], _G["PerfTooltipTextRight" .. i] = line, line end
+UIParent.CreateFontString = function()
+    return { Hide = function() end, SetFont = function() end, SetText = function(self, t) self.t = t end,
+        GetStringWidth = function(self) return #self.t * 6 end }
+end
+garbage("tooltip: item already hovered, columns lined up", 5000, function() ns.AddLines(named, item) end)
 local ids = {}
 for id in pairs(ns.char.bags) do ids[#ids + 1] = id end
 garbage("tooltip: item hovered for the first time", #ids, function(i) ns.AddLines(nop, ids[i]) end)

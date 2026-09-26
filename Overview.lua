@@ -372,6 +372,7 @@ local function Spacer(width)
     if width < 1 then return "" end
     return "|T" .. BLANK .. ":1:" .. width .. "|t"
 end
+ns.Spacer = Spacer
 
 -- The width of s in the given font, or nil if it can't be measured.
 local function Width(font, size, flags, s)
@@ -384,6 +385,7 @@ local function Width(font, size, flags, s)
     local w = measure:GetStringWidth()
     return type(w) == "number" and w or nil
 end
+ns.TextWidth = Width
 
 -- Lines up the right-hand columns of the rows added from line `first` on; leaves the
 -- plain text if the tooltip's text can't be measured. Each row is { name, value... };

@@ -3,9 +3,12 @@
 -- Other characters' data can't change during a session, so their lines are built
 -- once per itemID and cached. The current character's line is memoised for the
 -- last item shown, which covers the tooltip refreshing while you hover.
+--
+-- The breakdown is lined up in columns (see Align): measured once per item and kept
+-- with the cached lines, so hovering an item again costs nothing extra.
 local _, ns = ...
 
-local pairs, wipe, type, pcall, floor = pairs, wipe, type, pcall, math.floor
+local pairs, wipe, type, pcall, floor, max = pairs, wipe, type, pcall, math.floor, math.max
 local issecretvalue = issecretvalue or function() return false end
 local GetItemInfoInstant = C_Item.GetItemInfoInstant
 
@@ -29,7 +32,7 @@ local EMPTY = { n = 0, total = 0 }
 
 local cache, cacheSize = {}, 0
 local names, shortNames = {}, {}
-local lastId, lastVer, curCount, curText
+local lastId, lastVer, curCount, curText, curParts
 
 -- An { r, g, b } colour from another addon, if it's usable.
 local function Usable(c)
@@ -88,11 +91,11 @@ function ns.ShortName(key, c)
     return s
 end
 
--- Returns the character's total for an item and the right-hand text: a grey
--- breakdown then the count, so counts line up at the tooltip's right edge.
--- e.g. "[bag] 12 · [bank] 40    52"
+-- Returns the character's total for an item, the right-hand text (a grey breakdown
+-- then the count, e.g. "[bag] 12 · [bank] 40    52"), and the breakdown's parts
+-- ("[bag] 12", "[bank] 40") for lining up in columns.
 function ns.Describe(c, id)
-    local total, text = 0, nil
+    local total, text, parts = 0, nil, nil
     for i = 1, #LOCS do
         local t = c[LOCS[i]]
         local n = t and t[id]
@@ -100,27 +103,29 @@ function ns.Describe(c, id)
             total = total + n
             local part = LABELS[i] .. " " .. n
             text = text and (text .. SEP .. part) or part
+            parts = parts or {}
+            parts[#parts + 1] = part
         end
     end
     if text then text = GREY .. text .. "|r    " .. total end
-    return total, text
+    return total, text, parts
 end
 
--- Rows are stored flat as count, left, right and kept sorted highest count first.
+-- Rows are stored flat as count, left, right, parts and kept sorted highest count first.
 local function BuildOthers(id)
     local e, n, total
     for key, c in pairs(ns.db.chars) do
         if key ~= ns.charKey then
-            local count, text = ns.Describe(c, id)
+            local count, text, parts = ns.Describe(c, id)
             if count > 0 then
                 if not e then e, n, total = {}, 0, 0 end
                 total = total + count
                 local i = n
-                while i > 0 and e[i * 3 - 2] < count do
-                    e[i * 3 + 1], e[i * 3 + 2], e[i * 3 + 3] = e[i * 3 - 2], e[i * 3 - 1], e[i * 3]
+                while i > 0 and e[i * 4 - 3] < count do
+                    e[i * 4 + 1], e[i * 4 + 2], e[i * 4 + 3], e[i * 4 + 4] = e[i * 4 - 3], e[i * 4 - 2], e[i * 4 - 1], e[i * 4]
                     i = i - 1
                 end
-                e[i * 3 + 1], e[i * 3 + 2], e[i * 3 + 3] = count, ColoredName(key, c), text
+                e[i * 4 + 1], e[i * 4 + 2], e[i * 4 + 3], e[i * 4 + 4] = count, ColoredName(key, c), text, parts
                 n = n + 1
             end
         end
@@ -128,6 +133,90 @@ local function BuildOthers(id)
     if not e then return EMPTY end
     e.n, e.total = n, total
     return e
+end
+
+---------------------------------------------------------------------------
+-- Columns. Tooltip text isn't monospaced, so each row's breakdown is lined up by
+-- measuring it in the tooltip's font and padding with transparent spacers. Columns fill
+-- from the right: the count at the edge, the place before it next, and so on, so the
+-- numbers and icons line up down the list even when characters keep an item in a
+-- different number of places. The result is kept with the cached rows and redone only
+-- when the current character's line or the font changes.
+---------------------------------------------------------------------------
+local GAP = 8
+local fontStrings = {} -- [tooltip] = { TextLeft = { [line] = fs }, TextRight = { ... } }
+
+-- A tooltip line's font string (e.g. GameTooltipTextLeft2), remembered so repeat hovers
+-- don't build its name again. Lines are made as the tooltip first needs them, so a
+-- missing one isn't remembered.
+local function LineText(tt, side, line)
+    local fs = fontStrings[tt]
+    if not fs then
+        fs = { TextLeft = {}, TextRight = {} }
+        fontStrings[tt] = fs
+    end
+    local t = fs[side][line]
+    if not t then
+        local name = tt.GetName and tt:GetName()
+        t = name and _G[name .. side .. line]
+        fs[side][line] = t
+    end
+    return t
+end
+
+-- One row's right-hand text: every column padded to its widest entry.
+local function Row(parts, count, font, size, flags, widths, columns, countWidth)
+    local text, pending = "", 0
+    local offset = columns - (parts and #parts or 0)
+    for col = 1, columns do
+        local pad = col > 1 and GAP or 0
+        local part = col > offset and parts[col - offset]
+        if part then
+            local w = ns.TextWidth(font, size, flags, part)
+            if not w then return nil end
+            text = text .. ns.Spacer(pending + pad + widths[col] - w) .. GREY .. part .. "|r"
+            pending = 0
+        else
+            pending = pending + pad + widths[col]
+        end
+    end
+    local w = ns.TextWidth(font, size, flags, tostring(count))
+    if not w then return nil end
+    return text .. ns.Spacer(pending + GAP * 2 + countWidth - w) .. count
+end
+
+-- Measures the rows (yours included) and stores their aligned text in e.aligned (others)
+-- and e.alignedCur. Returns false if the text can't be measured.
+local function Align(e, curParts, font, size, flags)
+    -- Columns counted from the right; a row with fewer places leaves the left ones empty.
+    local columns = curParts and #curParts or 0
+    for i = 1, e.n * 4, 4 do columns = max(columns, #e[i + 3]) end
+    local widths, countWidth = {}, 0
+    for col = 1, columns do widths[col] = 0 end
+    local function Measure(parts, count)
+        local offset = columns - #parts
+        for i = 1, #parts do
+            local w = ns.TextWidth(font, size, flags, parts[i])
+            if not w then return false end
+            if w > widths[offset + i] then widths[offset + i] = w end
+        end
+        local w = ns.TextWidth(font, size, flags, tostring(count))
+        if not w then return false end
+        countWidth = max(countWidth, w)
+        return true
+    end
+    if curParts and not Measure(curParts, curCount) then return false end
+    for i = 1, e.n * 4, 4 do
+        if not Measure(e[i + 3], e[i]) then return false end
+    end
+    e.aligned = e.aligned or {}
+    e.alignedCur = curParts and Row(curParts, curCount, font, size, flags, widths, columns, countWidth)
+    for i = 1, e.n * 4, 4 do
+        e.aligned[i] = Row(e[i + 3], e[i], font, size, flags, widths, columns, countWidth)
+        if not e.aligned[i] then return false end
+    end
+    e.font, e.size, e.flags, e.alignVer = font, size, flags, ns.version
+    return true
 end
 
 function ns.InvalidateCache()
@@ -154,21 +243,45 @@ function ns.AddLines(tt, id)
 
     if id ~= lastId or ns.version ~= lastVer then
         lastId, lastVer = id, ns.version
-        curCount, curText = ns.Describe(ns.char, id)
+        curCount, curText, curParts = ns.Describe(ns.char, id)
     end
 
     local rows = e.n + (curCount > 0 and 1 or 0)
     if rows == 0 then return end
+
+    -- Our lines use the tooltip's body font (its second line): lines the tooltip hasn't
+    -- needed before are new font strings, which a UI addon that restyled the existing
+    -- ones (EllesmereUI) hasn't reached. The columns are measured in that font.
+    local body = LineText(tt, "TextLeft", 2)
+    local font, size, flags
+    if body and body.GetFont then font, size, flags = body:GetFont() end
+    -- Lined up only when others have it too (on your own there's nothing to line up).
+    -- Your line depends only on the item and ns.version, so this item's cached alignment
+    -- holds until either the version or the font changes.
+    local aligned = false
+    if font and e ~= EMPTY then
+        aligned = e.alignVer == ns.version and e.font == font and e.size == size and e.flags == flags
+        if not aligned then aligned = Align(e, curCount > 0 and curParts, font, size, flags) end
+    end
+
     tt:AddLine(" ")
+    local first = tt.NumLines and tt:NumLines() + 1
     -- With one character the total would just repeat their count.
     if rows > 1 then
         tt:AddDoubleLine(TOTAL, e.total + curCount, 1, 0.82, 0, 1, 1, 1)
     end
     if curCount > 0 then
-        tt:AddDoubleLine(ColoredName(ns.charKey, ns.char), curText, 1, 1, 1, 1, 1, 1)
+        tt:AddDoubleLine(ColoredName(ns.charKey, ns.char), aligned and e.alignedCur or curText, 1, 1, 1, 1, 1, 1)
     end
-    for i = 1, e.n * 3, 3 do
-        tt:AddDoubleLine(e[i + 1], e[i + 2], 1, 1, 1, 1, 1, 1)
+    for i = 1, e.n * 4, 4 do
+        tt:AddDoubleLine(e[i + 1], aligned and e.aligned[i] or e[i + 2], 1, 1, 1, 1, 1, 1)
+    end
+    if font and first then
+        for line = first, first + rows - (rows > 1 and 0 or 1) do
+            local l, r = LineText(tt, "TextLeft", line), LineText(tt, "TextRight", line)
+            if l and l.SetFont then l:SetFont(font, size, flags) end
+            if r and r.SetFont then r:SetFont(font, size, flags) end
+        end
     end
 end
 

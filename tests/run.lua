@@ -2426,6 +2426,102 @@ test("ElvUI's bags: hovering the gold shows our gold across characters", functio
 end)
 
 ---------------------------------------------------------------------------
+-- Item tooltip columns
+-- A tooltip whose lines have font strings, and a font 6 units per character, icons 12,
+-- and our blank spacers their given width.
+local function visibleWidth(t)
+    local w = 0
+    t = t:gsub("|T[^|]-blank%.tga:1:(%d+)|t", function(n) w = w + tonumber(n) return "" end)
+    t = t:gsub("|T.-|t", function() w = w + 12 return "" end)
+    t = t:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    return w + #t * 6
+end
+
+local function measurableTooltip()
+    GameTooltip.GetName = function() return "GameTooltip" end
+    GameTooltip.NumLines = function(self) return #self.lines end
+    local rights = {}
+    for i = 1, 20 do
+        local function fontString(size)
+            return { GetFont = function(self) return "font", self.size or size, "" end,
+                SetFont = function(self, _, s) self.size = s end,
+                SetText = function(self, t) self.text = t end }
+        end
+        _G["GameTooltipTextLeft" .. i] = fontString(i == 2 and 12 or 14)
+        rights[i] = fontString(14)
+        _G["GameTooltipTextRight" .. i] = rights[i]
+    end
+    UIParent.CreateFontString = function()
+        return { Hide = function() end, SetFont = function() end,
+            SetText = function(self, t) self.text = t end,
+            GetStringWidth = function(self) return visibleWidth(self.text) end }
+    end
+    return rights
+end
+
+local function clearTooltipLines()
+    for i = 1, 20 do _G["GameTooltipTextLeft" .. i], _G["GameTooltipTextRight" .. i] = nil, nil end
+end
+
+-- The width of a row's text up to where its count starts (the last spacer).
+local function beforeCount(t)
+    return visibleWidth(t:match("^(.*)|T[^|]-blank%.tga:1:%d+|t%d+$") or "")
+end
+
+test("item tooltip: places and counts line up in columns, from the right", function()
+    wow.load(FILES)
+    measurableTooltip()
+    wow.setBag(0, 16, { [1] = { 100, 23 } })
+    wow.login({ v = 2, chars = {
+        ["Big"] = alt("Big", "PRIEST", { bags = { [100] = 30 }, mail = { [100] = 1000 } }),
+        ["Mid"] = alt("Mid", "DRUID", { bank = { [100] = 5 } }),
+        ["Three"] = alt("Three", "ROGUE", { bags = { [100] = 4 }, bank = { [100] = 6 }, mail = { [100] = 7 } }),
+    } })
+    local lines = wow.hover(GameTooltip, 100)
+    eq(lines[2][1], "Total"); eq(lines[2][2], 1075)
+    local rows = {}
+    for i = 3, #lines do rows[#rows + 1] = lines[i][2] end
+    eq(#rows, 4)
+    -- Every row the same width, so the right-aligned counts and columns line up.
+    local width = visibleWidth(rows[1])
+    for i, t in ipairs(rows) do eq(visibleWidth(t), width, "row " .. i .. " width") end
+    -- The last place of every row ends at the same point, one or three places.
+    local edge = beforeCount(rows[1])
+    assert(edge > 0, rows[1])
+    for i, t in ipairs(rows) do eq(beforeCount(t), edge, "row " .. i .. " last place") end
+    assert(rows[1]:find("Interface\\AddOns\\AltsForever\\media\\blank.tga", 1, true), "our spacer")
+    -- Our lines are in the tooltip's body font (line 2's), not the default of new lines.
+    for i = 3, #lines do eq(select(2, _G["GameTooltipTextRight" .. i]:GetFont()), 12, "line " .. i) end
+    clearTooltipLines()
+end)
+
+test("item tooltip columns are measured once per item, then reused", function()
+    wow.load(FILES)
+    measurableTooltip()
+    local measured = 0
+    local make = UIParent.CreateFontString
+    UIParent.CreateFontString = function()
+        local fs = make()
+        local get = fs.GetStringWidth
+        fs.GetStringWidth = function(self) measured = measured + 1 return get(self) end
+        return fs
+    end
+    wow.login({ v = 2, chars = {
+        ["Big"] = alt("Big", "PRIEST", { bags = { [100] = 30 } }),
+        ["Mid"] = alt("Mid", "DRUID", { bank = { [100] = 5 }, bags = { [101] = 2 } }),
+    } })
+    wow.hover(GameTooltip, 100)
+    local first = measured
+    assert(first > 0, "measured the first time")
+    wow.hover(GameTooltip, 100)
+    wow.hover(GameTooltip, 101)
+    local afterOther = measured
+    wow.hover(GameTooltip, 100)
+    eq(measured, afterOther, "back to the first item: its columns are still cached")
+    clearTooltipLines()
+end)
+
+---------------------------------------------------------------------------
 -- Minimap button
 test("a minimap button is made as soon as saved data loads (before login)", function()
     wow.load(FILES)
