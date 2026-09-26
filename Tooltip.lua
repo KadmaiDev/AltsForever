@@ -200,8 +200,8 @@ end
 -- Measures the rows (yours included) on tooltip tt in the given font and returns their
 -- aligned text: { cur = yours, [i] = the other row starting at e[i] }, or nil if it
 -- can't be measured.
-local function Measured(e, curParts, tt, font, size, flags)
-    if not ns.MeasureIn(tt, font, size, flags) then return nil end
+local function Measured(e, curParts, tt, font, size, flags, line)
+    if not ns.MeasureIn(tt, font, size, flags, line) then return nil end
     -- Place columns counted from the right; a row with fewer places leaves the left ones empty.
     local places = curParts and #curParts / 2 or 0
     for i = 1, e.n * 4, 4 do places = max(places, #e[i + 3] / 2) end
@@ -236,16 +236,16 @@ local function Measured(e, curParts, tt, font, size, flags)
     return result
 end
 
-local function Align(e, curParts, tt, font, size, flags)
-    local result = Measured(e, curParts, tt, font, size, flags)
-    ns.MeasureDone()
+local function Align(e, curParts, tt, font, size, flags, line)
+    local result = Measured(e, curParts, tt, font, size, flags, line)
+    ns.MeasureDone(result ~= nil)
     return result
 end
 
 -- The item's aligned rows for a font, cached per font (a UI addon may show the tooltip
 -- in a different font from the one its lines start with) and redone when ns.version
 -- changes (your own line). Looked up without building a key, so repeat hovers are free.
-local function Aligned(e, tt, font, size, flags)
+local function Aligned(e, tt, font, size, flags, line)
     local byFont = e.aligned
     if not byFont then
         byFont = {}
@@ -263,7 +263,7 @@ local function Aligned(e, tt, font, size, flags)
     end
     local result = byFlags[flags]
     if not result or result.ver ~= ns.version then
-        result = Align(e, curCount > 0 and curParts, tt, font, size, flags)
+        result = Align(e, curCount > 0 and curParts, tt, font, size, flags, line)
         byFlags[flags] = result
     end
     return result
@@ -282,7 +282,7 @@ local function Apply(tt)
     if not (fs and fs.GetFont) then return false end
     local font, size, flags = fs:GetFont()
     if not ns.UsableFont(font, size, flags) then return false end
-    local result = Aligned(st.e, tt, font, size, flags or "")
+    local result = Aligned(st.e, tt, font, size, flags or "", fs)
     if not result then return false end
     local changed, line = false, st.row
     local function Set(text)

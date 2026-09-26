@@ -2223,7 +2223,7 @@ test("the XP bar's columns are lined up by measuring them in the tooltip's font"
         local size = i <= 2 and 12 or 14
         return { GetFont = function(self) return self.font or "font", self.size or size, "" end,
             SetFont = function(self, f, s) self.font, self.size = f, s end,
-            SetText = function(self, t) self.text = t end,
+            SetText = function(self, t) self.text = t end, GetText = function(self) return self.text end,
             GetStringWidth = function(self) return width(self.text or "") end }
     end
     for i = 1, 10 do
@@ -2442,6 +2442,7 @@ local function visibleWidth(t, size)
 end
 
 local function measurableTooltip()
+    wow.ownDraw = 1
     GameTooltip.GetName = function() return "GameTooltip" end
     GameTooltip.NumLines = function(self) return #self.lines end
     GameTooltip.hooks = {}
@@ -2454,6 +2455,11 @@ local function measurableTooltip()
                 SetText = function(self, t) self.text = t end, GetText = function(self) return self.text end,
                 GetStringWidth = function(self)
                     wow.measured = (wow.measured or 0) + 1
+                    -- In game a secret width is still a number; only issecretvalue tells.
+                    if wow.secretWidths then
+                        wow.SECRET = 4242.5
+                        return 4242.5
+                    end
                     return visibleWidth(self.text or "", self.size)
                 end }
         end
@@ -2461,20 +2467,16 @@ local function measurableTooltip()
         rights[i] = fontString()
         _G["GameTooltipTextRight" .. i] = rights[i]
     end
-    -- Our measuring font string on the tooltip. wow.secretWidths makes it answer with
-    -- secret values, as the game's tooltips can while Blizzard's code builds them.
+    -- Our measuring font string on the tooltip: text widths as the lines, but it gets
+    -- spacers wrong (wow.ownDraw scales everything it measures when set below 1 to show
+    -- that only text is measured there), as in game.
     GameTooltip.CreateFontString = function()
         return { SetPoint = function() end, SetAlpha = function() end,
             SetFont = function(self, _, s) self.size = s end,
             SetText = function(self, t) self.text = t end,
             GetStringWidth = function(self)
                 wow.measured = (wow.measured or 0) + 1
-                -- In game a secret width is still a number; only issecretvalue tells.
-                if wow.secretWidths then
-                    wow.SECRET = 4242.5
-                    return 4242.5
-                end
-                return visibleWidth(self.text or "", self.size)
+                return visibleWidth(self.text or "", self.size) * wow.ownDraw
             end }
     end
     return rights
@@ -2509,10 +2511,14 @@ local function checkColumns(rows, size)
     local width = visibleWidth(rows[1], size)
     -- Spacers are whole units, so allow up to half a unit.
     local function near(a, b, msg) assert(math.abs(a - b) <= 0.5, msg .. ": " .. a .. " vs " .. b) end
-    for i, t in ipairs(rows) do near(visibleWidth(t, size), width, "row " .. i .. " width") end
-    local edge = beforeCount(rows[1], size)
-    assert(edge > 0, rows[1])
-    for i, t in ipairs(rows) do near(beforeCount(t, size), edge, "row " .. i .. " last place") end
+    -- Whole rows may differ by up to a unit of rounding: right-aligned, that only moves
+    -- the (empty) left edge.
+    for i, t in ipairs(rows) do assert(math.abs(visibleWidth(t, size) - width) <= 1, "row " .. i .. " width") end
+    -- Where the last place ends, counted from the right edge.
+    local function lastPlace(t) return visibleWidth(t, size) - beforeCount(t, size) end
+    assert(beforeCount(rows[1], size) > 0, rows[1])
+    local edge = lastPlace(rows[1])
+    for i, t in ipairs(rows) do near(lastPlace(t), edge, "row " .. i .. " last place") end
     local columns = {}
     for i, t in ipairs(rows) do
         for col, x in ipairs(iconsFromEnd(t, size)) do
@@ -2761,21 +2767,36 @@ test("overview row tooltip: professions line up, skill right-aligned and notes a
     clearTooltipLines()
 end)
 
-test("secret widths (while Blizzard builds a tooltip) leave the plain text, no error", function()
+test("secret widths (while Blizzard builds a tooltip): plain text until a spacer scale is known", function()
     wow.load(FILES)
+    wow.ownDraw = 1
     local rights = measurableTooltip()
+    spacerDraw = 0.87
+    wow.setBag(0, 16, { [1] = { 100, 23 }, [2] = { 101, 4 } })
+    wow.login({ v = 2, chars = {
+        ["Big"] = alt("Big", "PRIEST", { bags = { [100] = 30, [101] = 12 }, mail = { [100] = 1000, [101] = 3 } }),
+        ["Mid"] = alt("Mid", "DRUID", { bank = { [100] = 5, [101] = 150 } }),
+    } })
+    -- Nothing learned yet: the lines' widths are secret, so the plain text stays.
     wow.secretWidths = true
-    columnAlts()
     local lines = wow.hover(GameTooltip, 100)
-    eq(lines[2][1], "Total")
     for i = 3, #lines do eq(rights[i].text, nil, "line " .. i .. " left as added") end
-    -- Once widths can be read again, the next hover lines them up.
+    -- A readable hover lines it up and learns how wide spacers are drawn.
     wow.secretWidths = nil
-    wow.hover(GameTooltip, 100)
-    assert(rights[3].text, "lined up")
-    -- A secret font is left alone too.
+    lines = wow.hover(GameTooltip, 100)
+    eq(checkColumns(rowTexts(rights, lines), 12), 2)
+    -- Secret again, another item: measured in our own font string with the learned scale.
+    wow.secretWidths = true
+    for i = 1, 20 do rights[i].text = nil end
+    lines = wow.hover(GameTooltip, 101)
+    local rows = rowTexts(rights, lines)
+    eq(#rows, 3, "lined up")
+    wow.secretWidths = nil
+    eq(checkColumns(rows, 12), 2)
+    -- A secret font is left alone.
     rights[3].GetFont = function() return wow.SECRET, 12, "" end
     GameTooltip.hooks.OnShow(GameTooltip)
+    spacerDraw = 1
     clearTooltipLines()
 end)
 

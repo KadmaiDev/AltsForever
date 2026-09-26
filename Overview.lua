@@ -380,14 +380,15 @@ end
 -- Tooltip text isn't monospaced, so columns are lined up by measuring each value and
 -- padding with a transparent texture (a spacer) of the missing width. Shared with the
 -- item tooltip (Tooltip.lua).
---  * Measuring happens in a font string of our own on the tooltip (ns.MeasureIn), in the
---    tooltip line's font, so it shares the tooltip's scale and drawing. A font string on
---    UIParent disagreed: in game the tooltip drew spacers at about 87% of the width it
---    measured, so rows padded to the same width came out up to 7 units apart. The
---    tooltip's own lines can't be used: while Blizzard's secure code builds a tooltip,
---    their widths read as secret values (2026-09-26).
---  * Every width and font read is checked with issecretvalue first; if anything is
---    secret, the plain text stays and the next hover tries again.
+--  * Measuring happens in the tooltip's own line (ns.MeasureIn), which is exact. Other
+--    font strings, even our own on the tooltip, disagree about spacers: in game the
+--    tooltip drew them at about 87% of what those measured (rows came out up to 7 units
+--    apart), while text widths agreed (checked 2026-09-26).
+--  * While Blizzard's secure code builds a tooltip, its lines' widths read as secret
+--    values. Then the text is measured in our own font string on the tooltip, with the
+--    spacer scale learned from a real line earlier (remembered per font and size). With
+--    none learned yet, the plain text stays and a later hover lines it up.
+--  * Every width and font read is checked with issecretvalue first.
 --  * Spacers are calibrated: a 100-unit one is measured first and every spacer scaled.
 --  * Spacers are whole units; each one's rounding is carried into the next one to its
 --    left (rows are right-aligned, so build them from the right: ns.StartRow, then ns.Pad
@@ -405,6 +406,8 @@ ns.Spacer = Spacer
 local issecretvalue = issecretvalue or function() return false end
 local measuring, spacerScale, carry = nil, 1, 0
 local measurers = {} -- [tooltip] = our measuring font string on it
+local scales = {}    -- [font][size] = spacer scale learned from a real tooltip line
+local restoreLine, restoreText -- a tooltip line being measured in, and its text
 
 -- The width of s in the font string being measured in, or nil if it can't be measured.
 function ns.TextWidth(s)
@@ -419,9 +422,34 @@ function ns.UsableFont(font, size, flags)
     return font and not issecretvalue(font) and not issecretvalue(size) and not issecretvalue(flags)
 end
 
--- Starts measuring on tooltip tt in the given font. Returns false if it can't measure.
-function ns.MeasureIn(tt, font, size, flags)
+-- Starts measuring on tooltip tt in the given font: in `line` (one of its lines, whose
+-- text the caller sets afterwards) if its widths can be read, otherwise in our own font
+-- string with a spacer scale learned earlier. Returns false if it can't measure.
+function ns.MeasureIn(tt, font, size, flags, line)
     if not ns.UsableFont(font, size, flags) then return false end
+    local bySize = scales[font]
+    restoreLine = nil
+    if line and line.GetStringWidth and line.GetText then
+        local text = line:GetText()
+        if not issecretvalue(text) then restoreLine, restoreText = line, text end
+    end
+    if restoreLine then
+        measuring = line
+        local unit = ns.TextWidth(Spacer(100))
+        if unit and unit > 0 then
+            spacerScale = unit / 100
+            if not bySize then
+                bySize = {}
+                scales[font] = bySize
+            end
+            bySize[size] = spacerScale
+            return true
+        end
+        line:SetText(restoreText)
+        restoreLine = nil
+    end
+    local known = bySize and bySize[size]
+    if not known then return false end
     local m = measurers[tt]
     if not m then
         if not tt.CreateFontString then return false end
@@ -431,17 +459,18 @@ function ns.MeasureIn(tt, font, size, flags)
         measurers[tt] = m
     end
     m:SetFont(font, size, flags)
-    measuring = m
-    local unit = ns.TextWidth(Spacer(100))
-    m:SetText("")
-    if not unit then return false end
-    spacerScale = unit > 0 and unit / 100 or 1
+    measuring, spacerScale = m, known
     return true
 end
 
--- Clears the measuring font string when done, so it holds no text.
-function ns.MeasureDone()
-    if measuring then measuring:SetText("") end
+-- Done measuring: our own font string is cleared, and a tooltip line measured in gets
+-- its text back unless `keep` (the caller is about to set it).
+function ns.MeasureDone(keep)
+    for _, m in pairs(measurers) do
+        if measuring == m then m:SetText("") end
+    end
+    if restoreLine and not keep then restoreLine:SetText(restoreText) end
+    restoreLine = nil
 end
 
 function ns.StartRow() carry = 0 end
@@ -477,7 +506,7 @@ local function Align(tt, first, rows, labels, lefts)
             if text and text.SetFont then text:SetFont(font, size, flags) end
         end
     end
-    if not ns.MeasureIn(tt, font, size, flags) then return end
+    if not ns.MeasureIn(tt, font, size, flags, _G[name .. "TextRight" .. first]) then return end
     local columns, widths, measured = #rows[1] - 1, {}, {}
     for col = 1, columns do widths[col] = 0 end
     for i, row in ipairs(rows) do
@@ -511,7 +540,7 @@ local function Align(tt, first, rows, labels, lefts)
         end
         texts[i] = text
     end
-    ns.MeasureDone()
+    ns.MeasureDone(true)
     for i, text in ipairs(texts) do
         local right = _G[name .. "TextRight" .. (first + i - 1)]
         if right then right:SetText(text) end
