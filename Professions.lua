@@ -27,7 +27,7 @@ local STATUS_TEXT = {
     nil, -- built per row: "Needs 120 (107)"
     "|cff9d9d9dNot scanned|r",
 }
-local LIGHT = "|cffc0c0c0"
+local LIGHT = "|cffe0e0e0" -- matches the item breakdown (Tooltip.lua)
 local MAX_SKILLUP_LINES = 6 -- reagent tooltip; each character shows at most 2
 
 -- Skill-up details (grey points) in tooltips; /af skillups turns them off.

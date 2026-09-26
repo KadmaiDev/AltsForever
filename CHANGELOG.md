@@ -1,6 +1,6 @@
 ## Unreleased
 
-- **Tidier item tooltips:** the per-character breakdown is lined up in columns, so the icons, numbers and totals sit under each other even when characters keep an item in different places. The breakdown is also a lighter grey, easier to read on the default tooltip. Every line uses the tooltip's own font, so they're all the same size with UI addons like EllesmereUI.
+- **Tidier item tooltips:** the per-character breakdown is lined up in columns, so the icons, numbers and totals sit under each other even when characters keep an item in different places. The breakdown, and the "skill-ups to" notes, are also a lighter grey, easier to read on the default tooltip. Every line uses the tooltip's own font, so they're all the same size with UI addons like EllesmereUI.
 - **Gold with ElvUI and EllesmereUI bags:** hovering the gold in ElvUI's bags now shows your gold across characters. EllesmereUI's bags have their own gold summary, which stays; if you turn off its gold tracking (in EllesmereUI's bag options), Alts Forever's shows there instead.
 
 ## Alts Forever 0.6.0

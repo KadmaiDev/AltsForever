@@ -1368,7 +1368,7 @@ end)
 
 ---------------------------------------------------------------------------
 -- Skill-ups across alts (0.3.0): grey points and reagents from the live game
-local L = "|cffc0c0c0"
+local L = "|cffe0e0e0"
 local LINEN, COPPER_TUBE, BOLT = 2589, 4361, 4359
 local function to(n) return L .. " · to " .. n .. "|r" end
 local function skillupsTo(n) return L .. " · skill-ups to " .. n .. "|r" end
