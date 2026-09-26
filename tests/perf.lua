@@ -91,7 +91,8 @@ local named = { AddLine = nop.AddLine, AddDoubleLine = nop.AddDoubleLine, NumLin
 local lines = {}
 for i = 1, 40 do
     lines[i] = { GetFont = function() return "font", 12, "" end, SetFont = function() end,
-        SetText = function(self, t) self.t = t end, GetText = function(self) return self.t end }
+        SetText = function(self, t) self.t = t end, GetText = function(self) return self.t end,
+        GetStringWidth = function(self) return #self.t * 6 end }
     _G["PerfTooltipTextLeft" .. i], _G["PerfTooltipTextRight" .. i] = lines[i], lines[i]
 end
 UIParent.CreateFontString = function()

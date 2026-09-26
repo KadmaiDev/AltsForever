@@ -165,36 +165,67 @@ local function LineText(tt, side, line)
     return t
 end
 
--- One row's right-hand text. Each place is an icon then its number: the icons sit at the
--- same spot in every row and the numbers are right-aligned after them. `places` is the
--- number of place columns; icon[col], num[col] their widest entries. The icon is followed
--- by a real space before any spacer: in game a spacer straight after an icon was drawn
--- narrower than asked (checked 2026-09-26), a spacer after text wasn't.
-local function Row(parts, count, font, size, flags, icon, num, places, countWidth)
-    local text, pending = "", 0
-    local offset = places - #parts / 2
-    for col = 1, places do
-        pending = pending + (col > 1 and GAP or 0)
+-- Measuring happens in the tooltip's own line, so the widths come from exactly the font,
+-- scale and drawing rules the tooltip uses. (A separate hidden font string measured the
+-- spacers wider than the tooltip drew them: in game, rows padded to the same width came
+-- out up to 7 units apart, the more padding the bigger the gap. Checked 2026-09-26.)
+local measuring   -- the font string being measured in
+local spacerScale -- how wide the tooltip draws a spacer, per unit asked for
+
+local function W(s)
+    measuring:SetText(s)
+    local w = measuring:GetStringWidth()
+    return type(w) == "number" and w or nil
+end
+
+-- A spacer that draws `width` wide in the measured line. Spacers are whole units, so each
+-- one's rounding is carried into the next one to its left: the text is right-aligned, so
+-- every icon and number stays within half a unit of its place counted from the right.
+local carry = 0
+local function Pad(width)
+    width = width + carry
+    local n = floor(width / spacerScale + 0.5)
+    if n < 1 then
+        carry = width
+        return ""
+    end
+    carry = width - n * spacerScale
+    return ns.Spacer(n)
+end
+
+-- One row's right-hand text, built from the right. Each place is an icon then its
+-- number: the icons sit at the same spot in every row and the numbers are right-aligned
+-- after them. `places` is the number of place columns; icon[col], num[col] their widest
+-- entries.
+local function Row(parts, count, icon, num, places, countWidth)
+    carry = 0
+    local w = W(tostring(count))
+    if not w then return nil end
+    local text = Pad(GAP * 2 + countWidth - w) .. count
+    local offset, lead = places - #parts / 2, 0
+    for col = places, 1, -1 do
+        local gap = col > 1 and GAP or 0
         if col > offset then
             local k = (col - offset) * 2
             local label, n = parts[k - 1] .. " ", tostring(parts[k])
-            local wi, wn = ns.TextWidth(font, size, flags, label), ns.TextWidth(font, size, flags, n)
+            local wi, wn = W(label), W(n)
             if not (wi and wn) then return nil end
-            text = text .. ns.Spacer(pending + icon[col] - wi) .. GREY .. label
-                .. ns.Spacer(num[col] - wn) .. n .. "|r"
-            pending = 0
+            text = Pad(num[col] - wn) .. n .. "|r" .. text
+            text = Pad(gap + icon[col] - wi) .. GREY .. label .. text
         else
-            pending = pending + icon[col] + num[col]
+            lead = lead + gap + icon[col] + num[col]
         end
     end
-    local w = ns.TextWidth(font, size, flags, tostring(count))
-    if not w then return nil end
-    return text .. ns.Spacer(pending + GAP * 2 + countWidth - w) .. count
+    return Pad(lead) .. text
 end
 
--- Measures the rows (yours included) and returns their aligned text: { cur = yours,
--- [i] = the other row starting at e[i] }, or nil if the text can't be measured.
-local function Align(e, curParts, font, size, flags)
+-- Measures the rows (yours included) in font string fs and returns their aligned text:
+-- { cur = yours, [i] = the other row starting at e[i] }, or nil if it can't be measured.
+-- Leaves fs's text changed; the caller sets it again.
+local function Align(e, curParts, fs)
+    measuring = fs
+    local unit = W(ns.Spacer(100))
+    spacerScale = (unit and unit > 0) and unit / 100 or 1
     -- Place columns counted from the right; a row with fewer places leaves the left ones empty.
     local places = curParts and #curParts / 2 or 0
     for i = 1, e.n * 4, 4 do places = max(places, #e[i + 3] / 2) end
@@ -204,12 +235,11 @@ local function Align(e, curParts, font, size, flags)
         local offset = places - #parts / 2
         for k = 2, #parts, 2 do
             local col = offset + k / 2
-            local wi = ns.TextWidth(font, size, flags, parts[k - 1] .. " ")
-            local wn = ns.TextWidth(font, size, flags, tostring(parts[k]))
+            local wi, wn = W(parts[k - 1] .. " "), W(tostring(parts[k]))
             if not (wi and wn) then return false end
             icon[col], num[col] = max(icon[col], wi), max(num[col], wn)
         end
-        local w = ns.TextWidth(font, size, flags, tostring(count))
+        local w = W(tostring(count))
         if not w then return false end
         countWidth = max(countWidth, w)
         return true
@@ -220,11 +250,11 @@ local function Align(e, curParts, font, size, flags)
     end
     local result = { ver = ns.version }
     if curParts then
-        result.cur = Row(curParts, curCount, font, size, flags, icon, num, places, countWidth)
+        result.cur = Row(curParts, curCount, icon, num, places, countWidth)
         if not result.cur then return nil end
     end
     for i = 1, e.n * 4, 4 do
-        result[i] = Row(e[i + 3], e[i], font, size, flags, icon, num, places, countWidth)
+        result[i] = Row(e[i + 3], e[i], icon, num, places, countWidth)
         if not result[i] then return nil end
     end
     return result
@@ -233,7 +263,7 @@ end
 -- The item's aligned rows for a font, cached per font (a UI addon may show the tooltip
 -- in a different font from the one its lines start with) and redone when ns.version
 -- changes (your own line). Looked up without building a key, so repeat hovers are free.
-local function Aligned(e, font, size, flags)
+local function Aligned(e, fs, font, size, flags)
     local byFont = e.aligned
     if not byFont then
         byFont = {}
@@ -251,7 +281,7 @@ local function Aligned(e, font, size, flags)
     end
     local result = byFlags[flags]
     if not result or result.ver ~= ns.version then
-        result = Align(e, curCount > 0 and curParts, font, size, flags)
+        result = Align(e, curCount > 0 and curParts, fs)
         byFlags[flags] = result
     end
     return result
@@ -270,7 +300,7 @@ local function Apply(tt)
     if not (fs and fs.GetFont) then return false end
     local font, size, flags = fs:GetFont()
     if not font then return false end
-    local result = Aligned(st.e, font, size, flags or "")
+    local result = Aligned(st.e, fs, font, size, flags or "")
     if not result then return false end
     local changed, line = false, st.row
     local function Set(text)

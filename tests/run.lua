@@ -2428,10 +2428,12 @@ end)
 ---------------------------------------------------------------------------
 -- Item tooltip columns
 -- A tooltip whose lines have font strings, in a font whose characters are size / 2 wide
--- (icons 12, our blank spacers their given width), so a font change changes widths.
+-- (icons 12, our blank spacers their given width times spacerDraw), so a font change
+-- changes widths. In game the tooltip drew spacers at about 87% of the width asked for.
+local spacerDraw = 1
 local function visibleWidth(t, size)
     local w = 0
-    t = t:gsub("|T[^|]-blank%.tga:1:(%d+)|t", function(n) w = w + tonumber(n) return "" end)
+    t = t:gsub("|T[^|]-blank%.tga:1:(%d+)|t", function(n) w = w + tonumber(n) * spacerDraw return "" end)
     t = t:gsub("|T.-|t", function() w = w + 12 return "" end)
     t = t:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
     return w + #t * (size or 12) / 2
@@ -2447,7 +2449,11 @@ local function measurableTooltip()
         local function fontString()
             return { size = 12, GetFont = function(self) return "font", self.size, "" end,
                 SetFont = function(self, _, s) self.size = s end,
-                SetText = function(self, t) self.text = t end, GetText = function(self) return self.text end }
+                SetText = function(self, t) self.text = t end, GetText = function(self) return self.text end,
+                GetStringWidth = function(self)
+                    wow.measured = (wow.measured or 0) + 1
+                    return visibleWidth(self.text or "", self.size)
+                end }
         end
         _G["GameTooltipTextLeft" .. i] = fontString()
         rights[i] = fontString()
@@ -2488,14 +2494,16 @@ end
 -- Checks the rows line up in a font of the given size.
 local function checkColumns(rows, size)
     local width = visibleWidth(rows[1], size)
-    for i, t in ipairs(rows) do eq(visibleWidth(t, size), width, "row " .. i .. " width") end
+    -- Spacers are whole units, so allow up to half a unit.
+    local function near(a, b, msg) assert(math.abs(a - b) <= 0.5, msg .. ": " .. a .. " vs " .. b) end
+    for i, t in ipairs(rows) do near(visibleWidth(t, size), width, "row " .. i .. " width") end
     local edge = beforeCount(rows[1], size)
     assert(edge > 0, rows[1])
-    for i, t in ipairs(rows) do eq(beforeCount(t, size), edge, "row " .. i .. " last place") end
+    for i, t in ipairs(rows) do near(beforeCount(t, size), edge, "row " .. i .. " last place") end
     local columns = {}
     for i, t in ipairs(rows) do
         for col, x in ipairs(iconsFromEnd(t, size)) do
-            if columns[col] then eq(x, columns[col], "row " .. i .. ", icon " .. col .. " from the right")
+            if columns[col] then near(x, columns[col], "row " .. i .. ", icon " .. col .. " from the right")
             else columns[col] = x end
         end
     end
@@ -2553,28 +2561,32 @@ test("item tooltip columns are lined up again in the font a UI addon shows them 
     clearTooltipLines()
 end)
 
+test("item tooltip: spacers are calibrated to how wide the tooltip really draws them", function()
+    wow.load(FILES)
+    local rights = measurableTooltip()
+    spacerDraw = 0.87
+    columnAlts()
+    local lines = wow.hover(GameTooltip, 100)
+    eq(checkColumns(rowTexts(rights, lines), 12), 3)
+    spacerDraw = 1
+    clearTooltipLines()
+end)
+
 test("item tooltip columns are measured once per item and font, then reused", function()
     wow.load(FILES)
     measurableTooltip()
-    local measured = 0
-    local make = UIParent.CreateFontString
-    UIParent.CreateFontString = function()
-        local fs = make()
-        local get = fs.GetStringWidth
-        fs.GetStringWidth = function(self) measured = measured + 1 return get(self) end
-        return fs
-    end
+    wow.measured = 0
     wow.login({ v = 2, chars = {
         ["Big"] = alt("Big", "PRIEST", { bags = { [100] = 30 } }),
         ["Mid"] = alt("Mid", "DRUID", { bank = { [100] = 5 }, bags = { [101] = 2 } }),
     } })
     wow.hover(GameTooltip, 100)
-    assert(measured > 0, "measured the first time")
+    assert(wow.measured > 0, "measured the first time")
     wow.hover(GameTooltip, 100)
     wow.hover(GameTooltip, 101)
-    local afterOther = measured
+    local afterOther = wow.measured
     wow.hover(GameTooltip, 100)
-    eq(measured, afterOther, "back to the first item: its columns are still cached")
+    eq(wow.measured, afterOther, "back to the first item: its columns are still cached")
     clearTooltipLines()
 end)
 
