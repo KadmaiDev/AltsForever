@@ -26,7 +26,9 @@ local LABELS = {
     "|TInterface\\Icons\\INV_Shirt_White_01:0:0:0:0:64:64:5:59:5:59|t",
 }
 local TOTAL = "Total"
-local GREY = "|cffc0c0c0"
+-- The breakdown: light grey, a step softer than the white totals but readable on
+-- Blizzard's see-through tooltip as well as darker UI skins.
+local GREY = "|cffe0e0e0"
 local SEP = " · "
 local EMPTY = { n = 0, total = 0 }
 

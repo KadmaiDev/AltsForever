@@ -23,7 +23,7 @@ local ICON = {
 }
 local function R(breakdown, n)
     breakdown = breakdown:gsub("(%a+) ", function(word) return assert(ICON[word], word) .. " " end)
-    return "|cffc0c0c0" .. breakdown .. "|r    " .. n
+    return "|cffe0e0e0" .. breakdown .. "|r    " .. n
 end
 
 -- A saved character, in the stored shape.
