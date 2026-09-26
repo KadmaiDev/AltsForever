@@ -66,9 +66,11 @@ local function ChangeSince(back)
     return best and AccountTotal() - days[best]
 end
 
+-- A change in gold: green gained, red lost, white none.
 local function Signed(copper)
-    if copper < 0 then return "-" .. GetCoinTextureString(-copper, iconSize) end
-    return "+" .. GetCoinTextureString(copper, iconSize)
+    if copper < 0 then return "|cffff4040-" .. GetCoinTextureString(-copper, iconSize) .. "|r" end
+    if copper > 0 then return "|cff20ff20+" .. GetCoinTextureString(copper, iconSize) .. "|r" end
+    return GetCoinTextureString(0, iconSize)
 end
 
 -- This session (this character), today and this week (all characters).

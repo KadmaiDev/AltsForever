@@ -2650,9 +2650,23 @@ test("session stats: gold this session, today and this week across characters", 
     ns.AddMoneyLines(tt)
     local got = {}
     for _, l in ipairs(tt.lines) do got[l[1]] = l[2] end
-    eq(got["This session"], "+500c")
-    eq(got["Today, all characters"], "+2500c")
-    eq(got["This week, all characters"], "+5500c")
+    eq(got["This session"], "|cff20ff20+500c|r", "gains in green")
+    eq(got["Today, all characters"], "|cff20ff20+2500c|r")
+    eq(got["This week, all characters"], "|cff20ff20+5500c|r")
+    wow.money = 100
+    wow.fire("PLAYER_MONEY")
+    tt = wow.tooltip()
+    ns.AddMoneyLines(tt)
+    got = {}
+    for _, l in ipairs(tt.lines) do got[l[1]] = l[2] end
+    eq(got["This session"], "|cffff4040-900c|r", "losses in red")
+    wow.money = 1000
+    wow.fire("PLAYER_MONEY")
+    tt = wow.tooltip()
+    ns.AddMoneyLines(tt)
+    got = {}
+    for _, l in ipairs(tt.lines) do got[l[1]] = l[2] end
+    eq(got["This session"], "0c", "no change: plain")
     -- Days over a year old are dropped when a new day starts.
     days[today - 500] = 1
     wow.now = NOW + 86400
