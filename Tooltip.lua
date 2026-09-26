@@ -191,8 +191,8 @@ local function Row(parts, count, font, size, flags, icon, num, places, countWidt
     return text .. ns.Spacer(pending + GAP * 2 + countWidth - w) .. count
 end
 
--- Measures the rows (yours included) and stores their aligned text in e.aligned (others)
--- and e.alignedCur. Returns false if the text can't be measured.
+-- Measures the rows (yours included) and returns their aligned text: { cur = yours,
+-- [i] = the other row starting at e[i] }, or nil if the text can't be measured.
 local function Align(e, curParts, font, size, flags)
     -- Place columns counted from the right; a row with fewer places leaves the left ones empty.
     local places = curParts and #curParts / 2 or 0
@@ -213,18 +213,93 @@ local function Align(e, curParts, font, size, flags)
         countWidth = max(countWidth, w)
         return true
     end
-    if curParts and not Measure(curParts, curCount) then return false end
+    if curParts and not Measure(curParts, curCount) then return nil end
     for i = 1, e.n * 4, 4 do
-        if not Measure(e[i + 3], e[i]) then return false end
+        if not Measure(e[i + 3], e[i]) then return nil end
     end
-    e.aligned = e.aligned or {}
-    e.alignedCur = curParts and Row(curParts, curCount, font, size, flags, icon, num, places, countWidth)
+    local result = { ver = ns.version }
+    if curParts then
+        result.cur = Row(curParts, curCount, font, size, flags, icon, num, places, countWidth)
+        if not result.cur then return nil end
+    end
     for i = 1, e.n * 4, 4 do
-        e.aligned[i] = Row(e[i + 3], e[i], font, size, flags, icon, num, places, countWidth)
-        if not e.aligned[i] then return false end
+        result[i] = Row(e[i + 3], e[i], font, size, flags, icon, num, places, countWidth)
+        if not result[i] then return nil end
     end
-    e.font, e.size, e.flags, e.alignVer = font, size, flags, ns.version
-    return true
+    return result
+end
+
+-- The item's aligned rows for a font, cached per font (a UI addon may show the tooltip
+-- in a different font from the one its lines start with) and redone when ns.version
+-- changes (your own line). Looked up without building a key, so repeat hovers are free.
+local function Aligned(e, font, size, flags)
+    local byFont = e.aligned
+    if not byFont then
+        byFont = {}
+        e.aligned = byFont
+    end
+    local bySize = byFont[font]
+    if not bySize then
+        bySize = {}
+        byFont[font] = bySize
+    end
+    local byFlags = bySize[size]
+    if not byFlags then
+        byFlags = {}
+        bySize[size] = byFlags
+    end
+    local result = byFlags[flags]
+    if not result or result.ver ~= ns.version then
+        result = Align(e, curCount > 0 and curParts, font, size, flags)
+        byFlags[flags] = result
+    end
+    return result
+end
+
+-- What our lines in each tooltip are, so they can be lined up again once the tooltip
+-- is shown: UI addons such as EllesmereUI set their own font on every line then, after
+-- our lines were added and measured.
+local states = {}
+
+-- Lines up our rows in the fonts they have now. Returns true if any text changed.
+local function Apply(tt)
+    local st = states[tt]
+    if not (st and st.e and st.id == lastId and st.row) then return false end
+    local fs = LineText(tt, "TextRight", st.row)
+    if not (fs and fs.GetFont) then return false end
+    local font, size, flags = fs:GetFont()
+    if not font then return false end
+    local result = Aligned(st.e, font, size, flags or "")
+    if not result then return false end
+    local changed, line = false, st.row
+    local function Set(text)
+        local right = LineText(tt, "TextRight", line)
+        if right and text and right:GetText() ~= text then
+            right:SetText(text)
+            changed = true
+        end
+        line = line + 1
+    end
+    if st.cur then Set(result.cur) end
+    for i = 1, st.e.n * 4, 4 do Set(result[i]) end
+    return changed
+end
+
+-- After the tooltip is shown (and restyled), line up again in the final font; a change
+-- needs another Show so the tooltip resizes to the new text.
+local reshowing = {}
+local function OnShow(tt)
+    if reshowing[tt] or tt:IsForbidden() then return end
+    if Apply(tt) then
+        reshowing[tt] = true
+        pcall(tt.Show, tt)
+        reshowing[tt] = nil
+    end
+end
+
+local function OnCleared(tt)
+    local st = states[tt]
+    if st then st.e = nil end
 end
 
 function ns.InvalidateCache()
@@ -257,21 +332,6 @@ function ns.AddLines(tt, id)
     local rows = e.n + (curCount > 0 and 1 or 0)
     if rows == 0 then return end
 
-    -- Our lines use the tooltip's body font (its second line): lines the tooltip hasn't
-    -- needed before are new font strings, which a UI addon that restyled the existing
-    -- ones (EllesmereUI) hasn't reached. The columns are measured in that font.
-    local body = LineText(tt, "TextLeft", 2)
-    local font, size, flags
-    if body and body.GetFont then font, size, flags = body:GetFont() end
-    -- Lined up only when others have it too (on your own there's nothing to line up).
-    -- Your line depends only on the item and ns.version, so this item's cached alignment
-    -- holds until either the version or the font changes.
-    local aligned = false
-    if font and e ~= EMPTY then
-        aligned = e.alignVer == ns.version and e.font == font and e.size == size and e.flags == flags
-        if not aligned then aligned = Align(e, curCount > 0 and curParts, font, size, flags) end
-    end
-
     tt:AddLine(" ")
     local first = tt.NumLines and tt:NumLines() + 1
     -- With one character the total would just repeat their count.
@@ -279,19 +339,29 @@ function ns.AddLines(tt, id)
         tt:AddDoubleLine(TOTAL, e.total + curCount, 1, 0.82, 0, 1, 1, 1)
     end
     if curCount > 0 then
-        tt:AddDoubleLine(ColoredName(ns.charKey, ns.char), aligned and e.alignedCur or curText, 1, 1, 1, 1, 1, 1)
+        tt:AddDoubleLine(ColoredName(ns.charKey, ns.char), curText, 1, 1, 1, 1, 1, 1)
     end
     for i = 1, e.n * 4, 4 do
-        tt:AddDoubleLine(e[i + 1], aligned and e.aligned[i] or e[i + 2], 1, 1, 1, 1, 1, 1)
+        tt:AddDoubleLine(e[i + 1], e[i + 2], 1, 1, 1, 1, 1, 1)
     end
-    if font and first then
-        for line = first, first + rows - (rows > 1 and 0 or 1) do
-            local l, r = LineText(tt, "TextLeft", line), LineText(tt, "TextRight", line)
-            if l and l.SetFont then l:SetFont(font, size, flags) end
-            if r and r.SetFont then r:SetFont(font, size, flags) end
+
+    -- Columns only when others have it too (on your own there's nothing to line up),
+    -- and only in tooltips with named lines (the game's).
+    if e == EMPTY or not first then return end
+    local st = states[tt]
+    if not st then
+        st = {}
+        states[tt] = st
+        if tt.HookScript then
+            tt:HookScript("OnShow", OnShow)
+            tt:HookScript("OnTooltipCleared", OnCleared)
         end
     end
+    st.e, st.id, st.cur = e, id, curCount > 0
+    st.row = first + (rows > 1 and 1 or 0)
+    Apply(tt)
 end
+
 
 local function OnItem(tt, data)
     if (tt ~= GameTooltip and tt ~= ItemRefTooltip) or tt:IsForbidden() then return end

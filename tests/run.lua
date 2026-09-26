@@ -2427,34 +2427,36 @@ end)
 
 ---------------------------------------------------------------------------
 -- Item tooltip columns
--- A tooltip whose lines have font strings, and a font 6 units per character, icons 12,
--- and our blank spacers their given width.
-local function visibleWidth(t)
+-- A tooltip whose lines have font strings, in a font whose characters are size / 2 wide
+-- (icons 12, our blank spacers their given width), so a font change changes widths.
+local function visibleWidth(t, size)
     local w = 0
     t = t:gsub("|T[^|]-blank%.tga:1:(%d+)|t", function(n) w = w + tonumber(n) return "" end)
     t = t:gsub("|T.-|t", function() w = w + 12 return "" end)
     t = t:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-    return w + #t * 6
+    return w + #t * (size or 12) / 2
 end
 
 local function measurableTooltip()
     GameTooltip.GetName = function() return "GameTooltip" end
     GameTooltip.NumLines = function(self) return #self.lines end
+    GameTooltip.hooks = {}
+    GameTooltip.HookScript = function(self, script, fn) self.hooks[script] = fn end
     local rights = {}
     for i = 1, 20 do
-        local function fontString(size)
-            return { GetFont = function(self) return "font", self.size or size, "" end,
+        local function fontString()
+            return { size = 12, GetFont = function(self) return "font", self.size, "" end,
                 SetFont = function(self, _, s) self.size = s end,
-                SetText = function(self, t) self.text = t end }
+                SetText = function(self, t) self.text = t end, GetText = function(self) return self.text end }
         end
-        _G["GameTooltipTextLeft" .. i] = fontString(i == 2 and 12 or 14)
-        rights[i] = fontString(14)
+        _G["GameTooltipTextLeft" .. i] = fontString()
+        rights[i] = fontString()
         _G["GameTooltipTextRight" .. i] = rights[i]
     end
     UIParent.CreateFontString = function()
-        return { Hide = function() end, SetFont = function() end,
+        return { Hide = function() end, SetFont = function(self, _, s) self.size = s end,
             SetText = function(self, t) self.text = t end,
-            GetStringWidth = function(self) return visibleWidth(self.text) end }
+            GetStringWidth = function(self) return visibleWidth(self.text, self.size) end }
     end
     return rights
 end
@@ -2464,61 +2466,94 @@ local function clearTooltipLines()
 end
 
 -- The width of a row's text up to where its count starts (the last spacer).
-local function beforeCount(t)
-    return visibleWidth(t:match("^(.*)|T[^|]-blank%.tga:1:%d+|t%d+$") or "")
+local function beforeCount(t, size)
+    return visibleWidth(t:match("^(.*)|T[^|]-blank%.tga:1:%d+|t%d+$") or "", size)
 end
 
-test("item tooltip: places and counts line up in columns, from the right", function()
-    wow.load(FILES)
-    measurableTooltip()
+-- Each place's icon: its distance from the right edge, nearest the count first.
+local function iconsFromEnd(t, size)
+    local total, found = visibleWidth(t, size), {}
+    local pos = 1
+    while true do
+        local a, b = t:find("|T.-|t", pos)
+        if not a then break end
+        if not t:sub(a, b):find("blank.tga", 1, true) then
+            table.insert(found, 1, total - visibleWidth(t:sub(1, a - 1), size))
+        end
+        pos = b + 1
+    end
+    return found
+end
+
+-- Checks the rows line up in a font of the given size.
+local function checkColumns(rows, size)
+    local width = visibleWidth(rows[1], size)
+    for i, t in ipairs(rows) do eq(visibleWidth(t, size), width, "row " .. i .. " width") end
+    local edge = beforeCount(rows[1], size)
+    assert(edge > 0, rows[1])
+    for i, t in ipairs(rows) do eq(beforeCount(t, size), edge, "row " .. i .. " last place") end
+    local columns = {}
+    for i, t in ipairs(rows) do
+        for col, x in ipairs(iconsFromEnd(t, size)) do
+            if columns[col] then eq(x, columns[col], "row " .. i .. ", icon " .. col .. " from the right")
+            else columns[col] = x end
+        end
+    end
+    return #columns
+end
+
+local function columnAlts()
     wow.setBag(0, 16, { [1] = { 100, 23 } })
     wow.login({ v = 2, chars = {
         ["Big"] = alt("Big", "PRIEST", { bags = { [100] = 30 }, mail = { [100] = 1000 } }),
         ["Mid"] = alt("Mid", "DRUID", { bank = { [100] = 5 } }),
         ["Three"] = alt("Three", "ROGUE", { bags = { [100] = 4 }, bank = { [100] = 6 }, mail = { [100] = 7 } }),
     } })
+end
+
+local function rowTexts(rights, lines)
+    local rows = {}
+    for i = 3, #lines do rows[#rows + 1] = rights[i].text end
+    return rows
+end
+
+test("item tooltip: places and counts line up in columns, from the right", function()
+    wow.load(FILES)
+    local rights = measurableTooltip()
+    columnAlts()
     local lines = wow.hover(GameTooltip, 100)
     eq(lines[2][1], "Total"); eq(lines[2][2], 1075)
-    local rows = {}
-    for i = 3, #lines do rows[#rows + 1] = lines[i][2] end
+    local rows = rowTexts(rights, lines)
     eq(#rows, 4)
-    -- Every row the same width, so the right-aligned counts and columns line up.
-    local width = visibleWidth(rows[1])
-    for i, t in ipairs(rows) do eq(visibleWidth(t), width, "row " .. i .. " width") end
-    -- The last place of every row ends at the same point, one or three places.
-    local edge = beforeCount(rows[1])
-    assert(edge > 0, rows[1])
-    for i, t in ipairs(rows) do eq(beforeCount(t), edge, "row " .. i .. " last place") end
+    eq(checkColumns(rows, 12), 3, "three place columns")
     assert(rows[1]:find("Interface\\AddOns\\AltsForever\\media\\blank.tga", 1, true), "our spacer")
-    -- Each place's icon starts the same distance from the right edge in every row that
-    -- has something in that column, whatever the numbers' widths.
-    local function iconsFromEnd(t)
-        local total, found = visibleWidth(t), {}
-        local pos = 1
-        while true do
-            local a, b = t:find("|T.-|t", pos)
-            if not a then break end
-            if not t:sub(a, b):find("blank.tga", 1, true) then
-                table.insert(found, 1, total - visibleWidth(t:sub(1, a - 1)))
-            end
-            pos = b + 1
-        end
-        return found -- nearest the count first
-    end
-    local columns = {}
-    for i, t in ipairs(rows) do
-        for col, x in ipairs(iconsFromEnd(t)) do
-            if columns[col] then eq(x, columns[col], "row " .. i .. ", icon " .. col .. " from the right")
-            else columns[col] = x end
-        end
-    end
-    eq(#columns, 3, "three place columns")
-    -- Our lines are in the tooltip's body font (line 2's), not the default of new lines.
-    for i = 3, #lines do eq(select(2, _G["GameTooltipTextRight" .. i]:GetFont()), 12, "line " .. i) end
     clearTooltipLines()
 end)
 
-test("item tooltip columns are measured once per item, then reused", function()
+test("item tooltip columns are lined up again in the font a UI addon shows them in", function()
+    wow.load(FILES)
+    local rights = measurableTooltip()
+    columnAlts()
+    local lines = wow.hover(GameTooltip, 100)
+    -- EllesmereUI sets its own font on every line when the tooltip is shown.
+    for i = 1, #lines do rights[i].size = 16 end
+    local shows = 0
+    GameTooltip.Show = function(self) shows = shows + 1 self.shown = true end
+    GameTooltip.hooks.OnShow(GameTooltip)
+    eq(shows, 1, "shown again so it resizes to the new text")
+    eq(checkColumns(rowTexts(rights, lines), 16), 3)
+    -- Nothing to do the next time it's shown in that font.
+    GameTooltip.hooks.OnShow(GameTooltip)
+    eq(shows, 1)
+    -- A cleared tooltip (now showing something else) is left alone.
+    GameTooltip.hooks.OnTooltipCleared(GameTooltip)
+    for i = 1, #lines do rights[i].size = 12 end
+    GameTooltip.hooks.OnShow(GameTooltip)
+    eq(shows, 1)
+    clearTooltipLines()
+end)
+
+test("item tooltip columns are measured once per item and font, then reused", function()
     wow.load(FILES)
     measurableTooltip()
     local measured = 0
@@ -2534,8 +2569,7 @@ test("item tooltip columns are measured once per item, then reused", function()
         ["Mid"] = alt("Mid", "DRUID", { bank = { [100] = 5 }, bags = { [101] = 2 } }),
     } })
     wow.hover(GameTooltip, 100)
-    local first = measured
-    assert(first > 0, "measured the first time")
+    assert(measured > 0, "measured the first time")
     wow.hover(GameTooltip, 100)
     wow.hover(GameTooltip, 101)
     local afterOther = measured

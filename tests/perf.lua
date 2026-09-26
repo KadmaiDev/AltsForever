@@ -88,8 +88,12 @@ end)
 -- The game's tooltips have named lines, so their columns get lined up.
 local named = { AddLine = nop.AddLine, AddDoubleLine = nop.AddDoubleLine, NumLines = nop.NumLines,
     GetName = function() return "PerfTooltip" end }
-local line = { GetFont = function() return "font", 12, "" end, SetFont = function() end }
-for i = 1, 40 do _G["PerfTooltipTextLeft" .. i], _G["PerfTooltipTextRight" .. i] = line, line end
+local lines = {}
+for i = 1, 40 do
+    lines[i] = { GetFont = function() return "font", 12, "" end, SetFont = function() end,
+        SetText = function(self, t) self.t = t end, GetText = function(self) return self.t end }
+    _G["PerfTooltipTextLeft" .. i], _G["PerfTooltipTextRight" .. i] = lines[i], lines[i]
+end
 UIParent.CreateFontString = function()
     return { Hide = function() end, SetFont = function() end, SetText = function(self, t) self.t = t end,
         GetStringWidth = function(self) return #self.t * 6 end }
