@@ -124,6 +124,9 @@ end
 ---------------------------------------------------------------------------
 local frame, rows, footer
 
+local NO_LABELS, NOTE_LEFT = {}, { [2] = true }
+local function ByFirst(a, b) return a[1] < b[1] end
+
 local function RowTooltip(row)
     local key = row.key
     local c = key and ns.db.chars[key]
@@ -156,21 +159,29 @@ local function RowTooltip(row)
     if c.played then tt:AddDoubleLine("Played", ns.PlayedText(c, now), 1, 0.82, 0, 1, 1, 1) end
     if c.ilvl then tt:AddDoubleLine("Item level", c.ilvl, 1, 0.82, 0, 1, 1, 1) end
     if c.money then tt:AddDoubleLine("Gold", GetCoinTextureString(c.money), 1, 0.82, 0, 1, 1, 1) end
+    -- Professions: name, skill and a note, in columns (lined up once shown, below).
+    local profRows, profFirst
     if c.profs and next(c.profs) then
         tt:AddLine(" ")
         local skillups = ns.SkillupsOn()
+        profRows = {}
         for name, skill in pairs(c.profs) do
-            local right = skill
+            local note = ""
             if skillups then
                 local n = ns.SkillupCount(c, name)
                 if ns.AtRankCap(c, name) then
                     -- At the final maximum there's nothing to train, so say nothing.
-                    if skill < MAX_PROFESSION then right = skill .. GREY .. "  (train to skill up)|r" end
+                    if skill < MAX_PROFESSION then note = GREY .. "(train to skill up)|r" end
                 elseif n then
-                    right = skill .. GREY .. "  (" .. n .. " skill-up recipe" .. (n == 1 and "" or "s") .. ")|r"
+                    note = GREY .. "(" .. n .. " skill-up recipe" .. (n == 1 and "" or "s") .. ")|r"
                 end
             end
-            tt:AddDoubleLine(name, right, 1, 1, 1, 1, 1, 1)
+            profRows[#profRows + 1] = { name, tostring(skill), note }
+        end
+        table.sort(profRows, ByFirst)
+        profFirst = tt.NumLines and tt:NumLines() + 1
+        for _, r in ipairs(profRows) do
+            tt:AddDoubleLine(r[1], r[3] ~= "" and (r[2] .. "  " .. r[3]) or r[2], 1, 1, 1, 1, 1, 1)
         end
     end
     tt:AddLine(" ")
@@ -182,6 +193,12 @@ local function RowTooltip(row)
         tt:AddLine("|cff66ccffClick to see gear · Right-click to forget this character|r")
     end
     tt:Show()
+    -- Line up the professions in the font the tooltip is shown in (a UI addon such as
+    -- EllesmereUI sets its own when it's shown), then show again to fit the new text.
+    if profFirst then
+        ns.AlignColumns(tt, profFirst, profRows, NO_LABELS, NOTE_LEFT)
+        tt:Show()
+    end
 end
 
 local function CreateCells(parent, font)
@@ -417,11 +434,12 @@ end
 
 -- Lines up the right-hand columns of the rows added from line `first` on; leaves the
 -- plain text if the tooltip's text can't be measured. Each row is { name, value... };
--- labels[col] is text shown before that column's value (e.g. "rested").
+-- labels[col] is text shown before that column's value (e.g. "rested"). Columns are
+-- right-aligned, except those marked in `lefts` (e.g. notes of different lengths).
 -- Our lines take the font of the tooltip's second line (its body text): a line the
 -- tooltip hasn't needed before gets a new font string, which a UI addon that restyled
 -- the existing ones (EllesmereUI) hasn't reached, so it would show in the game's font.
-local function Align(tt, first, rows, labels)
+local function Align(tt, first, rows, labels, lefts)
     local name = tt.GetName and tt:GetName()
     local fs = name and _G[name .. "TextLeft2"]
     local font, size, flags
@@ -449,12 +467,20 @@ local function Align(tt, first, rows, labels)
     for i, row in ipairs(rows) do
         ns.StartRow()
         local text = ""
+        -- Spacers are made right to left (each carries its rounding to the next on its left).
         for col = columns, 1, -1 do
             local gap = col > 1 and GAP or 0
-            if labels[col] then
-                text = ns.Pad(gap) .. labels[col] .. ns.Pad(widths[col] - measured[i][col]) .. row[col + 1] .. text
+            local spare = widths[col] - measured[i][col]
+            if lefts and lefts[col] then
+                local after = ns.Pad(spare)
+                text = (labels[col] or "") .. row[col + 1] .. after .. text
+                text = ns.Pad(gap) .. text
+            elseif labels[col] then
+                local fill = ns.Pad(spare)
+                text = labels[col] .. fill .. row[col + 1] .. text
+                text = ns.Pad(gap) .. text
             else
-                text = ns.Pad(gap + widths[col] - measured[i][col]) .. row[col + 1] .. text
+                text = ns.Pad(gap + spare) .. row[col + 1] .. text
             end
         end
         texts[i] = text
@@ -464,6 +490,11 @@ local function Align(tt, first, rows, labels)
         if right then right:SetText(text) end
     end
 end
+
+ns.AlignColumns = Align
+
+-- The last rows added, so a tooltip we open ourselves can line them up again once shown.
+local lastRows = {}
 
 -- Adds a "Your characters" section; returns false, adding nothing, if there are no rows.
 -- `title` starts a tooltip we opened ourselves; otherwise a gap follows the bar's own.
@@ -479,7 +510,10 @@ function ns.AddCharacterRows(tt, rows, labels, title, noGap)
         end
         tt:AddDoubleLine(row[1], text, 1, 1, 1, 1, 1, 1)
     end
-    if first then Align(tt, first, rows, labels) end
+    if first then
+        Align(tt, first, rows, labels)
+        lastRows.tt, lastRows.first, lastRows.rows, lastRows.labels = tt, first, rows, labels
+    end
     return true
 end
 
@@ -532,7 +566,18 @@ local function HookBar(bar, ownTooltip, add)
             if add(tt) then tt:Show() end
         elseif ownTooltip then
             tt:SetOwner(self, "ANCHOR_TOP")
-            if add(tt, true) then tt:Show() else tt:Hide() end
+            lastRows.tt = nil
+            if add(tt, true) then
+                tt:Show()
+                -- Shown now, in its final font (a UI addon such as EllesmereUI sets its
+                -- own on show): line up again and show again to fit.
+                if lastRows.tt == tt then
+                    Align(tt, lastRows.first, lastRows.rows, lastRows.labels)
+                    tt:Show()
+                end
+            else
+                tt:Hide()
+            end
         end
     end)
     if ownTooltip then

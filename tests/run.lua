@@ -1556,7 +1556,7 @@ test("overview row tooltip counts recipes still giving skill-ups", function()
     local row = overviewRows()[3] -- High
     row.scripts.OnEnter(row)
     local text = textOf(GameTooltip.lines)
-    assert(text:find("Tailoring = 200" .. G .. "  (2 skill-up recipes)|r", 1, true), text)
+    assert(text:find("Tailoring = 200  " .. G .. "(2 skill-up recipes)|r", 1, true), text)
     assert(text:find("Enchanting = 180\n", 1, true) or text:find("Enchanting = 180$"), text)
     SlashCmdList.ALTSFOREVER("skillups")
     row.scripts.OnEnter(row)
@@ -1601,7 +1601,7 @@ test("overview: at a rank cap it says to train; at 300 it says nothing extra", f
     local row = overviewRows()[3] -- High
     row.scripts.OnEnter(row)
     local text = textOf(GameTooltip.lines)
-    assert(text:find("Tailoring = 225" .. G .. "  (train to skill up)|r", 1, true), text)
+    assert(text:find("Tailoring = 225  " .. G .. "(train to skill up)|r", 1, true), text)
     assert(text:find("Enchanting = 300\n", 1, true) or text:find("Enchanting = 300$"), text)
 end)
 
@@ -2710,6 +2710,39 @@ test("session stats carry over a /reload, but start again on a real login", func
     saved = AltsForeverDB
     seconds, xp, gold = reloaded(true, false, NOW + 1820)
     eq(seconds, 600, "a real login starts again"); eq(xp, 0); eq(gold, "0c")
+end)
+
+test("overview row tooltip: professions line up, skill right-aligned and notes after it", function()
+    wow.load(FILES)
+    wow.now = NOW
+    local rights = measurableTooltip()
+    GameTooltip.Show = function(self) self.shown = true end
+    local saved = overviewAlts()
+    saved.recipeInfo = { Tailoring = { a = "250;A;", b = "150;B;", c = "210;C;,1:1" } }
+    saved.chars["High"].recipes = { Tailoring = { a = true, b = true, c = true } }
+    saved.chars["High"].profs = { Tailoring = 200, Enchanting = 80, Cooking = 1 }
+    wow.login(saved)
+    SlashCmdList.ALTSFOREVER("")
+    local row = overviewRows()[3] -- High
+    row.scripts.OnEnter(row)
+    local texts = {}
+    for i, l in ipairs(GameTooltip.lines) do
+        if l[1] == "Cooking" or l[1] == "Enchanting" or l[1] == "Tailoring" then texts[#texts + 1] = rights[i].text end
+    end
+    eq(#texts, 3, "sorted by name: Cooking, Enchanting, Tailoring")
+    local width = visibleWidth(texts[1], 12)
+    local function skillEnd(t) -- width up to the end of the skill number
+        local lead, rest = t:match("^(|T[^|]-blank%.tga:1:%d+|t)(.*)$")
+        local digits = (rest or t):match("^(%d+)")
+        return visibleWidth((lead or "") .. digits, 12)
+    end
+    local edge = skillEnd(texts[1])
+    for i, t in ipairs(texts) do
+        assert(math.abs(visibleWidth(t, 12) - width) <= 0.5, "row " .. i .. " width: " .. t)
+        assert(math.abs(skillEnd(t) - edge) <= 0.5, "row " .. i .. " skill right edge: " .. t)
+    end
+    assert(texts[3]:find("(2 skill-up recipes)", 1, true), texts[3])
+    clearTooltipLines()
 end)
 
 ---------------------------------------------------------------------------
