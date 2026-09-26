@@ -1,8 +1,12 @@
-## Unreleased
+## Alts Forever 0.7.0
 
-- **Session stats (optional, off by default):** turn on "Show session stats" in the options menu or type `/af stats`. Your XP bar then shows this session's time, XP gained and about how long to level at that pace, and your bag gold shows gold gained or lost this session, today and this week across all your characters. Off, nothing changes.
-- **Tidier item tooltips:** the per-character breakdown is lined up in columns, so the icons, numbers and totals sit under each other even when characters keep an item in different places. The breakdown, and the "skill-ups to" notes, are also a lighter grey, easier to read on the default tooltip. Every line uses the tooltip's own font, so they're all the same size with UI addons like EllesmereUI. The overview's character tooltip lines up its professions the same way. In the overview window the XP percentages line up too, and gathering professions (Fishing, Skinning, Herbalism) no longer say "(0 skill-up recipes)" when their few recipes (Fish Bowl, Camp Chair) have gone grey.
-- **Gold with ElvUI and EllesmereUI bags:** hovering the gold in ElvUI's bags now shows your gold across characters. EllesmereUI's bags have their own gold summary, which stays; if you turn off its gold tracking (in EllesmereUI's bag options), Alts Forever's shows there instead.
+- **Session stats (optional, off by default):** turn on "Show session stats" in the options menu or type `/af stats`.
+  - Your XP bar shows this session's time, XP gained, and about how long to level at that pace.
+  - Your bag gold shows gold gained or lost this session, today and this week across all your characters, in green or red.
+  - A `/reload` doesn't reset the session. With it off, nothing changes.
+- **Tidier tooltips:** item counts, the XP and reputation bar lists, and the professions in the overview's character tooltip are lined up in proper columns, so icons, numbers and totals sit exactly under each other, with any font or UI addon. Every line uses the tooltip's own font, so they're all the same size with UI addons like EllesmereUI. The breakdown and the "skill-ups to" notes are a lighter grey, easier to read on the default tooltip.
+- **Overview window:** the XP percentages line up, and gathering professions (Fishing, Skinning, Herbalism) no longer say "(0 skill-up recipes)" when their few recipes (Fish Bowl, Camp Chair) have gone grey.
+- **Gold with ElvUI and EllesmereUI bags:** hovering the gold in ElvUI's bags shows your gold across characters. EllesmereUI's bags keep their own gold summary; turn off its gold tracking (in EllesmereUI's bag options) to see Alts Forever's there instead.
 
 ## Alts Forever 0.6.0
 
