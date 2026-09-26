@@ -2230,6 +2230,11 @@ test("the XP bar's columns are lined up by measuring them in the tooltip's font"
         rights[i], lefts[i] = fontString(i), fontString(i)
         _G["GameTooltipTextRight" .. i], _G["GameTooltipTextLeft" .. i] = rights[i], lefts[i]
     end
+    GameTooltip.CreateFontString = function()
+        return { SetPoint = function() end, SetAlpha = function() end, SetFont = function() end,
+            SetText = function(self, t) self.text = t end,
+            GetStringWidth = function(self) return width(self.text or "") end }
+    end
     wow.login(overviewAlts())
     wow.fire("PLAYER_ENTERING_WORLD")
     bar.scripts.OnEnter(bar)
@@ -2456,10 +2461,21 @@ local function measurableTooltip()
         rights[i] = fontString()
         _G["GameTooltipTextRight" .. i] = rights[i]
     end
-    UIParent.CreateFontString = function()
-        return { Hide = function() end, SetFont = function(self, _, s) self.size = s end,
+    -- Our measuring font string on the tooltip. wow.secretWidths makes it answer with
+    -- secret values, as the game's tooltips can while Blizzard's code builds them.
+    GameTooltip.CreateFontString = function()
+        return { SetPoint = function() end, SetAlpha = function() end,
+            SetFont = function(self, _, s) self.size = s end,
             SetText = function(self, t) self.text = t end,
-            GetStringWidth = function(self) return visibleWidth(self.text, self.size) end }
+            GetStringWidth = function(self)
+                wow.measured = (wow.measured or 0) + 1
+                -- In game a secret width is still a number; only issecretvalue tells.
+                if wow.secretWidths then
+                    wow.SECRET = 4242.5
+                    return 4242.5
+                end
+                return visibleWidth(self.text or "", self.size)
+            end }
     end
     return rights
 end
@@ -2742,6 +2758,24 @@ test("overview row tooltip: professions line up, skill right-aligned and notes a
         assert(math.abs(skillEnd(t) - edge) <= 0.5, "row " .. i .. " skill right edge: " .. t)
     end
     assert(texts[3]:find("(2 skill-up recipes)", 1, true), texts[3])
+    clearTooltipLines()
+end)
+
+test("secret widths (while Blizzard builds a tooltip) leave the plain text, no error", function()
+    wow.load(FILES)
+    local rights = measurableTooltip()
+    wow.secretWidths = true
+    columnAlts()
+    local lines = wow.hover(GameTooltip, 100)
+    eq(lines[2][1], "Total")
+    for i = 3, #lines do eq(rights[i].text, nil, "line " .. i .. " left as added") end
+    -- Once widths can be read again, the next hover lines them up.
+    wow.secretWidths = nil
+    wow.hover(GameTooltip, 100)
+    assert(rights[3].text, "lined up")
+    -- A secret font is left alone too.
+    rights[3].GetFont = function() return wow.SECRET, 12, "" end
+    GameTooltip.hooks.OnShow(GameTooltip)
     clearTooltipLines()
 end)
 

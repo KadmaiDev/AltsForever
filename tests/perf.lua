@@ -87,7 +87,11 @@ garbage("tooltip: item already hovered", 5000, function()
 end)
 -- The game's tooltips have named lines, so their columns get lined up.
 local named = { AddLine = nop.AddLine, AddDoubleLine = nop.AddDoubleLine, NumLines = nop.NumLines,
-    GetName = function() return "PerfTooltip" end }
+    GetName = function() return "PerfTooltip" end,
+    CreateFontString = function()
+        return { SetPoint = function() end, SetAlpha = function() end, SetFont = function() end,
+            SetText = function(self, t) self.t = t end, GetStringWidth = function(self) return #self.t * 6 end }
+    end }
 local lines = {}
 for i = 1, 40 do
     lines[i] = { GetFont = function() return "font", 12, "" end, SetFont = function() end,
