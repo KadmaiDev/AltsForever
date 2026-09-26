@@ -2336,6 +2336,29 @@ test("ElvUI's and EllesmereUI's reputation bar tooltips get the lines added at t
     end
 end)
 
+test("everything in the menus can also be done with a command", function()
+    wow.load(FILES)
+    wow.login(mailAlts())
+    SlashCmdList.ALTSFOREVER("minimap")
+    eq(AltsForeverMinimapButton:IsShown(), false); eq(AltsForeverDB.minimapHidden, true)
+    assert(wow.printed[#wow.printed]:find("/af minimap brings it back", 1, true))
+    SlashCmdList.ALTSFOREVER("minimap")
+    eq(AltsForeverMinimapButton:IsShown(), true); eq(AltsForeverDB.minimapHidden, nil)
+    SlashCmdList.ALTSFOREVER("sendmail")
+    eq(AltsForeverDB.sendToAltOff, true)
+    wow.fire("MAIL_SHOW")
+    eq(altsButton(), nil, "no arrow while it's off")
+    SlashCmdList.ALTSFOREVER("sendmail")
+    eq(AltsForeverDB.sendToAltOff, nil)
+    SlashCmdList.ALTSFOREVER("rep")
+    eq(AltsForeverRepFrame:IsShown(), true)
+    SlashCmdList.ALTSFOREVER("rep")
+    eq(AltsForeverRepFrame:IsShown(), false)
+    SlashCmdList.ALTSFOREVER("help")
+    local help = table.concat(wow.printed, "\n")
+    assert(help:find("rep | mail | list | delete Name | skillups | sendmail | minimap | mem", 1, true), help)
+end)
+
 ---------------------------------------------------------------------------
 -- Minimap button
 test("a minimap button is made as soon as saved data loads (before login)", function()

@@ -54,9 +54,12 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | Command | What it does |
 |---|---|
 | `/af` | Open or close the overview window |
+| `/af rep` | Open or close the Reputation panel |
 | `/af mail` | List every character's soonest mail expiry |
 | `/af list` | List stored characters |
 | `/af skillups` | Turn the skill-up details in tooltips on or off |
+| `/af sendmail` | Turn the send-to-alt arrow at the mailbox on or off |
+| `/af minimap` | Show or hide the minimap button |
 | `/af delete Full Name` | Forget a character, e.g. `/af delete Thessa Oakenbrook` |
 | `/af mem` | Show the addon's memory use |
 

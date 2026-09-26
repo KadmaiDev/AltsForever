@@ -227,14 +227,28 @@ function commands.skillups()
     Print(ns.db.skillupsOff and "Skill-up details in tooltips off." or "Skill-up details in tooltips on.")
 end
 
+function commands.minimap()
+    ns.SetMinimapButton(not ns.MinimapButtonOn())
+    Print(ns.MinimapButtonOn() and "Minimap button shown." or "Minimap button hidden. /af minimap brings it back.")
+end
+
+function commands.sendmail()
+    ns.SetSendToAlt(not ns.SendToAltOn())
+    Print(ns.SendToAltOn() and "Send to alt arrow at the mailbox on." or "Send to alt arrow at the mailbox off.")
+end
+
+function commands.rep()
+    ns.ToggleReputation()
+end
+
 function commands.mem()
     UpdateAddOnMemoryUsage()
     Print(("Memory: %.1f KB"):format(GetAddOnMemoryUsage(ADDON)))
 end
 
 function commands.help()
-    Print("by Kadmai. /af opens the overview. Also: /af mail | list | delete Name | skillups | mem")
-    Print("Or click Alts Forever in the minimap's addon menu (right-click for options).")
+    Print("by Kadmai. /af opens the overview. Also: /af rep | mail | list | delete Name | skillups | sendmail | minimap | mem")
+    Print("Or use the minimap button (right-click for options).")
 end
 ns.ShowHelp = commands.help
 
