@@ -142,6 +142,8 @@ function M.load(files)
         end
     end
     function frameMethods:GetChildren() return unpack(self.children or {}) end
+    function frameMethods:GetParent() return self.parent end
+    function frameMethods:GetPoint() if self.point then return unpack(self.point) end end
     function frameMethods:Show()
         local was = self.shown
         self.shown = true
@@ -431,6 +433,7 @@ function M.load(files)
     MainStatusTrackingBarContainer, SecondaryStatusTrackingBarContainer = nil, nil
     ElvUI_ExperienceBarHolder, EllesmereEAB_XPBar = nil, nil
     ElvUI_ReputationBarHolder, EllesmereEAB_RepBar = nil, nil
+    EUI_Bags, EUI_BagMoneyFrame, ElvUI_ContainerFrame = nil, nil, nil
     local ns = {}
     for _, file in ipairs(files) do
         assert(loadfile(file))("AltsForever", ns)

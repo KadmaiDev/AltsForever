@@ -1,3 +1,7 @@
+## Unreleased
+
+- **Gold with ElvUI and EllesmereUI bags:** hovering the gold in ElvUI's bags now shows your gold across characters. EllesmereUI's bags have their own gold summary, which stays; if you turn off its gold tracking (in EllesmereUI's bag options), Alts Forever's shows there instead.
+
 ## Alts Forever 0.6.0
 
 - **Your alts on the XP bar:** hover the experience bar to see your other characters that are still levelling, with their level, XP and rested XP (including what they've built up while logged out), lined up in columns.

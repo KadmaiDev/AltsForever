@@ -2,7 +2,7 @@
 -- money shown in your bags or bank.
 local _, ns = ...
 
-local pairs, sort, wipe, GetMoney = pairs, table.sort, wipe, GetMoney
+local pairs, select, sort, type, wipe, GetMoney = pairs, select, table.sort, type, wipe, GetMoney
 local issecretvalue = issecretvalue or function() return false end
 local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
 
@@ -86,6 +86,61 @@ local function HookButtons()
     end
 end
 
+-- EllesmereUIBags replaces the bags with its own, whose money display (EUI_BagMoneyFrame)
+-- has an invisible hover area on top showing EllesmereUI's own gold summary. That's the
+-- player's choice, so ours shows there only when they've turned EllesmereUI's gold
+-- tracking off (its summary then shows nothing). The setting is read on every hover, so
+-- switching it applies straight away.
+local function EllesmereGoldOff()
+    local db = EllesmereUI and EllesmereUI._bagsDB
+    local profile = type(db) == "table" and db.profile
+    return type(profile) == "table" and profile.enableGoldTracking == false
+end
+
+-- Our gold tooltip just above a bag addon's money display.
+local function ShowAbove(self)
+    local tt = GameTooltip
+    tt:SetOwner(self, "ANCHOR_NONE")
+    tt:ClearAllPoints()
+    tt:SetPoint("BOTTOMRIGHT", self, "TOPRIGHT", 0, 2)
+    ns.AddMoneyLines(tt)
+    tt:Show()
+end
+
+local function EllesmereEnter(self)
+    if EllesmereGoldOff() then ShowAbove(self) end
+end
+
+-- The hover area is an unnamed frame beside the money display, anchored to it. Found
+-- and hooked once, the first time the bags are shown.
+local function HookEllesmereBags()
+    local money = EUI_BagMoneyFrame
+    local footer = money and money.GetParent and money:GetParent()
+    if not footer or hooked[money] then return end
+    for i = 1, select("#", footer:GetChildren()) do
+        local child = select(i, footer:GetChildren())
+        local anchor
+        if child.GetPoint then anchor = select(2, child:GetPoint(1)) end
+        if child ~= money and anchor == money and child.HookScript and not hooked[child] then
+            hooked[money], hooked[child] = true, true
+            child:HookScript("OnEnter", EllesmereEnter)
+            child:HookScript("OnLeave", OnLeave)
+            return
+        end
+    end
+end
+
+-- ElvUI's bags: the gold text has a click area (pickupGold) but no tooltip, so ours
+-- shows there. ElvUI's own gold across characters is on its Gold datatext, left alone.
+local function HookElvUIBags()
+    local bags = ElvUI_ContainerFrame
+    local area = bags and bags.pickupGold
+    if not area or hooked[area] or not area.HookScript then return end
+    hooked[area] = true
+    area:HookScript("OnEnter", ShowAbove)
+    area:HookScript("OnLeave", OnLeave)
+end
+
 function ns.StartMoney()
     local char = ns.char
 
@@ -101,4 +156,7 @@ function ns.StartMoney()
 
     HookButtons()
     ns.On("BANKFRAME_OPENED", HookButtons)
+    if EUI_Bags and EUI_Bags.HookScript then EUI_Bags:HookScript("OnShow", HookEllesmereBags) end
+    -- ElvUI builds its bags during its own login setup; this runs after every addon's.
+    ns.On("PLAYER_ENTERING_WORLD", HookElvUIBags)
 end
