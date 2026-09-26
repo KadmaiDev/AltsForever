@@ -2,7 +2,7 @@
 package.path = "tests/?.lua;" .. package.path
 local wow = require("wow")
 
-local FILES = { "Core.lua", "Scanner.lua", "Mail.lua", "Money.lua", "Professions.lua", "Character.lua", "Overview.lua", "Gear.lua", "Tooltip.lua", "Options.lua", "Reputation.lua", "Skin.lua" }
+local FILES = { "Core.lua", "Scanner.lua", "Mail.lua", "Money.lua", "Professions.lua", "Character.lua", "Columns.lua", "Overview.lua", "Bars.lua", "Gear.lua", "Tooltip.lua", "Options.lua", "Reputation.lua", "Skin.lua" }
 local tests, passed, failed = {}, 0, 0
 
 local function test(name, fn) tests[#tests + 1] = { name = name, fn = fn } end

@@ -27,7 +27,9 @@ Mail.lua
 Money.lua
 Professions.lua
 Character.lua
+Columns.lua
 Overview.lua
+Bars.lua
 Gear.lua
 Tooltip.lua
 Options.lua

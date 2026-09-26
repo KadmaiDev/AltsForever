@@ -76,12 +76,12 @@ luajit tests/run.lua
 
 ## Design notes
 
-- Item counts are stored as `itemID -> count` per location per character, without slot positions or item links. The rest is small: each equipped item's link (for the gear panel), learned recipe names with what they make, their grey point and reagents (one short string per recipe your characters know), and a few numbers such as level, gold and time played. Five characters take 17 KB on disk.
+- Item counts are stored as `itemID -> count` per location per character, without slot positions or item links. The rest is small: each equipped item's link (for the gear panel), learned recipe names with what they make, their grey point and reagents (one short string per recipe your characters know), and a few numbers such as level, gold and time played. Five characters take about 25 KB on disk.
 - Scans only happen on events. `BAG_UPDATE_DELAYED` groups a batch of changes into one scan, and only when a carried bag changed. There are no OnUpdate handlers.
 - Scans refill the existing tables and read stacks through one reused `ItemLocation`, so a scan allocates nothing.
-- Other characters' tooltip lines are built once per item and cached, up to 500 items. The current character's line is recomputed only when their data changes. Hovering an item again creates no garbage.
+- Other characters' tooltip lines are built once per item and cached, up to 500 items, and so is their column layout. The current character's line is recomputed only when their data changes. Hovering an item again creates no garbage.
 - The overview and gear windows aren't created until you first open them.
-- Measured outside the game (`luajit tests/perf.lua`): about 100 KB for the addon, plus 8-9 KB per character. `/af mem` shows the real figure in game.
+- Measured outside the game (`luajit tests/perf.lua`): about 195 KB for the addon, nearly all of it the addon's own code, plus about 9 KB per character (five characters: about 240 KB). Nothing grows while you play. `/af mem` shows the real figure in game.
 
 ## Development
 
