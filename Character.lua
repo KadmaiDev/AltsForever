@@ -151,9 +151,35 @@ function ns.SessionXP(now)
     return seconds, sessionXP, toLevel
 end
 
+-- /reload keeps the session: a reload fires PLAYER_LOGOUT like a real logout, so the
+-- session's numbers are saved then, and PLAYER_ENTERING_WORLD says whether the UI came
+-- back from a reload (keep them) or a fresh login (start again). One small write at
+-- logout, one check when entering the world; nothing while playing.
+local function SaveSession()
+    ns.db.session = { key = ns.charKey, at = time(), start = sessionStart, xp = sessionXP,
+        gold = ns.SessionGold and ns.SessionGold() }
+end
+
+local checkedSession = false
+local function RestoreSession(_, isReloadingUi)
+    if checkedSession then return end
+    checkedSession = true
+    local s = ns.db.session
+    ns.db.session = nil
+    if not (s and s.key == ns.charKey and s.start) then return end
+    -- The event's second value says it's a reload; if a client doesn't send it, a
+    -- logout under a minute ago counts as one.
+    local reload = isReloadingUi == true or (isReloadingUi == nil and time() - (s.at or 0) < 60)
+    if not reload then return end
+    sessionStart, sessionXP = s.start, s.xp or 0
+    if s.gold and ns.SetSessionGold then ns.SetSessionGold(s.gold) end
+end
+
 function ns.StartCharacter()
     local char = ns.char
     sessionStart = time()
+    ns.On("PLAYER_LOGOUT", SaveSession)
+    ns.On("PLAYER_ENTERING_WORLD", RestoreSession)
     local function Scan()
         ns.ScanCharacter(char)
         TrackXP(char)

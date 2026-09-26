@@ -35,6 +35,10 @@ local KEEP_DAYS = 400
 local dayOffset, today, nextDay = 0, nil, 0
 local sessionStart -- this character's gold at login
 
+-- For keeping the session across /reload (Character.lua).
+function ns.SessionGold() return sessionStart end
+function ns.SetSessionGold(copper) sessionStart = copper end
+
 local function AccountTotal()
     local total = 0
     for _, c in pairs(ns.db.chars) do
