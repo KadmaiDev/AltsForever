@@ -377,24 +377,24 @@ end
 -- lines are built only on hover.
 ---------------------------------------------------------------------------
 
--- Tooltip text isn't monospaced, so columns are lined up by measuring each value and
--- padding with a transparent texture (a spacer) of the missing width. Shared with the
--- item tooltip (Tooltip.lua).
---  * Measuring happens in the tooltip's own line (ns.MeasureIn), which is exact. Other
---    font strings, even our own on the tooltip, disagree about spacers: in game the
---    tooltip drew them at about 87% of what those measured (rows came out up to 7 units
---    apart), while text widths agreed (checked 2026-09-26).
---  * While Blizzard's secure code builds a tooltip, its lines' widths read as secret
---    values. Then the text is measured in our own font string on the tooltip, with the
---    spacer scale learned from a real line earlier (remembered per font and size). With
---    none learned yet, the plain text stays and a later hover lines it up.
---  * Every width and font read is checked with issecretvalue first.
---  * Spacers are calibrated: a 100-unit one is measured first and every spacer scaled.
---  * Spacers are whole units; each one's rounding is carried into the next one to its
---    left (rows are right-aligned, so build them from the right: ns.StartRow, then ns.Pad
---    right to left), keeping everything within half a unit of its place.
+-- Columns in tooltips. Tooltip text isn't monospaced, so columns are laid out with font
+-- strings of our own on the tooltip: each cell is a font string set to its column's
+-- width, justified in it, and anchored a measured distance from the right edge of its
+-- line. The game positions them, so they line up exactly in any font. The line's own
+-- right-hand text becomes a transparent spacer that makes the tooltip wide enough.
+--  * Padding the text with spacers was tried first and couldn't be made exact: the
+--    tooltip draws spacers at a width that depends on the font (84-90% of what any
+--    font string measures), and rows came out up to 7 units apart (2026-09-26).
+--  * Text widths are measured in a hidden font string of our own on the tooltip; they
+--    agree with the tooltip's lines. The lines' own widths can read as secret values
+--    while Blizzard's secure code builds a tooltip, so they're never used.
+--  * Every width and font read is checked with issecretvalue first; if anything can't
+--    be read, the plain text stays.
+--  * Cells are made once per tooltip and reused, and hidden when the tooltip is cleared
+--    or hidden.
 local BLANK = "Interface\\AddOns\\" .. ADDON .. "\\media\\blank.tga"
 local GAP = 10
+local RESERVE = 1.25 -- spacers draw at 84-100% of their width: reserve enough room
 
 local function Spacer(width)
     width = floor(width + 0.5)
@@ -404,17 +404,26 @@ end
 ns.Spacer = Spacer
 
 local issecretvalue = issecretvalue or function() return false end
-local measuring, spacerScale, carry = nil, 1, 0
-local measurers = {} -- [tooltip] = our measuring font string on it
-local scales = {}    -- [font][size] = spacer scale learned from a real tooltip line
-local restoreLine, restoreText -- a tooltip line being measured in, and its text
+local measurers = {} -- [tooltip] = hidden font string for measuring
+local pools = {}     -- [tooltip] = { used = n, [i] = cell font string }
+local lineTexts = {} -- [tooltip] = { TextLeft = { [line] = fs }, TextRight = { ... } }
 
--- The width of s in the font string being measured in, or nil if it can't be measured.
-function ns.TextWidth(s)
-    measuring:SetText(s)
-    local w = measuring:GetStringWidth()
-    if issecretvalue(w) or type(w) ~= "number" then return nil end
-    return w
+-- A tooltip line's font string (e.g. GameTooltipTextRight12), remembered so repeat
+-- hovers don't build its name again. Lines are made as the tooltip first needs them, so
+-- a missing one isn't remembered.
+function ns.LineText(tt, side, line)
+    local byTip = lineTexts[tt]
+    if not byTip then
+        byTip = { TextLeft = {}, TextRight = {} }
+        lineTexts[tt] = byTip
+    end
+    local fs = byTip[side][line]
+    if not fs then
+        local name = tt.GetName and tt:GetName()
+        fs = name and _G[name .. side .. line]
+        byTip[side][line] = fs
+    end
+    return fs
 end
 
 -- A font as read from a font string, if it can be used (not secret).
@@ -422,69 +431,109 @@ function ns.UsableFont(font, size, flags)
     return font and not issecretvalue(font) and not issecretvalue(size) and not issecretvalue(flags)
 end
 
--- Starts measuring on tooltip tt in the given font: in `line` (one of its lines, whose
--- text the caller sets afterwards) if its widths can be read, otherwise in our own font
--- string with a spacer scale learned earlier. Returns false if it can't measure.
-function ns.MeasureIn(tt, font, size, flags, line)
-    if not ns.UsableFont(font, size, flags) then return false end
-    local bySize = scales[font]
-    restoreLine = nil
-    if line and line.GetStringWidth and line.GetText then
-        local text = line:GetText()
-        if not issecretvalue(text) then restoreLine, restoreText = line, text end
-    end
-    if restoreLine then
-        measuring = line
-        local unit = ns.TextWidth(Spacer(100))
-        if unit and unit > 0 then
-            spacerScale = unit / 100
-            if not bySize then
-                bySize = {}
-                scales[font] = bySize
-            end
-            bySize[size] = spacerScale
-            return true
-        end
-        line:SetText(restoreText)
-        restoreLine = nil
-    end
-    local known = bySize and bySize[size]
-    if not known then return false end
+local function Width(m, s)
+    m:SetText(s)
+    local w = m:GetStringWidth()
+    if issecretvalue(w) or type(w) ~= "number" then return nil end
+    return w
+end
+
+-- Measures rows of cells (rows[i][col], nil or "" for an empty cell) for a column spec
+-- (spec[col] = { gap = space before the column, justify = "LEFT" or "RIGHT" }). Returns
+-- a layout { widths, right (each column's distance from the line's right edge), reserve
+-- (the spacer that makes room), font, size, flags }, or nil if it can't be measured.
+function ns.MeasureColumns(tt, rows, spec, font, size, flags)
+    if not (ns.UsableFont(font, size, flags) and tt.CreateFontString) then return nil end
     local m = measurers[tt]
     if not m then
-        if not tt.CreateFontString then return false end
         m = tt:CreateFontString(nil, "BACKGROUND")
         m:SetPoint("TOPLEFT")
         m:SetAlpha(0)
         measurers[tt] = m
     end
     m:SetFont(font, size, flags)
-    measuring, spacerScale = m, known
-    return true
+    local columns, widths = #spec, {}
+    for col = 1, columns do widths[col] = 0 end
+    for _, cells in ipairs(rows) do
+        for col = 1, columns do
+            local s = cells[col]
+            if s and s ~= "" then
+                local w = Width(m, s)
+                if not w then
+                    m:SetText("")
+                    return nil
+                end
+                if w > widths[col] then widths[col] = w end
+            end
+        end
+    end
+    m:SetText("")
+    local right, x = {}, 0
+    for col = columns, 1, -1 do
+        right[col] = x
+        x = x + widths[col] + (col > 1 and spec[col].gap or 0)
+    end
+    return { widths = widths, right = right, reserve = Spacer(x * RESERVE + 1),
+        font = font, size = size, flags = flags }
 end
 
--- Done measuring: our own font string is cleared, and a tooltip line measured in gets
--- its text back unless `keep` (the caller is about to set it).
-function ns.MeasureDone(keep)
-    for _, m in pairs(measurers) do
-        if measuring == m then m:SetText("") end
-    end
-    if restoreLine and not keep then restoreLine:SetText(restoreText) end
-    restoreLine = nil
+-- Hides a tooltip's cells.
+function ns.ClearColumns(tt)
+    local pool = pools[tt]
+    if not pool then return end
+    for i = 1, pool.used do pool[i]:Hide() end
+    pool.used = 0
 end
 
-function ns.StartRow() carry = 0 end
+local function ClearOnHide(tt) ns.ClearColumns(tt) end
 
--- A spacer that draws `width` wide, carrying its rounding to the next one on its left.
-function ns.Pad(width)
-    width = width + carry
-    local n = floor(width / spacerScale + 0.5)
-    if n < 1 then
-        carry = width
-        return ""
+-- Places rows' cells on lines first, first + 1, ... with a layout from MeasureColumns,
+-- replacing whatever cells the tooltip had. Returns true if a line's text changed (the
+-- tooltip then needs a Show to fit it).
+function ns.PlaceColumns(tt, first, rows, spec, layout)
+    local pool = pools[tt]
+    if not pool then
+        pool = { used = 0 }
+        pools[tt] = pool
+        if tt.HookScript then
+            tt:HookScript("OnTooltipCleared", ClearOnHide)
+            tt:HookScript("OnHide", ClearOnHide)
+        end
     end
-    carry = width - n * spacerScale
-    return Spacer(n)
+    ns.ClearColumns(tt)
+    local used, changed = 0, false
+    local widths, right = layout.widths, layout.right
+    for i, cells in ipairs(rows) do
+        local line = ns.LineText(tt, "TextRight", first + i - 1)
+        if not line then break end
+        local current = line:GetText()
+        if issecretvalue(current) or current ~= layout.reserve then
+            line:SetText(layout.reserve)
+            changed = true
+        end
+        for col = 1, #spec do
+            local s = cells[col]
+            if s and s ~= "" then
+                used = used + 1
+                local fs = pool[used]
+                if not fs then
+                    fs = tt:CreateFontString(nil, "ARTWORK")
+                    fs:SetWordWrap(false)
+                    fs:SetTextColor(1, 1, 1)
+                    pool[used] = fs
+                end
+                fs:SetFont(layout.font, layout.size, layout.flags)
+                fs:SetWidth(widths[col] + 1)
+                fs:SetJustifyH(spec[col].justify or "RIGHT")
+                fs:ClearAllPoints()
+                fs:SetPoint("RIGHT", line, "RIGHT", -right[col], 0)
+                fs:SetText(s)
+                fs:Show()
+            end
+        end
+    end
+    pool.used = used
+    return changed
 end
 
 -- Lines up the right-hand columns of the rows added from line `first` on; leaves the
@@ -495,56 +544,38 @@ end
 -- tooltip hasn't needed before gets a new font string, which a UI addon that restyled
 -- the existing ones (EllesmereUI) hasn't reached, so it would show in the game's font.
 local function Align(tt, first, rows, labels, lefts)
-    local name = tt.GetName and tt:GetName()
-    local fs = name and _G[name .. "TextLeft2"]
+    local body = ns.LineText(tt, "TextLeft", 2)
     local font, size, flags
-    if fs and fs.GetFont then font, size, flags = fs:GetFont() end
+    if body and body.GetFont then font, size, flags = body:GetFont() end
     if not ns.UsableFont(font, size, flags) then return end
     for line = first - 1, first + #rows - 1 do
         for _, side in ipairs({ "TextLeft", "TextRight" }) do
-            local text = _G[name .. side .. line]
+            local text = ns.LineText(tt, side, line)
             if text and text.SetFont then text:SetFont(font, size, flags) end
         end
     end
-    if not ns.MeasureIn(tt, font, size, flags, _G[name .. "TextRight" .. first]) then return end
-    local columns, widths, measured = #rows[1] - 1, {}, {}
-    for col = 1, columns do widths[col] = 0 end
+    -- A label becomes its own column just before its value.
+    local spec, cellRows = {}, {}
+    local columns = #rows[1] - 1
+    for col = 1, columns do
+        local justify = lefts and lefts[col] and "LEFT" or "RIGHT"
+        if labels[col] then
+            spec[#spec + 1] = { gap = GAP, justify = "RIGHT" }
+            spec[#spec + 1] = { gap = 0, justify = justify }
+        else
+            spec[#spec + 1] = { gap = GAP, justify = justify }
+        end
+    end
     for i, row in ipairs(rows) do
-        measured[i] = {}
+        local cells = {}
         for col = 1, columns do
-            local w = ns.TextWidth(row[col + 1])
-            if not w then return ns.MeasureDone() end
-            measured[i][col] = w
-            if w > widths[col] then widths[col] = w end
+            if labels[col] then cells[#cells + 1] = labels[col] end
+            cells[#cells + 1] = row[col + 1]
         end
+        cellRows[i] = cells
     end
-    local texts = {}
-    for i, row in ipairs(rows) do
-        ns.StartRow()
-        local text = ""
-        -- Spacers are made right to left (each carries its rounding to the next on its left).
-        for col = columns, 1, -1 do
-            local gap = col > 1 and GAP or 0
-            local spare = widths[col] - measured[i][col]
-            if lefts and lefts[col] then
-                local after = ns.Pad(spare)
-                text = (labels[col] or "") .. row[col + 1] .. after .. text
-                text = ns.Pad(gap) .. text
-            elseif labels[col] then
-                local fill = ns.Pad(spare)
-                text = labels[col] .. fill .. row[col + 1] .. text
-                text = ns.Pad(gap) .. text
-            else
-                text = ns.Pad(gap + spare) .. row[col + 1] .. text
-            end
-        end
-        texts[i] = text
-    end
-    ns.MeasureDone(true)
-    for i, text in ipairs(texts) do
-        local right = _G[name .. "TextRight" .. (first + i - 1)]
-        if right then right:SetText(text) end
-    end
+    local layout = ns.MeasureColumns(tt, cellRows, spec, font, size, flags)
+    if layout then ns.PlaceColumns(tt, first, cellRows, spec, layout) end
 end
 
 ns.AlignColumns = Align

@@ -139,168 +139,89 @@ local function BuildOthers(id)
 end
 
 ---------------------------------------------------------------------------
--- Columns. Tooltip text isn't monospaced, so each row's breakdown is lined up by
--- measuring it in the tooltip's font and padding with transparent spacers. Columns fill
--- from the right: the count at the edge, the place before it next, and so on, so the
--- numbers and icons line up down the list even when characters keep an item in a
--- different number of places. The result is kept with the cached rows and redone only
--- when the current character's line or the font changes.
+-- Columns. The breakdown is laid out in columns with ns.MeasureColumns/PlaceColumns
+-- (Overview.lua): each place is an icon then its number (right-aligned), and the count
+-- is last, at the edge. Columns fill from the right, so the icons and numbers line up
+-- down the list even when characters keep an item in a different number of places. The
+-- cells and their widths are kept with the cached rows (per font) and redone only when
+-- the current character's line or the font changes, so repeat hovers only place them.
 ---------------------------------------------------------------------------
-local GAP = 8
-local fontStrings = {} -- [tooltip] = { TextLeft = { [line] = fs }, TextRight = { ... } }
+local GAP, ICON_GAP = 8, 3
 
--- A tooltip line's font string (e.g. GameTooltipTextLeft2), remembered so repeat hovers
--- don't build its name again. Lines are made as the tooltip first needs them, so a
--- missing one isn't remembered.
-local function LineText(tt, side, line)
-    local fs = fontStrings[tt]
-    if not fs then
-        fs = { TextLeft = {}, TextRight = {} }
-        fontStrings[tt] = fs
-    end
-    local t = fs[side][line]
-    if not t then
-        local name = tt.GetName and tt:GetName()
-        t = name and _G[name .. side .. line]
-        fs[side][line] = t
-    end
-    return t
-end
-
--- Measuring (in the tooltip's own line), spacer calibration and rounding: see
--- ns.MeasureIn / ns.Pad in Overview.lua.
-local W, Pad = function(s) return ns.TextWidth(s) end, function(w) return ns.Pad(w) end
-
--- One row's right-hand text, built from the right. Each place is an icon then its
--- number: the icons sit at the same spot in every row and the numbers are right-aligned
--- after them. `places` is the number of place columns; icon[col], num[col] their widest
--- entries.
-local function Row(parts, count, icon, num, places, countWidth)
-    ns.StartRow()
-    local w = W(tostring(count))
-    if not w then return nil end
-    local text = Pad(GAP * 2 + countWidth - w) .. count
-    local offset, lead = places - #parts / 2, 0
-    for col = places, 1, -1 do
-        local gap = col > 1 and GAP or 0
-        if col > offset then
-            local k = (col - offset) * 2
-            local label, n = parts[k - 1] .. " ", tostring(parts[k])
-            local wi, wn = W(label), W(n)
-            if not (wi and wn) then return nil end
-            text = Pad(num[col] - wn) .. n .. "|r" .. text
-            text = Pad(gap + icon[col] - wi) .. GREY .. label .. text
-        else
-            lead = lead + gap + icon[col] + num[col]
-        end
-    end
-    return Pad(lead) .. text
-end
-
--- Measures the rows (yours included) on tooltip tt in the given font and returns their
--- aligned text: { cur = yours, [i] = the other row starting at e[i] }, or nil if it
--- can't be measured.
-local function Measured(e, curParts, tt, font, size, flags, line)
-    if not ns.MeasureIn(tt, font, size, flags, line) then return nil end
-    -- Place columns counted from the right; a row with fewer places leaves the left ones empty.
-    local places = curParts and #curParts / 2 or 0
+-- The item's rows as cells, yours first (the order of the lines), and the column spec;
+-- rebuilt when ns.version changes (your own line).
+local function Grid(e)
+    local grid = e.grid
+    if grid and grid.ver == ns.version then return grid end
+    local places = curCount > 0 and curParts and #curParts / 2 or 0
     for i = 1, e.n * 4, 4 do places = max(places, #e[i + 3] / 2) end
-    local icon, num, countWidth = {}, {}, 0
-    for col = 1, places do icon[col], num[col] = 0, 0 end
-    local function Measure(parts, count)
-        local offset = places - #parts / 2
-        for k = 2, #parts, 2 do
-            local col = offset + k / 2
-            local wi, wn = W(parts[k - 1] .. " "), W(tostring(parts[k]))
-            if not (wi and wn) then return false end
-            icon[col], num[col] = max(icon[col], wi), max(num[col], wn)
+    local spec = {}
+    for p = 1, places do
+        spec[#spec + 1] = { gap = GAP, justify = "LEFT" }           -- icon
+        spec[#spec + 1] = { gap = ICON_GAP, justify = "RIGHT" }     -- its number
+    end
+    spec[#spec + 1] = { gap = GAP * 2, justify = "RIGHT" }          -- the count
+    local function Cells(parts, count)
+        local cells, offset = {}, (places - #parts / 2) * 2
+        for k = 1, #parts, 2 do
+            cells[offset + k] = parts[k]
+            cells[offset + k + 1] = GREY .. parts[k + 1] .. "|r"
         end
-        local w = W(tostring(count))
-        if not w then return false end
-        countWidth = max(countWidth, w)
-        return true
+        cells[places * 2 + 1] = tostring(count)
+        return cells
     end
-    if curParts and not Measure(curParts, curCount) then return nil end
-    for i = 1, e.n * 4, 4 do
-        if not Measure(e[i + 3], e[i]) then return nil end
-    end
-    local result = { ver = ns.version }
-    if curParts then
-        result.cur = Row(curParts, curCount, icon, num, places, countWidth)
-        if not result.cur then return nil end
-    end
-    for i = 1, e.n * 4, 4 do
-        result[i] = Row(e[i + 3], e[i], icon, num, places, countWidth)
-        if not result[i] then return nil end
-    end
-    return result
+    local rows = {}
+    if curCount > 0 and curParts then rows[1] = Cells(curParts, curCount) end
+    for i = 1, e.n * 4, 4 do rows[#rows + 1] = Cells(e[i + 3], e[i]) end
+    grid = { ver = ns.version, spec = spec, rows = rows, layouts = {} }
+    e.grid = grid
+    return grid
 end
 
-local function Align(e, curParts, tt, font, size, flags, line)
-    local result = Measured(e, curParts, tt, font, size, flags, line)
-    ns.MeasureDone(result ~= nil)
-    return result
-end
-
--- The item's aligned rows for a font, cached per font (a UI addon may show the tooltip
--- in a different font from the one its lines start with) and redone when ns.version
--- changes (your own line). Looked up without building a key, so repeat hovers are free.
-local function Aligned(e, tt, font, size, flags, line)
-    local byFont = e.aligned
-    if not byFont then
-        byFont = {}
-        e.aligned = byFont
-    end
-    local bySize = byFont[font]
+-- The grid's layout for a font, measured once per font (a UI addon may show the tooltip
+-- in a different font from the one its lines start with). Looked up without building a
+-- key, so repeat hovers are free.
+local function Layout(grid, tt, font, size, flags)
+    local bySize = grid.layouts[font]
     if not bySize then
         bySize = {}
-        byFont[font] = bySize
+        grid.layouts[font] = bySize
     end
     local byFlags = bySize[size]
     if not byFlags then
         byFlags = {}
         bySize[size] = byFlags
     end
-    local result = byFlags[flags]
-    if not result or result.ver ~= ns.version then
-        result = Align(e, curCount > 0 and curParts, tt, font, size, flags, line)
-        byFlags[flags] = result
+    local layout = byFlags[flags]
+    if not layout then
+        layout = ns.MeasureColumns(tt, grid.rows, grid.spec, font, size, flags)
+        byFlags[flags] = layout -- nil (couldn't measure) is tried again next time
     end
-    return result
+    return layout
 end
 
--- What our lines in each tooltip are, so they can be lined up again once the tooltip
--- is shown: UI addons such as EllesmereUI set their own font on every line then, after
--- our lines were added and measured.
+-- What our lines in each tooltip are, so they can be placed again once the tooltip is
+-- shown: UI addons such as EllesmereUI set their own font on every line then, after our
+-- lines were added.
 local states = {}
 
--- Lines up our rows in the fonts they have now. Returns true if any text changed.
+-- Places our columns in the font the lines have now. Returns true if the tooltip needs
+-- a Show to fit them.
 local function Apply(tt)
     local st = states[tt]
     if not (st and st.e and st.id == lastId and st.row) then return false end
-    local fs = LineText(tt, "TextRight", st.row)
+    local fs = ns.LineText(tt, "TextLeft", st.row)
     if not (fs and fs.GetFont) then return false end
     local font, size, flags = fs:GetFont()
     if not ns.UsableFont(font, size, flags) then return false end
-    local result = Aligned(st.e, tt, font, size, flags or "", fs)
-    if not result then return false end
-    local changed, line = false, st.row
-    local function Set(text)
-        local right = LineText(tt, "TextRight", line)
-        local current = right and right:GetText()
-        if right and text and (issecretvalue(current) or current ~= text) then
-            right:SetText(text)
-            changed = true
-        end
-        line = line + 1
-    end
-    if st.cur then Set(result.cur) end
-    for i = 1, st.e.n * 4, 4 do Set(result[i]) end
-    return changed
+    local grid = Grid(st.e)
+    local layout = Layout(grid, tt, font, size, flags or "")
+    if not layout then return false end
+    return ns.PlaceColumns(tt, st.row, grid.rows, grid.spec, layout)
 end
 
--- After the tooltip is shown (and restyled), line up again in the final font; a change
--- needs another Show so the tooltip resizes to the new text.
+-- After the tooltip is shown (and restyled), place again in the final font; a change
+-- needs another Show so the tooltip resizes.
 local reshowing = {}
 local function OnShow(tt)
     if reshowing[tt] or tt:IsForbidden() then return end

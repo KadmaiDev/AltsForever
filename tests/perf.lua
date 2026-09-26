@@ -87,21 +87,18 @@ garbage("tooltip: item already hovered", 5000, function()
 end)
 -- The game's tooltips have named lines, so their columns get lined up.
 local named = { AddLine = nop.AddLine, AddDoubleLine = nop.AddDoubleLine, NumLines = nop.NumLines,
-    GetName = function() return "PerfTooltip" end,
+    GetName = function() return "PerfTooltip" end, HookScript = function() end,
     CreateFontString = function()
-        return { SetPoint = function() end, SetAlpha = function() end, SetFont = function() end,
+        local noop = function() end
+        return { SetPoint = noop, SetAlpha = noop, SetFont = noop, ClearAllPoints = noop, SetWidth = noop,
+            SetJustifyH = noop, SetWordWrap = noop, SetTextColor = noop, Show = noop, Hide = noop,
             SetText = function(self, t) self.t = t end, GetStringWidth = function(self) return #self.t * 6 end }
     end }
 local lines = {}
 for i = 1, 40 do
     lines[i] = { GetFont = function() return "font", 12, "" end, SetFont = function() end,
-        SetText = function(self, t) self.t = t end, GetText = function(self) return self.t end,
-        GetStringWidth = function(self) return #self.t * 6 end }
+        SetText = function(self, t) self.t = t end, GetText = function(self) return self.t end }
     _G["PerfTooltipTextLeft" .. i], _G["PerfTooltipTextRight" .. i] = lines[i], lines[i]
-end
-UIParent.CreateFontString = function()
-    return { Hide = function() end, SetFont = function() end, SetText = function(self, t) self.t = t end,
-        GetStringWidth = function(self) return #self.t * 6 end }
 end
 garbage("tooltip: item already hovered, columns lined up", 5000, function() ns.AddLines(named, item) end)
 local ids = {}
