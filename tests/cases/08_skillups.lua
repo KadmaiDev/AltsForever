@@ -182,8 +182,13 @@ test("overview row tooltip counts recipes still giving skill-ups", function()
     wow.now = NOW
     local saved = overviewAlts()
     saved.recipeInfo = { Tailoring = { a = "250;A;", b = "150;B;", c = "210;C;,1:1" } }
-    saved.chars["High"].recipes = { Tailoring = { a = true, b = true, c = true }, Fishing = {} }
+    saved.chars["High"].recipes = { Tailoring = { a = true, b = true, c = true }, Fishing = { ["fish bowl"] = true }, Mining = { smelt = true } }
     saved.chars["High"].profs.Fishing = 50
+    saved.chars["High"].profs.Mining = 150
+    -- Fish Bowl is grey at 25; smelting too at 125: gathering professions say nothing at 0,
+    -- others still do.
+    saved.recipeInfo.Fishing = { ["fish bowl"] = "25;Fish Bowl;" }
+    saved.recipeInfo.Mining = { smelt = "125;Smelt;" }
     wow.login(saved)
     eq(ns.SkillupCount(saved.chars["High"], "Tailoring"), 2, "skill 200: a and c")
     eq(ns.SkillupCount(saved.chars["High"], "Enchanting"), nil, "never scanned")
@@ -193,7 +198,8 @@ test("overview row tooltip counts recipes still giving skill-ups", function()
     local text = textOf(GameTooltip.lines)
     assert(text:find("Tailoring = 200  " .. G .. "(2 skill-up recipes)|r", 1, true), text)
     assert(text:find("Enchanting = 180\n", 1, true) or text:find("Enchanting = 180$"), text)
-    assert(text:find("Fishing = 50\n", 1, true) or text:find("Fishing = 50$"), "no recipes: no note\n" .. text)
+    assert(text:find("Fishing = 50\n", 1, true) or text:find("Fishing = 50$"), "gathering, nothing left: no note\n" .. text)
+    assert(text:find("Mining = 150  " .. G .. "(0 skill-up recipes)|r", 1, true), "crafting: 0 still shown\n" .. text)
     SlashCmdList.ALTSFOREVER("skillups")
     row.scripts.OnEnter(row)
     text = textOf(GameTooltip.lines)

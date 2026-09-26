@@ -132,6 +132,7 @@ end
 local frame, rows, footer
 
 local NO_LABELS, NOTE_LEFT = {}, { [2] = true }
+local GATHERING = { Fishing = true, Skinning = true, Herbalism = true }
 local function ByFirst(a, b) return a[1] < b[1] end
 
 local function RowTooltip(row)
@@ -179,8 +180,9 @@ local function RowTooltip(row)
                 if ns.AtRankCap(c, name) then
                     -- At the final maximum there's nothing to train, so say nothing.
                     if skill < MAX_PROFESSION then note = GREY .. "(train to skill up)|r" end
-                elseif n and next(c.recipes[name]) then
-                    -- Not for professions without recipes on record (Fishing): "0" is noise.
+                elseif n and (n > 0 or not GATHERING[name]) and next(c.recipes[name]) then
+                    -- Gathering professions level by gathering; their few recipes (Fish
+                    -- Bowl, Camp Chair) are novelties, so "0" there is noise.
                     note = GREY .. "(" .. n .. " skill-up recipe" .. (n == 1 and "" or "s") .. ")|r"
                 end
             end
