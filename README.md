@@ -60,6 +60,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af skillups` | Turn the skill-up details in tooltips on or off |
 | `/af sendmail` | Turn the send-to-alt arrow at the mailbox on or off |
 | `/af minimap` | Show or hide the minimap button |
+| `/af stats` | Turn session stats on or off (off by default): XP this session and time to level on the XP bar, gold this session, today and this week on your bag gold |
 | `/af delete Full Name` | Forget a character, e.g. `/af delete Thessa Oakenbrook` |
 | `/af mem` | Show the addon's memory use |
 

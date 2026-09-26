@@ -237,6 +237,12 @@ function commands.sendmail()
     Print(ns.SendToAltOn() and "Send to alt arrow at the mailbox on." or "Send to alt arrow at the mailbox off.")
 end
 
+function commands.stats()
+    ns.SetStats(not ns.StatsOn())
+    Print(ns.StatsOn() and "Session stats on: XP this session on the XP bar, gold over time on your bag gold."
+        or "Session stats off.")
+end
+
 function commands.rep()
     ns.ToggleReputation()
 end
@@ -247,7 +253,7 @@ function commands.mem()
 end
 
 function commands.help()
-    Print("by Kadmai. /af opens the overview. Also: /af rep | mail | list | delete Name | skillups | sendmail | minimap | mem")
+    Print("by Kadmai. /af opens the overview. Also: /af rep | mail | list | delete Name | skillups | sendmail | minimap | stats | mem")
     Print("Or use the minimap button (right-click for options).")
 end
 ns.ShowHelp = commands.help

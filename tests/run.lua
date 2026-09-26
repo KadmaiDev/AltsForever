@@ -1725,7 +1725,7 @@ test("minimap compartment: click opens the overview, right-click the options men
     AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
     local texts = {}
     for _, item in ipairs(wow.menu.items) do texts[#texts + 1] = item.text end
-    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Show skill-up details | Send mail to alts | Show minimap button | Memory use")
+    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Show skill-up details | Send mail to alts | Show session stats | Show minimap button | Memory use")
     wow.menuItem("Open overview").fn()
     eq(AltsForeverFrame:IsShown(), true)
     wow.menuItem("Open overview").fn()
@@ -2353,7 +2353,7 @@ test("everything in the menus can also be done with a command", function()
     eq(AltsForeverRepFrame:IsShown(), false)
     SlashCmdList.ALTSFOREVER("help")
     local help = table.concat(wow.printed, "\n")
-    assert(help:find("rep | mail | list | delete Name | skillups | sendmail | minimap | mem", 1, true), help)
+    assert(help:find("rep | mail | list | delete Name | skillups | sendmail | minimap | stats | mem", 1, true), help)
 end)
 
 ---------------------------------------------------------------------------
@@ -2585,6 +2585,79 @@ test("item tooltip columns are measured once per item and font, then reused", fu
     wow.hover(GameTooltip, 100)
     eq(wow.measured, afterOther, "back to the first item: its columns are still cached")
     clearTooltipLines()
+end)
+
+---------------------------------------------------------------------------
+-- Session stats (off by default)
+test("session stats are off by default: no pace on the XP bar, no gold over time", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    local bar = blizzardXPBar()
+    wow.money = 500
+    wow.login(overviewAlts())
+    wow.fire("PLAYER_ENTERING_WORLD")
+    bar.scripts.OnEnter(bar)
+    eq(lineTexts(GameTooltip):find("This session", 1, true), nil)
+    local tt = wow.tooltip()
+    ns.AddMoneyLines(tt)
+    for _, l in ipairs(tt.lines) do assert(l[1] ~= "This session", "no gold stats") end
+end)
+
+test("session stats: XP this session across a level-up, and about how long to level", function()
+    wow.load(FILES)
+    wow.now = NOW
+    local bar = blizzardXPBar()
+    wow.stats.level, wow.stats.xp, wow.stats.xpMax = 24, 5700, 10000
+    wow.login(overviewAlts())
+    wow.fire("PLAYER_ENTERING_WORLD")
+    SlashCmdList.ALTSFOREVER("stats")
+    eq(AltsForeverDB.statsOn, true)
+    wow.stats.xp = 7700
+    wow.fire("PLAYER_XP_UPDATE", "player")
+    wow.stats.level, wow.stats.xp, wow.stats.xpMax = 25, 500, 12000
+    wow.fire("PLAYER_LEVEL_UP", 25)
+    wow.fire("PLAYER_XP_UPDATE", "player")
+    wow.now = NOW + 3600
+    bar.scripts.OnEnter(bar)
+    local lines = {}
+    for _, l in ipairs(GameTooltip.lines) do lines[#lines + 1] = l[1] .. "=" .. tostring(l[2]) end
+    local text = table.concat(lines, " | ")
+    assert(text:find("This session=1h 0m", 1, true), text)
+    assert(text:find("XP gained=4800", 1, true) or text:find("XP gained=4,800", 1, true), text)
+    -- 11,500 XP to go at 4,800 an hour: about 2h 23m.
+    assert(text:find("Time to level=about 2h 23m", 1, true), text)
+    assert(text:find("Your characters", 1, true), "alts still listed after")
+    SlashCmdList.ALTSFOREVER("stats")
+    eq(AltsForeverDB.statsOn, nil)
+end)
+
+test("session stats: gold this session, today and this week across characters", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.money = 1000
+    wow.login({ v = 2, chars = { ["Brak Stone"] = alt("Brak Stone", "WARRIOR", { money = 5000 }) } })
+    local days = AltsForeverDB.goldDays
+    local today
+    for day in pairs(days) do today = day end
+    eq(days[today], 6000, "today's total recorded at login")
+    days[today - 1] = 4000 -- yesterday
+    days[today - 9] = 1000 -- over a week ago
+    wow.money = 1500
+    wow.fire("PLAYER_MONEY")
+    eq(days[today], 6500)
+    SlashCmdList.ALTSFOREVER("stats")
+    local tt = wow.tooltip()
+    ns.AddMoneyLines(tt)
+    local got = {}
+    for _, l in ipairs(tt.lines) do got[l[1]] = l[2] end
+    eq(got["This session"], "+500c")
+    eq(got["Today, all characters"], "+2500c")
+    eq(got["This week, all characters"], "+5500c")
+    -- Days over a year old are dropped when a new day starts.
+    days[today - 500] = 1
+    wow.now = NOW + 86400
+    wow.fire("PLAYER_MONEY")
+    eq(days[today - 500], nil)
 end)
 
 ---------------------------------------------------------------------------

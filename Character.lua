@@ -112,9 +112,52 @@ local function StartPlayed(char)
     end)
 end
 
+---------------------------------------------------------------------------
+-- Session stats: shown only with "Show session stats" on (off by default: some players
+-- don't want a pace to keep up with). Nothing here is saved.
+---------------------------------------------------------------------------
+function ns.StatsOn() return ns.db.statsOn == true end
+
+function ns.SetStats(on)
+    ns.db.statsOn = on or nil
+end
+
+-- XP gained since login, counting level-ups, from each reading of level, XP and max XP.
+local sessionStart, sessionXP = 0, 0
+local lastLevel, lastXP, lastMax
+
+local function TrackXP(c)
+    local level, xp, xpMax = c.level, c.xp, c.xpMax
+    if not (level and xp and xpMax) then return end
+    if lastLevel then
+        if level == lastLevel and xp > lastXP then
+            sessionXP = sessionXP + xp - lastXP
+        elseif level > lastLevel then
+            sessionXP = sessionXP + (lastMax - lastXP) + xp
+        end
+    end
+    lastLevel, lastXP, lastMax = level, xp, xpMax
+end
+
+-- Seconds this session, XP gained, and seconds to level at this session's pace (nil
+-- until there's a pace: some XP gained and a minute played, and not at max level).
+function ns.SessionXP(now)
+    local c = ns.char
+    local seconds = now - sessionStart
+    local toLevel
+    if sessionXP > 0 and seconds >= 60 and c.level and c.level < ns.MaxLevel() and c.xp and c.xpMax then
+        toLevel = (c.xpMax - c.xp) * seconds / sessionXP
+    end
+    return seconds, sessionXP, toLevel
+end
+
 function ns.StartCharacter()
     local char = ns.char
-    local function Scan() ns.ScanCharacter(char) end
+    sessionStart = time()
+    local function Scan()
+        ns.ScanCharacter(char)
+        TrackXP(char)
+    end
     for _, event in ipairs({
         "PLAYER_XP_UPDATE", "UPDATE_EXHAUSTION", "PLAYER_LEVEL_UP", "PLAYER_UPDATE_RESTING",
         "ZONE_CHANGED_NEW_AREA", "HEARTHSTONE_BOUND", "PLAYER_AVG_ITEM_LEVEL_UPDATE",

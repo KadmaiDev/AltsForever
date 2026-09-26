@@ -55,6 +55,8 @@ local function SkillupsSelected() return ns.SkillupsOn() end
 local function ToggleSkillups() ns.SetSkillups(not ns.SkillupsOn()) end
 local function SendToAltSelected() return ns.SendToAltOn() end
 local function ToggleSendToAlt() ns.SetSendToAlt(not ns.SendToAltOn()) end
+local function StatsSelected() return ns.StatsOn() end
+local function ToggleStats() ns.SetStats(not ns.StatsOn()) end
 local function MinimapSelected() return ns.MinimapButtonOn() end
 local function ToggleMinimap() ns.SetMinimapButton(not ns.MinimapButtonOn()) end
 
@@ -69,6 +71,7 @@ function ns.ShowOptionsMenu(owner)
         end
         root:CreateCheckbox("Show skill-up details", SkillupsSelected, ToggleSkillups)
         root:CreateCheckbox("Send mail to alts", SendToAltSelected, ToggleSendToAlt)
+        root:CreateCheckbox("Show session stats", StatsSelected, ToggleStats)
         root:CreateCheckbox("Show minimap button", MinimapSelected, ToggleMinimap)
         root:CreateButton("Memory use", function() ns.RunCommand("mem") end)
     end)

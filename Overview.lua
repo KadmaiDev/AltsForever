@@ -467,9 +467,9 @@ end
 
 -- Adds a "Your characters" section; returns false, adding nothing, if there are no rows.
 -- `title` starts a tooltip we opened ourselves; otherwise a gap follows the bar's own.
-function ns.AddCharacterRows(tt, rows, labels, title)
+function ns.AddCharacterRows(tt, rows, labels, title, noGap)
     if #rows == 0 then return false end
-    if title then tt:AddLine(title, 1, 1, 1) else tt:AddLine(" ") end
+    if title then tt:AddLine(title, 1, 1, 1) elseif not noGap then tt:AddLine(" ") end
     tt:AddLine("Your characters", 1, 0.82, 0)
     local first = tt.NumLines and tt:NumLines() + 1
     for _, row in ipairs(rows) do
@@ -485,7 +485,18 @@ end
 
 local XP_LABELS = { nil, nil, GREY .. "rested|r " }
 
--- Your other characters still levelling: level, XP and rested XP.
+local BigNumber = BreakUpLargeNumbers or tostring
+
+-- This session: time, XP gained and, once there's a pace, about how long to level.
+local function AddSession(tt)
+    local seconds, xp, toLevel = ns.SessionXP(time())
+    tt:AddDoubleLine("This session", ns.FormatPlayed(seconds), 1, 0.82, 0, 1, 1, 1)
+    tt:AddDoubleLine("XP gained", BigNumber(xp), 1, 1, 1, 1, 1, 1)
+    if toLevel then tt:AddDoubleLine("Time to level", "about " .. ns.FormatPlayed(toLevel), 1, 1, 1, 1, 1, 1) end
+end
+
+-- This session's stats (when turned on), then your other characters still levelling:
+-- level, XP and rested XP.
 function ns.AddXPLines(tt, fresh)
     local chars, maxLevel, now = ns.db.chars, ns.MaxLevel(), time()
     local rows = {}
@@ -496,7 +507,16 @@ function ns.AddXPLines(tt, fresh)
             rows[#rows + 1] = { ns.ColoredName(key, c), tostring(c.level), xp, ns.RestedText(c, now) }
         end
     end
-    return ns.AddCharacterRows(tt, rows, XP_LABELS, fresh and "Experience")
+    local me = ns.char
+    local stats = ns.StatsOn() and me.level and me.level < maxLevel
+    if #rows == 0 and not stats then return false end
+    if fresh then tt:AddLine("Experience", 1, 1, 1) else tt:AddLine(" ") end
+    if stats then
+        AddSession(tt)
+        if #rows > 0 then tt:AddLine(" ") end
+    end
+    ns.AddCharacterRows(tt, rows, XP_LABELS, nil, true)
+    return true
 end
 
 -- Blizzard's bars show a tooltip only sometimes, so we open one if none is showing;

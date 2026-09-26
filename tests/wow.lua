@@ -46,7 +46,8 @@ function M.load(files)
     M.SECRET = SECRET
     issecretvalue = function(v) return v == M.SECRET end
     M.now = nil -- set to freeze the clock
-    time = function() return M.now or os.time() end
+    time = function(t) if t then return os.time(t) end return M.now or os.time() end
+    date = os.date
     print = function(msg) M.printed[#M.printed + 1] = msg end
     SlashCmdList = {}
     INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED = 1, 19

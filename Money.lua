@@ -3,6 +3,7 @@
 local _, ns = ...
 
 local pairs, select, sort, type, wipe, GetMoney = pairs, select, table.sort, type, wipe, GetMoney
+local floor, time, date = math.floor, time, date
 local issecretvalue = issecretvalue or function() return false end
 local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
 
@@ -22,8 +23,68 @@ local function ByMoney(a, b) return chars[a].money > chars[b].money end
 local iconSize = 12
 local function Coins(copper) return GetCoinTextureString(copper, iconSize) end
 
+---------------------------------------------------------------------------
+-- Gold over time. db.goldDays[day] = total gold across all characters, the latest
+-- reading that day (days counted in local time), kept for about a year: one number a
+-- day. Recorded whether or not session stats are shown, so the history is there if a
+-- player turns them on later. The day only changes at midnight, so recording costs a
+-- sum over the characters and nothing else.
+---------------------------------------------------------------------------
+local DAY = 86400
+local KEEP_DAYS = 400
+local dayOffset, today, nextDay = 0, nil, 0
+local sessionStart -- this character's gold at login
+
+local function AccountTotal()
+    local total = 0
+    for _, c in pairs(ns.db.chars) do
+        if c.money then total = total + c.money end
+    end
+    return total
+end
+
+local function RecordDay()
+    local now = time()
+    local days = ns.db.goldDays
+    if not today or now >= nextDay then
+        today = floor((now + dayOffset) / DAY)
+        nextDay = (today + 1) * DAY - dayOffset
+        for day in pairs(days) do
+            if day < today - KEEP_DAYS then days[day] = nil end
+        end
+    end
+    days[today] = AccountTotal()
+end
+
+-- The change in total gold since the latest day at least `back` days before today
+-- (1: today; 7: this week), or nil if there's no such day yet.
+local function ChangeSince(back)
+    local days, best = ns.db.goldDays, nil
+    for day in pairs(days) do
+        if day <= today - back and (not best or day > best) then best = day end
+    end
+    return best and AccountTotal() - days[best]
+end
+
+local function Signed(copper)
+    if copper < 0 then return "-" .. GetCoinTextureString(-copper, iconSize) end
+    return "+" .. GetCoinTextureString(copper, iconSize)
+end
+
+-- This session (this character), today and this week (all characters).
+local function AddStats(tt)
+    tt:AddLine(" ")
+    if sessionStart and ns.char.money then
+        tt:AddDoubleLine("This session", Signed(ns.char.money - sessionStart), 1, 0.82, 0, 1, 1, 1)
+    end
+    local day, week = ChangeSince(1), ChangeSince(7)
+    if day then tt:AddDoubleLine("Today, all characters", Signed(day), 1, 1, 1, 1, 1, 1) end
+    if week then tt:AddDoubleLine("This week, all characters", Signed(week), 1, 1, 1, 1, 1, 1) end
+end
+
 -- A "Gold" title, then the same layout as item tooltips: total (only when more
--- than one character has gold), the current character, then others by amount.
+-- than one character has gold), the current character, then others by amount; then
+-- gold over time if session stats are on.
 function ns.AddMoneyLines(tt)
     chars = ns.db.chars
     wipe(order)
@@ -48,6 +109,7 @@ function ns.AddMoneyLines(tt)
         local key = order[i]
         tt:AddDoubleLine(ns.ColoredName(key, chars[key]), Coins(chars[key].money), 1, 1, 1, 1, 1, 1)
     end
+    if ns.StatsOn() then AddStats(tt) end
 end
 
 local function OnEnter(self)
@@ -144,9 +206,18 @@ end
 function ns.StartMoney()
     local char = ns.char
 
+    -- Local time's offset from UTC, so days start at local midnight.
+    local now = time()
+    dayOffset = now - time(date("!*t", now))
+    ns.db.goldDays = ns.db.goldDays or {}
+
     local function Update()
         local m = GetMoney()
-        if not issecretvalue(m) then char.money = m end
+        if not issecretvalue(m) then
+            char.money = m
+            sessionStart = sessionStart or m
+            RecordDay()
+        end
     end
     ns.On("PLAYER_MONEY", Update)
     Update()
