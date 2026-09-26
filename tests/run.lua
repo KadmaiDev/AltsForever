@@ -2205,22 +2205,30 @@ test("the XP bar's columns are lined up by measuring them in the tooltip's font"
     -- A tooltip whose lines have font strings, and text 6 units per visible character.
     GameTooltip.GetName = function() return "GameTooltip" end
     GameTooltip.NumLines = function(self) return #self.lines end
+    local function spacers(t)
+        local w = {}
+        for n in t:gmatch("blank%.tga:1:(%d+)|t") do w[#w + 1] = tonumber(n) end
+        return w
+    end
+    -- Width as drawn: 6 per visible character, spacers their width.
+    local function width(t)
+        local visible = t:gsub("|T.-|t", ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+        local sum = #visible * 6
+        for _, n in ipairs(spacers(t)) do sum = sum + n end
+        return sum
+    end
     -- Line 2 has the tooltip's body font; lines 3 on are new lines in the game's default.
     local rights, lefts = {}, {}
     local function fontString(i)
         local size = i <= 2 and 12 or 14
         return { GetFont = function(self) return self.font or "font", self.size or size, "" end,
             SetFont = function(self, f, s) self.font, self.size = f, s end,
-            SetText = function(self, t) self.text = t end }
+            SetText = function(self, t) self.text = t end,
+            GetStringWidth = function(self) return width(self.text or "") end }
     end
     for i = 1, 10 do
         rights[i], lefts[i] = fontString(i), fontString(i)
         _G["GameTooltipTextRight" .. i], _G["GameTooltipTextLeft" .. i] = rights[i], lefts[i]
-    end
-    UIParent.CreateFontString = function()
-        return { Hide = function() end, SetFont = function() end,
-            SetText = function(self, t) self.text = t end,
-            GetStringWidth = function(self) return #self.text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") * 6 end }
     end
     wow.login(overviewAlts())
     wow.fire("PLAYER_ENTERING_WORLD")
@@ -2228,18 +2236,7 @@ test("the XP bar's columns are lined up by measuring them in the tooltip's font"
     -- High: level 40, 0%, rested 150% (full); Low: 12, 10%, rested ...
     local high, low = rights[3].text, rights[4].text
     assert(high and low, "rows 3 and 4 rewritten")
-    local function spacers(t)
-        local w = {}
-        for n in t:gmatch("blank%.tga:1:(%d+)|t") do w[#w + 1] = tonumber(n) end
-        return w
-    end
     -- Same total width per row: each column padded to its widest value.
-    local function width(t)
-        local visible = t:gsub("|T.-|t", ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-        local sum = #visible * 6
-        for _, n in ipairs(spacers(t)) do sum = sum + n end
-        return sum
-    end
     eq(width(high), width(low), "rows end up the same width")
     for i = 2, 4 do
         eq(select(2, lefts[i]:GetFont()), 12, "left text of line " .. i .. " in the body font")

@@ -165,40 +165,16 @@ local function LineText(tt, side, line)
     return t
 end
 
--- Measuring happens in the tooltip's own line, so the widths come from exactly the font,
--- scale and drawing rules the tooltip uses. (A separate hidden font string measured the
--- spacers wider than the tooltip drew them: in game, rows padded to the same width came
--- out up to 7 units apart, the more padding the bigger the gap. Checked 2026-09-26.)
-local measuring   -- the font string being measured in
-local spacerScale -- how wide the tooltip draws a spacer, per unit asked for
-
-local function W(s)
-    measuring:SetText(s)
-    local w = measuring:GetStringWidth()
-    return type(w) == "number" and w or nil
-end
-
--- A spacer that draws `width` wide in the measured line. Spacers are whole units, so each
--- one's rounding is carried into the next one to its left: the text is right-aligned, so
--- every icon and number stays within half a unit of its place counted from the right.
-local carry = 0
-local function Pad(width)
-    width = width + carry
-    local n = floor(width / spacerScale + 0.5)
-    if n < 1 then
-        carry = width
-        return ""
-    end
-    carry = width - n * spacerScale
-    return ns.Spacer(n)
-end
+-- Measuring (in the tooltip's own line), spacer calibration and rounding: see
+-- ns.MeasureIn / ns.Pad in Overview.lua.
+local W, Pad = function(s) return ns.TextWidth(s) end, function(w) return ns.Pad(w) end
 
 -- One row's right-hand text, built from the right. Each place is an icon then its
 -- number: the icons sit at the same spot in every row and the numbers are right-aligned
 -- after them. `places` is the number of place columns; icon[col], num[col] their widest
 -- entries.
 local function Row(parts, count, icon, num, places, countWidth)
-    carry = 0
+    ns.StartRow()
     local w = W(tostring(count))
     if not w then return nil end
     local text = Pad(GAP * 2 + countWidth - w) .. count
@@ -223,9 +199,7 @@ end
 -- { cur = yours, [i] = the other row starting at e[i] }, or nil if it can't be measured.
 -- Leaves fs's text changed; the caller sets it again.
 local function Align(e, curParts, fs)
-    measuring = fs
-    local unit = W(ns.Spacer(100))
-    spacerScale = (unit and unit > 0) and unit / 100 or 1
+    if not ns.MeasureIn(fs) then return nil end
     -- Place columns counted from the right; a row with fewer places leaves the left ones empty.
     local places = curParts and #curParts / 2 or 0
     for i = 1, e.n * 4, 4 do places = max(places, #e[i + 3] / 2) end

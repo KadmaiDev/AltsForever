@@ -360,12 +360,19 @@ end
 -- lines are built only on hover.
 ---------------------------------------------------------------------------
 
--- Tooltip text isn't monospaced, so the columns are lined up by measuring each value in
--- the tooltip's own font and padding it on the left with a transparent texture of exactly
--- the missing width.
+-- Tooltip text isn't monospaced, so columns are lined up by measuring each value and
+-- padding with a transparent texture (a spacer) of the missing width. Shared with the
+-- item tooltip (Tooltip.lua).
+--  * Measuring happens in the tooltip's own line (ns.MeasureIn), so the widths come from
+--    exactly the font, scale and drawing rules the tooltip uses. A separate hidden font
+--    string disagreed: in game the tooltip drew spacers at about 87% of the width asked
+--    for, so rows padded to the same width came out up to 7 units apart (2026-09-26).
+--  * Spacers are calibrated: a 100-unit one is measured first and every spacer scaled.
+--  * Spacers are whole units; each one's rounding is carried into the next one to its
+--    left (rows are right-aligned, so build them from the right: ns.StartRow, then ns.Pad
+--    right to left), keeping everything within half a unit of its place.
 local BLANK = "Interface\\AddOns\\" .. ADDON .. "\\media\\blank.tga"
 local GAP = 10
-local measure
 
 local function Spacer(width)
     width = floor(width + 0.5)
@@ -374,18 +381,39 @@ local function Spacer(width)
 end
 ns.Spacer = Spacer
 
--- The width of s in the given font, or nil if it can't be measured.
-local function Width(font, size, flags, s)
-    if not measure then
-        measure = UIParent:CreateFontString(nil, "BACKGROUND")
-        measure:Hide()
-    end
-    measure:SetFont(font, size, flags)
-    measure:SetText(s)
-    local w = measure:GetStringWidth()
+local measuring, spacerScale, carry = nil, 1, 0
+
+-- The width of s in the font string being measured in, or nil if it can't be measured.
+function ns.TextWidth(s)
+    measuring:SetText(s)
+    local w = measuring:GetStringWidth()
     return type(w) == "number" and w or nil
 end
-ns.TextWidth = Width
+
+-- Starts measuring in font string fs (changing its text: set it again afterwards).
+-- Returns false if it can't be measured.
+function ns.MeasureIn(fs)
+    if not (fs and fs.SetText and fs.GetStringWidth) then return false end
+    measuring = fs
+    local unit = ns.TextWidth(Spacer(100))
+    if not unit then return false end
+    spacerScale = unit > 0 and unit / 100 or 1
+    return true
+end
+
+function ns.StartRow() carry = 0 end
+
+-- A spacer that draws `width` wide, carrying its rounding to the next one on its left.
+function ns.Pad(width)
+    width = width + carry
+    local n = floor(width / spacerScale + 0.5)
+    if n < 1 then
+        carry = width
+        return ""
+    end
+    carry = width - n * spacerScale
+    return Spacer(n)
+end
 
 -- Lines up the right-hand columns of the rows added from line `first` on; leaves the
 -- plain text if the tooltip's text can't be measured. Each row is { name, value... };
@@ -405,30 +433,35 @@ local function Align(tt, first, rows, labels)
             if text and text.SetFont then text:SetFont(font, size, flags) end
         end
     end
+    if not ns.MeasureIn(_G[name .. "TextRight" .. first]) then return end
     local columns, widths, measured = #rows[1] - 1, {}, {}
     for col = 1, columns do widths[col] = 0 end
     for i, row in ipairs(rows) do
         measured[i] = {}
         for col = 1, columns do
-            local w = Width(font, size, flags, row[col + 1])
+            local w = ns.TextWidth(row[col + 1])
             if not w then return end
             measured[i][col] = w
             if w > widths[col] then widths[col] = w end
         end
     end
+    local texts = {}
     for i, row in ipairs(rows) do
-        local right = _G[name .. "TextRight" .. (first + i - 1)]
-        if not right then return end
+        ns.StartRow()
         local text = ""
-        for col = 1, columns do
-            local pad = col > 1 and GAP or 0
+        for col = columns, 1, -1 do
+            local gap = col > 1 and GAP or 0
             if labels[col] then
-                text = text .. Spacer(pad) .. labels[col]
-                pad = 0
+                text = ns.Pad(gap) .. labels[col] .. ns.Pad(widths[col] - measured[i][col]) .. row[col + 1] .. text
+            else
+                text = ns.Pad(gap + widths[col] - measured[i][col]) .. row[col + 1] .. text
             end
-            text = text .. Spacer(pad + widths[col] - measured[i][col]) .. row[col + 1]
         end
-        right:SetText(text)
+        texts[i] = text
+    end
+    for i, text in ipairs(texts) do
+        local right = _G[name .. "TextRight" .. (first + i - 1)]
+        if right then right:SetText(text) end
     end
 end
 
