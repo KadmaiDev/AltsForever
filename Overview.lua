@@ -43,11 +43,18 @@ local function Duration(seconds)
     return max(h, 1) .. "h"
 end
 
-function ns.LevelText(c)
-    if not c.level then return GREY .. "?|r" end
-    if c.level >= ns.MaxLevel() or not c.xpMax or c.xpMax == 0 then return tostring(c.level) end
+-- The level and, below max level, how far into it: the overview shows them in two
+-- cells so the percentages line up.
+function ns.LevelParts(c)
+    if not c.level then return GREY .. "?|r", "" end
+    if c.level >= ns.MaxLevel() or not c.xpMax or c.xpMax == 0 then return tostring(c.level), "" end
     -- Multiply first: 5700 / 10000 * 100 is 56.99... in floating point.
-    return c.level .. "  " .. GREY .. floor(c.xp * 100 / c.xpMax) .. "%|r"
+    return tostring(c.level), GREY .. floor(c.xp * 100 / c.xpMax) .. "%|r"
+end
+
+function ns.LevelText(c)
+    local level, pct = ns.LevelParts(c)
+    return pct == "" and level or (level .. "  " .. pct)
 end
 
 -- Rested as a share of a level; blue when full, "-" at max level, "?" if not recorded yet.
@@ -172,7 +179,8 @@ local function RowTooltip(row)
                 if ns.AtRankCap(c, name) then
                     -- At the final maximum there's nothing to train, so say nothing.
                     if skill < MAX_PROFESSION then note = GREY .. "(train to skill up)|r" end
-                elseif n then
+                elseif n and next(c.recipes[name]) then
+                    -- Not for professions without recipes on record (Fishing): "0" is noise.
                     note = GREY .. "(" .. n .. " skill-up recipe" .. (n == 1 and "" or "s") .. ")|r"
                 end
             end
@@ -226,6 +234,17 @@ local function CreateRow(i)
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.08)
     row.cells = CreateCells(row, "GameFontHighlightSmall")
+    -- The Level column: the level right-aligned in a narrow cell, then how far into it,
+    -- so the percentages line up whatever the level's width.
+    local level = row.cells[2]
+    level:SetWidth(18)
+    level:SetJustifyH("RIGHT")
+    row.pct = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    ns.SkinText(row.pct)
+    row.pct:SetPoint("LEFT", level, "RIGHT", 6, 0)
+    row.pct:SetWidth(COLUMNS[2].width - 32)
+    row.pct:SetJustifyH("LEFT")
+    row.pct:SetWordWrap(false)
     row:SetScript("OnEnter", RowTooltip)
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     -- Left: gear. Right: the character's menu (Forget...).
@@ -248,7 +267,9 @@ local function Refresh()
         local cells = row.cells
         row.key = key
         cells[1]:SetText(ns.ColoredName(key, c))
-        cells[2]:SetText(ns.LevelText(c))
+        local level, pct = ns.LevelParts(c)
+        cells[2]:SetText(level)
+        row.pct:SetText(pct)
         cells[3]:SetText(ns.RestedText(c, now))
         cells[4]:SetText(c.money and GetCoinTextureString(c.money) or (GREY .. "?|r"))
         local n1, s1, n2, s2 = ns.ProfCells(c)

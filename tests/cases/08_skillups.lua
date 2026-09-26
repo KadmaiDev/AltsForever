@@ -182,7 +182,8 @@ test("overview row tooltip counts recipes still giving skill-ups", function()
     wow.now = NOW
     local saved = overviewAlts()
     saved.recipeInfo = { Tailoring = { a = "250;A;", b = "150;B;", c = "210;C;,1:1" } }
-    saved.chars["High"].recipes = { Tailoring = { a = true, b = true, c = true } }
+    saved.chars["High"].recipes = { Tailoring = { a = true, b = true, c = true }, Fishing = {} }
+    saved.chars["High"].profs.Fishing = 50
     wow.login(saved)
     eq(ns.SkillupCount(saved.chars["High"], "Tailoring"), 2, "skill 200: a and c")
     eq(ns.SkillupCount(saved.chars["High"], "Enchanting"), nil, "never scanned")
@@ -192,6 +193,7 @@ test("overview row tooltip counts recipes still giving skill-ups", function()
     local text = textOf(GameTooltip.lines)
     assert(text:find("Tailoring = 200  " .. G .. "(2 skill-up recipes)|r", 1, true), text)
     assert(text:find("Enchanting = 180\n", 1, true) or text:find("Enchanting = 180$"), text)
+    assert(text:find("Fishing = 50\n", 1, true) or text:find("Fishing = 50$"), "no recipes: no note\n" .. text)
     SlashCmdList.ALTSFOREVER("skillups")
     row.scripts.OnEnter(row)
     text = textOf(GameTooltip.lines)
