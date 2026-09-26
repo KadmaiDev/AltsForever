@@ -167,8 +167,9 @@ end
 
 -- One row's right-hand text. Each place is an icon then its number: the icons sit at the
 -- same spot in every row and the numbers are right-aligned after them. `places` is the
--- number of place columns; icon[col], num[col] their widest entries.
-local ICON_GAP = 3
+-- number of place columns; icon[col], num[col] their widest entries. The icon is followed
+-- by a real space before any spacer: in game a spacer straight after an icon was drawn
+-- narrower than asked (checked 2026-09-26), a spacer after text wasn't.
 local function Row(parts, count, font, size, flags, icon, num, places, countWidth)
     local text, pending = "", 0
     local offset = places - #parts / 2
@@ -176,14 +177,14 @@ local function Row(parts, count, font, size, flags, icon, num, places, countWidt
         pending = pending + (col > 1 and GAP or 0)
         if col > offset then
             local k = (col - offset) * 2
-            local label, n = parts[k - 1], tostring(parts[k])
+            local label, n = parts[k - 1] .. " ", tostring(parts[k])
             local wi, wn = ns.TextWidth(font, size, flags, label), ns.TextWidth(font, size, flags, n)
             if not (wi and wn) then return nil end
             text = text .. ns.Spacer(pending + icon[col] - wi) .. GREY .. label
-                .. ns.Spacer(ICON_GAP + num[col] - wn) .. n .. "|r"
+                .. ns.Spacer(num[col] - wn) .. n .. "|r"
             pending = 0
         else
-            pending = pending + icon[col] + ICON_GAP + num[col]
+            pending = pending + icon[col] + num[col]
         end
     end
     local w = ns.TextWidth(font, size, flags, tostring(count))
@@ -203,7 +204,7 @@ local function Align(e, curParts, font, size, flags)
         local offset = places - #parts / 2
         for k = 2, #parts, 2 do
             local col = offset + k / 2
-            local wi = ns.TextWidth(font, size, flags, parts[k - 1])
+            local wi = ns.TextWidth(font, size, flags, parts[k - 1] .. " ")
             local wn = ns.TextWidth(font, size, flags, tostring(parts[k]))
             if not (wi and wn) then return false end
             icon[col], num[col] = max(icon[col], wi), max(num[col], wn)
