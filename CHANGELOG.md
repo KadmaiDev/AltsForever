@@ -1,8 +1,9 @@
-## Unreleased
+## Alts Forever 0.6.0
 
-- **New commands** for what could only be clicked before: `/af rep` opens the Reputation panel, `/af minimap` shows or hides the minimap button, and `/af sendmail` turns the send-to-alt arrow at the mailbox on or off.
-- **XP across your characters:** hover the experience bar to see every character that's still levelling, with their level, XP and rested XP (including what they've built up while logged out). Works with Blizzard's bar, ElvUI's and EllesmereUI's.
-- **Reputation across your characters, on the bar:** hover the reputation bar to see your other characters' standing with the faction you're watching, e.g. "Friendly 8%  500 / 6000". Works with Blizzard's bar, ElvUI's and EllesmereUI's.
+- **Your alts on the XP bar:** hover the experience bar to see your other characters that are still levelling, with their level, XP and rested XP (including what they've built up while logged out), lined up in columns.
+- **Your alts on the reputation bar:** hover the reputation bar to see your other characters' standing with the faction you're watching, e.g. "Friendly 8%  500 / 6000".
+- Both work with Blizzard's bars, ElvUI's and EllesmereUI's.
+- **New commands** for what could only be clicked before: `/af rep` opens the Reputation panel, `/af minimap` shows or hides the minimap button, and `/af sendmail` turns the send-to-alt arrow at the mailbox on or off. `/af help` lists them all.
 
 ## Alts Forever 0.5.0
 
