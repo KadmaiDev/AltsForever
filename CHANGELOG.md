@@ -4,6 +4,7 @@
   - Open it from your own bags and bank: an entry at the bottom of the bag's portrait menu, or a small Alts Forever button in the header of Blizzard's bank and of ElvUI's and EllesmereUI's bags and bank.
   - Or from the overview's new bag button, by right-clicking a character in the overview, from the minimap button's menu, or with `/af bags` and `/af bank` (add a name for another character, e.g. `/af bank Tarnia`).
 - **Options menu:** Open overview is always in the minimap button's menu now (it brings the overview to the front if it's already open), with Bags and bank below it.
+- **Fixed: Settings... in the options menu** could be blocked by the game ("AddOn tried to call the protected function"). It now opens the Options page straight away, and in combat says it can't instead.
 - **Windows stay in front:** the overview, Reputation, gear and bags windows come to the front when you click or open them, instead of drawing through each other.
 
 ## Alts Forever 0.8.0
