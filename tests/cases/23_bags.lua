@@ -182,35 +182,58 @@ test("an item whose quality isn't loaded yet is requested and the window fills a
     eq(wow.itemLoads[1], 700)
 end)
 
-test("a shortcut button on the game's bags and bank (and ElvUI's, EllesmereUI's) opens the window there", function()
+-- Opens one of Blizzard's menus that addons add to (by its tag) and returns it.
+function openBlizzardMenu(tag)
+    return MenuUtil.CreateContextMenu(nil, function(owner, root) wow.menuMods[tag](owner, root) end)
+end
+
+test("shortcuts: Blizzard's bag menus get an entry; the bank, ElvUI and EllesmereUI a button in their header", function()
     local ns = wow.load(FILES)
     wow.ns = ns
-    CreateFrame("Frame", "ContainerFrameCombinedBags")
-    CreateFrame("Frame", "EUI_MainBagFrame")
+    -- EllesmereUI's bags header: its bags button (internal field) sits left of sort and search.
+    local eui = CreateFrame("Frame", "EUI_MainBagFrame")
+    local header = CreateFrame("Frame", nil, eui)
+    eui._bagsBtn = CreateFrame("Button", nil, header)
+    CreateFrame("Frame", "ElvUI_ContainerFrame")
     wow.login(nil)
     wow.fire("PLAYER_ENTERING_WORLD")
+    -- Blizzard's bags, combined and separate: an entry in the portrait menu, no button.
+    for _, tag in ipairs({ "MENU_CONTAINER_FRAME_COMBINED", "MENU_CONTAINER_FRAME" }) do
+        openBlizzardMenu(tag)
+        local entry = wow.menuItem("Alts Forever: every character's bags")
+        assert(entry, tag)
+        eq(entry.fn(), nil, "returns nothing, so the menu closes")
+        eq(AltsForeverBagsFrame:IsShown(), true)
+        eq(AltsForeverBagsFrame.bags.highlightLocked, true, "on the bags")
+    end
     local s = ns.BagShortcuts()
-    local bags = s.ContainerFrameCombinedBags
-    assert(bags and s.EUI_MainBagFrame, "attached to the bag windows that exist")
-    eq(bags.parent, ContainerFrameCombinedBags, "shows and hides with the bags")
-    eq(bags.point[1], "TOPRIGHT", "outside the window's left edge, clear of its contents")
-    eq(bags.point[3], "TOPLEFT")
-    eq(s.BankFrame, nil, "no bank window yet")
-    bags.scripts.OnEnter(bags)
+    local e = s.EUI_MainBagFrame
+    eq(e.parent, header, "in EllesmereUI's header")
+    eq(e.point[1], "RIGHT"); eq(e.point[2], eui._bagsBtn); eq(e.point[3], "LEFT")
+    local elv = s.ElvUI_ContainerFrame
+    eq(elv.parent, ElvUI_ContainerFrame)
+    eq(elv.point[1], "TOPLEFT", "inside ElvUI's top-left corner")
+    eq(elv.point[4] > 0 and elv.point[5] < 0, true)
+    elv.scripts.OnEnter(elv)
     eq(GameTooltip.lines[2][1], "Every character's bags")
-    bags.scripts.OnClick(bags)
-    eq(AltsForeverBagsFrame:IsShown(), true)
-    bags.scripts.OnClick(bags)
-    eq(AltsForeverBagsFrame:IsShown(), true, "a second click leaves it open")
-    -- The bank window appears on the first visit.
+    eq(s.BankFrame, nil, "no bank window yet")
+    -- Blizzard's bank, made on the first visit: left of its search box.
     CreateFrame("Frame", "BankFrame")
+    CreateFrame("EditBox", "BankItemSearchBox", BankFrame)
     wow.fire("BANKFRAME_OPENED")
     local bank = s.BankFrame
     assert(bank, "attached when the bank opens")
+    eq(bank.point[2], BankItemSearchBox)
+    AltsForeverBagsFrame:Hide()
     bank.scripts.OnClick(bank)
+    eq(AltsForeverBagsFrame:IsShown(), true)
     eq(AltsForeverBagsFrame.bank.highlightLocked, true, "opened on the bank")
-    -- Opening the bags later catches windows made after login.
-    CreateFrame("Frame", "ElvUI_ContainerFrame")
+    bank.scripts.OnClick(bank)
+    eq(AltsForeverBagsFrame:IsShown(), true, "a second click leaves it open")
+    -- EllesmereUI's bank, found later (opening bags checks again): left of its sort button.
+    local euiBank = CreateFrame("Frame", "EUI_BankFrame")
+    euiBank._searchBox = CreateFrame("EditBox", nil, CreateFrame("Frame", nil, euiBank))
     ToggleAllBags()
-    assert(s.ElvUI_ContainerFrame, "ElvUI's bags too")
+    eq(s.EUI_BankFrame.point[2], euiBank._searchBox)
+    eq(s.ContainerFrameCombinedBags, nil, "never a button outside a window")
 end)

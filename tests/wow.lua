@@ -238,6 +238,9 @@ function M.load(files)
     end
     M.missingTemplates = {}
     ToggleAllBags = function() end
+    -- Blizzard's menus that addons may add to, by tag.
+    M.menuMods = {}
+    Menu = { ModifyMenu = function(tag, fn) M.menuMods[tag] = fn end }
 
     -- Chat windows: ChatFrame1 prints "Total time played" (recorded in playedShown)
     -- when it gets TIME_PLAYED_MSG; ChatFrame2 doesn't listen for it.
@@ -415,6 +418,7 @@ function M.load(files)
             return item
         end
         function root:CreateTitle(text) return add("title", text) end
+        function root:CreateDivider() return add("divider") end
         function root:CreateButton(text, fn) return add("button", text, fn) end
         function root:CreateCheckbox(text, isSelected, setSelected) return add("checkbox", text, isSelected, setSelected) end
         function root:CreateRadio(text, isSelected, setSelected, data)

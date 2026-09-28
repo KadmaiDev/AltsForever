@@ -420,59 +420,124 @@ function ns.BagsWindowChanged()
     if frame and frame:IsShown() and shownKey == ns.charKey then Fill() end
 end
 
+
 ---------------------------------------------------------------------------
--- Shortcuts on the game's own bags and bank (and ElvUI's and EllesmereUI's): a small
--- Alts Forever button just outside each window's top-left edge, so it never covers
--- anything inside their layouts. It opens this window on the same place. Attached the
--- first time each window is found; the checks stop once all are attached.
+-- Shortcuts from the player's own bags and bank to this window, inside each UI:
+-- Blizzard's bags get an entry in their portrait menu; Blizzard's bank, ElvUI's and
+-- EllesmereUI's windows get a small button in their header, next to their own
+-- buttons. Each is added the first time its window is found; the checks stop once
+-- all are.
 ---------------------------------------------------------------------------
-local HOSTS = {
-    { "ContainerFrameCombinedBags", "bags" }, { "ContainerFrame1", "bags" },
-    { "ElvUI_ContainerFrame", "bags" }, { "EUI_MainBagFrame", "bags" },
-    { "BankFrame", "bank" }, { "ElvUI_BankContainerFrame", "bank" }, { "EUI_BankFrame", "bank" },
-}
 local ICON = "Interface\\AddOns\\" .. (...) .. "\\media\\icon.tga"
-local shortcuts, missing = {}, #HOSTS
+
+-- Opens this window on your own bags or bank (left open if it already shows them).
+local function OpenFromShortcut(which)
+    if not (frame and frame:IsShown() and view == which) then ns.ShowBags(ns.charKey, which) end
+end
 
 local function ShortcutEnter(b)
-    GameTooltip:SetOwner(b, "ANCHOR_LEFT")
+    GameTooltip:SetOwner(b, "ANCHOR_BOTTOM")
     GameTooltip:AddLine("Alts Forever")
     GameTooltip:AddLine(b.which == "bank" and L["Every character's bank"] or L["Every character's bags"], 1, 1, 1)
     GameTooltip:Show()
 end
 
+local function Shortcut(parent, which, size)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(size, size)
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetAllPoints()
+    b.icon:SetTexture(ICON)
+    local hl = b:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.15)
+    b.which = which
+    b:SetScript("OnClick", function(self) OpenFromShortcut(self.which) end)
+    b:SetScript("OnEnter", ShortcutEnter)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    return b
+end
+
+-- Where each window gets its button. Each returns the button, or nil if the window
+-- (or the part it's placed beside) isn't there yet. EllesmereUI's fields are not its
+-- official API: they're checked before use.
+local PLACES = {
+    -- Blizzard's bank: in the title area, left of the search box.
+    BankFrame = function()
+        local search = _G.BankItemSearchBox
+        if not (_G.BankFrame and search) then return end
+        local b = Shortcut(_G.BankFrame, "bank", 22)
+        b:SetPoint("RIGHT", search, "LEFT", -10, 0)
+        return b
+    end,
+    -- ElvUI: its header buttons are all on the right; the top-left corner is free.
+    ElvUI_ContainerFrame = function()
+        local f = _G.ElvUI_ContainerFrame
+        if not f then return end
+        local b = Shortcut(f, "bags", 20)
+        b:SetPoint("TOPLEFT", f, "TOPLEFT", 6, -6)
+        ns.SkinSlot(b)
+        return b
+    end,
+    ElvUI_BankContainerFrame = function()
+        local f = _G.ElvUI_BankContainerFrame
+        if not f then return end
+        local b = Shortcut(f, "bank", 20)
+        b:SetPoint("TOPLEFT", f, "TOPLEFT", 6, -6)
+        ns.SkinSlot(b)
+        return b
+    end,
+    -- EllesmereUI's bags: left of its bags button (which is left of sort and search).
+    EUI_MainBagFrame = function()
+        local f = _G.EUI_MainBagFrame
+        local anchor = f and f._bagsBtn
+        if not (anchor and anchor.GetParent) then return end
+        local b = Shortcut(anchor:GetParent(), "bags", 24)
+        b:SetPoint("RIGHT", anchor, "LEFT", -6, 0)
+        return b
+    end,
+    -- EllesmereUI's bank: left of its sort button, which sits 13 px left of the search box.
+    EUI_BankFrame = function()
+        local f = _G.EUI_BankFrame
+        local search = f and f._searchBox
+        if not (search and search.GetParent) then return end
+        local b = Shortcut(search:GetParent(), "bank", 24)
+        b:SetPoint("RIGHT", search, "LEFT", -13 - 24 - 6, 0)
+        return b
+    end,
+}
+local shortcuts, missing = {}, 0
+for _ in pairs(PLACES) do missing = missing + 1 end
+
 local function AttachShortcuts()
     if missing == 0 then return end
-    for _, host in ipairs(HOSTS) do
-        local f = _G[host[1]]
-        if f and not shortcuts[host[1]] and f.CreateTexture then
-            local b = CreateFrame("Button", nil, f)
-            b:SetSize(26, 26)
-            b:SetPoint("TOPRIGHT", f, "TOPLEFT", -2, -6)
-            b.icon = b:CreateTexture(nil, "ARTWORK")
-            b.icon:SetAllPoints()
-            b.icon:SetTexture(ICON)
-            local hl = b:CreateTexture(nil, "HIGHLIGHT")
-            hl:SetAllPoints()
-            hl:SetColorTexture(1, 1, 1, 0.15)
-            b.which = host[2]
-            b:SetScript("OnClick", function(self)
-                if not (frame and frame:IsShown() and view == self.which) then ns.ShowBags(ns.charKey, self.which) end
-            end)
-            b:SetScript("OnEnter", ShortcutEnter)
-            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-            ns.SkinSlot(b)
-            shortcuts[host[1]] = b
-            missing = missing - 1
+    for name, place in pairs(PLACES) do
+        if not shortcuts[name] then
+            local b = place()
+            if b then
+                shortcuts[name] = b
+                missing = missing - 1
+            end
         end
     end
 end
 
 function ns.BagShortcuts() return shortcuts end
 
+-- Blizzard's bags: an entry at the bottom of the portrait button's menu (combined and
+-- separate bags; tags checked in game 2026-09-28).
+local function AddMenuEntry(_, root)
+    root:CreateDivider()
+    root:CreateButton(L["Alts Forever: every character's bags"], function() OpenFromShortcut("bags") end)
+end
+
 function ns.StartBags()
+    if Menu and Menu.ModifyMenu then
+        Menu.ModifyMenu("MENU_CONTAINER_FRAME_COMBINED", AddMenuEntry)
+        Menu.ModifyMenu("MENU_CONTAINER_FRAME", AddMenuEntry)
+    end
     ns.On("PLAYER_ENTERING_WORLD", AttachShortcuts)
-    -- The bank window (and ElvUI's) may be made on the first visit.
+    -- The bank windows may be made on the first visit.
     ns.On("BANKFRAME_OPENED", function()
         AttachShortcuts()
         if C_Timer then C_Timer.After(0, AttachShortcuts) end
