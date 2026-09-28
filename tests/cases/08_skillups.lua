@@ -354,3 +354,20 @@ test("/af delete also forgets recipes nobody else knows", function()
     eq(info["rough copper vest"], nil, "only Mid knew it")
     eq(info["copper bracers"], "60;Copper Bracers;", "Aldric still knows it")
 end)
+
+test("gathering professions are recognised in any language (by the game's profession IDs)", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.skillLineNames = { [356] = "Angeln", [182] = "Kräuterkunde", [393] = "Kürschnerei" }
+    local saved = overviewAlts()
+    saved.recipeInfo = { Angeln = { ["fischglas"] = "25;Fischglas;" }, Bergbau = { kupfer = "125;Kupfer;" } }
+    saved.chars["High"].profs = { Angeln = 50, Bergbau = 150 }
+    saved.chars["High"].recipes = { Angeln = { fischglas = true }, Bergbau = { kupfer = true } }
+    wow.login(saved)
+    SlashCmdList.ALTSFOREVER("")
+    local row = overviewRows()[3] -- High
+    row.scripts.OnEnter(row)
+    local text = textOf(GameTooltip.lines)
+    assert(text:find("Angeln = 50\n", 1, true) or text:find("Angeln = 50$"), "German Fishing: no note\n" .. text)
+    assert(text:find("Bergbau = 150  ", 1, true), "German Mining (not gathering here) keeps its note\n" .. text)
+end)

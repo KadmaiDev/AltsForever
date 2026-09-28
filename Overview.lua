@@ -5,6 +5,7 @@ local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 
 local floor, max, pairs, time = math.floor, math.max, pairs, time
+local issecretvalue = issecretvalue or function() return false end
 local ipairs = ipairs
 local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
 
@@ -133,7 +134,26 @@ end
 local frame, rows, footer
 
 local NO_LABELS, NOTE_LEFT = {}, { [2] = true }
-local GATHERING = { Fishing = true, Skinning = true, Herbalism = true }
+-- Gathering professions by their game IDs (Fishing 356, Herbalism 182, Skinning 393), so
+-- the check works in every language: the game names them in the player's language. The
+-- set is kept once every name is known (profession data may not be loaded at first).
+local GATHERING_IDS = { 356, 182, 393 }
+local gathering
+local function Gathering()
+    if gathering then return gathering end
+    local set, complete = {}, true
+    local ts = C_TradeSkillUI
+    for _, id in ipairs(GATHERING_IDS) do
+        local name = ts and ts.GetTradeSkillDisplayName and ts.GetTradeSkillDisplayName(id)
+        if type(name) == "string" and name ~= "" and not issecretvalue(name) then
+            set[name] = true
+        else
+            complete = false
+        end
+    end
+    if complete then gathering = set end
+    return set
+end
 local function ByFirst(a, b) return a[1] < b[1] end
 
 local function RowTooltip(row)
@@ -181,7 +201,7 @@ local function RowTooltip(row)
                 if ns.AtRankCap(c, name) then
                     -- At the final maximum there's nothing to train, so say nothing.
                     if skill < MAX_PROFESSION then note = GREY .. "(train to skill up)|r" end
-                elseif n and (n > 0 or not GATHERING[name]) and next(c.recipes[name]) then
+                elseif n and (n > 0 or not Gathering()[name]) and next(c.recipes[name]) then
                     -- Gathering professions level by gathering; their few recipes (Fish
                     -- Bowl, Camp Chair) are novelties, so "0" there is noise.
                     note = GREY .. "(" .. n .. " skill-up recipe" .. (n == 1 and "" or "s") .. ")|r"

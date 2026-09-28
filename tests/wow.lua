@@ -70,7 +70,10 @@ function M.load(files)
         return p[1], 136243, p[2], p[3] or 150
     end
     local ts = function() return M.tradeskill end
+    -- Profession names by skill line, in the client's language (M.skillLineNames).
+    M.skillLineNames = { [356] = "Fishing", [182] = "Herbalism", [393] = "Skinning", [186] = "Mining" }
     C_TradeSkillUI = {
+        GetTradeSkillDisplayName = function(id) return M.skillLineNames[id] end,
         IsTradeSkillReady = function() return ts().ready end,
         IsTradeSkillLinked = function() return ts().linked end,
         IsTradeSkillGuild = function() return ts().guild end,
