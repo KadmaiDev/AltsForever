@@ -38,6 +38,10 @@ Hovering a recipe (pattern, schematic, formula...) lists your characters who hav
 
 ![Recipe tooltips showing Known, Can learn and Needs skill, and a Can craft line](media/professions.png)
 
+## Languages
+
+English, German, French, Spanish (Spain and Latin America), Brazilian Portuguese, and Simplified and Traditional Chinese, following your game's language. The translations are new: if something reads oddly in your language, please say so in the comments on CurseForge.
+
 ## Status
 
 Bags (including the keyring and reagent bag), bank tabs, mail (including items you mail to your alts), equipped items and equipped bags.

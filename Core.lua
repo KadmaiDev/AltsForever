@@ -1,5 +1,6 @@
 -- Alts Forever core: saved data, character identity, event dispatch, slash commands.
 local ADDON, ns = ...
+local L = ns.L
 
 -- Only one copy of Alts Forever may run (e.g. the CurseForge copy and a dev copy both
 -- enabled). Addons load one at a time, so a copy that finds another already running stays
@@ -12,8 +13,8 @@ if AltsForeverRunning then
     local f = CreateFrame("Frame")
     f:RegisterEvent("PLAYER_LOGIN")
     f:SetScript("OnEvent", function()
-        print("|cff66ccffAlts Forever|r: two copies are enabled (" .. running .. " and " .. ADDON
-            .. "). Only " .. running .. " is running; disable one of them in the AddOns list.")
+        print("|cff66ccffAlts Forever|r: " .. L["two copies are enabled (%s and %s). Only %s is running; disable one of them in the AddOns list."]
+            :format(running, ADDON, running))
     end)
     return
 end
@@ -227,42 +228,42 @@ local commands = {}
 
 function commands.list()
     for key, c in pairs(ns.db.chars) do
-        Print(key .. (c.bank and "" or "  (bank not scanned)"))
+        Print(key .. (c.bank and "" or "  " .. L["(bank not scanned)"]))
     end
 end
 
 function commands.delete(arg)
     local key = arg ~= "" and FindChar(arg)
-    if not key then return Print("No character named '" .. arg .. "'. Use /af list.") end
-    if key == ns.charKey then return Print("You can't delete the character you're logged in on.") end
+    if not key then return Print(L["No character named '%s'. Use /af list."]:format(arg)) end
+    if key == ns.charKey then return Print(L["You can't delete the character you're logged in on."]) end
     ns.ForgetCharacter(key)
-    Print("Deleted " .. key .. ".")
+    Print(L["Deleted %s."]:format(key))
 end
 
 function commands.mail()
     -- Everyone with mail on record, however far off it expires.
-    if not ns.PrintMailWarnings(math.huge) then Print("No mail with items or gold on record.") end
+    if not ns.PrintMailWarnings(math.huge) then Print(L["No mail with items or gold on record."]) end
 end
 
 function commands.skillups()
     ns.SetSkillups(not ns.SkillupsOn())
-    Print(ns.db.skillupsOff and "Skill-up details in tooltips off." or "Skill-up details in tooltips on.")
+    Print(ns.db.skillupsOff and L["Skill-up details in tooltips off."] or L["Skill-up details in tooltips on."])
 end
 
 function commands.minimap()
     ns.SetMinimapButton(not ns.MinimapButtonOn())
-    Print(ns.MinimapButtonOn() and "Minimap button shown." or "Minimap button hidden. /af minimap brings it back.")
+    Print(ns.MinimapButtonOn() and L["Minimap button shown."] or L["Minimap button hidden. /af minimap brings it back."])
 end
 
 function commands.sendmail()
     ns.SetSendToAlt(not ns.SendToAltOn())
-    Print(ns.SendToAltOn() and "Send to alt arrow at the mailbox on." or "Send to alt arrow at the mailbox off.")
+    Print(ns.SendToAltOn() and L["Send to alt arrow at the mailbox on."] or L["Send to alt arrow at the mailbox off."])
 end
 
 function commands.stats()
     ns.SetStats(not ns.StatsOn())
-    Print(ns.StatsOn() and "Session stats on: XP this session on the XP bar, gold over time on your bag gold."
-        or "Session stats off.")
+    Print(ns.StatsOn() and L["Session stats on: XP this session on the XP bar, gold over time on your bag gold."]
+        or L["Session stats off."])
 end
 
 function commands.rep()
@@ -271,12 +272,12 @@ end
 
 function commands.mem()
     UpdateAddOnMemoryUsage()
-    Print(("Memory: %.1f KB"):format(GetAddOnMemoryUsage(ADDON)))
+    Print(L["Memory: %.1f KB"]:format(GetAddOnMemoryUsage(ADDON)))
 end
 
 function commands.help()
-    Print("by Kadmai. /af opens the overview. Also: /af rep | mail | list | delete Name | skillups | sendmail | minimap | stats | mem")
-    Print("Or use the minimap button (right-click for options).")
+    Print(L["by Kadmai. /af opens the overview. Also: /af rep | mail | list | delete Name | skillups | sendmail | minimap | stats | mem"])
+    Print(L["Or use the minimap button (right-click for options)."])
 end
 ns.ShowHelp = commands.help
 

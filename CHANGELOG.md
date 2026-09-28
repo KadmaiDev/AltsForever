@@ -1,5 +1,7 @@
 ## Unreleased
 
+- **Translations:** Alts Forever now speaks German, French, Spanish (Spain and Latin America), Brazilian Portuguese, and Simplified and Traditional Chinese, following your game's language. Corrections from native speakers are very welcome.
+- **Works on every language's client:** the "(0 skill-up recipes)" rule for gathering professions no longer depends on English profession names.
 - **Two copies enabled:** if two copies of Alts Forever are enabled at once (for example an old and a new install), only the first one runs and it says so in chat, so tooltips don't show everything twice and your saved data can't be mixed up.
 
 ## Alts Forever 0.7.0

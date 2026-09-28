@@ -2,6 +2,7 @@
 -- characters (Blizzard's bars, ElvUI's and EllesmereUI's).
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
+local L = ns.L
 
 local floor, ipairs, pairs, type, time = math.floor, ipairs, pairs, type, time
 local GREY = "|cff9d9d9d"
@@ -21,7 +22,7 @@ local lastRows = {}
 function ns.AddCharacterRows(tt, rows, labels, title, noGap)
     if #rows == 0 then return false end
     if title then tt:AddLine(title, 1, 1, 1) elseif not noGap then tt:AddLine(" ") end
-    tt:AddLine("Your characters", 1, 0.82, 0)
+    tt:AddLine(L["Your characters"], 1, 0.82, 0)
     local first = tt.NumLines and tt:NumLines() + 1
     for _, row in ipairs(rows) do
         local text = ""
@@ -37,16 +38,16 @@ function ns.AddCharacterRows(tt, rows, labels, title, noGap)
     return true
 end
 
-local XP_LABELS = { nil, nil, GREY .. "rested|r " }
+local XP_LABELS = { nil, nil, GREY .. L["rested"] .. "|r " }
 
 local BigNumber = BreakUpLargeNumbers or tostring
 
 -- This session: time, XP gained and, once there's a pace, about how long to level.
 local function AddSession(tt)
     local seconds, xp, toLevel = ns.SessionXP(time())
-    tt:AddDoubleLine("This session", ns.FormatPlayed(seconds), 1, 0.82, 0, 1, 1, 1)
-    tt:AddDoubleLine("XP gained", BigNumber(xp), 1, 1, 1, 1, 1, 1)
-    if toLevel then tt:AddDoubleLine("Time to level", "about " .. ns.FormatPlayed(toLevel), 1, 1, 1, 1, 1, 1) end
+    tt:AddDoubleLine(L["This session"], ns.FormatPlayed(seconds), 1, 0.82, 0, 1, 1, 1)
+    tt:AddDoubleLine(L["XP gained"], BigNumber(xp), 1, 1, 1, 1, 1, 1)
+    if toLevel then tt:AddDoubleLine(L["Time to level"], L["about %s"]:format(ns.FormatPlayed(toLevel)), 1, 1, 1, 1, 1, 1) end
 end
 
 -- This session's stats (when turned on), then your other characters still levelling:
@@ -64,7 +65,7 @@ function ns.AddXPLines(tt, fresh)
     local me = ns.char
     local stats = ns.StatsOn() and me.level and me.level < maxLevel
     if #rows == 0 and not stats then return false end
-    if fresh then tt:AddLine("Experience", 1, 1, 1) else tt:AddLine(" ") end
+    if fresh then tt:AddLine(L["Experience"], 1, 1, 1) else tt:AddLine(" ") end
     if stats then
         AddSession(tt)
         if #rows > 0 then tt:AddLine(" ") end

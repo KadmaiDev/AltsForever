@@ -4,6 +4,7 @@
 -- characters can still skill up with them.
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
+local L = ns.L
 
 local pairs, ipairs, wipe, tonumber, type, sort = pairs, ipairs, wipe, tonumber, type, table.sort
 local issecretvalue = issecretvalue or function() return false end
@@ -23,10 +24,10 @@ local REQUIRES = "^" .. (ITEM_MIN_SKILL or "Requires %s (%d)")
 -- Statuses, in the order they're listed.
 local KNOWN, CAN_LEARN, NEEDS_SKILL, NOT_SCANNED = 1, 2, 3, 4
 local STATUS_TEXT = {
-    "|cff20ff20Known|r",
-    "|cffffd100Can learn|r",
+    "|cff20ff20" .. L["Known"] .. "|r",
+    "|cffffd100" .. L["Can learn"] .. "|r",
     nil, -- built per row: "Needs 120 (107)"
-    "|cff9d9d9dNot scanned|r",
+    "|cff9d9d9d" .. L["Not scanned"] .. "|r",
 }
 local LIGHT = "|cffe0e0e0" -- matches the item breakdown (Tooltip.lua)
 local MAX_SKILLUP_LINES = 6 -- reagent tooltip; each character shows at most 2
@@ -428,7 +429,7 @@ local function BuildRows(p)
     -- Texts are built here, once per item, so hovering again allocates nothing. (No
     -- skill-up levels here: the owner found them confusing on recipe items.)
     for i = 1, rows do
-        rowText[i] = STATUS_TEXT[rowStatus[i]] or ("|cffff2020Needs " .. p.req .. " (" .. rowSkill[i] .. ")|r")
+        rowText[i] = STATUS_TEXT[rowStatus[i]] or ("|cffff2020" .. L["Needs %s (%s)"]:format(p.req, rowSkill[i]) .. "|r")
     end
 end
 
@@ -491,7 +492,7 @@ local function FindCrafters(id)
                     -- Saves from before 0.3.0 hold true here, so the grey point is unknown.
                     local grey = skillups and type(lname) == "string" and ns.RecipeGrey(prof, lname)
                     local skill = grey and SkillFor(c, prof)
-                    if skill and skill < grey then text = text .. LIGHT .. " · skill-ups to " .. grey .. "|r" end
+                    if skill and skill < grey then text = text .. LIGHT .. " · " .. L["skill-ups to %s"]:format(grey) .. "|r" end
                     list = list or {}
                     list[#list + 1] = "  " .. text
                     break -- once per character, even if two professions make it
@@ -510,7 +511,7 @@ function ns.AddCraftLines(tt, id)
     local list = lastCraft
     if not list then return end
     tt:AddLine(" ")
-    tt:AddLine("Can craft", 1, 0.82, 0)
+    tt:AddLine(L["Can craft"], 1, 0.82, 0)
     for i = 1, #list do tt:AddLine(list[i], 1, 1, 1) end
 end
 
@@ -585,9 +586,9 @@ local function FindUses(id)
                 end
             end
             if l1 then
-                local who = ns.ShortName(key, c) .. LIGHT .. " · to "
-                local block = { key = key, best = l1, "  " .. n1, who .. g1 .. "|r" }
-                if l2 then block[3], block[4] = "  " .. n2, who .. g2 .. "|r" end
+                local who = ns.ShortName(key, c) .. LIGHT .. " · "
+                local block = { key = key, best = l1, "  " .. n1, who .. L["to %s"]:format(g1) .. "|r" }
+                if l2 then block[3], block[4] = "  " .. n2, who .. L["to %s"]:format(g2) .. "|r" end
                 blocks = blocks or {}
                 blocks[#blocks + 1] = block
             end
@@ -610,7 +611,7 @@ local function FindUses(id)
             list[list.n * 2 - 1], list[list.n * 2] = block[i], block[i + 1]
         end
     end
-    if total > list.n then list.more = "  +" .. (total - list.n) .. " more" end
+    if total > list.n then list.more = "  " .. L["+%d more"]:format(total - list.n) end
     return list
 end
 
@@ -625,7 +626,7 @@ function ns.AddSkillupLines(tt, id)
     local list = lastUse
     if not list then return end
     tt:AddLine(" ")
-    tt:AddLine("Skill-ups", 1, 0.82, 0)
+    tt:AddLine(L["Skill-ups"], 1, 0.82, 0)
     for i = 1, list.n do
         tt:AddDoubleLine(list[i * 2 - 1], list[i * 2], 1, 1, 1, 1, 1, 1)
     end

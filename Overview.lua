@@ -3,6 +3,7 @@
 -- only built the first time it's opened, and only refreshes while it's showing.
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
+local L = ns.L
 
 local floor, max, pairs, time = math.floor, math.max, pairs, time
 local issecretvalue = issecretvalue or function() return false end
@@ -13,20 +14,20 @@ local GREY = "|cff9d9d9d"
 local MAX_PROFESSION = 300 -- the last rank's maximum on Forever (Classic ruleset)
 local ROW_HEIGHT = 20
 local COLUMNS = {
-    { title = "Character", width = 180 },
-    { title = "Level", width = 80 },
-    { title = "Rested", width = 70 },
-    { title = "Gold", width = 120, right = true },
+    { title = L["Character"], width = 180 },
+    { title = L["Level"], width = 80 },
+    { title = L["Rested"], width = 70 },
+    { title = L["Gold"], width = 120, right = true },
     -- Each main profession gets a name column and a right-aligned skill column, so
     -- the skill numbers line up. The gap separates it from the right-aligned gold.
-    { title = "Professions", width = 104, gap = 16 },
+    { title = L["Professions"], width = 104, gap = 16 },
     { title = "", width = 34, right = true },
     { title = "", width = 104, gap = 16 },
     { title = "", width = 34, right = true },
-    { title = "Mail", width = 60, gap = 16 },
-    { title = "Zone", width = 140 },
-    { title = "Played", width = 70, right = true },
-    { title = "Last seen", width = 80, right = true },
+    { title = L["Mail"], width = 60, gap = 16 },
+    { title = L["Zone"], width = 140 },
+    { title = L["Played"], width = 70, right = true },
+    { title = L["Last seen"], width = 80, right = true },
 }
 local LIGHT = "|cffc0c0c0"
 
@@ -34,15 +35,15 @@ local LIGHT = "|cffc0c0c0"
 -- Text helpers (no UI, so they can be tested)
 ---------------------------------------------------------------------------
 function ns.FormatAgo(seconds)
-    if seconds < 3600 then return "<1h" end
-    if seconds < 86400 then return floor(seconds / 3600) .. "h ago" end
-    return floor(seconds / 86400) .. "d ago"
+    if seconds < 3600 then return L["<1h"] end
+    if seconds < 86400 then return L["%dh ago"]:format(floor(seconds / 3600)) end
+    return L["%dd ago"]:format(floor(seconds / 86400))
 end
 
 local function Duration(seconds)
     local d, h = floor(seconds / 86400), floor(seconds % 86400 / 3600)
-    if d > 0 then return d .. "d " .. h .. "h" end
-    return max(h, 1) .. "h"
+    if d > 0 then return L["%dd %dh"]:format(d, h) end
+    return L["%dh"]:format(max(h, 1))
 end
 
 -- The level and, below max level, how far into it: the overview shows them in two
@@ -95,9 +96,9 @@ end
 -- Time played as "12d 5h", "5h 20m" or "20m"; "?" if not recorded yet.
 function ns.FormatPlayed(seconds)
     local d, h, m = floor(seconds / 86400), floor(seconds % 86400 / 3600), floor(seconds % 3600 / 60)
-    if d > 0 then return d .. "d " .. h .. "h" end
-    if h > 0 then return h .. "h " .. m .. "m" end
-    return m .. "m"
+    if d > 0 then return L["%dd %dh"]:format(d, h) end
+    if h > 0 then return L["%dh %dm"]:format(h, m) end
+    return L["%dm"]:format(m)
 end
 
 function ns.PlayedText(c, now)
@@ -165,29 +166,29 @@ local function RowTooltip(row)
     tt:SetOwner(row, "ANCHOR_RIGHT")
     tt:AddLine(ns.ColoredName(key, c))
     if c.level then
-        local line = "Level " .. c.level
+        local line = L["Level %d"]:format(c.level)
         if c.xpMax and c.xpMax > 0 and c.level < ns.MaxLevel() then
-            line = line .. "  " .. GREY .. "(" .. c.xp .. " / " .. c.xpMax .. " XP)|r"
+            line = line .. "  " .. GREY .. L["(%d / %d XP)"]:format(c.xp, c.xpMax) .. "|r"
         end
         tt:AddLine(line, 1, 1, 1)
     end
     local rested, cap, toFull = ns.RestedNow(c, now)
     if rested then
-        local where = c.resting and "in an inn or city" or "out in the world"
-        tt:AddDoubleLine("Rested", floor(rested) .. " XP (" .. ns.RestedText(c, now) .. ")", 1, 0.82, 0, 1, 1, 1)
+        local where = c.resting and L["logged out in an inn or city"] or L["logged out in the world"]
+        tt:AddDoubleLine(L["Rested"], L["%d XP (%s)"]:format(floor(rested), ns.RestedText(c, now)), 1, 0.82, 0, 1, 1, 1)
         if rested < cap then
-            tt:AddLine(GREY .. "Full in " .. Duration(toFull) .. ", logged out " .. where .. "|r")
+            tt:AddLine(GREY .. L["Full in %s, %s"]:format(Duration(toFull), where) .. "|r")
         end
     end
     if c.mailExpires then
         local left = c.mailExpires - now
-        tt:AddDoubleLine("Mail expires", ns.ExpiryColor(left) .. ns.ExpiryText(left) .. "|r", 1, 0.82, 0, 1, 1, 1)
-        tt:AddLine(GREY .. (c.mailDeletes and "The soonest will be deleted, not returned" or "The soonest goes back to its sender") .. "|r")
+        tt:AddDoubleLine(L["Mail expires"], ns.ExpiryColor(left) .. ns.ExpiryText(left) .. "|r", 1, 0.82, 0, 1, 1, 1)
+        tt:AddLine(GREY .. (c.mailDeletes and L["The soonest will be deleted, not returned"] or L["The soonest goes back to its sender"]) .. "|r")
     end
-    if c.hearth then tt:AddDoubleLine("Hearthstone", c.hearth, 1, 0.82, 0, 1, 1, 1) end
-    if c.played then tt:AddDoubleLine("Played", ns.PlayedText(c, now), 1, 0.82, 0, 1, 1, 1) end
-    if c.ilvl then tt:AddDoubleLine("Item level", c.ilvl, 1, 0.82, 0, 1, 1, 1) end
-    if c.money then tt:AddDoubleLine("Gold", GetCoinTextureString(c.money), 1, 0.82, 0, 1, 1, 1) end
+    if c.hearth then tt:AddDoubleLine(L["Hearthstone"], c.hearth, 1, 0.82, 0, 1, 1, 1) end
+    if c.played then tt:AddDoubleLine(L["Played"], ns.PlayedText(c, now), 1, 0.82, 0, 1, 1, 1) end
+    if c.ilvl then tt:AddDoubleLine(L["Item level"], c.ilvl, 1, 0.82, 0, 1, 1, 1) end
+    if c.money then tt:AddDoubleLine(L["Gold"], GetCoinTextureString(c.money), 1, 0.82, 0, 1, 1, 1) end
     -- Professions: name, skill and a note, in columns (lined up once shown, below).
     local profRows, profFirst
     if c.profs and next(c.profs) then
@@ -200,11 +201,11 @@ local function RowTooltip(row)
                 local n = ns.SkillupCount(c, name)
                 if ns.AtRankCap(c, name) then
                     -- At the final maximum there's nothing to train, so say nothing.
-                    if skill < MAX_PROFESSION then note = GREY .. "(train to skill up)|r" end
+                    if skill < MAX_PROFESSION then note = GREY .. L["(train to skill up)"] .. "|r" end
                 elseif n and (n > 0 or not Gathering()[name]) and next(c.recipes[name]) then
                     -- Gathering professions level by gathering; their few recipes (Fish
                     -- Bowl, Camp Chair) are novelties, so "0" there is noise.
-                    note = GREY .. "(" .. n .. " skill-up recipe" .. (n == 1 and "" or "s") .. ")|r"
+                    note = GREY .. (n == 1 and L["(%d skill-up recipe)"] or L["(%d skill-up recipes)"]):format(n) .. "|r"
                 end
             end
             profRows[#profRows + 1] = { name, tostring(skill), note }
@@ -216,12 +217,12 @@ local function RowTooltip(row)
         end
     end
     tt:AddLine(" ")
-    tt:AddLine(GREY .. (c.bank and "Bank scanned" or "Bank not scanned yet - visit a banker") .. "|r")
-    if c.dura then tt:AddDoubleLine("Lowest durability", ns.DurabilityText(c.dura), 1, 0.82, 0, 1, 1, 1) end
+    tt:AddLine(GREY .. (c.bank and L["Bank scanned"] or L["Bank not scanned yet - visit a banker"]) .. "|r")
+    if c.dura then tt:AddDoubleLine(L["Lowest durability"], ns.DurabilityText(c.dura), 1, 0.82, 0, 1, 1, 1) end
     if key == ns.charKey then
-        tt:AddLine("|cff66ccffClick to see gear|r")
+        tt:AddLine("|cff66ccff" .. L["Click to see gear"] .. "|r")
     else
-        tt:AddLine("|cff66ccffClick to see gear · Right-click to forget this character|r")
+        tt:AddLine("|cff66ccff" .. L["Click to see gear"] .. " · " .. L["Right-click to forget this character"] .. "|r")
     end
     tt:Show()
     -- Line up the professions in the font the tooltip is shown in (a UI addon such as
@@ -309,7 +310,7 @@ local function Refresh()
         row:Show()
     end
     for i = #keys + 1, #rows do rows[i]:Hide() end
-    footer:SetText("Total played: " .. ns.FormatPlayed(played) .. "     Total gold: " .. GetCoinTextureString(total))
+    footer:SetText(L["Total played: %s"]:format(ns.FormatPlayed(played)) .. "     " .. L["Total gold: %s"]:format(GetCoinTextureString(total)))
     frame:SetHeight(54 + #keys * ROW_HEIGHT + 32)
 end
 
@@ -365,7 +366,7 @@ local function CreateWindow()
     cog:SetScript("OnClick", function(self) ns.ShowOptionsMenu(self) end)
     cog:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Options")
+        GameTooltip:AddLine(L["Options"])
         GameTooltip:Show()
     end)
     cog:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -379,15 +380,15 @@ local function CreateWindow()
     rep:SetScript("OnClick", function() ns.ToggleReputation() end)
     rep:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Reputation")
-        GameTooltip:AddLine("Every character's standing with each faction", 1, 1, 1)
+        GameTooltip:AddLine(L["Reputation"])
+        GameTooltip:AddLine(L["Every character's standing with each faction"], 1, 1, 1)
         GameTooltip:Show()
     end)
     rep:SetScript("OnLeave", function() GameTooltip:Hide() end)
     f.repButton = rep
     f.credit = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     f.credit:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 12)
-    f.credit:SetText("Alts Forever by Kadmai")
+    f.credit:SetText(L["Alts Forever by Kadmai"])
 
     ns.SkinWindow(f)
     f:SetScript("OnShow", Refresh)

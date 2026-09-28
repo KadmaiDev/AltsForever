@@ -47,6 +47,8 @@ function M.load(files)
     issecretvalue = function(v) return v == M.SECRET end
     M.now = nil -- set to freeze the clock
     time = function(t) if t then return os.time(t) end return M.now or os.time() end
+    -- The client language: English unless a test sets wow.locale before loading.
+    GetLocale = function() return M.locale or "enUS" end
     date = os.date
     print = function(msg) M.printed[#M.printed + 1] = msg end
     SlashCmdList = {}

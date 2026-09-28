@@ -6,6 +6,7 @@
 -- removed: it was the likely source of a one-off taint error on Esc, see AGENTS.md.)
 local ADDON, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
+local L = ns.L
 
 local GREY = "|cff9d9d9d"
 
@@ -19,8 +20,8 @@ end
 
 -- Removes a character; returns false and a reason if it can't.
 function ns.ForgetCharacter(key)
-    if not ns.db.chars[key] then return false, "No character named '" .. tostring(key) .. "'." end
-    if key == ns.charKey then return false, "You can't forget the character you're logged in on." end
+    if not ns.db.chars[key] then return false, L["No character named '%s'."]:format(tostring(key)) end
+    if key == ns.charKey then return false, L["You can't forget the character you're logged in on."] end
     ns.db.chars[key] = nil
     ns.PruneRecipeInfo()
     ns.InvalidateCache()
@@ -34,12 +35,12 @@ end
 local function ForgetDialog()
     if StaticPopupDialogs.ALTSFOREVER_FORGET then return end
     StaticPopupDialogs.ALTSFOREVER_FORGET = {
-        text = "Forget %s?\n\nAlts Forever removes their items, gold, gear and recipes. They're recorded again next time you log in on them.",
+        text = L["Forget %s?\n\nAlts Forever removes their items, gold, gear and recipes. They're recorded again next time you log in on them."],
         button1 = YES or "Yes",
         button2 = NO or "No",
         OnAccept = function(_, key)
             local ok, why = ns.ForgetCharacter(key)
-            ns.Print(ok and ("Forgot " .. key .. ".") or why)
+            ns.Print(ok and L["Forgot %s."]:format(key) or why)
             if ns.RefreshOverview then ns.RefreshOverview() end
         end,
         timeout = 0,
@@ -68,13 +69,13 @@ function ns.ShowOptionsMenu(owner)
         root:CreateTitle("Alts Forever")
         -- Not when it's already open (e.g. from the overview's own cog button).
         if not ns.OverviewShown() then
-            root:CreateButton("Open overview", function() ns.ToggleOverview(true) end)
+            root:CreateButton(L["Open overview"], function() ns.ToggleOverview(true) end)
         end
-        root:CreateCheckbox("Show skill-up details", SkillupsSelected, ToggleSkillups)
-        root:CreateCheckbox("Send mail to alts", SendToAltSelected, ToggleSendToAlt)
-        root:CreateCheckbox("Show session stats", StatsSelected, ToggleStats)
-        root:CreateCheckbox("Show minimap button", MinimapSelected, ToggleMinimap)
-        root:CreateButton("Memory use", function() ns.RunCommand("mem") end)
+        root:CreateCheckbox(L["Show skill-up details"], SkillupsSelected, ToggleSkillups)
+        root:CreateCheckbox(L["Send mail to alts"], SendToAltSelected, ToggleSendToAlt)
+        root:CreateCheckbox(L["Show session stats"], StatsSelected, ToggleStats)
+        root:CreateCheckbox(L["Show minimap button"], MinimapSelected, ToggleMinimap)
+        root:CreateButton(L["Memory use"], function() ns.RunCommand("mem") end)
     end)
 end
 
@@ -84,13 +85,13 @@ function ns.ShowCharacterMenu(owner, key)
     if not (c and MenuUtil and MenuUtil.CreateContextMenu) then return end
     MenuUtil.CreateContextMenu(owner, function(_, root)
         root:CreateTitle(ns.ColoredName(key, c))
-        local forget = root:CreateButton("Forget " .. (c.name or key) .. "...", function()
+        local forget = root:CreateButton(L["Forget %s..."]:format(c.name or key), function()
             ForgetDialog()
             StaticPopup_Show("ALTSFOREVER_FORGET", c.name or key, nil, key)
         end)
         if key == ns.charKey then
             forget:SetEnabled(false)
-            root:CreateTitle(GREY .. "(the character you're on)|r")
+            root:CreateTitle(GREY .. L["(the character you're on)"] .. "|r")
         end
     end)
 end
@@ -131,9 +132,9 @@ end
 local function ButtonTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddLine("Alts Forever")
-    GameTooltip:AddLine("Click: open the overview", 1, 1, 1)
-    GameTooltip:AddLine("Right-click: options", 1, 1, 1)
-    GameTooltip:AddLine("Drag: move around the minimap", 1, 1, 1)
+    GameTooltip:AddLine(L["Click: open the overview"], 1, 1, 1)
+    GameTooltip:AddLine(L["Right-click: options"], 1, 1, 1)
+    GameTooltip:AddLine(L["Drag: move around the minimap"], 1, 1, 1)
     GameTooltip:Show()
 end
 
@@ -193,8 +194,8 @@ end
 function AltsForever_OnAddonCompartmentEnter(_, frame)
     GameTooltip:SetOwner(frame, "ANCHOR_LEFT")
     GameTooltip:AddLine("Alts Forever")
-    GameTooltip:AddLine("Click: open the overview", 1, 1, 1)
-    GameTooltip:AddLine("Right-click: options", 1, 1, 1)
+    GameTooltip:AddLine(L["Click: open the overview"], 1, 1, 1)
+    GameTooltip:AddLine(L["Right-click: options"], 1, 1, 1)
     GameTooltip:Show()
 end
 

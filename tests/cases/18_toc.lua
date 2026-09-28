@@ -51,7 +51,7 @@ end)
 
 test("every addon file stops at once in a copy that isn't running", function()
     for _, file in ipairs(FILES) do
-        if file ~= "Core.lua" then
+        if file ~= "Core.lua" and file ~= "Locales.lua" and not file:find("^Locale_") then
             local text = assert(io.open(file)):read("*a")
             local after = text:match("\nlocal [%w_]+, ns = %.%.%.\n([^\n]*)")
             assert(after and after:find("^if ns%.disabled then return end"), file .. ": the guard must follow the ns line")

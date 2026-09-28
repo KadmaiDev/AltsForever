@@ -3,6 +3,7 @@
 -- expire, and adds an "Alts" button to the send-mail screen.
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
+local L = ns.L
 
 local wipe, pairs, next, floor, time = wipe, pairs, next, math.floor, time
 local issecretvalue = issecretvalue or function() return false end
@@ -44,11 +45,11 @@ end
 
 -- "2d 4h", "5h" or "<1h"; "expired" once the time has passed.
 function ns.ExpiryText(seconds)
-    if seconds <= 0 then return "expired" end
+    if seconds <= 0 then return L["expired"] end
     local d, h = floor(seconds / DAY), floor(seconds % DAY / 3600)
-    if d > 0 then return d .. "d " .. h .. "h" end
-    if h > 0 then return h .. "h" end
-    return "<1h"
+    if d > 0 then return L["%dd %dh"]:format(d, h) end
+    if h > 0 then return L["%dh"]:format(h) end
+    return L["<1h"]
 end
 
 -- Red under a day, orange under the warning window, plain otherwise.
@@ -70,7 +71,7 @@ function ns.MailWarnings(now, within)
         local c = chars[key]
         local left = c.mailExpires - now
         list[i] = ns.ColoredName(key, c) .. ": " .. ns.ExpiryColor(left) .. ns.ExpiryText(left) .. "|r"
-            .. (c.mailDeletes and " (will be |cffff2020deleted|r)" or " (returned to sender)")
+            .. " " .. (c.mailDeletes and L["(will be |cffff2020deleted|r)"] or L["(returned to sender)"])
     end
     return list
 end
@@ -78,7 +79,7 @@ end
 function ns.PrintMailWarnings(within)
     local lines = ns.MailWarnings(time(), within or WARN_WITHIN)
     if #lines == 0 then return false end
-    ns.Print("Mail with items or gold expiring soon:")
+    ns.Print(L["Mail with items or gold expiring soon:"])
     for _, line in ipairs(lines) do ns.Print("  " .. line) end
     return true
 end
@@ -130,14 +131,14 @@ end
 local function AltsMenu(owner)
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
     MenuUtil.CreateContextMenu(owner, function(_, root)
-        root:CreateTitle("Send to")
+        root:CreateTitle(L["Send to"])
         local list = ns.SendToAltEntries()
-        if #list == 0 then root:CreateTitle("|cff9d9d9dNo other characters yet|r") end
+        if #list == 0 then root:CreateTitle("|cff9d9d9d" .. L["No other characters yet"] .. "|r") end
         for _, e in ipairs(list) do
             local c = ns.db.chars[e.key]
             local text = ns.ColoredName(e.key, c)
             if e.n > 0 then
-                text = text .. LIGHT .. " · skill-ups with " .. e.n .. (e.n == 1 and " item" or " items") .. "|r"
+                text = text .. LIGHT .. " · " .. (e.n == 1 and L["skill-ups with %d item"] or L["skill-ups with %d items"]):format(e.n) .. "|r"
             end
             root:CreateButton(text, function() SendMailNameEditBox:SetText(c.name or e.key) end)
         end
@@ -170,8 +171,8 @@ local function CreateAltsButton()
     b:SetScript("OnClick", AltsMenu)
     b:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Send to one of your characters")
-        GameTooltip:AddLine("Characters who can still skill up with what you've attached are marked.", 1, 1, 1, true)
+        GameTooltip:AddLine(L["Send to one of your characters"])
+        GameTooltip:AddLine(L["Characters who can still skill up with what you've attached are marked."], 1, 1, 1, true)
         GameTooltip:Show()
     end)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)

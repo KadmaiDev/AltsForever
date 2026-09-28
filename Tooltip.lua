@@ -8,6 +8,7 @@
 -- with the cached lines, so hovering an item again costs nothing extra.
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
+local L = ns.L
 
 local pairs, wipe, type, pcall, floor, max = pairs, wipe, type, pcall, math.floor, math.max
 local issecretvalue = issecretvalue or function() return false end
@@ -26,7 +27,7 @@ local LABELS = {
     "|TInterface\\Minimap\\Tracking\\Mailbox:0|t",
     "|TInterface\\Icons\\INV_Shirt_White_01:0:0:0:0:64:64:5:59:5:59|t",
 }
-local TOTAL = "Total"
+local TOTAL = L["Total"]
 -- The breakdown: light grey, a step softer than the white totals but readable on
 -- Blizzard's see-through tooltip as well as darker UI skins.
 local GREY = "|cffe0e0e0"

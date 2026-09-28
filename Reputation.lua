@@ -3,6 +3,7 @@
 -- characters across). The panel is only built the first time it's opened.
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
+local L = ns.L
 
 local floor, pairs, ipairs, wipe, sort = math.floor, pairs, ipairs, wipe, table.sort
 local issecretvalue = issecretvalue or function() return false end
@@ -62,7 +63,7 @@ function ns.AddRepLines(tt, fresh)
         title = ns.db.factions and ns.db.factions[id]
         if not title and d.name and not issecretvalue(d.name) then title = d.name end
     end
-    return ns.AddCharacterRows(tt, rows, {}, title or (fresh and "Reputation"))
+    return ns.AddCharacterRows(tt, rows, {}, title or (fresh and L["Reputation"]))
 end
 
 ---------------------------------------------------------------------------
@@ -205,7 +206,7 @@ local function Fill()
     panel.empty:SetShown(#factions == 0)
     local shown = math.min(VISIBLE_ROWS, #factions)
     panel.footer:SetText(#factions > VISIBLE_ROWS
-        and (GREY .. (offset + 1) .. "-" .. (offset + shown) .. " of " .. #factions .. " (scroll for more)|r") or "")
+        and (GREY .. (offset + 1) .. "-" .. (offset + shown) .. " " .. L["of %d (scroll for more)"]:format(#factions) .. "|r") or "")
     panel:SetHeight(52 + math.max(shown, 3) * ROW_HEIGHT + 30)
 end
 
@@ -227,14 +228,14 @@ local function CreatePanel()
     end)
     local title = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     if not f.TitleText then title:SetPoint("TOP", 0, -6) end
-    title:SetText("Reputation")
+    title:SetText(L["Reputation"])
     header = CreateFrame("Frame", nil, f)
     header:SetHeight(ROW_HEIGHT)
     header:SetPoint("TOPLEFT", f, "TOPLEFT", 8, -30)
     header:SetPoint("RIGHT", f, "RIGHT", -8, 0)
     f.empty = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     f.empty:SetPoint("CENTER")
-    f.empty:SetText(GREY .. "No reputation recorded yet.\nLog in on each character once.|r")
+    f.empty:SetText(GREY .. L["No reputation recorded yet.\nLog in on each character once."] .. "|r")
     f.footer = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.footer:SetPoint("BOTTOM", f, "BOTTOM", 0, 10)
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverRepFrame" end

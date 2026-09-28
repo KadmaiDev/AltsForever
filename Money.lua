@@ -2,6 +2,7 @@
 -- money shown in your bags or bank.
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
+local L = ns.L
 
 local pairs, select, sort, type, wipe, GetMoney = pairs, select, table.sort, type, wipe, GetMoney
 local floor, time, date = math.floor, time, date
@@ -82,11 +83,11 @@ end
 local function AddStats(tt)
     tt:AddLine(" ")
     if sessionStart and ns.char.money then
-        tt:AddDoubleLine("This session", Signed(ns.char.money - sessionStart), 1, 0.82, 0, 1, 1, 1)
+        tt:AddDoubleLine(L["This session"], Signed(ns.char.money - sessionStart), 1, 0.82, 0, 1, 1, 1)
     end
     local day, week = ChangeSince(1), ChangeSince(7)
-    if day then tt:AddDoubleLine("Today, all characters", Signed(day), 1, 1, 1, 1, 1, 1) end
-    if week then tt:AddDoubleLine("This week, all characters", Signed(week), 1, 1, 1, 1, 1, 1) end
+    if day then tt:AddDoubleLine(L["Today, all characters"], Signed(day), 1, 1, 1, 1, 1, 1) end
+    if week then tt:AddDoubleLine(L["This week, all characters"], Signed(week), 1, 1, 1, 1, 1, 1) end
 end
 
 -- A "Gold" title, then the same layout as item tooltips: total (only when more
@@ -107,9 +108,9 @@ function ns.AddMoneyLines(tt)
     sort(order, ByMoney)
 
     local mine = ns.char.money or 0
-    tt:AddLine("Gold", 1, 0.82, 0)
+    tt:AddLine(L["Gold"], 1, 0.82, 0)
     if n > 0 then
-        tt:AddDoubleLine("Total", Coins(total + mine), 1, 0.82, 0, 1, 1, 1)
+        tt:AddDoubleLine(L["Total"], Coins(total + mine), 1, 0.82, 0, 1, 1, 1)
     end
     tt:AddDoubleLine(ns.ColoredName(ns.charKey, ns.char), Coins(mine), 1, 1, 1, 1, 1, 1)
     for i = 1, n do

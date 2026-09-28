@@ -3,6 +3,7 @@
 -- style panel opened by clicking a character in the overview.
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
+local L = ns.L
 
 local floor, pairs, wipe = math.floor, pairs, wipe
 local issecretvalue = issecretvalue or function() return false end
@@ -158,7 +159,7 @@ local function CreatePanel()
     f.footer:SetPoint("BOTTOM", f, "BOTTOM", 0, 14)
     f.empty = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     f.empty:SetPoint("CENTER")
-    f.empty:SetText(GREY .. "No gear recorded yet.\nLog in on this character once.|r")
+    f.empty:SetText(GREY .. L["No gear recorded yet.\nLog in on this character once."] .. "|r")
 
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverGearFrame" end
     ns.SkinWindow(f)
@@ -169,7 +170,7 @@ local function Fill()
     local c = ns.db.chars[shownKey]
     if not c then return panel:Hide() end
     local gear = c.gear
-    panel.title:SetText(ns.ColoredName(shownKey, c) .. (c.ilvl and (GREY .. "  ilvl " .. c.ilvl .. "|r") or ""))
+    panel.title:SetText(ns.ColoredName(shownKey, c) .. (c.ilvl and (GREY .. "  " .. L["ilvl %s"]:format(c.ilvl) .. "|r") or ""))
     panel.empty:SetShown(not gear)
     for slot, b in pairs(buttons) do
         local link = gear and gear[slot]
@@ -181,7 +182,7 @@ local function Fill()
         if pct and pct < LOW_DURABILITY then b.icon:SetVertexColor(1, 0.3, 0.3) else b.icon:SetVertexColor(1, 1, 1) end
         if b.name then b.name:SetText(link and ns.LinkName(link) or "") end
     end
-    panel.footer:SetText(gear and ("Lowest durability: " .. ns.DurabilityText(c.dura)) or "")
+    panel.footer:SetText(gear and (L["Lowest durability: %s"]:format(ns.DurabilityText(c.dura))) or "")
 end
 
 -- Opens the gear panel for a character, beside the overview if it's open; clicking

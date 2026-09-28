@@ -21,6 +21,13 @@
 ## AddonCompartmentFuncOnEnter: AltsForever_OnAddonCompartmentEnter
 ## AddonCompartmentFuncOnLeave: AltsForever_OnAddonCompartmentLeave
 
+Locales.lua
+Locale_deDE.lua
+Locale_esES.lua
+Locale_frFR.lua
+Locale_ptBR.lua
+Locale_zhCN.lua
+Locale_zhTW.lua
 Core.lua
 Scanner.lua
 Mail.lua
