@@ -28,8 +28,8 @@ local DEFAULTS = {
     equip = "Interface\\Icons\\INV_Shirt_White_01",
 }
 local RECOMMENDED = {
-    bags = { "Interface\\Icons\\INV_Misc_Bag_01", "Interface\\Icons\\INV_Misc_Bag_07", "Interface\\Icons\\INV_Misc_Bag_08",
-        "Interface\\Icons\\INV_Misc_Bag_09", "Interface\\Icons\\INV_Misc_Bag_10", "Interface\\Icons\\INV_Misc_Bag_12" },
+    bags = { DEFAULTS.bags, "Interface\\Icons\\INV_Misc_Bag_01", "Interface\\Icons\\INV_Misc_Bag_07", "Interface\\Icons\\INV_Misc_Bag_08",
+        "Interface\\Icons\\INV_Misc_Bag_09", "Interface\\Icons\\INV_Misc_Bag_10" },
     bank = { "Interface\\Minimap\\Tracking\\Banker", "Interface\\Icons\\INV_Box_01", "Interface\\Icons\\INV_Box_02",
         "Interface\\Icons\\INV_Misc_Coin_01", "Interface\\Icons\\INV_Misc_Key_03", "Interface\\Icons\\INV_Misc_Bag_10" },
     mail = { "Interface\\Minimap\\Tracking\\Mailbox", "Interface\\Icons\\INV_Letter_01", "Interface\\Icons\\INV_Letter_02",
@@ -203,8 +203,8 @@ local function ShowList(kind)
     end
     picker.list, picker.browse, picker.offset = list, list, 0
     if picker.search then picker.search:SetText("") end
-    picker.spellTab:SetEnabled(kind ~= "spell")
-    picker.itemTab:SetEnabled(kind ~= "item")
+    if kind == "spell" then picker.spellTab:LockHighlight() else picker.spellTab:UnlockHighlight() end
+    if kind == "item" then picker.itemTab:LockHighlight() else picker.itemTab:UnlockHighlight() end
     Render()
 end
 
@@ -259,11 +259,12 @@ local function CreatePicker()
         b:SetPoint("TOPLEFT", label, "BOTTOMLEFT", (i - 1) * (SIZE + GAP), -6)
         f.recommended[i] = b
     end
-    f.words = PanelButton(f, L["Use words instead"], 150)
-    f.words:SetPoint("LEFT", f.recommended[6], "RIGHT", 16, 0)
-    f.words:SetScript("OnClick", function() ns.SetPlaceIcon(picker.place, "words") end)
+    -- Top right, on the preview's line, anchored to the window's edge so they stay inside it.
     f.reset = PanelButton(f, L["Reset to default"], 130)
-    f.reset:SetPoint("LEFT", f.words, "RIGHT", 6, 0)
+    f.reset:SetPoint("TOPRIGHT", -16, -28)
+    f.words = PanelButton(f, L["Use words instead"], 150)
+    f.words:SetPoint("RIGHT", f.reset, "LEFT", -6, 0)
+    f.words:SetScript("OnClick", function() ns.SetPlaceIcon(picker.place, "words") end)
     f.reset:SetScript("OnClick", function() ns.SetPlaceIcon(picker.place, nil) end)
 
     local ok2, search = pcall(CreateFrame, "EditBox", nil, f, "InputBoxTemplate")
@@ -315,7 +316,21 @@ local function CreatePicker()
     slider:SetPoint("TOPLEFT", grid, "TOPRIGHT", 8, 0)
     slider:SetPoint("BOTTOMLEFT", grid, "BOTTOMRIGHT", 8, 0)
     slider:SetWidth(16)
-    slider:SetThumbTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
+    local track = slider:CreateTexture(nil, "BACKGROUND")
+    track:SetPoint("TOP", 0, 0)
+    track:SetPoint("BOTTOM", 0, 0)
+    track:SetWidth(6)
+    track:SetColorTexture(1, 1, 1, 0.12)
+    slider.track = track
+    local thumb = slider:CreateTexture(nil, "OVERLAY")
+    thumb:SetSize(12, 28)
+    thumb:SetColorTexture(1, 0.82, 0, 0.8)
+    slider:SetThumbTexture(thumb)
+    slider:EnableMouseWheel(true)
+    slider:SetScript("OnMouseWheel", function(_, delta)
+        picker.offset = picker.offset - delta * 2
+        Render()
+    end)
     slider:SetValueStep(1)
     slider:SetObeyStepOnDrag(true)
     slider:SetScript("OnValueChanged", function(self, value)
