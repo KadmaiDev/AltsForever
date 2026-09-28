@@ -7,6 +7,7 @@
 - **A friendlier start:** on a new install, a short welcome in chat explains how to use Alts Forever and what to visit on each character. Logging in on a new character says it's now tracked, and the overview says how to add your other characters while it only knows one.
 - **Translations:** Alts Forever now speaks German, French, Spanish (Spain and Latin America), Brazilian Portuguese, and Simplified and Traditional Chinese, following your game's language. Corrections from native speakers are very welcome.
 - **Works on every language's client:** the "(0 skill-up recipes)" rule for gathering professions no longer depends on English profession names.
+- **Fixed: the options menu with EllesmereUI's minimap.** Right-clicking the minimap button inside EllesmereUI's button tray opened the menu, but clicking any entry just closed it. Every entry works now.
 - **Two copies enabled:** if two copies of Alts Forever are enabled at once (for example an old and a new install), only the first one runs and it says so in chat, so tooltips don't show everything twice and your saved data can't be mixed up.
 
 ## Alts Forever 0.7.0
