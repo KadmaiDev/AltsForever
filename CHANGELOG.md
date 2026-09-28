@@ -1,4 +1,4 @@
-## Unreleased
+## Alts Forever 0.8.0
 
 - **Choose your tooltip icons:** pick the icons item tooltips use for bags, bank, mail and worn items, or words instead, from Options > AddOns > Alts Forever (or `/af icons`). The picker has recommended icons, a search by item or spell name, and every spell and item icon in the game to browse, with a preview. Hover an icon to see what it is.
 - **New bag icon:** tooltips now show a white linen bag for bags. The red one is still in the picker if you prefer it.
