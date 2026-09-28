@@ -53,7 +53,7 @@ test("the options menu has Settings..., which opens the page", function()
     wow.load(FILES)
     wow.login(nil)
     AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
-    wow.menuItem("Settings...").fn()
+    eq(wow.menuItem("Settings...").fn(), nil, "returns nothing, so the menu closes (a return value is a MenuResponse)")
     eq(wow.settingsOpened, nil, "not while the menu is still closing")
     for _, fn in ipairs(wow.timers) do fn() end
     eq(wow.settingsOpened, 77, "a frame later")

@@ -239,7 +239,9 @@ function ns.ShowOptionsMenu(owner)
         root:CreateCheckbox(L["Show session stats"], StatsSelected, ToggleStats)
         root:CreateCheckbox(L["Show minimap button"], MinimapSelected, ToggleMinimap)
         root:CreateButton(L["Memory use"], function() ns.RunCommand("mem") end)
-        if ns.HasSettings() then root:CreateButton(L["Settings..."], ns.OpenSettings) end
+        -- Wrapped: a menu button's return value is read as a MenuResponse, and
+        -- OpenSettings' true kept the menu open.
+        if ns.HasSettings() then root:CreateButton(L["Settings..."], function() ns.OpenSettings() end) end
     end)
 end
 
