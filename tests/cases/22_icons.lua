@@ -95,6 +95,25 @@ test("the picker's search finds icons by item and spell name", function()
     C_SpellBook, Enum.SpellBookSpellBank = nil, nil
 end)
 
+test("the picker finds spells even where the game has no Enum.SpellBookSpellBank", function()
+    local ns = wow.load(FILES)
+    local asked
+    C_SpellBook = {
+        GetNumSpellBookSkillLines = function() return 1 end,
+        GetSpellBookSkillLineInfo = function() return { itemIndexOffset = 0, numSpellBookItems = 1 } end,
+        GetSpellBookItemInfo = function(slot, bank) asked = bank return { name = "Holy Light", iconID = 135920 } end,
+    }
+    Enum.SpellBookSpellBank = nil
+    wow.login(nil)
+    ns.OpenIconPicker("bags")
+    local p = ns.IconPicker()
+    p.search:SetText("holy")
+    p.search.scripts.OnTextChanged(p.search, true)
+    eq(p.grid[1].value, 135920, "found by spell name")
+    eq(asked, 0, "the player's spellbook")
+    C_SpellBook = nil
+end)
+
 test("the Options page lists each place's icon, and Change... opens the picker for it", function()
     local ns = wow.load(FILES)
     wow.login(nil)

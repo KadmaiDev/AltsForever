@@ -171,10 +171,13 @@ local function SearchPool()
             end
         end
     end
+    -- The player's spellbook. Enum.SpellBookSpellBank isn't documented on Forever; its
+    -- Player value is 0 on retail, so fall back to that. A failure is reported (BugSack
+    -- shows it), not hidden, but never stops the picker.
     local SB = C_SpellBook
-    local bank = Enum and Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Player
-    if SB and SB.GetNumSpellBookSkillLines and SB.GetSpellBookSkillLineInfo and SB.GetSpellBookItemInfo and bank then
-        pcall(function()
+    local bank = Enum and Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Player or 0
+    if SB and SB.GetNumSpellBookSkillLines and SB.GetSpellBookSkillLineInfo and SB.GetSpellBookItemInfo then
+        local ok, err = pcall(function()
             for line = 1, SB.GetNumSpellBookSkillLines() do
                 local info = SB.GetSpellBookSkillLineInfo(line)
                 if info then
@@ -185,6 +188,7 @@ local function SearchPool()
                 end
             end
         end)
+        if not ok and geterrorhandler then geterrorhandler()(err) end
     end
     picker.pool = pool
     return pool
