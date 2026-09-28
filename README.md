@@ -8,7 +8,7 @@ A World of Warcraft: Forever addon (interface 16001) that adds a total and a per
 
 ![Item tooltip for Linen Cloth: skill-ups across characters, then counts per character](media/item-tracking.png)
 
-Locations are shown as icons: Red Linen Bag (bags), banker (bank), mailbox (mail) and white shirt (wearing).
+Locations are shown as icons: a linen bag (bags), banker (bank), mailbox (mail) and white shirt (wearing). You can pick your own icons, or words instead, with `/af icons`.
 
 The current character always comes first. Other characters are sorted by count.
 
