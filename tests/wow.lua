@@ -188,6 +188,8 @@ function M.load(files)
     end
     function frameMethods:GetChildren() return unpack(self.children or {}) end
     function frameMethods:GetParent() return self.parent end
+    function frameMethods:SetHeight(h) self.height = h end
+    function frameMethods:GetHeight() return self.height or 0 end
     function frameMethods:SetChecked(on) self.checked = on end
     function frameMethods:GetChecked() return self.checked end
     function frameMethods:GetPoint() if self.point then return unpack(self.point) end end

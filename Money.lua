@@ -225,6 +225,7 @@ function ns.StartMoney()
             char.money = m
             sessionStart = sessionStart or m
             RecordDay()
+            ns.BagsWindowChanged()
         end
     end
     ns.On("PLAYER_MONEY", Update)

@@ -55,13 +55,17 @@ end
 
 -- Equipped gear, plus the bags themselves (they sit in inventory slots too).
 local EQUIP_SLOTS = {}
+local BAG_INV = {} -- bag -> the inventory slot its bag item sits in
 for slot = INVSLOT_FIRST_EQUIPPED or 1, INVSLOT_LAST_EQUIPPED or 19 do
     EQUIP_SLOTS[#EQUIP_SLOTS + 1] = slot
 end
 for _, name in ipairs({ "Bag_1", "Bag_2", "Bag_3", "Bag_4", "ReagentBag" }) do
     local bag = BagIndex[name]
     local ok, invSlot = pcall(C_Container.ContainerIDToInventoryID, bag)
-    if bag and ok and invSlot then EQUIP_SLOTS[#EQUIP_SLOTS + 1] = invSlot end
+    if bag and ok and invSlot then
+        EQUIP_SLOTS[#EQUIP_SLOTS + 1] = invSlot
+        BAG_INV[bag] = invSlot
+    end
 end
 
 -- A slot in the saved layout: one number, itemID * 1000 + stack size (Classic stacks
@@ -77,7 +81,8 @@ function ns.SlotItem(value)
 end
 
 -- Counts every item in the bags into out; with layout, also records each bag's slots
--- in layout[bag] (an array as long as the bag; a bag with no slots is removed).
+-- in layout[bag] (an array as long as the bag; a bag with no slots is removed), and
+-- at index 0 the bag item itself, for its name in the bags window.
 function ns.ScanContainers(bags, out, layout)
     wipe(out)
     for i = 1, #bags do
@@ -106,6 +111,8 @@ function ns.ScanContainers(bags, out, layout)
         end
         -- The bag got smaller (swapped for a smaller one).
         if slots then
+            local inv = BAG_INV[bag]
+            if inv then slots[0] = GetInventoryItemID("player", inv) or slots[0] end
             for slot = #slots, size + 1, -1 do slots[slot] = nil end
         end
     end

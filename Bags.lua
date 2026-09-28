@@ -1,4 +1,5 @@
--- Alts Forever bags window: any character's bags or bank, slot by slot, as last seen.
+-- Alts Forever bags window: any character's bags or bank, slot by slot, as last seen,
+-- either all in one grid or split by bag (bank: by tab), with their money at the bottom.
 -- Opened from the overview's title bar, a character's right-click menu, /af bags and
 -- /af bank. The slots come from the scanner (char.layout); for characters not scanned
 -- since this was added, the window falls back to one slot per item with its total.
@@ -7,38 +8,45 @@ local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
 
-local floor, ceil, max, ipairs, pairs, sort, time = math.floor, math.ceil, math.max, ipairs, pairs, table.sort, time
+local floor, ceil, max, min, ipairs, pairs, sort, time = math.floor, math.ceil, math.max, math.min, ipairs, pairs, table.sort, time
 local C_Item = C_Item
 local GetItemIconByID = C_Item.GetItemIconByID
+local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
 
 local GREY = "|cff9d9d9d"
 local COLS, SIZE, GAP, PAD = 14, 36, 3, 12
-local TOP, TAB_ROW, BOTTOM = 62, 26, 34
+local TOP, BOTTOM, HEADER, SECTION_GAP = 60, 34, 20, 8
 local EMPTY_SLOT = "Interface\\PaperDoll\\UI-Backpack-EmptySlot"
 local BORDER = "Interface\\Common\\WhiteIconFrame"
-local MAX_TABS = 9
+local BagIndex = Enum.BagIndex
 
 local frame
-local slots, tabButtons = {}, {}
-local shownKey, view, tab = nil, "bags", 1
--- What's shown, reused between fills: item IDs (false for an empty slot) and counts.
-local ids, counts, bankTabs = {}, {}, {}
-local shown = 0
+local slots, headers = {}, {}
+local shownKey, view = nil, "bags"
+local scroll, contentHeight = 0, 0
 local loadRetry = false
 
 ---------------------------------------------------------------------------
 -- What to show (no UI, so tests can check it)
 ---------------------------------------------------------------------------
-local function Add(id, count)
-    shown = shown + 1
-    ids[shown], counts[shown] = id or false, count or 0
+-- The slots, reused between fills: item IDs (false for an empty slot) and counts, and
+-- the sections they're grouped in: { bag = bag index or false, from, to, used }.
+local ids, counts, sections = {}, {}, {}
+local shown, nSections = 0, 0
+
+local function NewSection(bag)
+    nSections = nSections + 1
+    local s = sections[nSections] or {}
+    sections[nSections] = s
+    s.bag, s.from, s.to, s.used = bag, shown + 1, shown, 0
+    return s
 end
 
-local function AddLayout(values)
-    for i = 1, #values do
-        local id, count = ns.SlotItem(values[i])
-        Add(id, count)
-    end
+local function Add(section, id, count)
+    shown = shown + 1
+    ids[shown], counts[shown] = id or false, count or 0
+    section.to = shown
+    if id then section.used = section.used + 1 end
 end
 
 -- One slot per item, with its total: for bags or a bank seen before slots were recorded.
@@ -51,49 +59,55 @@ local function AddCounts(totals)
     end
     for i = #byId, n + 1, -1 do byId[i] = nil end
     sort(byId)
-    for i = 1, n do Add(byId[i], totals[byId[i]]) end
+    local section = NewSection(false)
+    for i = 1, n do Add(section, byId[i], totals[byId[i]]) end
 end
 
--- Fills ids/counts for a character's view; returns how it was recorded: "slots",
--- "counts" (no layout yet) or nil (nothing recorded), and for the bank, its tabs.
-function ns.BagsContents(c, which, tabIndex)
-    shown = 0
+-- Fills the slots for a character's bags or bank, one section per bag if split, else one
+-- for all; returns how it was recorded: "slots", "counts" (no layout yet) or nil.
+function ns.BagsContents(c, which, split)
+    shown, nSections = 0, 0
     local layout = c.layout
     local how
-    if which == "bank" then
-        local n = 0
-        for _, bag in ipairs(ns.BANK_TABS) do
-            if layout and layout[bag] then
-                n = n + 1
-                bankTabs[n] = bag
+    local section
+    for _, bag in ipairs(which == "bank" and ns.BANK_TABS or ns.CARRIED_BAGS) do
+        local values = layout and layout[bag]
+        if values then
+            if split or not section then section = NewSection(split and bag or false) end
+            for i = 1, #values do
+                local id, count = ns.SlotItem(values[i])
+                Add(section, id, count)
             end
-        end
-        for i = #bankTabs, n + 1, -1 do bankTabs[i] = nil end
-        if n > 0 then
-            AddLayout(layout[bankTabs[math.min(tabIndex or 1, n)]])
             how = "slots"
-        elseif c.bank then
-            AddCounts(c.bank)
-            how = "counts"
         end
-    else
-        for i = #bankTabs, 1, -1 do bankTabs[i] = nil end
-        for _, bag in ipairs(ns.CARRIED_BAGS) do
-            if layout and layout[bag] then
-                AddLayout(layout[bag])
-                how = "slots"
-            end
-        end
-        if not how and c.bags and next(c.bags) then
-            AddCounts(c.bags)
+    end
+    if not how then
+        local totals = which == "bank" and c.bank or c.bags
+        if totals and next(totals) then
+            AddCounts(totals)
             how = "counts"
         end
     end
     for i = #ids, shown + 1, -1 do ids[i], counts[i] = nil, nil end
-    return how, bankTabs
+    return how
 end
 
-function ns.BagsShown() return ids, counts, shown end
+function ns.BagsShown() return ids, counts, shown, sections, nSections end
+
+-- A section's title: the bag's name (or bank tab), or the whole place's.
+local function SectionName(c, bag)
+    if not bag then return view == "bank" and L["Bank"] or L["Bags"] end
+    if bag == BagIndex.Backpack then return BACKPACK_TOOLTIP or L["Backpack"] end
+    if bag == BagIndex.Keyring then return KEYRING or L["Keyring"] end
+    for i, tab in ipairs(ns.BANK_TABS) do
+        if tab == bag then return L["Tab %d"]:format(i) end
+    end
+    local item = c.layout[bag][0]
+    local name = item and C_Item.GetItemNameByID(item)
+    if not name and item and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(item) end
+    return name or L["Bag %d"]:format(bag)
+end
+ns.BagsSectionName = SectionName
 
 ---------------------------------------------------------------------------
 -- Window
@@ -117,7 +131,7 @@ end
 local function Slot(i)
     local b = slots[i]
     if b then return b end
-    b = CreateFrame("Button", nil, frame)
+    b = CreateFrame("Button", nil, frame.content)
     b:SetSize(SIZE, SIZE)
     b.icon = b:CreateTexture(nil, "ARTWORK")
     b.icon:SetAllPoints()
@@ -137,18 +151,36 @@ local function Slot(i)
     return b
 end
 
--- Item quality isn't known until the game has loaded the item: ask for it, and fill
--- again once a second later (once per fill, however many items were missing).
+-- A section heading with a faint line after it, as in EllesmereUI's bags.
+local function Header(i)
+    local h = headers[i]
+    if h then return h end
+    h = frame.content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    ns.SkinText(h)
+    h.line = frame.content:CreateTexture(nil, "ARTWORK")
+    h.line:SetHeight(1)
+    h.line:SetColorTexture(1, 1, 1, 0.12)
+    h.line:SetPoint("LEFT", h, "RIGHT", 8, 0)
+    h.line:SetPoint("RIGHT", frame.content, "RIGHT", 0, 0)
+    headers[i] = h
+    return h
+end
+
+-- Item quality and names aren't known until the game has loaded the item: ask for it,
+-- and fill again a second later (once per fill, however many items were missing).
+local function RetryLater()
+    if loadRetry or not C_Timer then return end
+    loadRetry = true
+    C_Timer.After(1, function()
+        if frame:IsShown() then Fill() end
+    end)
+end
+
 local function Quality(id)
     local q = C_Item.GetItemQualityByID and C_Item.GetItemQualityByID(id)
     if q == nil and C_Item.RequestLoadItemDataByID then
         C_Item.RequestLoadItemDataByID(id)
-        if not loadRetry and C_Timer then
-            loadRetry = true
-            C_Timer.After(1, function()
-                if frame:IsShown() then Fill() end
-            end)
-        end
+        RetryLater()
     end
     return q
 end
@@ -180,40 +212,64 @@ local function Seen(c, now)
     return L["Last seen: %s"]:format(ns.SeenText(shownKey, c, now))
 end
 
+-- The tallest the slot area gets before it scrolls.
+local function MaxView()
+    local h = UIParent and UIParent:GetHeight() or 0
+    return max(h > 0 and floor(h * 0.7) - TOP - BOTTOM or 560, 4 * (SIZE + GAP))
+end
+
+local function Place()
+    local visible = min(contentHeight, MaxView())
+    scroll = max(0, min(scroll, contentHeight - visible))
+    frame.content:ClearAllPoints()
+    frame.content:SetPoint("TOPLEFT", frame.holder, "TOPLEFT", 0, scroll)
+    frame.content:SetPoint("TOPRIGHT", frame.holder, "TOPRIGHT", 0, scroll)
+    frame.content:SetHeight(max(contentHeight, 1))
+    frame.holder:SetHeight(max(visible, 3 * (SIZE + GAP)))
+    frame:SetHeight(TOP + frame.holder:GetHeight() + BOTTOM)
+end
+
 function Fill()
     local c = shownKey and ns.db.chars[shownKey]
     if not c then return frame:Hide() end
     loadRetry = false
-    local how, tabs = ns.BagsContents(c, view, tab)
-    if #tabs > 0 and tab > #tabs then tab = #tabs end
+    local split = ns.db.bagsSplit and true or false
+    local how = ns.BagsContents(c, view, split)
     frame.who:SetText(ns.ColoredName(shownKey, c))
     for _, v in ipairs({ "bags", "bank" }) do
         if v == view then frame[v]:LockHighlight() else frame[v]:UnlockHighlight() end
     end
-    -- Bank tab buttons, only with more than one tab.
-    local tabRow = #tabs > 1 and TAB_ROW or 0
-    for i = 1, MAX_TABS do
-        local t = tabButtons[i]
-        if i <= #tabs and #tabs > 1 then
-            t:Show()
-            if i == tab then t:LockHighlight() else t:UnlockHighlight() end
-        elseif t then
-            t:Hide()
+    frame.split:SetChecked(split)
+
+    local y, free = 0, 0
+    for n = 1, nSections do
+        local s = sections[n]
+        local h = Header(n)
+        local title = SectionName(c, s.bag)
+        h:SetText(how == "slots" and (title .. GREY .. "  (" .. s.used .. " / " .. (s.to - s.from + 1) .. ")|r") or title)
+        h:ClearAllPoints()
+        h:SetPoint("TOPLEFT", frame.content, "TOPLEFT", 0, -y)
+        h:Show()
+        h.line:Show()
+        y = y + HEADER
+        for i = s.from, s.to do
+            local k = i - s.from
+            local b = Slot(i)
+            b:ClearAllPoints()
+            b:SetPoint("TOPLEFT", frame.content, "TOPLEFT", k % COLS * (SIZE + GAP), -y - floor(k / COLS) * (SIZE + GAP))
+            ShowSlot(b, ids[i], counts[i])
+            if not ids[i] then free = free + 1 end
+            b:Show()
         end
+        y = y + ceil((s.to - s.from + 1) / COLS) * (SIZE + GAP) + SECTION_GAP
     end
-    local top = TOP + tabRow
-    local free = 0
-    for i = 1, shown do
-        local b = Slot(i)
-        b:ClearAllPoints()
-        b:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD + (i - 1) % COLS * (SIZE + GAP), -top - floor((i - 1) / COLS) * (SIZE + GAP))
-        ShowSlot(b, ids[i], counts[i])
-        if not ids[i] then free = free + 1 end
-        b:Show()
+    for n = nSections + 1, #headers do
+        headers[n]:Hide()
+        headers[n].line:Hide()
     end
     for i = shown + 1, #slots do slots[i]:Hide() end
-    local rows = max(ceil(shown / COLS), 3)
-    frame:SetHeight(top + rows * (SIZE + GAP) - GAP + BOTTOM)
+    contentHeight = y
+    Place()
 
     if not how then
         frame.empty:SetText(GREY .. (view == "bank" and L["Bank not seen yet.\nVisit the bank on this character once."]
@@ -229,6 +285,7 @@ function Fill()
         frame.info:SetText("")
     end
     frame.seen:SetText(how and (GREY .. Seen(c, time()) .. "|r") or "")
+    frame.money:SetText(c.money and GetCoinTextureString(c.money) or "")
 end
 
 local function PickCharacter(owner)
@@ -237,7 +294,7 @@ local function PickCharacter(owner)
             root:CreateRadio(ns.ColoredName(key, ns.db.chars[key]),
                 function(k) return k == shownKey end,
                 function(k)
-                    shownKey, tab = k, 1
+                    shownKey, scroll = k, 0
                     Fill()
                 end, key)
         end
@@ -250,7 +307,7 @@ local function ViewButton(name, text, x)
     b:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -30)
     b:SetText(text)
     b:SetScript("OnClick", function()
-        view, tab = name, 1
+        view, scroll = name, 0
         Fill()
     end)
     ns.SkinButton(b)
@@ -261,7 +318,7 @@ local function CreateWindow()
     local ok, f = pcall(CreateFrame, "Frame", "AltsForeverBagsFrame", UIParent, "BasicFrameTemplateWithInset")
     if not ok then f = CreateFrame("Frame", "AltsForeverBagsFrame", UIParent, "BackdropTemplate") end
     frame = f
-    f.slots, f.tabs = slots, tabButtons
+    f.slots, f.headers = slots, headers
     f:SetWidth(PAD * 2 + COLS * (SIZE + GAP) - GAP)
     f:SetFrameStrata("HIGH")
     f:SetMovable(true)
@@ -290,27 +347,51 @@ local function CreateWindow()
     ViewButton("bags", L["Bags"], PAD + 210)
     ViewButton("bank", L["Bank"], PAD + 294)
 
-    for i = 1, MAX_TABS do
-        local t = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-        t:SetSize(56, 20)
-        t:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + (i - 1) * 60, -TOP + 2)
-        t:SetText(L["Tab %d"]:format(i))
-        t:SetScript("OnClick", function()
-            tab = i
-            Fill()
-        end)
-        ns.SkinButton(t)
-        t:Hide()
-        tabButtons[i] = t
-    end
+    -- All in one grid, or a section per bag (the choice is kept for every character).
+    local split = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+    split:SetSize(24, 24)
+    split:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + 384, -29)
+    split.label = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    split.label:SetPoint("LEFT", split, "RIGHT", 2, 0)
+    split.label:SetText(L["By bag"])
+    split:SetScript("OnClick", function(self)
+        ns.db.bagsSplit = self:GetChecked() and true or nil
+        scroll = 0
+        Fill()
+    end)
+    split:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["By bag"])
+        GameTooltip:AddLine(L["Show each bag (or bank tab) separately, or everything in one grid."], 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    split:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ns.SkinCheck(split)
+    ns.SkinText(split.label)
+    f.split = split
+
+    -- The slots scroll inside a clipped holder when they're taller than the screen allows.
+    local holder = CreateFrame("Frame", nil, f)
+    holder:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -TOP)
+    holder:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -TOP)
+    holder:SetClipsChildren(true)
+    f.holder = holder
+    f.content = CreateFrame("Frame", nil, holder)
+    f:EnableMouseWheel(true)
+    f:SetScript("OnMouseWheel", function(_, delta)
+        scroll = scroll - delta * 2 * (SIZE + GAP)
+        Place()
+    end)
 
     f.empty = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    f.empty:SetPoint("CENTER", 0, -10)
+    f.empty:SetPoint("CENTER", holder, "CENTER")
     f.info = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.info:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD + 2, 12)
     f.seen = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    f.seen:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 2, 12)
-    for _, fs in ipairs({ f.empty, f.info, f.seen }) do ns.SkinText(fs) end
+    f.seen:SetPoint("BOTTOM", f, "BOTTOM", 0, 12)
+    f.money = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    f.money:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 2, 11)
+    for _, fs in ipairs({ f.empty, f.info, f.seen, f.money }) do ns.SkinText(fs) end
 
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverBagsFrame" end
     ns.SkinWindow(f)
@@ -323,7 +404,7 @@ function ns.ShowBags(key, which)
     if not frame then CreateWindow() end
     key, which = key or ns.charKey, which or "bags"
     if frame:IsShown() and shownKey == key and view == which then return frame:Hide() end
-    if shownKey ~= key or view ~= which then tab = 1 end
+    if shownKey ~= key or view ~= which then scroll = 0 end
     shownKey, view = key, which
     Fill()
     frame:Show()
@@ -331,7 +412,7 @@ end
 
 function ns.BagsWindow() return frame end
 
--- The scanner calls this after each bags or bank scan.
+-- The scanner calls this after each bags or bank scan; money changes too.
 function ns.BagsWindowChanged()
     if frame and frame:IsShown() and shownKey == ns.charKey then Fill() end
 end

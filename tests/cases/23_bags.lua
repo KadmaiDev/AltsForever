@@ -12,10 +12,13 @@ test("scans record each bag's and bank tab's slots, reusing the same tables", fu
     local ns = wow.load(FILES)
     wow.setBag(0, 4, { [1] = { 100, 20 }, [3] = { 200, 1 } })
     wow.setBag(1, 2, { [2] = { 100, 5 } })
+    wow.inventory[31] = 4245
     wow.login(nil)
     local layout = ns.char.layout
     eq(table.concat(layout[0], ","), "100020,0,200001,0", "item * 1000 + count, 0 for empty")
     eq(table.concat(layout[1], ","), "0,100005")
+    eq(layout[1][0], 4245, "the bag item itself, for its name")
+    eq(layout[0][0], nil, "the backpack isn't an item")
     eq(layout[2], nil, "no bag in that slot: nothing stored")
     eq(ns.char.bags[100], 25, "the counts tooltips use are unchanged")
     eq(ns.char.bank, nil); eq(ns.char.bankAt, nil)
@@ -75,26 +78,45 @@ test("the bags window shows a character's bags slot by slot, with free slots and
     eq(f:IsShown(), false)
 end)
 
-test("the bank view has a button per tab, and the dropdown switches character", function()
+-- The section headings on show.
+function bagsHeadings()
+    local out = {}
+    for _, h in ipairs(AltsForeverBagsFrame.headers) do
+        if h:IsShown() then out[#out + 1] = h.text end
+    end
+    return table.concat(out, " | ")
+end
+
+test("all in one or by bag (remembered), bank tabs as sections, and money at the bottom", function()
     local ns = wow.load(FILES)
     wow.ns = ns
     wow.login({ v = 2, chars = {
-        ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { level = 20, bank = { [500] = 40 }, bags = { [600] = 1 } }),
+        ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { level = 20, bank = { [500] = 40 }, bags = { [600] = 1 }, money = 12345 }),
         ["Old Timer"] = alt("Old Timer", "MAGE", { level = 10, bags = {} }),
     } })
+    wow.setBag(0, 2, { [1] = { 100, 1 } })
+    wow.setBag(1, 2, { [2] = { 101, 1 } })
+    wow.inventory[31] = 4245
+    wow.itemNames[4245] = "Red Linen Bag"
     wow.setBag(6, 2, { [1] = { 400, 2 } })
     wow.setBag(7, 3, { [3] = { 401, 1 } })
+    bagsChanged(0)
     wow.fire("BANKFRAME_OPENED")
-    SlashCmdList.ALTSFOREVER("bank")
+    SlashCmdList.ALTSFOREVER("bags")
     local f = AltsForeverBagsFrame
-    eq(bagsGrid(), "400x2 -")
-    local tabs = f.tabs
-    eq(tabs[1].text, "Tab 1")
-    eq(tabs[1]:IsShown(), true); eq(tabs[2]:IsShown(), true); eq(tabs[3]:IsShown(), false)
-    tabs[2].scripts.OnClick(tabs[2])
-    eq(bagsGrid(), "- - 401x1")
-    eq(f.info.text, "2 of 3 slots free")
+    eq(f.split:GetChecked(), false, "all in one by default")
+    eq(bagsHeadings(), "Bags|cff9d9d9d  (2 / 4)|r")
+    eq(bagsGrid(), "100x1 - - 101x1")
+    f.split:SetChecked(true)
+    f.split.scripts.OnClick(f.split)
+    eq(AltsForeverDB.bagsSplit, true, "remembered")
+    eq(bagsHeadings(), "Backpack|cff9d9d9d  (1 / 2)|r | Red Linen Bag|cff9d9d9d  (1 / 2)|r")
+    f.bank.scripts.OnClick(f.bank)
+    eq(bagsHeadings(), "Tab 1|cff9d9d9d  (1 / 2)|r | Tab 2|cff9d9d9d  (1 / 3)|r")
+    eq(bagsGrid(), "400x2 - - - 401x1")
+    eq(f.info.text, "3 of 5 slots free")
     assert(f.seen.text:find("Bank last visited", 1, true), f.seen.text)
+    eq(f.money.text, ns.char.money .. "c")
     -- The dropdown lists every character; an alt seen before slots were recorded shows totals.
     f.who.scripts.OnClick(f.who)
     eq(#wow.menu.items, 3)
@@ -102,8 +124,9 @@ test("the bank view has a button per tab, and the dropdown switches character", 
     eq(tarn.isSelected(tarn.data), false)
     tarn.setSelected(tarn.data)
     eq(bagsGrid(), "500x40", "one slot per item, with its total")
+    eq(bagsHeadings(), "Bank", "no slot numbers for totals")
     assert(f.info.text:find("Totals only", 1, true), f.info.text)
-    eq(tabs[1]:IsShown(), false, "no tabs without slots")
+    eq(f.money.text, "12345c")
     f.bags.scripts.OnClick(f.bags)
     eq(bagsGrid(), "600x1")
     -- Nothing recorded: says what to do.
@@ -111,6 +134,23 @@ test("the bank view has a button per tab, and the dropdown switches character", 
     eq(f.empty:IsShown(), true)
     assert(f.empty.text:find("Visit the bank", 1, true), f.empty.text)
     eq(f.info.text, "")
+    eq(f.money.text, "")
+end)
+
+test("a tall bank scrolls instead of growing past the screen", function()
+    local ns = wow.load(FILES)
+    wow.ns = ns
+    for bag = 6, 8 do wow.setBag(bag, 98, {}) end
+    wow.login(nil)
+    wow.fire("BANKFRAME_OPENED")
+    ns.ShowBags(nil, "bank")
+    local f = AltsForeverBagsFrame
+    local before = f.content.point
+    assert(f.holder:GetHeight() <= 560, f.holder:GetHeight())
+    f.scripts.OnMouseWheel(f, -1)
+    assert(f.content.point[5] > 0, "scrolled down")
+    f.scripts.OnMouseWheel(f, 100)
+    eq(f.content.point[5], 0, "not past the top")
 end)
 
 test("the bags window opens from the overview's button, a character's menu and /af bank Name", function()
