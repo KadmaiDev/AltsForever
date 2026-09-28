@@ -62,15 +62,24 @@ function M.load(files)
             setting.tooltip = tooltip
             category.checkboxes[#category.checkboxes + 1] = setting
         end,
+        RegisterCanvasLayoutCategory = function(frame, name)
+            M.settings = { name = name, frame = frame, GetID = function() return 77 end }
+            return M.settings
+        end,
         RegisterAddOnCategory = function(category) category.registered = true end,
         OpenToCategory = function(id) M.settingsOpened = id end,
     }
-    SettingsPanel = { GetLayout = function() return { AddInitializer = function(_, init) M.settings.button = init end } end }
+    M.settingsShown = nil
+    SettingsPanel = { IsShown = function() return M.settingsShown end,
+        GetLayout = function() return { AddInitializer = function(_, init) M.settings.button = init end } end }
+    HideUIPanel = function(panel) if panel == SettingsPanel then M.settingsShown = false end end
     CreateSettingsButtonInitializer = function(name, text, click, tooltip)
         return { name = name, text = text, click = click, tooltip = tooltip }
     end
     -- The client language: English unless a test sets wow.locale before loading.
     GetLocale = function() return M.locale or "enUS" end
+    M.inCombat = nil
+    InCombatLockdown = function() return M.inCombat end
     date = os.date
     print = function(msg) M.printed[#M.printed + 1] = msg end
     SlashCmdList = {}
@@ -171,6 +180,8 @@ function M.load(files)
     end
     function frameMethods:GetChildren() return unpack(self.children or {}) end
     function frameMethods:GetParent() return self.parent end
+    function frameMethods:SetChecked(on) self.checked = on end
+    function frameMethods:GetChecked() return self.checked end
     function frameMethods:GetPoint() if self.point then return unpack(self.point) end end
     function frameMethods:Show()
         local was = self.shown

@@ -115,7 +115,6 @@ L["Show which characters can still skill up: in Can craft, on materials (Skill-u
 L["An arrow next to the To box at the mailbox to pick one of your characters. Same as /af sendmail."] = "在邮箱收件人栏旁显示一个箭头，用于选择你的角色。等同于 /af sendmail。"
 L["Off by default. Your XP bar shows this session's XP and time to level; your bag gold shows gold gained or lost this session, today and this week. Same as /af stats."] = "默认关闭。经验条显示本次获得的经验和升级所需时间；背包金币显示本次、今天和本周的金币增减。等同于 /af stats。"
 L["Same as /af minimap. Alts Forever is also in the minimap's addon menu."] = "等同于 /af minimap。Alts Forever 也在小地图的插件菜单中。"
-L["Overview"] = "总览"
 L["Every character at a glance. Right-click a character there to forget them. Same as /af."] = "一览所有角色。在那里右键点击角色可将其忘记。等同于 /af。"
 L["Settings..."] = "设置..."
 L["Welcome! Hover any item to see how many your characters have, and where."] = "欢迎！将鼠标悬停在任意物品上，即可查看你的角色有多少、在哪里。"
@@ -123,3 +122,5 @@ L["Type /af or click the minimap button for all your characters at a glance. Set
 L["Log in on each character once, and open their bank, mailbox and profession windows once, so Alts Forever knows what they have."] = "请用每个角色登录一次，并打开一次银行、邮箱和专业窗口，让 Alts Forever 知道他们拥有什么。"
 L["Now tracking %s. Open the bank and mailbox once on this character so they're included too."] = "现在开始记录 %s。请用此角色打开一次银行和邮箱，把它们也包括进来。"
 L["Log in on your other characters once to add them here."] = "用你的其他角色各登录一次，即可将其添加到这里。"
+L["All your alts at a glance, by Kadmai"] = "一览你的所有小号，作者 Kadmai"
+L["Type /af help for every command."] = "输入 /af help 查看所有命令。"

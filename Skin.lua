@@ -92,6 +92,26 @@ function ns.SkinWindow(f)
     end
 end
 
+-- A button (e.g. on the Options page): EllesmereUI's flat button, or ElvUI's.
+function ns.SkinButton(b)
+    if not b then return end
+    if skin then
+        if skin.Button then pcall(skin.Button, b) end
+    elseif Elv() then
+        pcall(elvS.HandleButton, elvS, b)
+    end
+end
+
+-- A tick box: EllesmereUI's, or ElvUI's.
+function ns.SkinCheck(c)
+    if not c then return end
+    if skin then
+        if skin.Checkbox then pcall(skin.Checkbox, c) end
+    elseif Elv() then
+        pcall(elvS.HandleCheckBox, elvS, c)
+    end
+end
+
 -- An item slot in the gear panel (ElvUI only: EllesmereUI's API has no item button style).
 function ns.SkinSlot(b)
     if not skin and Elv() then pcall(ElvIconButton, b, b.icon) end

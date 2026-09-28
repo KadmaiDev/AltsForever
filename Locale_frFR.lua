@@ -115,7 +115,6 @@ L["Show which characters can still skill up: in Can craft, on materials (Skill-u
 L["An arrow next to the To box at the mailbox to pick one of your characters. Same as /af sendmail."] = "Une flèche à côté du destinataire à la boîte aux lettres pour choisir l'un de vos personnages. Comme /af sendmail."
 L["Off by default. Your XP bar shows this session's XP and time to level; your bag gold shows gold gained or lost this session, today and this week. Same as /af stats."] = "Désactivé par défaut. La barre d'XP montre l'XP de la session et le temps avant le niveau ; l'or des sacs montre l'or gagné ou perdu cette session, aujourd'hui et cette semaine. Comme /af stats."
 L["Same as /af minimap. Alts Forever is also in the minimap's addon menu."] = "Comme /af minimap. Alts Forever est aussi dans le menu des AddOns de la minicarte."
-L["Overview"] = "Aperçu"
 L["Every character at a glance. Right-click a character there to forget them. Same as /af."] = "Tous les personnages d'un coup d'œil. Clic droit sur un personnage pour l'oublier. Comme /af."
 L["Settings..."] = "Paramètres..."
 L["Welcome! Hover any item to see how many your characters have, and where."] = "Bienvenue ! Survolez n'importe quel objet pour voir combien vos personnages en ont, et où."
@@ -123,3 +122,5 @@ L["Type /af or click the minimap button for all your characters at a glance. Set
 L["Log in on each character once, and open their bank, mailbox and profession windows once, so Alts Forever knows what they have."] = "Connectez-vous une fois avec chaque personnage et ouvrez une fois sa banque, sa boîte aux lettres et ses fenêtres de métier, pour qu'Alts Forever sache ce qu'il possède."
 L["Now tracking %s. Open the bank and mailbox once on this character so they're included too."] = "%s est maintenant suivi. Ouvrez une fois la banque et la boîte aux lettres avec ce personnage pour les inclure aussi."
 L["Log in on your other characters once to add them here."] = "Connectez-vous une fois avec vos autres personnages pour les ajouter ici."
+L["All your alts at a glance, by Kadmai"] = "Tous vos rerolls d'un coup d'œil, par Kadmai"
+L["Type /af help for every command."] = "Tapez /af help pour toutes les commandes."

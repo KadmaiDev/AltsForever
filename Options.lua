@@ -2,9 +2,7 @@
 -- Options > AddOns, a minimap button and the minimap's addon compartment entry (click:
 -- overview, right-click: options menu), the same menu from the overview's cog button, and
 -- "Forget" on a character row's right-click menu. Menus and pop-ups are only built when
--- clicked. The settings page uses Blizzard's standard settings API only (its first version
--- was removed on 2026-09-25 over a taint scare whose real cause was elsewhere; see
--- AGENTS.md for how it's checked).
+-- clicked.
 local ADDON, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
@@ -65,39 +63,120 @@ local function ToggleMinimap() ns.SetMinimapButton(not ns.MinimapButtonOn()) end
 
 ---------------------------------------------------------------------------
 -- Options > AddOns > Alts Forever
+-- A "canvas" page (as Keystance, EllesmereUI and BugSack have): Blizzard's panel only
+-- hosts our own frame, with the logo, an Open overview button and the settings as tick
+-- boxes. None of Blizzard's setting objects (RegisterProxySetting and friends) are used,
+-- so our values never run through Blizzard's settings code (a test keeps it that way).
+-- The page is registered at login but only built the first time it's shown.
 ---------------------------------------------------------------------------
-local category
+local category, canvas
 
-local function Checkbox(variable, name, get, set, tooltip)
-    local setting = Settings.RegisterProxySetting(category, variable, Settings.VarType.Boolean, name, false,
-        function() return get() and true or false end, set)
-    Settings.CreateCheckbox(category, setting, tooltip)
+-- Opens the overview from the page: Blizzard's panel closes first and the overview opens
+-- a frame later (as EllesmereUI does), so nothing of ours runs inside its closing. In
+-- combat the panel is left alone.
+local function OpenOverviewFromOptions()
+    if not InCombatLockdown() and SettingsPanel and SettingsPanel:IsShown() and HideUIPanel then
+        HideUIPanel(SettingsPanel)
+    end
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, function() ns.ToggleOverview(true) end)
+    else
+        ns.ToggleOverview(true)
+    end
+end
+
+local function Tooltip(owner, title, text)
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(title)
+    GameTooltip:AddLine(text, 1, 1, 1, true)
+    GameTooltip:Show()
+end
+
+local SETTINGS = {
+    { L["Show skill-up details"], SkillupsSelected, function(on) ns.SetSkillups(on) end,
+        L["Show which characters can still skill up: in Can craft, on materials (Skill-ups) and in the overview. Same as /af skillups."] },
+    { L["Send mail to alts"], SendToAltSelected, function(on) ns.SetSendToAlt(on) end,
+        L["An arrow next to the To box at the mailbox to pick one of your characters. Same as /af sendmail."] },
+    { L["Show session stats"], StatsSelected, function(on) ns.SetStats(on) end,
+        L["Off by default. Your XP bar shows this session's XP and time to level; your bag gold shows gold gained or lost this session, today and this week. Same as /af stats."] },
+    { L["Show minimap button"], MinimapSelected, function(on) ns.SetMinimapButton(on) end,
+        L["Same as /af minimap. Alts Forever is also in the minimap's addon menu."] },
+}
+
+local function RefreshCanvas(f)
+    for i, check in ipairs(f.checks) do check:SetChecked(SETTINGS[i][2]() and true or false) end
+end
+
+local function BuildCanvas(f)
+    local logo = f:CreateTexture(nil, "ARTWORK")
+    logo:SetSize(56, 56)
+    logo:SetPoint("TOPLEFT", 16, -16)
+    logo:SetTexture("Interface\\AddOns\\" .. ADDON .. "\\media\\logo.tga") -- the full badge, big enough here
+    f.logo = logo
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", logo, "TOPRIGHT", 10, -6)
+    title:SetText("Alts Forever")
+    local by = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    by:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -4)
+    by:SetText(L["All your alts at a glance, by Kadmai"])
+    local open = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    open:SetSize(200, 24)
+    open:SetPoint("TOPLEFT", logo, "BOTTOMLEFT", 0, -16)
+    open:SetText(L["Open overview"])
+    open:SetScript("OnClick", OpenOverviewFromOptions)
+    open:SetScript("OnEnter", function(self)
+        Tooltip(self, L["Open overview"], L["Every character at a glance. Right-click a character there to forget them. Same as /af."])
+    end)
+    open:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    f.open = open
+    ns.SkinButton(open)
+    f.checks = {}
+    local above = open
+    for i, entry in ipairs(SETTINGS) do
+        local check = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+        check:SetSize(26, 26)
+        check:SetPoint("TOPLEFT", above, "BOTTOMLEFT", i == 1 and -2 or 0, i == 1 and -14 or -4)
+        local label = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        label:SetPoint("LEFT", check, "RIGHT", 4, 0)
+        label:SetText(entry[1])
+        check.label = label
+        check:SetScript("OnClick", function(self)
+            entry[3](self:GetChecked() and true or false)
+            RefreshCanvas(f)
+        end)
+        check:SetScript("OnEnter", function(self) Tooltip(self, entry[1], entry[4]) end)
+        check:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        ns.SkinCheck(check)
+        ns.SkinText(label)
+        f.checks[i] = check
+        above = check
+    end
+    local help = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    help:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 2, -16)
+    help:SetText(L["Type /af help for every command."])
+    for _, fs in ipairs({ title, by, help }) do ns.SkinText(fs) end
 end
 
 local function RegisterSettings()
-    category = Settings.RegisterVerticalLayoutCategory("Alts Forever")
-    Checkbox("ALTSFOREVER_SKILLUPS", L["Show skill-up details"], SkillupsSelected, ns.SetSkillups,
-        L["Show which characters can still skill up: in Can craft, on materials (Skill-ups) and in the overview. Same as /af skillups."])
-    Checkbox("ALTSFOREVER_SENDMAIL", L["Send mail to alts"], SendToAltSelected, ns.SetSendToAlt,
-        L["An arrow next to the To box at the mailbox to pick one of your characters. Same as /af sendmail."])
-    Checkbox("ALTSFOREVER_STATS", L["Show session stats"], StatsSelected, ns.SetStats,
-        L["Off by default. Your XP bar shows this session's XP and time to level; your bag gold shows gold gained or lost this session, today and this week. Same as /af stats."])
-    Checkbox("ALTSFOREVER_MINIMAP", L["Show minimap button"], MinimapSelected, ns.SetMinimapButton,
-        L["Same as /af minimap. Alts Forever is also in the minimap's addon menu."])
-    if CreateSettingsButtonInitializer and SettingsPanel and SettingsPanel.GetLayout then
-        SettingsPanel:GetLayout(category):AddInitializer(CreateSettingsButtonInitializer(
-            L["Overview"], L["Open overview"], function() ns.ToggleOverview(true) end,
-            L["Every character at a glance. Right-click a character there to forget them. Same as /af."], true))
-    end
-    Settings.RegisterAddOnCategory(category)
+    local f = CreateFrame("Frame", "AltsForeverOptionsPanel")
+    f:SetScript("OnShow", function(self)
+        if not self.built then
+            self.built = true
+            BuildCanvas(self)
+        end
+        RefreshCanvas(self)
+    end)
+    local cat = Settings.RegisterCanvasLayoutCategory(f, "Alts Forever")
+    Settings.RegisterAddOnCategory(cat)
+    category, canvas = cat, f
 end
 
 function ns.StartOptions()
-    if not (Settings and Settings.RegisterVerticalLayoutCategory and Settings.RegisterProxySetting) then return end
+    if category or not (Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory) then return end
     -- The settings API isn't in Forever's documentation: report a failure, but keep going.
     local ok, err = pcall(RegisterSettings)
     if not ok then
-        category = nil
+        category, canvas = nil, nil
         if geterrorhandler then geterrorhandler()(err) end
     end
 end
@@ -105,11 +184,11 @@ end
 -- Opens Options > AddOns > Alts Forever; false if there's no page.
 function ns.OpenSettings()
     if not (category and Settings.OpenToCategory) then return false end
-    Settings.OpenToCategory(category:GetID())
-    return true
+    return pcall(Settings.OpenToCategory, category:GetID())
 end
 
 function ns.HasSettings() return category ~= nil end
+function ns.OptionsPanel() return canvas end
 
 -- The options menu: from the compartment's right-click and the overview's cog button.
 function ns.ShowOptionsMenu(owner)
