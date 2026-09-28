@@ -1,4 +1,4 @@
-## Unreleased
+## Alts Forever 0.9.0
 
 - **Bags and bank window:** see any character's bags or bank slot by slot, as you last saw them, with stack counts, empty and free slots, quality borders and their gold. Show everything in one grid, or tick "By bag" for a section per bag or bank tab ("Red Linen Bag (7 / 8)"). Pick the character from a dropdown and switch between bags and bank. It plays the game's bag sounds as it opens and closes. Drag the corner to resize it: the width sets how many slots per row, the height how tall it gets before it scrolls, and both are remembered. Each character's slots are recorded the next time you log in on them or visit their bank; until then it shows their items with totals. Suggested by a player: thank you!
   - Open it from your own bags and bank: an entry at the bottom of the bag's portrait menu, or a small Alts Forever button in the header of Blizzard's bank and of ElvUI's and EllesmereUI's bags and bank.
