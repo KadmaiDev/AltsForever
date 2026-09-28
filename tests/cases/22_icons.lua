@@ -27,7 +27,13 @@ test("the picker: recommended icons, then every spell or item icon in a scrollin
     eq(p.recommended[1].value, "Interface\\Minimap\\Tracking\\Banker", "the default is recommended first")
     eq(p.recommended[1].selected:IsShown(), true, "and marked as the current one")
     ns.OpenIconPicker("bags")
-    eq(p.recommended[1].value, 133652, "bags: the default bag's icon first")
+    eq(p.recommended[1].value, "Interface\\Icons\\INV_Misc_Bag_01", "bags: the white linen bag first (the default)")
+    eq(p.recommended[2].value, 133652, "then the Red Linen Bag, the old default")
+    p.recommended[1].scripts.OnEnter(p.recommended[1])
+    eq(GameTooltip.lines[1][1], "INV_Misc_Bag_01", "hover: its name")
+    eq(GameTooltip.lines[2][1], "Default · In use")
+    p.grid[1].scripts.OnEnter(p.grid[1])
+    eq(GameTooltip.lines[1][1], "Icon 136001", "browsing: only a number is known")
     eq(p.recommended[1].selected:IsShown(), true)
     ns.OpenIconPicker("bank")
     eq(p.grid[1].value, 136001, "spell icons first")
@@ -74,6 +80,12 @@ test("the picker's search finds icons by item and spell name", function()
     for _, b in ipairs(p.grid) do if b.value then found[#found + 1] = b.value end end
     table.sort(found)
     eq(table.concat(found, ","), "132889,133639,135920", "a bag, a crafted item and a spell; not the ore")
+    for _, b in ipairs(p.grid) do
+        if b.value == 135920 then
+            b.scripts.OnEnter(b)
+            eq(GameTooltip.lines[1][1], "Linen Blessing", "search results show what they belong to")
+        end
+    end
     p.search:SetText("mithril")
     p.search.scripts.OnTextChanged(p.search, true)
     assert(p.counter.text:find("Nothing found", 1, true), p.counter.text)

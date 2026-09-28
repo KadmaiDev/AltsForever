@@ -19,16 +19,17 @@ ns.ICON_PLACES = { "bags", "bank", "mail", "equip" }
 local PLACE_NAMES = { bags = L["Bags"], bank = L["Bank"], mail = L["Mail"], equip = L["Worn"] }
 function ns.PlaceName(place) return PLACE_NAMES[place] end
 
--- Defaults and suggestions. Bags default to a bag item's icon, looked up from the item.
-local BAG_ICON_ITEM = 5762 -- Red Linen Bag
+-- Defaults and recommendations. Bags default to the white linen bag (the owner's pick,
+-- 2026-09-28; the Red Linen Bag, the earlier default, is still recommended).
+local RED_LINEN_BAG = 5762
 local DEFAULTS = {
-    bags = C_Item.GetItemIconByID(BAG_ICON_ITEM) or "Interface\\Icons\\INV_Misc_Bag_08",
+    bags = "Interface\\Icons\\INV_Misc_Bag_01",
     bank = "Interface\\Minimap\\Tracking\\Banker",
     mail = "Interface\\Minimap\\Tracking\\Mailbox",
     equip = "Interface\\Icons\\INV_Shirt_White_01",
 }
 local RECOMMENDED = {
-    bags = { DEFAULTS.bags, "Interface\\Icons\\INV_Misc_Bag_01", "Interface\\Icons\\INV_Misc_Bag_07", "Interface\\Icons\\INV_Misc_Bag_08",
+    bags = { DEFAULTS.bags, C_Item.GetItemIconByID(RED_LINEN_BAG) or "Interface\\Icons\\INV_Misc_Bag_08", "Interface\\Icons\\INV_Misc_Bag_07", "Interface\\Icons\\INV_Misc_Bag_08",
         "Interface\\Icons\\INV_Misc_Bag_09", "Interface\\Icons\\INV_Misc_Bag_10" },
     bank = { "Interface\\Minimap\\Tracking\\Banker", "Interface\\Icons\\INV_Box_01", "Interface\\Icons\\INV_Box_02",
         "Interface\\Icons\\INV_Misc_Coin_01", "Interface\\Icons\\INV_Misc_Key_03", "Interface\\Icons\\INV_Misc_Bag_10" },
@@ -69,8 +70,16 @@ end
 local COLS, ROWS, SIZE, GAP = 12, 7, 32, 4
 local picker
 
-local function SetButtonIcon(b, icon)
-    b.value = icon
+-- What to call an icon: the item or spell it came from (search results), its texture's
+-- name for a path ("INV_Misc_Bag_01"), or its number (Forever has no names for those).
+function ns.IconLabel(icon, name)
+    if name then return name end
+    if type(icon) == "string" then return icon:match("([^\\/]+)$") or icon end
+    return L["Icon %s"]:format(tostring(icon))
+end
+
+local function SetButtonIcon(b, icon, name)
+    b.value, b.name = icon, name
     b.icon:SetTexture(icon)
     if Cropped(icon) then b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) else b.icon:SetTexCoord(0, 1, 0, 1) end
 end
@@ -97,6 +106,17 @@ local function IconButton(parent)
     b:SetScript("OnClick", function(self)
         if self.value then ns.SetPlaceIcon(picker.place, self.value) end
     end)
+    b:SetScript("OnEnter", function(self)
+        if not self.value then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(ns.IconLabel(self.value, self.name))
+        local notes = {}
+        if self.value == DEFAULTS[picker.place] then notes[#notes + 1] = L["Default"] end
+        if self.value == ns.IconChoice(picker.place) then notes[#notes + 1] = L["In use"] end
+        if #notes > 0 then GameTooltip:AddLine(table.concat(notes, " · "), 1, 1, 1) end
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
     return b
 end
 
@@ -108,11 +128,11 @@ local function Render()
     for i, b in ipairs(picker.grid) do
         local icon = list and list[picker.offset * COLS + i]
         if icon then
-            SetButtonIcon(b, icon)
+            SetButtonIcon(b, icon, picker.names and picker.names[icon])
             b:Show()
             Selected(b)
         else
-            b.value = nil
+            b.value, b.name = nil, nil
             b:Hide()
         end
     end
@@ -134,7 +154,7 @@ local function SearchPool()
             local key = name:lower()
             if not seen[key] then
                 seen[key] = true
-                pool[#pool + 1] = { key, icon }
+                pool[#pool + 1] = { key, icon, name }
             end
         end
     end
@@ -175,18 +195,18 @@ local function Search(text)
     text = (text or ""):match("^%s*(.-)%s*$"):lower()
     if text == "" then
         if picker.listKind == "search" then picker.listKind = nil end
-        picker.list, picker.offset = picker.browse, 0
+        picker.list, picker.names, picker.offset = picker.browse, nil, 0
         Render()
         return
     end
-    local results, icons = {}, {}
+    local results, names = {}, {}
     for _, entry in ipairs(SearchPool()) do
-        if entry[1]:find(text, 1, true) and not icons[entry[2]] then
-            icons[entry[2]] = true
+        if entry[1]:find(text, 1, true) and not names[entry[2]] then
+            names[entry[2]] = entry[3]
             results[#results + 1] = entry[2]
         end
     end
-    picker.list, picker.offset = results, 0
+    picker.list, picker.names, picker.offset = results, names, 0
     Render()
     picker.counter:SetText(#results == 0 and L["Nothing found; try Spell icons or Item icons."] or picker.counter:GetText())
 end
@@ -201,7 +221,7 @@ local function ShowList(kind)
     elseif GetMacroItemIcons then
         GetMacroItemIcons(list)
     end
-    picker.list, picker.browse, picker.offset = list, list, 0
+    picker.list, picker.browse, picker.names, picker.offset = list, list, nil, 0
     if picker.search then picker.search:SetText("") end
     if kind == "spell" then picker.spellTab:LockHighlight() else picker.spellTab:UnlockHighlight() end
     if kind == "item" then picker.itemTab:LockHighlight() else picker.itemTab:UnlockHighlight() end
@@ -341,7 +361,7 @@ local function CreatePicker()
     f.slider = slider
 
     -- The icon lists are big: let them go when the picker closes.
-    f:SetScript("OnHide", function(self) self.list, self.browse, self.pool = nil, nil, nil end)
+    f:SetScript("OnHide", function(self) self.list, self.browse, self.pool, self.names = nil, nil, nil, nil end)
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverIconPicker" end
     ns.SkinWindow(f)
     f:Hide()

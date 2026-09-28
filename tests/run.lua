@@ -16,7 +16,7 @@ end
 -- Right-hand text as the tooltip builds it: grey breakdown, then the count.
 -- Tests write "Bags 12 · Bank 40"; the words are swapped for the real icons.
 ICON = {
-    Bags = "|T133652:0:0:0:0:64:64:5:59:5:59|t",
+    Bags = "|TInterface\\Icons\\INV_Misc_Bag_01:0:0:0:0:64:64:5:59:5:59|t",
     Bank = "|TInterface\\Minimap\\Tracking\\Banker:0|t",
     Mail = "|TInterface\\Minimap\\Tracking\\Mailbox:0|t",
     Wearing = "|TInterface\\Icons\\INV_Shirt_White_01:0:0:0:0:64:64:5:59:5:59|t",

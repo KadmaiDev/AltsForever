@@ -1,6 +1,7 @@
 ## Unreleased
 
-- **Choose your tooltip icons:** pick the icons item tooltips use for bags, bank, mail and worn items, or words instead, from Options > AddOns > Alts Forever (or `/af icons`). The picker has recommended icons, a search by item or spell name, and every spell and item icon in the game to browse, with a preview.
+- **Choose your tooltip icons:** pick the icons item tooltips use for bags, bank, mail and worn items, or words instead, from Options > AddOns > Alts Forever (or `/af icons`). The picker has recommended icons, a search by item or spell name, and every spell and item icon in the game to browse, with a preview. Hover an icon to see what it is.
+- **New bag icon:** tooltips now show a white linen bag for bags. The red one is still in the picker if you prefer it.
 - **Find an item across your characters:** `/af find linen` lists every item whose name contains "linen" on any character (bags, bank, mail or worn), biggest total first, with who has how many. Links are clickable.
 - **Settings page:** Alts Forever now has its own page under Options > AddOns, with the logo, an Open overview button and all its settings (skill-up details, send mail to alts, session stats, minimap button), each explained when you hover it. The options menu has a Settings... entry that opens it.
 - **A friendlier start:** on a new install, a short welcome in chat explains how to use Alts Forever and what to visit on each character. Logging in on a new character says it's now tracked, and the overview says how to add your other characters while it only knows one.

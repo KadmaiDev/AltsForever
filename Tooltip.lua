@@ -16,17 +16,10 @@ local GetItemInfoInstant = C_Item.GetItemInfoInstant
 
 local MAX_CACHE = 500
 local LOCS = { "bags", "bank", "mail", "equip" }
--- Inline icons sized to the text (":0"). Item icons have a built-in border, so
--- it's cropped off (texcoords 5-59 of 64). Bags use a bag item's icon, looked
--- up from the item so we don't depend on its file name.
-local BAG_ICON_ITEM = 5762 -- Red Linen Bag
-local bagIcon = C_Item.GetItemIconByID(BAG_ICON_ITEM) or "Interface\\Icons\\INV_Misc_Bag_08"
-local LABELS = {
-    "|T" .. bagIcon .. ":0:0:0:0:64:64:5:59:5:59|t",
-    "|TInterface\\Minimap\\Tracking\\Banker:0|t",
-    "|TInterface\\Minimap\\Tracking\\Mailbox:0|t",
-    "|TInterface\\Icons\\INV_Shirt_White_01:0:0:0:0:64:64:5:59:5:59|t",
-}
+-- The icon (or word) shown for each place, from Icons.lua: the defaults until the
+-- player's choices are known (login), then whatever they picked.
+local LABELS = {}
+for i, place in ipairs(LOCS) do LABELS[i] = ns.PlaceMarkup(place) end
 -- Rebuilt from the player's icon choices (Icons.lua) at login and whenever one changes.
 function ns.RefreshPlaceLabels()
     for i, place in ipairs(LOCS) do LABELS[i] = ns.PlaceMarkup(place) end
