@@ -1,6 +1,7 @@
 -- Alts Forever character: level, XP, rested XP, location, item level and time played,
 -- plus an estimate of the rested XP a character has gained since logging out.
 local _, ns = ...
+if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 
 local floor, min, time, type = math.floor, math.min, time, type
 local issecretvalue = issecretvalue or function() return false end

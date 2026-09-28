@@ -2,6 +2,7 @@
 -- XP, gold, professions, location, time played and when they were last played. It's
 -- only built the first time it's opened, and only refreshes while it's showing.
 local _, ns = ...
+if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 
 local floor, max, pairs, time = math.floor, math.max, pairs, time
 local ipairs = ipairs

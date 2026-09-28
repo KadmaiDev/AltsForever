@@ -1,6 +1,7 @@
 -- Alts Forever money: tracks each character's gold and lists it when you hover the
 -- money shown in your bags or bank.
 local _, ns = ...
+if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 
 local pairs, select, sort, type, wipe, GetMoney = pairs, select, table.sort, type, wipe, GetMoney
 local floor, time, date = math.floor, time, date

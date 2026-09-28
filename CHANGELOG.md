@@ -1,3 +1,7 @@
+## Unreleased
+
+- **Two copies enabled:** if two copies of Alts Forever are enabled at once (for example an old and a new install), only the first one runs and it says so in chat, so tooltips don't show everything twice and your saved data can't be mixed up.
+
 ## Alts Forever 0.7.0
 
 - **Session stats (optional, off by default):** turn on "Show session stats" in the options menu or type `/af stats`.

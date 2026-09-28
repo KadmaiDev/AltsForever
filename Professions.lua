@@ -3,6 +3,7 @@
 -- on craftable items which characters can make them, and on reagents which of your
 -- characters can still skill up with them.
 local _, ns = ...
+if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 
 local pairs, ipairs, wipe, tonumber, type, sort = pairs, ipairs, wipe, tonumber, type, table.sort
 local issecretvalue = issecretvalue or function() return false end

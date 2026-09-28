@@ -2,6 +2,7 @@
 -- suffixes and enchants survive) and durability, and shows it in a character-sheet
 -- style panel opened by clicking a character in the overview.
 local _, ns = ...
+if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 
 local floor, pairs, wipe = math.floor, pairs, wipe
 local issecretvalue = issecretvalue or function() return false end

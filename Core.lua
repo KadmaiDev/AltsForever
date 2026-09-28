@@ -1,6 +1,24 @@
 -- Alts Forever core: saved data, character identity, event dispatch, slash commands.
 local ADDON, ns = ...
 
+-- Only one copy of Alts Forever may run (e.g. the CurseForge copy and a dev copy both
+-- enabled). Addons load one at a time, so a copy that finds another already running stays
+-- off: every file stops here, before touching any global, event or hook, and it says so at
+-- login. Both copies keep their data in the same global, AltsForeverDB, so the running copy
+-- also puts its own data back when the other copy's saved data replaces it (below).
+if AltsForeverRunning then
+    ns.disabled = true
+    local running = AltsForeverRunning
+    local f = CreateFrame("Frame")
+    f:RegisterEvent("PLAYER_LOGIN")
+    f:SetScript("OnEvent", function()
+        print("|cff66ccffAlts Forever|r: two copies are enabled (" .. running .. " and " .. ADDON
+            .. "). Only " .. running .. " is running; disable one of them in the AddOns list.")
+    end)
+    return
+end
+AltsForeverRunning = ADDON
+
 local DB_VERSION = 2
 
 local pcall, type, pairs, ipairs, print, time = pcall, type, pairs, ipairs, print, time
@@ -153,8 +171,11 @@ function ns.InitChar(db, name, class, faction)
 end
 
 ns.On("ADDON_LOADED", function(name)
-    if name ~= ADDON then return end
-    ns.Off("ADDON_LOADED")
+    if name ~= ADDON then
+        -- Another copy's saved data just loaded into the shared global: keep ours.
+        if ns.db and AltsForeverDB ~= ns.db then AltsForeverDB = ns.db end
+        return
+    end
     AltsForeverDB = ns.InitDB(AltsForeverDB)
     ns.db = AltsForeverDB
     -- Left over from the rested XP rate check, which has been removed.

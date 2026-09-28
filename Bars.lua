@@ -1,6 +1,7 @@
 -- Alts Forever bars: hovering the experience or reputation bar lists your other
 -- characters (Blizzard's bars, ElvUI's and EllesmereUI's).
 local _, ns = ...
+if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 
 local floor, ipairs, pairs, type, time = math.floor, ipairs, pairs, type, time
 local GREY = "|cff9d9d9d"

@@ -1,6 +1,7 @@
 -- Alts Forever scanner: keeps the current character's bags, bank and equipped items up to date.
 -- Stores only itemID -> count, and refills the same tables so scans allocate nothing.
 local _, ns = ...
+if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 
 local wipe, pcall = wipe, pcall
 local issecretvalue = issecretvalue or function() return false end

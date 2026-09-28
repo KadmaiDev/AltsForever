@@ -8,6 +8,7 @@
 -- If both are installed, EllesmereUI's look wins. Without either nothing here runs and the
 -- classic look stays. Each window is skinned once, when it's first created.
 local ADDON, ns = ...
+if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 
 local ipairs, select, pcall, type = ipairs, select, pcall, type
 

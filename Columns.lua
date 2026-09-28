@@ -2,6 +2,7 @@
 -- (Tooltip.lua), the XP and reputation bar tooltips (Bars.lua) and the overview's
 -- character tooltip (Overview.lua).
 local ADDON, ns = ...
+if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 
 local floor, ipairs, type = math.floor, ipairs, type
 

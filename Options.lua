@@ -5,6 +5,7 @@
 -- Menus and pop-ups are only built when clicked. (An Options > AddOns page was tried and
 -- removed: it was the likely source of a one-off taint error on Esc, see AGENTS.md.)
 local ADDON, ns = ...
+if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 
 local GREY = "|cff9d9d9d"
 

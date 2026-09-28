@@ -430,6 +430,7 @@ function M.load(files)
     AltsForever_OnAddonCompartmentClick, AltsForever_OnAddonCompartmentEnter = nil, nil
     AltsForever_OnAddonCompartmentLeave = nil
     AltsForeverMinimapButton = nil
+    AltsForeverRunning = nil
     -- XP bars (Blizzard's, ElvUI's, EllesmereUI's) exist only if a test makes them.
     MainStatusTrackingBarContainer, SecondaryStatusTrackingBarContainer = nil, nil
     ElvUI_ExperienceBarHolder, EllesmereEAB_XPBar = nil, nil

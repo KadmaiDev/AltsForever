@@ -2,6 +2,7 @@
 -- to your own characters straight away, warns when mail with items or gold is about to
 -- expire, and adds an "Alts" button to the send-mail screen.
 local _, ns = ...
+if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 
 local wipe, pairs, next, floor, time = wipe, pairs, next, math.floor, time
 local issecretvalue = issecretvalue or function() return false end

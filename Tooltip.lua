@@ -7,6 +7,7 @@
 -- The breakdown is lined up in columns (see Align): measured once per item and kept
 -- with the cached lines, so hovering an item again costs nothing extra.
 local _, ns = ...
+if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 
 local pairs, wipe, type, pcall, floor, max = pairs, wipe, type, pcall, math.floor, math.max
 local issecretvalue = issecretvalue or function() return false end

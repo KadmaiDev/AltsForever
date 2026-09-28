@@ -2,6 +2,7 @@
 -- shows them side by side in a panel opened from the overview (factions down, your
 -- characters across). The panel is only built the first time it's opened.
 local _, ns = ...
+if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 
 local floor, pairs, ipairs, wipe, sort = math.floor, pairs, ipairs, wipe, table.sort
 local issecretvalue = issecretvalue or function() return false end
