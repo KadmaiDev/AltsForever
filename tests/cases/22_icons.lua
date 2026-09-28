@@ -122,5 +122,6 @@ test("the Options page lists each place's icon, and Change... opens the picker f
     ns.SetPlaceIcon("mail", "words")
     eq(f.icons.mail.text, "Mail:  Mail 23", "updates straight away")
     SlashCmdList.ALTSFOREVER("icons")
+    for _, fn in ipairs(wow.timers) do fn() end
     eq(wow.settingsOpened, 77, "/af icons opens this page")
 end)

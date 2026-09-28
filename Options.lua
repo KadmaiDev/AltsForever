@@ -208,10 +208,18 @@ function ns.StartOptions()
     end
 end
 
--- Opens Options > AddOns > Alts Forever; false if there's no page.
+-- Opens Options > AddOns > Alts Forever; false if there's no page. It opens a frame
+-- later: from a menu's click the menu is still closing, and opening the Options window
+-- inside that did nothing in game (2026-09-28). A failure is reported, not hidden.
+local function Open()
+    local ok, err = pcall(Settings.OpenToCategory, category:GetID())
+    if not ok and geterrorhandler then geterrorhandler()(err) end
+end
+
 function ns.OpenSettings()
     if not (category and Settings.OpenToCategory) then return false end
-    return pcall(Settings.OpenToCategory, category:GetID())
+    if C_Timer and C_Timer.After then C_Timer.After(0, Open) else Open() end
+    return true
 end
 
 function ns.HasSettings() return category ~= nil end
