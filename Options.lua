@@ -211,17 +211,18 @@ function ns.StartOptions()
     end
 end
 
--- Opens Options > AddOns > Alts Forever; false if there's no page. It opens a frame
--- later: from a menu's click the menu is still closing, and opening the Options window
--- inside that did nothing in game (2026-09-28). A failure is reported, not hidden.
-local function Open()
-    local ok, err = pcall(Settings.OpenToCategory, category:GetID())
-    if not ok and geterrorhandler then geterrorhandler()(err) end
-end
-
+-- Opens Options > AddOns > Alts Forever; false if there's no page. It must run straight
+-- from the player's click or command: the game blocks opening the Options window from a
+-- timer (ADDON_ACTION_BLOCKED on OpenSettingsPanel, seen 2026-09-28 when this waited a
+-- frame) and during combat, where it says so in chat instead. A failure is reported.
 function ns.OpenSettings()
     if not (category and Settings.OpenToCategory) then return false end
-    if C_Timer and C_Timer.After then C_Timer.After(0, Open) else Open() end
+    if InCombatLockdown() then
+        ns.Print(L["The options can't be opened during combat."])
+        return true
+    end
+    local ok, err = pcall(Settings.OpenToCategory, category:GetID())
+    if not ok and geterrorhandler then geterrorhandler()(err) end
     return true
 end
 

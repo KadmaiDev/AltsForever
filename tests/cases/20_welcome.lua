@@ -62,10 +62,19 @@ test("the options menu has Settings..., which opens the page", function()
     wow.load(FILES)
     wow.login(nil)
     AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
+    local timers = #wow.timers
     eq(wow.menuItem("Settings...").fn(), nil, "returns nothing, so the menu closes (a return value is a MenuResponse)")
-    eq(wow.settingsOpened, nil, "not while the menu is still closing")
-    for _, fn in ipairs(wow.timers) do fn() end
-    eq(wow.settingsOpened, 77, "a frame later")
+    eq(wow.settingsOpened, 77, "straight from the click: the game blocks opening the Options window from a timer")
+    eq(#wow.timers, timers, "no timer")
+    -- In combat the game blocks it: say so instead.
+    wow.settingsOpened = nil
+    wow.inCombat = true
+    wow.printed = {}
+    AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
+    wow.menuItem("Settings...").fn()
+    eq(wow.settingsOpened, nil)
+    assert(wow.printed[1]:find("during combat", 1, true), wow.printed[1])
+    wow.inCombat = nil
 end)
 
 test("without Blizzard's settings API the addon still works, with no Settings... entry", function()
