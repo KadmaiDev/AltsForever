@@ -244,3 +244,46 @@ test("shortcuts: Blizzard's bag menus get an entry; the bank, ElvUI and Ellesmer
     eq(s.EUI_BankFrame.point[2], euiBank._searchBox)
     eq(s.ContainerFrameCombinedBags, nil, "never a button outside a window")
 end)
+
+test("the bags window resizes: width sets the columns, height how tall before it scrolls; both remembered", function()
+    local ns = wow.load(FILES)
+    wow.ns = ns
+    wow.setBag(0, 20, {})
+    for bag = 6, 8 do wow.setBag(bag, 98, {}) end
+    wow.login(nil)
+    ns.ShowBags(nil, "bags")
+    local f = AltsForeverBagsFrame
+    local function place(i) return f.slots[i].point[4], f.slots[i].point[5] end
+    eq(f:GetWidth(), 12 * 2 + 14 * 39 - 3, "14 columns to start")
+    eq(select(2, place(15)), -20 - 39, "slot 15 starts the second row")
+    -- Drag the grip narrower: the grid reflows as soon as fewer columns fit.
+    f.grip.scripts.OnMouseDown(f.grip)
+    f:SetWidth(12 * 2 + 10 * 39 - 3 + 5)
+    f:SetHeight(300)
+    f.scripts.OnSizeChanged(f, f:GetWidth(), 300)
+    eq(select(2, place(11)), -20 - 39, "10 columns: slot 11 starts the second row")
+    eq(f:GetHeight(), 300, "the height follows the drag")
+    f.grip.scripts.OnMouseUp(f.grip)
+    eq(AltsForeverDB.bagsCols, 10)
+    eq(AltsForeverDB.bagsHeight, 300 - 60 - 34)
+    eq(f:GetWidth(), 12 * 2 + 10 * 39 - 3, "snapped to whole slots")
+    eq(f:GetHeight(), 60 + 3 * 39 + 34, "20 slots fit: the window shrinks to them (never below 3 rows)")
+    -- The bank is taller than the chosen height: it scrolls at that height.
+    wow.fire("BANKFRAME_OPENED")
+    ns.ShowBags(nil, "bank")
+    eq(f.holder:GetHeight(), 300 - 60 - 34)
+    -- Remembered after a reload.
+    local saved = AltsForeverDB
+    ns = wow.load(FILES)
+    wow.ns = ns
+    wow.login(saved)
+    ns.ShowBags(nil, "bags")
+    eq(AltsForeverBagsFrame:GetWidth(), 12 * 2 + 10 * 39 - 3)
+    -- Dragging back to 14 forgets the setting.
+    f = AltsForeverBagsFrame
+    f.grip.scripts.OnMouseDown(f.grip)
+    f:SetWidth(12 * 2 + 14 * 39 - 3)
+    f.scripts.OnSizeChanged(f, f:GetWidth(), f:GetHeight())
+    f.grip.scripts.OnMouseUp(f.grip)
+    eq(AltsForeverDB.bagsCols, nil)
+end)

@@ -14,7 +14,10 @@ local GetItemIconByID = C_Item.GetItemIconByID
 local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
 
 local GREY = "|cff9d9d9d"
-local COLS, SIZE, GAP, PAD = 14, 36, 3, 12
+local SIZE, GAP, PAD = 36, 3, 12
+-- Columns: set by the window's width (resize grip), remembered in db.bagsCols.
+local DEFAULT_COLS, MIN_COLS, MAX_COLS = 14, 10, 30
+local cols = DEFAULT_COLS
 local TOP, BOTTOM, HEADER, SECTION_GAP = 60, 34, 20, 8
 local EMPTY_SLOT = "Interface\\PaperDoll\\UI-Backpack-EmptySlot"
 local BORDER = "Interface\\Common\\WhiteIconFrame"
@@ -23,6 +26,7 @@ local BagIndex = Enum.BagIndex
 local frame
 local slots, headers = {}, {}
 local shownKey, view = nil, "bags"
+local sizing = false
 local scroll, contentHeight = 0, 0
 local loadRetry = false
 
@@ -212,27 +216,40 @@ local function Seen(c, now)
     return L["Last seen: %s"]:format(ns.SeenText(shownKey, c, now))
 end
 
--- The tallest the slot area gets before it scrolls.
+local MIN_VIEW = 3 * (SIZE + GAP)
+local function WidthFor(n) return PAD * 2 + n * (SIZE + GAP) - GAP end
+local function ColsFor(width)
+    return max(MIN_COLS, min(MAX_COLS, floor((width - PAD * 2 + GAP) / (SIZE + GAP) + 0.5)))
+end
+
+-- The tallest the slot area gets before it scrolls: as the player sized it, or by
+-- default 70% of the screen.
 local function MaxView()
+    if ns.db.bagsHeight then return max(ns.db.bagsHeight, MIN_VIEW) end
     local h = UIParent and UIParent:GetHeight() or 0
-    return max(h > 0 and floor(h * 0.7) - TOP - BOTTOM or 560, 4 * (SIZE + GAP))
+    return max(h > 0 and floor(h * 0.7) - TOP - BOTTOM or 560, MIN_VIEW)
 end
 
 local function Place()
-    local visible = min(contentHeight, MaxView())
+    -- While the player drags the grip, the window keeps the height they're dragging to.
+    local visible = sizing and max(frame:GetHeight() - TOP - BOTTOM, MIN_VIEW) or max(min(contentHeight, MaxView()), MIN_VIEW)
     scroll = max(0, min(scroll, contentHeight - visible))
     frame.content:ClearAllPoints()
     frame.content:SetPoint("TOPLEFT", frame.holder, "TOPLEFT", 0, scroll)
     frame.content:SetPoint("TOPRIGHT", frame.holder, "TOPRIGHT", 0, scroll)
     frame.content:SetHeight(max(contentHeight, 1))
-    frame.holder:SetHeight(max(visible, 3 * (SIZE + GAP)))
-    frame:SetHeight(TOP + frame.holder:GetHeight() + BOTTOM)
+    frame.holder:SetHeight(visible)
+    if not sizing then frame:SetHeight(TOP + visible + BOTTOM) end
 end
 
 function Fill()
     local c = shownKey and ns.db.chars[shownKey]
     if not c then return frame:Hide() end
     loadRetry = false
+    if not sizing then
+        cols = ns.db.bagsCols or DEFAULT_COLS
+        frame:SetWidth(WidthFor(cols))
+    end
     local split = ns.db.bagsSplit and true or false
     local how = ns.BagsContents(c, view, split)
     frame.who:SetText(ns.ColoredName(shownKey, c))
@@ -262,12 +279,12 @@ function Fill()
             local k = i - s.from
             local b = Slot(i)
             b:ClearAllPoints()
-            b:SetPoint("TOPLEFT", frame.content, "TOPLEFT", k % COLS * (SIZE + GAP), -y - floor(k / COLS) * (SIZE + GAP))
+            b:SetPoint("TOPLEFT", frame.content, "TOPLEFT", k % cols * (SIZE + GAP), -y - floor(k / cols) * (SIZE + GAP))
             ShowSlot(b, ids[i], counts[i])
             if not ids[i] then free = free + 1 end
             b:Show()
         end
-        y = y + ceil((s.to - s.from + 1) / COLS) * (SIZE + GAP) + SECTION_GAP
+        y = y + ceil((s.to - s.from + 1) / cols) * (SIZE + GAP) + SECTION_GAP
     end
     for n = nSections + 1, #headers do
         headers[n]:Hide()
@@ -306,7 +323,7 @@ end
 
 local function ViewButton(name, text, x)
     local b = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    b:SetSize(80, 22)
+    b:SetSize(70, 22)
     b:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -30)
     b:SetText(text)
     b:SetScript("OnClick", function()
@@ -322,7 +339,7 @@ local function CreateWindow()
     if not ok then f = CreateFrame("Frame", "AltsForeverBagsFrame", UIParent, "BackdropTemplate") end
     frame = f
     f.slots, f.headers = slots, headers
-    f:SetWidth(PAD * 2 + COLS * (SIZE + GAP) - GAP)
+    f:SetWidth(WidthFor(cols))
     f:SetFrameStrata("HIGH")
     f:SetMovable(true)
     f:EnableMouse(true)
@@ -336,7 +353,7 @@ local function CreateWindow()
 
     -- The character dropdown.
     local who = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    who:SetSize(200, 22)
+    who:SetSize(160, 22)
     who:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -30)
     who:SetScript("OnClick", PickCharacter)
     who:SetScript("OnEnter", function(self)
@@ -347,13 +364,13 @@ local function CreateWindow()
     who:SetScript("OnLeave", function() GameTooltip:Hide() end)
     ns.SkinButton(who)
     f.who = who
-    ViewButton("bags", L["Bags"], PAD + 210)
-    ViewButton("bank", L["Bank"], PAD + 294)
+    ViewButton("bags", L["Bags"], PAD + 166)
+    ViewButton("bank", L["Bank"], PAD + 240)
 
     -- All in one grid, or a section per bag (the choice is kept for every character).
     local split = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
     split:SetSize(24, 24)
-    split:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + 384, -29)
+    split:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + 316, -29)
     split.label = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     split.label:SetPoint("LEFT", split, "RIGHT", 2, 0)
     split.label:SetText(L["By bag"])
@@ -392,9 +409,46 @@ local function CreateWindow()
     f.info:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD + 2, 12)
     f.seen = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.money = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    f.money:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 2, 11)
+    f.money:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 14, 11)
     f.seen:SetPoint("RIGHT", f.money, "LEFT", -20, 0)
     for _, fs in ipairs({ f.empty, f.info, f.seen, f.money }) do ns.SkinText(fs) end
+
+    -- Resize grip: width sets the columns (snapped to whole slots when let go), height
+    -- how tall the window gets before it scrolls. Both are remembered.
+    f:SetResizable(true)
+    if f.SetResizeBounds then
+        f:SetResizeBounds(WidthFor(MIN_COLS), TOP + MIN_VIEW + BOTTOM, WidthFor(MAX_COLS), 2000)
+    end
+    local grip = CreateFrame("Button", nil, f)
+    grip:SetSize(16, 16)
+    grip:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -3, 3)
+    grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+    grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+    grip:SetScript("OnMouseDown", function()
+        sizing = true
+        f:StartSizing("BOTTOMRIGHT")
+    end)
+    grip:SetScript("OnMouseUp", function()
+        f:StopMovingOrSizing()
+        sizing = false
+        cols = ColsFor(f:GetWidth())
+        ns.db.bagsCols = cols ~= DEFAULT_COLS and cols or nil
+        ns.db.bagsHeight = max(floor(f:GetHeight() - TOP - BOTTOM), MIN_VIEW)
+        Fill()
+    end)
+    f.grip = grip
+    -- While dragging, the grid reflows as soon as another column fits.
+    f:SetScript("OnSizeChanged", function(self, width)
+        if not sizing then return end
+        local n = ColsFor(width)
+        if n ~= cols then
+            cols = n
+            Fill()
+        else
+            Place()
+        end
+    end)
 
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverBagsFrame" end
     ns.SkinWindow(f)
