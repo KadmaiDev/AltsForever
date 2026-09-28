@@ -287,3 +287,18 @@ test("the bags window resizes: width sets the columns, height how tall before it
     f.grip.scripts.OnMouseUp(f.grip)
     eq(AltsForeverDB.bagsCols, nil)
 end)
+
+test("our windows come to the front when opened or clicked, so they never draw through each other", function()
+    local ns = wow.load(FILES)
+    wow.ns = ns
+    wow.login({ v = 2, chars = { ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { level = 20, reps = {} }) } })
+    ns.ToggleOverview(true)
+    ns.ShowBags(nil, "bags")
+    ns.ToggleReputation()
+    ns.ShowGear("Tarn Moon")
+    for _, name in ipairs({ "AltsForeverFrame", "AltsForeverBagsFrame", "AltsForeverRepFrame", "AltsForeverGearFrame" }) do
+        local f = _G[name]
+        eq(f.toplevel, true, name .. ": raised when clicked")
+        assert((f.raised or 0) > 0, name .. ": raised when opened")
+    end
+end)

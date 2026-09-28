@@ -215,6 +215,9 @@ local function CreatePanel()
     if not ok then f = CreateFrame("Frame", "AltsForeverRepFrame", UIParent, "BackdropTemplate") end
     panel = f
     f:SetFrameStrata("HIGH")
+    -- Comes to the front when clicked or opened, so our windows never draw through each other.
+    f:SetToplevel(true)
+    f:HookScript("OnShow", f.Raise)
     f:SetMovable(true)
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")

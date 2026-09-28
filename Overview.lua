@@ -340,6 +340,8 @@ local function CreateWindow()
     f:SetSize(width, 200)
     f:SetPoint("CENTER")
     f:SetFrameStrata("HIGH")
+    -- Comes to the front when clicked or opened, so our windows never draw through each other.
+    f:SetToplevel(true)
     f:SetMovable(true)
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
@@ -409,7 +411,10 @@ local function CreateWindow()
     f.credit:SetText(L["Alts Forever by Kadmai"])
 
     ns.SkinWindow(f)
-    f:SetScript("OnShow", Refresh)
+    f:SetScript("OnShow", function(self)
+        self:Raise()
+        Refresh()
+    end)
     f:SetScript("OnHide", function()
         if AltsForeverGearFrame then AltsForeverGearFrame:Hide() end
         if AltsForeverRepFrame then AltsForeverRepFrame:Hide() end

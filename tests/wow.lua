@@ -190,6 +190,8 @@ function M.load(files)
     function frameMethods:GetParent() return self.parent end
     function frameMethods:SetHeight(h) self.height = h end
     function frameMethods:SetWidth(w) self.width = w end
+    function frameMethods:SetToplevel(on) self.toplevel = on end
+    function frameMethods:Raise() self.raised = (self.raised or 0) + 1 end
     function frameMethods:GetWidth() return self.width or 0 end
     function frameMethods:LockHighlight() self.highlightLocked = true end
     function frameMethods:UnlockHighlight() self.highlightLocked = false end
