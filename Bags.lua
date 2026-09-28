@@ -428,7 +428,10 @@ end
 -- buttons. Each is added the first time its window is found; the checks stop once
 -- all are.
 ---------------------------------------------------------------------------
-local ICON = "Interface\\AddOns\\" .. (...) .. "\\media\\icon.tga"
+local MEDIA = "Interface\\AddOns\\" .. (...) .. "\\media\\"
+local ICON = MEDIA .. "icon.tga"
+-- The logo with its gold ring, like EllesmereUI's own round header buttons.
+local RINGED = MEDIA .. "logo.tga"
 
 -- Opens this window on your own bags or bank (left open if it already shows them).
 local function OpenFromShortcut(which)
@@ -436,25 +439,36 @@ local function OpenFromShortcut(which)
 end
 
 local function ShortcutEnter(b)
+    if b.rest then b.icon:SetAlpha(1) end
     GameTooltip:SetOwner(b, "ANCHOR_BOTTOM")
     GameTooltip:AddLine("Alts Forever")
     GameTooltip:AddLine(b.which == "bank" and L["Every character's bank"] or L["Every character's bags"], 1, 1, 1)
     GameTooltip:Show()
 end
 
-local function Shortcut(parent, which, size)
+-- round: EllesmereUI's style, the ringed logo slightly dimmed, brightening on hover
+-- (no square highlight on a round button).
+local function Shortcut(parent, which, size, round)
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(size, size)
     b.icon = b:CreateTexture(nil, "ARTWORK")
     b.icon:SetAllPoints()
-    b.icon:SetTexture(ICON)
-    local hl = b:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetAllPoints()
-    hl:SetColorTexture(1, 1, 1, 0.15)
+    b.icon:SetTexture(round and RINGED or ICON)
+    if round then
+        b.rest = 0.9
+        b.icon:SetAlpha(b.rest)
+    else
+        local hl = b:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAllPoints()
+        hl:SetColorTexture(1, 1, 1, 0.15)
+    end
     b.which = which
     b:SetScript("OnClick", function(self) OpenFromShortcut(self.which) end)
     b:SetScript("OnEnter", ShortcutEnter)
-    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    b:SetScript("OnLeave", function(self)
+        if self.rest then self.icon:SetAlpha(self.rest) end
+        GameTooltip:Hide()
+    end)
     return b
 end
 
@@ -492,7 +506,7 @@ local PLACES = {
         local f = _G.EUI_MainBagFrame
         local anchor = f and f._bagsBtn
         if not (anchor and anchor.GetParent) then return end
-        local b = Shortcut(anchor:GetParent(), "bags", 24)
+        local b = Shortcut(anchor:GetParent(), "bags", 24, true)
         b:SetPoint("RIGHT", anchor, "LEFT", -6, 0)
         return b
     end,
@@ -501,7 +515,7 @@ local PLACES = {
         local f = _G.EUI_BankFrame
         local search = f and f._searchBox
         if not (search and search.GetParent) then return end
-        local b = Shortcut(search:GetParent(), "bank", 24)
+        local b = Shortcut(search:GetParent(), "bank", 24, true)
         b:SetPoint("RIGHT", search, "LEFT", -13 - 24 - 6, 0)
         return b
     end,

@@ -210,8 +210,15 @@ test("shortcuts: Blizzard's bag menus get an entry; the bank, ElvUI and Ellesmer
     local e = s.EUI_MainBagFrame
     eq(e.parent, header, "in EllesmereUI's header")
     eq(e.point[1], "RIGHT"); eq(e.point[2], eui._bagsBtn); eq(e.point[3], "LEFT")
+    eq(e.icon.texture, "Interface\\AddOns\\AltsForever\\media\\logo.tga", "the logo with its gold ring, like EllesmereUI's buttons")
+    eq(e.icon.alpha, 0.9)
+    e.scripts.OnEnter(e)
+    eq(e.icon.alpha, 1, "brightens on hover")
+    e.scripts.OnLeave(e)
+    eq(e.icon.alpha, 0.9)
     local elv = s.ElvUI_ContainerFrame
     eq(elv.parent, ElvUI_ContainerFrame)
+    eq(elv.icon.texture, "Interface\\AddOns\\AltsForever\\media\\icon.tga", "square elsewhere: the ringless logo")
     eq(elv.point[1], "TOPLEFT", "inside ElvUI's top-left corner")
     eq(elv.point[4] > 0 and elv.point[5] < 0, true)
     elv.scripts.OnEnter(elv)

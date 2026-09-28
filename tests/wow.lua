@@ -207,6 +207,8 @@ function M.load(files)
     end
     function frameMethods:SetShown(v) if v then self:Show() else self:Hide() end end
     function frameMethods:SetTexture(t) self.texture = t end
+    function frameMethods:SetAlpha(a) self.alpha = a end
+    function frameMethods:GetAlpha() return self.alpha or 1 end
     function frameMethods:SetVertexColor(r, g, b) self.tint = { r, g, b } end
     function frameMethods:IsShown() return self.shown end
     function frameMethods:GetFrameLevel() return self.level or 1 end
