@@ -181,3 +181,36 @@ test("an item whose quality isn't loaded yet is requested and the window fills a
     ns.ShowBags(nil, "bags")
     eq(wow.itemLoads[1], 700)
 end)
+
+test("a shortcut button on the game's bags and bank (and ElvUI's, EllesmereUI's) opens the window there", function()
+    local ns = wow.load(FILES)
+    wow.ns = ns
+    CreateFrame("Frame", "ContainerFrameCombinedBags")
+    CreateFrame("Frame", "EUI_MainBagFrame")
+    wow.login(nil)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    local s = ns.BagShortcuts()
+    local bags = s.ContainerFrameCombinedBags
+    assert(bags and s.EUI_MainBagFrame, "attached to the bag windows that exist")
+    eq(bags.parent, ContainerFrameCombinedBags, "shows and hides with the bags")
+    eq(bags.point[1], "TOPRIGHT", "outside the window's left edge, clear of its contents")
+    eq(bags.point[3], "TOPLEFT")
+    eq(s.BankFrame, nil, "no bank window yet")
+    bags.scripts.OnEnter(bags)
+    eq(GameTooltip.lines[2][1], "Every character's bags")
+    bags.scripts.OnClick(bags)
+    eq(AltsForeverBagsFrame:IsShown(), true)
+    bags.scripts.OnClick(bags)
+    eq(AltsForeverBagsFrame:IsShown(), true, "a second click leaves it open")
+    -- The bank window appears on the first visit.
+    CreateFrame("Frame", "BankFrame")
+    wow.fire("BANKFRAME_OPENED")
+    local bank = s.BankFrame
+    assert(bank, "attached when the bank opens")
+    bank.scripts.OnClick(bank)
+    eq(AltsForeverBagsFrame.bank.highlightLocked, true, "opened on the bank")
+    -- Opening the bags later catches windows made after login.
+    CreateFrame("Frame", "ElvUI_ContainerFrame")
+    ToggleAllBags()
+    assert(s.ElvUI_ContainerFrame, "ElvUI's bags too")
+end)

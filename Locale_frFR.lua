@@ -167,3 +167,5 @@ L["Show each bag (or bank tab) separately, or everything in one grid."] = "Affic
 L["Backpack"] = "Sac à dos"
 L["Keyring"] = "Trousseau"
 L["Bag %d"] = "Sac %d"
+L["Every character's bags"] = "Les sacs de tous vos personnages"
+L["Every character's bank"] = "La banque de tous vos personnages"

@@ -189,6 +189,8 @@ function M.load(files)
     function frameMethods:GetChildren() return unpack(self.children or {}) end
     function frameMethods:GetParent() return self.parent end
     function frameMethods:SetHeight(h) self.height = h end
+    function frameMethods:LockHighlight() self.highlightLocked = true end
+    function frameMethods:UnlockHighlight() self.highlightLocked = false end
     function frameMethods:GetHeight() return self.height or 0 end
     function frameMethods:SetChecked(on) self.checked = on end
     function frameMethods:GetChecked() return self.checked end
@@ -230,10 +232,12 @@ function M.load(files)
         if template and M.missingTemplates[template] then error("Couldn't find inherited node \"" .. template .. "\"") end
         local f = newObject(kind, name)
         f.template = template
+        f.parent = f.parent or parent
         M.frames[#M.frames + 1] = f
         return f
     end
     M.missingTemplates = {}
+    ToggleAllBags = function() end
 
     -- Chat windows: ChatFrame1 prints "Total time played" (recorded in playedShown)
     -- when it gets TIME_PLAYED_MSG; ChatFrame2 doesn't listen for it.

@@ -167,3 +167,5 @@ L["Show each bag (or bank tab) separately, or everything in one grid."] = "分�
 L["Backpack"] = "行囊"
 L["Keyring"] = "钥匙链"
 L["Bag %d"] = "背包 %d"
+L["Every character's bags"] = "所有角色的背包"
+L["Every character's bank"] = "所有角色的银行"

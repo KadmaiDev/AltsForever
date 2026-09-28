@@ -419,3 +419,65 @@ function ns.BagsWindow() return frame end
 function ns.BagsWindowChanged()
     if frame and frame:IsShown() and shownKey == ns.charKey then Fill() end
 end
+
+---------------------------------------------------------------------------
+-- Shortcuts on the game's own bags and bank (and ElvUI's and EllesmereUI's): a small
+-- Alts Forever button just outside each window's top-left edge, so it never covers
+-- anything inside their layouts. It opens this window on the same place. Attached the
+-- first time each window is found; the checks stop once all are attached.
+---------------------------------------------------------------------------
+local HOSTS = {
+    { "ContainerFrameCombinedBags", "bags" }, { "ContainerFrame1", "bags" },
+    { "ElvUI_ContainerFrame", "bags" }, { "EUI_MainBagFrame", "bags" },
+    { "BankFrame", "bank" }, { "ElvUI_BankContainerFrame", "bank" }, { "EUI_BankFrame", "bank" },
+}
+local ICON = "Interface\\AddOns\\" .. (...) .. "\\media\\icon.tga"
+local shortcuts, missing = {}, #HOSTS
+
+local function ShortcutEnter(b)
+    GameTooltip:SetOwner(b, "ANCHOR_LEFT")
+    GameTooltip:AddLine("Alts Forever")
+    GameTooltip:AddLine(b.which == "bank" and L["Every character's bank"] or L["Every character's bags"], 1, 1, 1)
+    GameTooltip:Show()
+end
+
+local function AttachShortcuts()
+    if missing == 0 then return end
+    for _, host in ipairs(HOSTS) do
+        local f = _G[host[1]]
+        if f and not shortcuts[host[1]] and f.CreateTexture then
+            local b = CreateFrame("Button", nil, f)
+            b:SetSize(26, 26)
+            b:SetPoint("TOPRIGHT", f, "TOPLEFT", -2, -6)
+            b.icon = b:CreateTexture(nil, "ARTWORK")
+            b.icon:SetAllPoints()
+            b.icon:SetTexture(ICON)
+            local hl = b:CreateTexture(nil, "HIGHLIGHT")
+            hl:SetAllPoints()
+            hl:SetColorTexture(1, 1, 1, 0.15)
+            b.which = host[2]
+            b:SetScript("OnClick", function(self)
+                if not (frame and frame:IsShown() and view == self.which) then ns.ShowBags(ns.charKey, self.which) end
+            end)
+            b:SetScript("OnEnter", ShortcutEnter)
+            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            ns.SkinSlot(b)
+            shortcuts[host[1]] = b
+            missing = missing - 1
+        end
+    end
+end
+
+function ns.BagShortcuts() return shortcuts end
+
+function ns.StartBags()
+    ns.On("PLAYER_ENTERING_WORLD", AttachShortcuts)
+    -- The bank window (and ElvUI's) may be made on the first visit.
+    ns.On("BANKFRAME_OPENED", function()
+        AttachShortcuts()
+        if C_Timer then C_Timer.After(0, AttachShortcuts) end
+    end)
+    for _, name in ipairs({ "ToggleAllBags", "OpenAllBags", "ToggleBackpack", "OpenBackpack" }) do
+        if _G[name] then hooksecurefunc(name, AttachShortcuts) end
+    end
+end
