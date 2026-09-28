@@ -244,6 +244,9 @@ function M.load(files)
     end
     M.missingTemplates = {}
     ToggleAllBags = function() end
+    SOUNDKIT = { IG_BACKPACK_OPEN = 862, IG_BACKPACK_CLOSE = 863 }
+    M.sounds = {}
+    PlaySound = function(id) M.sounds[#M.sounds + 1] = id end
     -- Blizzard's menus that addons may add to, by tag.
     M.menuMods = {}
     Menu = { ModifyMenu = function(tag, fn) M.menuMods[tag] = fn end }

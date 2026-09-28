@@ -302,3 +302,16 @@ test("our windows come to the front when opened or clicked, so they never draw t
         assert((f.raised or 0) > 0, name .. ": raised when opened")
     end
 end)
+
+test("the bags window plays the game's bag sounds when it opens and closes, and only then", function()
+    local ns = wow.load(FILES)
+    wow.ns = ns
+    wow.setBag(0, 4, {})
+    wow.login(nil)
+    ns.ShowBags(nil, "bags")
+    eq(table.concat(wow.sounds, ","), "862", "open")
+    AltsForeverBagsFrame.bank.scripts.OnClick(AltsForeverBagsFrame.bank)
+    eq(#wow.sounds, 1, "switching views is silent")
+    ns.ShowBags(nil, "bank")
+    eq(table.concat(wow.sounds, ","), "862,863", "close")
+end)

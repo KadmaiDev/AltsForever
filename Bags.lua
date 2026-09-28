@@ -457,6 +457,11 @@ local function CreateWindow()
     ns.SkinWindow(f)
     f:Hide()
     f:SetPoint("CENTER")
+    -- The game's own bag sounds, however the window is opened or closed (Esc too); hooked
+    -- after the Hide above, so creating the window makes no sound.
+    local sounds = SOUNDKIT or {}
+    f:HookScript("OnShow", function() if sounds.IG_BACKPACK_OPEN then PlaySound(sounds.IG_BACKPACK_OPEN) end end)
+    f:HookScript("OnHide", function() if sounds.IG_BACKPACK_CLOSE then PlaySound(sounds.IG_BACKPACK_CLOSE) end end)
 end
 
 -- Opens the window on a character's bags or bank; the same again closes it.
