@@ -51,6 +51,10 @@ The bank and inbox are read when you open them; until then that character shows 
 
 Install it from CurseForge, or link or copy this folder to `<WoW Forever>\Interface\AddOns\AltsForever`. The folder in `AddOns` must be named `AltsForever`.
 
+## Settings
+
+Options > AddOns > Alts Forever has every setting, with a short explanation of each. The same settings are in the minimap button's right-click menu and the cog in the overview, and every one has a slash command.
+
 ## Commands
 
 Everything below can also be done by clicking: **click the Alts Forever minimap button** (or Alts Forever in the minimap's addon menu) to open the overview, **right-click it** (or the cog in the overview) for options. Drag the button to move it around the minimap, or hide it from the options menu, and **right-click a character in the overview** to forget them.

@@ -310,6 +310,9 @@ local function Refresh()
         row:Show()
     end
     for i = #keys + 1, #rows do rows[i]:Hide() end
+    -- With only one character there's nothing to compare yet: say how to add the others.
+    frame.credit:SetText(#keys == 1 and (GREY .. L["Log in on your other characters once to add them here."] .. "|r")
+        or L["Alts Forever by Kadmai"])
     footer:SetText(L["Total played: %s"]:format(ns.FormatPlayed(played)) .. "     " .. L["Total gold: %s"]:format(GetCoinTextureString(total)))
     frame:SetHeight(54 + #keys * ROW_HEIGHT + 32)
 end

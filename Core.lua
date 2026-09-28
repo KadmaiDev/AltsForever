@@ -177,6 +177,9 @@ ns.On("ADDON_LOADED", function(name)
         if ns.db and AltsForeverDB ~= ns.db then AltsForeverDB = ns.db end
         return
     end
+    -- A fresh install: no saved data, or no characters yet (then the welcome is shown).
+    local saved = AltsForeverDB
+    ns.freshInstall = type(saved) ~= "table" or type(saved.chars) ~= "table" or next(saved.chars) == nil
     AltsForeverDB = ns.InitDB(AltsForeverDB)
     ns.db = AltsForeverDB
     -- Left over from the rested XP rate check, which has been removed.
@@ -190,6 +193,7 @@ ns.On("PLAYER_LOGIN", function()
     local _, class = UnitClass("player")
     local name = ns.PlayerName()
     ns.AdoptFirstName(ns.db.chars, name, class)
+    local newChar = ns.db.chars[name] == nil
     ns.charKey, ns.char = ns.InitChar(ns.db, name, class, UnitFactionGroup("player"))
     ns.StartScanner()
     ns.StartMail()
@@ -201,7 +205,32 @@ ns.On("PLAYER_LOGIN", function()
     ns.StartGear()
     ns.StartTooltip()
     ns.StartReputation()
+    ns.StartOptions()
+    ns.Welcome(newChar)
 end)
+
+-- A few seconds after login (after the game's own login messages): on a fresh install,
+-- how to use Alts Forever, once; on a character seen for the first time, that it's now
+-- tracked. Existing players never see the welcome (db.welcomed is set quietly).
+function ns.Welcome(newChar)
+    local db = ns.db
+    local lines
+    if not db.welcomed and ns.freshInstall then
+        lines = {
+            L["Welcome! Hover any item to see how many your characters have, and where."],
+            L["Type /af or click the minimap button for all your characters at a glance. Settings are under Options > AddOns > Alts Forever."],
+            L["Log in on each character once, and open their bank, mailbox and profession windows once, so Alts Forever knows what they have."],
+        }
+    elseif newChar then
+        lines = { L["Now tracking %s. Open the bank and mailbox once on this character so they're included too."]:format(ns.charKey) }
+    end
+    db.welcomed = true
+    if not lines then return end
+    local function Show()
+        for i = 1, #lines do ns.Print(lines[i]) end
+    end
+    if C_Timer and C_Timer.After then C_Timer.After(5, Show) else Show() end
+end
 
 ns.On("PLAYER_LOGOUT", function()
     if ns.char then ns.char.seen = time() end

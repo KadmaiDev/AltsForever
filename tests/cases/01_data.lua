@@ -445,7 +445,7 @@ end)
 
 test("the help message and overview credit Kadmai", function()
     wow.load(FILES)
-    wow.login(nil)
+    wow.login({ v = 2, chars = { ["Brak Stone"] = alt("Brak Stone", "WARRIOR", {}) } })
     SlashCmdList.ALTSFOREVER("help")
     assert(table.concat(wow.printed, "\n"):find("by Kadmai", 1, true))
     SlashCmdList.ALTSFOREVER("")

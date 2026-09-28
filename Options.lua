@@ -1,9 +1,10 @@
--- Alts Forever options: everything the slash commands do, by clicking. A minimap button
--- and the minimap's addon compartment entry (click: overview, right-click: options menu),
--- the same menu from the overview's cog button, and "Forget" on a character row's
--- right-click menu.
--- Menus and pop-ups are only built when clicked. (An Options > AddOns page was tried and
--- removed: it was the likely source of a one-off taint error on Esc, see AGENTS.md.)
+-- Alts Forever options: everything the slash commands do, by clicking. A page under
+-- Options > AddOns, a minimap button and the minimap's addon compartment entry (click:
+-- overview, right-click: options menu), the same menu from the overview's cog button, and
+-- "Forget" on a character row's right-click menu. Menus and pop-ups are only built when
+-- clicked. The settings page uses Blizzard's standard settings API only (its first version
+-- was removed on 2026-09-25 over a taint scare whose real cause was elsewhere; see
+-- AGENTS.md for how it's checked).
 local ADDON, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
@@ -62,6 +63,54 @@ local function ToggleStats() ns.SetStats(not ns.StatsOn()) end
 local function MinimapSelected() return ns.MinimapButtonOn() end
 local function ToggleMinimap() ns.SetMinimapButton(not ns.MinimapButtonOn()) end
 
+---------------------------------------------------------------------------
+-- Options > AddOns > Alts Forever
+---------------------------------------------------------------------------
+local category
+
+local function Checkbox(variable, name, get, set, tooltip)
+    local setting = Settings.RegisterProxySetting(category, variable, Settings.VarType.Boolean, name, false,
+        function() return get() and true or false end, set)
+    Settings.CreateCheckbox(category, setting, tooltip)
+end
+
+local function RegisterSettings()
+    category = Settings.RegisterVerticalLayoutCategory("Alts Forever")
+    Checkbox("ALTSFOREVER_SKILLUPS", L["Show skill-up details"], SkillupsSelected, ns.SetSkillups,
+        L["Show which characters can still skill up: in Can craft, on materials (Skill-ups) and in the overview. Same as /af skillups."])
+    Checkbox("ALTSFOREVER_SENDMAIL", L["Send mail to alts"], SendToAltSelected, ns.SetSendToAlt,
+        L["An arrow next to the To box at the mailbox to pick one of your characters. Same as /af sendmail."])
+    Checkbox("ALTSFOREVER_STATS", L["Show session stats"], StatsSelected, ns.SetStats,
+        L["Off by default. Your XP bar shows this session's XP and time to level; your bag gold shows gold gained or lost this session, today and this week. Same as /af stats."])
+    Checkbox("ALTSFOREVER_MINIMAP", L["Show minimap button"], MinimapSelected, ns.SetMinimapButton,
+        L["Same as /af minimap. Alts Forever is also in the minimap's addon menu."])
+    if CreateSettingsButtonInitializer and SettingsPanel and SettingsPanel.GetLayout then
+        SettingsPanel:GetLayout(category):AddInitializer(CreateSettingsButtonInitializer(
+            L["Overview"], L["Open overview"], function() ns.ToggleOverview(true) end,
+            L["Every character at a glance. Right-click a character there to forget them. Same as /af."], true))
+    end
+    Settings.RegisterAddOnCategory(category)
+end
+
+function ns.StartOptions()
+    if not (Settings and Settings.RegisterVerticalLayoutCategory and Settings.RegisterProxySetting) then return end
+    -- The settings API isn't in Forever's documentation: report a failure, but keep going.
+    local ok, err = pcall(RegisterSettings)
+    if not ok then
+        category = nil
+        if geterrorhandler then geterrorhandler()(err) end
+    end
+end
+
+-- Opens Options > AddOns > Alts Forever; false if there's no page.
+function ns.OpenSettings()
+    if not (category and Settings.OpenToCategory) then return false end
+    Settings.OpenToCategory(category:GetID())
+    return true
+end
+
+function ns.HasSettings() return category ~= nil end
+
 -- The options menu: from the compartment's right-click and the overview's cog button.
 function ns.ShowOptionsMenu(owner)
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return ns.ShowHelp() end
@@ -76,6 +125,7 @@ function ns.ShowOptionsMenu(owner)
         root:CreateCheckbox(L["Show session stats"], StatsSelected, ToggleStats)
         root:CreateCheckbox(L["Show minimap button"], MinimapSelected, ToggleMinimap)
         root:CreateButton(L["Memory use"], function() ns.RunCommand("mem") end)
+        if ns.HasSettings() then root:CreateButton(L["Settings..."], ns.OpenSettings) end
     end)
 end
 

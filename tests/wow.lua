@@ -47,6 +47,28 @@ function M.load(files)
     issecretvalue = function(v) return v == M.SECRET end
     M.now = nil -- set to freeze the clock
     time = function(t) if t then return os.time(t) end return M.now or os.time() end
+    -- Blizzard's settings API (Options > AddOns): the page is recorded in M.settings.
+    M.settings, M.settingsOpened = nil, nil
+    Settings = {
+        VarType = { Boolean = "boolean" },
+        RegisterVerticalLayoutCategory = function(name)
+            M.settings = { name = name, checkboxes = {}, GetID = function() return 77 end }
+            return M.settings
+        end,
+        RegisterProxySetting = function(category, variable, varType, name, default, get, set)
+            return { variable = variable, name = name, get = get, set = set, category = category }
+        end,
+        CreateCheckbox = function(category, setting, tooltip)
+            setting.tooltip = tooltip
+            category.checkboxes[#category.checkboxes + 1] = setting
+        end,
+        RegisterAddOnCategory = function(category) category.registered = true end,
+        OpenToCategory = function(id) M.settingsOpened = id end,
+    }
+    SettingsPanel = { GetLayout = function() return { AddInitializer = function(_, init) M.settings.button = init end } end }
+    CreateSettingsButtonInitializer = function(name, text, click, tooltip)
+        return { name = name, text = text, click = click, tooltip = tooltip }
+    end
     -- The client language: English unless a test sets wow.locale before loading.
     GetLocale = function() return M.locale or "enUS" end
     date = os.date

@@ -55,6 +55,7 @@ CASES = {
     "17_minimap.lua",
     "18_toc.lua",
     "19_locales.lua",
+    "20_welcome.lua",
 }
 do
     local where = {}

@@ -89,7 +89,8 @@ end)
 test("no login warning when nothing expires soon", function()
     wow.load(FILES)
     wow.now = NOW
-    wow.login({ v = 2, chars = { ["Later"] = alt("Later", "PRIEST", { mail = {}, mailExpires = NOW + 10 * DAY }) } })
+    wow.login({ v = 2, chars = { ["Aldric"] = alt("Aldric", "MAGE", {}),
+        ["Later"] = alt("Later", "PRIEST", { mail = {}, mailExpires = NOW + 10 * DAY }) } })
     for _, fn in ipairs(wow.timers) do fn() end
     eq(#wow.printed, 0)
 end)
