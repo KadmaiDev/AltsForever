@@ -12,15 +12,21 @@ test("minimap compartment: click opens the overview, right-click the options men
     AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
     local texts = {}
     for _, item in ipairs(wow.menu.items) do texts[#texts + 1] = item.text end
-    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Show skill-up details | Send mail to alts | Show session stats | Show minimap button | Memory use | Settings...")
+    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Bags and bank | Show skill-up details | Send mail to alts | Show session stats | Show minimap button | Memory use | Settings...")
     wow.menuItem("Open overview").fn()
     eq(AltsForeverFrame:IsShown(), true)
     wow.menuItem("Open overview").fn()
     eq(AltsForeverFrame:IsShown(), true, "the menu only opens it")
+    -- Still offered while it's open (it may be behind other windows): brings it to the front.
     AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
-    eq(wow.menuItem("Open overview"), nil, "not offered while the overview is open")
+    local raised = AltsForeverFrame.raised or 0
+    wow.menuItem("Open overview").fn()
+    eq(AltsForeverFrame:IsShown(), true)
+    assert(AltsForeverFrame.raised > raised, "already open: brought to the front")
     AltsForeverFrame.cog.scripts.OnClick(AltsForeverFrame.cog)
-    eq(wow.menuItem("Open overview"), nil, "nor from the overview's own cog")
+    eq(wow.menuItem("Open overview"), nil, "not from the overview's own cog")
+    wow.menuItem("Bags and bank").fn()
+    eq(AltsForeverBagsFrame:IsShown(), true, "Bags and bank opens the bags window")
     AltsForever_OnAddonCompartmentEnter("AltsForever", UIParent)
     eq(GameTooltip.lines[1][1], "Alts Forever")
     assert(GameTooltip.lines[3][1]:find("Right-click", 1, true))

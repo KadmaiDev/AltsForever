@@ -228,15 +228,18 @@ end
 function ns.HasSettings() return category ~= nil end
 function ns.OptionsPanel() return canvas end
 
--- The options menu: from the compartment's right-click and the overview's cog button.
-function ns.ShowOptionsMenu(owner)
+-- The options menu: from the minimap button's and compartment's right-click, and the
+-- overview's cog button (fromOverview: it leaves out Open overview there).
+function ns.ShowOptionsMenu(owner, fromOverview)
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return ns.ShowHelp() end
     MenuUtil.CreateContextMenu(owner, function(_, root)
         root:CreateTitle("Alts Forever")
-        -- Not when it's already open (e.g. from the overview's own cog button).
-        if not ns.OverviewShown() then
+        -- Always there from the minimap: if the overview is already open behind other
+        -- windows, this brings it to the front.
+        if not fromOverview then
             root:CreateButton(L["Open overview"], function() ns.ToggleOverview(true) end)
         end
+        root:CreateButton(L["Bags and bank"], function() ns.ShowBags(ns.charKey, "bags") end)
         root:CreateCheckbox(L["Show skill-up details"], SkillupsSelected, ToggleSkillups)
         root:CreateCheckbox(L["Send mail to alts"], SendToAltSelected, ToggleSendToAlt)
         root:CreateCheckbox(L["Show session stats"], StatsSelected, ToggleStats)

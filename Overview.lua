@@ -368,7 +368,7 @@ local function CreateWindow()
     cog:SetPoint("TOPRIGHT", f, "TOPRIGHT", -28, -4)
     cog:SetNormalTexture("Interface\\Icons\\INV_Misc_Gear_01")
     cog:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-    cog:SetScript("OnClick", function(self) ns.ShowOptionsMenu(self) end)
+    cog:SetScript("OnClick", function(self) ns.ShowOptionsMenu(self, true) end)
     cog:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine(L["Options"])
@@ -427,7 +427,9 @@ end
 -- Opens or closes the overview; `open` only ever opens it (menus, settings page).
 function ns.ToggleOverview(open)
     if not frame then CreateWindow() end
-    if frame:IsShown() and not open then frame:Hide() else frame:Show() end
+    if frame:IsShown() and not open then return frame:Hide() end
+    frame:Show()
+    frame:Raise() -- already open: to the front, over other windows
 end
 
 function ns.OverviewShown()
