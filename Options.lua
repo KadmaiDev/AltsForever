@@ -328,7 +328,10 @@ function ns.CreateMinimapButton()
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
     b.icon = icon
     b:SetScript("OnClick", function(self, button)
-        if button == "RightButton" then ns.ShowOptionsMenu(self) else ns.ToggleOverview() end
+        -- The menu belongs to UIParent, not the button: EllesmereUI's minimap tray hides
+        -- itself (and this button) on any left press outside it, and a menu closes with
+        -- its owner, so every click on the menu only closed it. It opens at the cursor.
+        if button == "RightButton" then ns.ShowOptionsMenu(UIParent) else ns.ToggleOverview() end
     end)
     b:SetScript("OnEnter", ButtonTooltip)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)

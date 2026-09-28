@@ -13,6 +13,7 @@ test("a minimap button is made as soon as saved data loads (before login)", func
     eq(AltsForeverFrame:IsShown(), true)
     b.scripts.OnClick(b, "RightButton")
     eq(wow.menu.items[1].text, "Alts Forever", "right-click: options menu")
+    eq(wow.menu.owner, UIParent, "owned by UIParent: EllesmereUI's tray hides the button on a click, which closed the menu")
     b.scripts.OnEnter(b)
     eq(GameTooltip.lines[1][1], "Alts Forever")
 end)
