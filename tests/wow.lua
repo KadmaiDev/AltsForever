@@ -79,6 +79,12 @@ function M.load(files)
     -- The client language: English unless a test sets wow.locale before loading.
     GetLocale = function() return M.locale or "enUS" end
     M.inCombat = nil
+    -- The game's icon lists (the macro icon chooser's), filled into the table given.
+    M.macroIcons, M.macroItemIcons, M.itemIcons = {}, {}, {}
+    for i = 1, 30 do M.macroIcons[i] = 136000 + i end
+    for i = 1, 200 do M.macroItemIcons[i] = 133000 + i end
+    GetMacroIcons = function(t) for i, v in ipairs(M.macroIcons) do t[#t + 1] = v end end
+    GetMacroItemIcons = function(t) for i, v in ipairs(M.macroItemIcons) do t[#t + 1] = v end end
     InCombatLockdown = function() return M.inCombat end
     date = os.date
     print = function(msg) M.printed[#M.printed + 1] = msg end
@@ -311,7 +317,7 @@ function M.load(files)
             M.itemLoads = M.itemLoads or {}
             M.itemLoads[#M.itemLoads + 1] = id
         end,
-        GetItemIconByID = function(id) return id == 5762 and 133652 or nil end,
+        GetItemIconByID = function(id) return (M.itemIcons and M.itemIcons[id]) or (id == 5762 and 133652 or nil) end,
     }
     GetInventoryItemID = function(_, slot) return M.inventory[slot] end
 
@@ -474,6 +480,10 @@ function M.load(files)
     AltsForever_OnAddonCompartmentLeave = nil
     AltsForeverMinimapButton = nil
     AltsForeverRunning = nil
+    -- Every other global the addon made (named windows etc.), so a previous load is freed.
+    for k in pairs(_G) do
+        if type(k) == "string" and k:find("^AltsForever") then _G[k] = nil end
+    end
     -- XP bars (Blizzard's, ElvUI's, EllesmereUI's) exist only if a test makes them.
     MainStatusTrackingBarContainer, SecondaryStatusTrackingBarContainer = nil, nil
     ElvUI_ExperienceBarHolder, EllesmereEAB_XPBar = nil, nil

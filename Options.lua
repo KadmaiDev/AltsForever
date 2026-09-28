@@ -105,6 +105,13 @@ local SETTINGS = {
 
 local function RefreshCanvas(f)
     for i, check in ipairs(f.checks) do check:SetChecked(SETTINGS[i][2]() and true or false) end
+    for place, label in pairs(f.icons or {}) do
+        label:SetText(ns.PlaceName(place) .. ":  " .. ns.PlaceMarkup(place) .. " 23")
+    end
+end
+
+function ns.RefreshOptionsIcons()
+    if canvas and canvas.built then RefreshCanvas(canvas) end
 end
 
 local function BuildCanvas(f)
@@ -151,6 +158,26 @@ local function BuildCanvas(f)
         f.checks[i] = check
         above = check
     end
+    -- Tooltip icons: each place's current icon (or word) and a Change... button.
+    local heading = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    heading:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 2, -18)
+    heading:SetText(L["Tooltip icons"])
+    f.icons = {}
+    local row = heading
+    for i, place in ipairs(ns.ICON_PLACES) do
+        local change = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+        change:SetSize(100, 22)
+        change:SetPoint("TOPLEFT", row, "BOTTOMLEFT", i == 1 and 0 or 0, i == 1 and -8 or -4)
+        change:SetText(L["Change..."])
+        change:SetScript("OnClick", function() ns.OpenIconPicker(place) end)
+        ns.SkinButton(change)
+        local label = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        label:SetPoint("LEFT", change, "RIGHT", 10, 0)
+        ns.SkinText(label)
+        f.icons[place] = label
+        row = change
+    end
+    above = row
     local help = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     help:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 2, -16)
     help:SetText(L["Type /af help for every command."])

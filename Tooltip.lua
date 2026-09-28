@@ -27,6 +27,11 @@ local LABELS = {
     "|TInterface\\Minimap\\Tracking\\Mailbox:0|t",
     "|TInterface\\Icons\\INV_Shirt_White_01:0:0:0:0:64:64:5:59:5:59|t",
 }
+-- Rebuilt from the player's icon choices (Icons.lua) at login and whenever one changes.
+function ns.RefreshPlaceLabels()
+    for i, place in ipairs(LOCS) do LABELS[i] = ns.PlaceMarkup(place) end
+    ns.InvalidateCache()
+end
 local TOTAL = L["Total"]
 -- The breakdown: light grey, a step softer than the white totals but readable on
 -- Blizzard's see-through tooltip as well as darker UI skins.
@@ -401,6 +406,7 @@ local function OnItem(tt, data)
 end
 
 function ns.StartTooltip()
+    ns.RefreshPlaceLabels()
     if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall then
         TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, OnItem)
     else

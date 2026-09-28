@@ -63,6 +63,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 |---|---|
 | `/af` | Open or close the overview window |
 | `/af rep` | Open or close the Reputation panel |
+| `/af icons` | Choose the icons item tooltips use for bags, bank, mail and worn items |
 | `/af find <text>` | Find an item on any character by (part of) its name, e.g. `/af find linen` |
 | `/af mail` | List every character's soonest mail expiry |
 | `/af list` | List stored characters |
@@ -90,7 +91,7 @@ luajit tests/run.lua
 - Scans refill the existing tables and read stacks through one reused `ItemLocation`, so a scan allocates nothing.
 - Other characters' tooltip lines are built once per item and cached, up to 500 items, and so is their column layout. The current character's line is recomputed only when their data changes. Hovering an item again creates no garbage.
 - The overview and gear windows aren't created until you first open them.
-- Measured outside the game (`luajit tests/perf.lua`): about 195 KB for the addon, nearly all of it the addon's own code, plus about 9 KB per character (five characters: about 240 KB). Nothing grows while you play. `/af mem` shows the real figure in game.
+- Measured outside the game (`luajit tests/perf.lua`): about 220 KB for the addon, nearly all of it the addon's own code, plus about 9 KB per character. The icon picker's lists of every game icon are loaded only while the picker is open. Nothing grows while you play. `/af mem` shows the real figure in game.
 
 ## Development
 

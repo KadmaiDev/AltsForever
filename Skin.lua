@@ -102,6 +102,16 @@ function ns.SkinButton(b)
     end
 end
 
+-- A text box: EllesmereUI's, or ElvUI's.
+function ns.SkinEditBox(e)
+    if not e then return end
+    if skin then
+        if skin.EditBox then pcall(skin.EditBox, e) end
+    elseif Elv() then
+        pcall(elvS.HandleEditBox, elvS, e)
+    end
+end
+
 -- A tick box: EllesmereUI's, or ElvUI's.
 function ns.SkinCheck(c)
     if not c then return end
