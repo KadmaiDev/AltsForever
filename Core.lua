@@ -295,6 +295,10 @@ function commands.stats()
         or L["Session stats off."])
 end
 
+function commands.find(arg)
+    ns.FindItems(arg)
+end
+
 function commands.rep()
     ns.ToggleReputation()
 end
@@ -306,6 +310,7 @@ end
 
 function commands.help()
     Print(L["by Kadmai. /af opens the overview. Also: /af rep | mail | list | delete Name | skillups | sendmail | minimap | stats | mem"])
+    Print(L["/af find <text> searches every character's items by name."])
     Print(L["Or use the minimap button (right-click for options)."])
 end
 ns.ShowHelp = commands.help

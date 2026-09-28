@@ -63,6 +63,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 |---|---|
 | `/af` | Open or close the overview window |
 | `/af rep` | Open or close the Reputation panel |
+| `/af find <text>` | Find an item on any character by (part of) its name, e.g. `/af find linen` |
 | `/af mail` | List every character's soonest mail expiry |
 | `/af list` | List stored characters |
 | `/af skillups` | Turn the skill-up details in tooltips on or off |

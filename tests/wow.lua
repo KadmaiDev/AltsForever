@@ -306,6 +306,11 @@ function M.load(files)
             return id, nil, nil, nil, "icon:" .. id, M.itemClass[id]
         end,
         GetItemNameByID = function(id) return M.itemNames[id] end,
+        GetItemInfo = function(id) return M.itemNames[id], M.itemLinks and M.itemLinks[id] end,
+        RequestLoadItemDataByID = function(id)
+            M.itemLoads = M.itemLoads or {}
+            M.itemLoads[#M.itemLoads + 1] = id
+        end,
         GetItemIconByID = function(id) return id == 5762 and 133652 or nil end,
     }
     GetInventoryItemID = function(_, slot) return M.inventory[slot] end

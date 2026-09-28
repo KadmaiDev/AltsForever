@@ -56,6 +56,7 @@ CASES = {
     "18_toc.lua",
     "19_locales.lua",
     "20_welcome.lua",
+    "21_find.lua",
 }
 do
     local where = {}

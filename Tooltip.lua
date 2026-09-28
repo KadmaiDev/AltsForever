@@ -239,6 +239,90 @@ local function OnCleared(tt)
     if st then st.e = nil end
 end
 
+---------------------------------------------------------------------------
+-- /af find <text>: every item any character has (bags, bank, mail, worn) whose name
+-- contains the text, with who has how many. Only item IDs are stored, so names are looked
+-- up now, in the player's language; names the game hasn't loaded yet are requested and the
+-- search runs once more a second later. Nothing runs until the command is typed.
+---------------------------------------------------------------------------
+local MAX_FOUND = 10
+
+local function ItemName(id)
+    local name = C_Item.GetItemNameByID(id)
+    if type(name) == "string" and name ~= "" and not issecretvalue(name) then return name end
+end
+
+local function ItemLink(id, name)
+    if C_Item.GetItemInfo then
+        local _, link = C_Item.GetItemInfo(id) -- the link is the second value
+        if type(link) == "string" and not issecretvalue(link) then return link end
+    end
+    return "[" .. name .. "]"
+end
+
+local function ByCount(a, b)
+    if a.n ~= b.n then return a.n > b.n end
+    return a.key < b.key
+end
+
+local function ByTotal(a, b)
+    if a.total ~= b.total then return a.total > b.total end
+    return a.name < b.name
+end
+
+function ns.FindItems(text, retried)
+    text = (text or ""):match("^%s*(.-)%s*$")
+    if text == "" then return ns.Print(L["Type /af find and part of an item's name, e.g. /af find linen."]) end
+    local needle = text:lower()
+    local chars, ids = ns.db.chars, {}
+    for _, c in pairs(chars) do
+        for i = 1, #LOCS do
+            local t = c[LOCS[i]]
+            if t then for id in pairs(t) do ids[id] = true end end
+        end
+    end
+    local found, loading = {}, 0
+    for id in pairs(ids) do
+        local name = ItemName(id)
+        if name then
+            if name:lower():find(needle, 1, true) then found[#found + 1] = { id = id, name = name } end
+        else
+            loading = loading + 1
+            if C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(id) end
+        end
+    end
+    -- Some names aren't loaded yet: they've been asked for, so search again shortly.
+    if loading > 0 and not retried and C_Timer and C_Timer.After then
+        C_Timer.After(1, function() ns.FindItems(text, true) end)
+        return
+    end
+    for _, f in ipairs(found) do
+        local list, total = {}, 0
+        for key, c in pairs(chars) do
+            local n = ns.Describe(c, f.id)
+            if n > 0 then
+                list[#list + 1] = { key = key, c = c, n = n }
+                total = total + n
+            end
+        end
+        table.sort(list, ByCount)
+        f.list, f.total = list, total
+    end
+    table.sort(found, ByTotal)
+    if #found == 0 then
+        ns.Print(L["Nothing matching '%s' on any character."]:format(text))
+    else
+        ns.Print(L["Items matching '%s':"]:format(text))
+        for i = 1, math.min(#found, MAX_FOUND) do
+            local f, parts = found[i], {}
+            for j, e in ipairs(f.list) do parts[j] = ns.ShortName(e.key, e.c) .. " " .. e.n end
+            print("  " .. ItemLink(f.id, f.name) .. " " .. f.total .. ": " .. table.concat(parts, ", "))
+        end
+        if #found > MAX_FOUND then ns.Print(L["...and %d more; try a longer search."]:format(#found - MAX_FOUND)) end
+    end
+    if loading > 0 then ns.Print(L["Some item names were still loading; try again in a moment."]) end
+end
+
 function ns.InvalidateCache()
     wipe(cache)
     wipe(names)
