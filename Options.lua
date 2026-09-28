@@ -254,6 +254,8 @@ function ns.ShowCharacterMenu(owner, key)
     if not (c and MenuUtil and MenuUtil.CreateContextMenu) then return end
     MenuUtil.CreateContextMenu(owner, function(_, root)
         root:CreateTitle(ns.ColoredName(key, c))
+        root:CreateButton(L["Bags"], function() ns.ShowBags(key, "bags") end)
+        root:CreateButton(L["Bank"], function() ns.ShowBags(key, "bank") end)
         local forget = root:CreateButton(L["Forget %s..."]:format(c.name or key), function()
             ForgetDialog()
             StaticPopup_Show("ALTSFOREVER_FORGET", c.name or key, nil, key)

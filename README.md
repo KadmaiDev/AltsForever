@@ -18,6 +18,8 @@ Type `/af` to open the **overview**: every character with level and XP, rested X
 
 ![The overview window with a character's details and gear panel](media/alt-overview.png)
 
+**Bags and bank:** the bag button in the overview's title bar (or `/af bags`, `/af bank`, or right-click a character) opens a window showing any character's bags or bank slot by slot, as you last saw them: each stack with its count, empty slots, how many slots are free, and a coloured border for uncommon and better items. Pick the character from the dropdown, switch between Bags and Bank, and between bank tabs. Hover an item for its tooltip, shift-click to link it. A character's slots are recorded the next time you log in on them (bags) or visit their bank; until then the window shows one slot per item with its total.
+
 **Mail expiry:** a few seconds after you log in, Alts Forever warns in chat if any character has mail with items or gold expiring within 3 days, and says whether it'll be returned to the sender or deleted. The overview's Mail column shows how long each character has; `/af mail` lists them all.
 
 Hovering a recipe (pattern, schematic, formula...) lists your characters who have that profession: **Known**, **Can learn**, **Needs 120 (107)** (required skill, their skill), or **Not scanned**. Open each profession window once on each character so Alts Forever knows which recipes they've learned.
@@ -64,6 +66,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af` | Open or close the overview window |
 | `/af rep` | Open or close the Reputation panel |
 | `/af icons` | Choose the icons item tooltips use for bags, bank, mail and worn items |
+| `/af bags [name]`, `/af bank [name]` | Show your bags or bank slot by slot, or another character's, e.g. `/af bank Tarnia` |
 | `/af find <text>` | Find an item on any character by (part of) its name, e.g. `/af find linen` |
 | `/af mail` | List every character's soonest mail expiry |
 | `/af list` | List stored characters |
@@ -86,11 +89,11 @@ luajit tests/run.lua
 
 ## Design notes
 
-- Item counts are stored as `itemID -> count` per location per character, without slot positions or item links. The rest is small: each equipped item's link (for the gear panel), learned recipe names with what they make, their grey point and reagents (one short string per recipe your characters know), and a few numbers such as level, gold and time played. Five characters take about 25 KB on disk.
+- Item counts are stored as `itemID -> count` per location per character, without item links. For the bags window, each bag's and bank tab's slots are kept too, one number per slot (item and stack size), about 1.5 KB per character. The rest is small: each equipped item's link (for the gear panel), learned recipe names with what they make, their grey point and reagents (one short string per recipe your characters know), and a few numbers such as level, gold and time played. Five characters take about 25 KB on disk.
 - Scans only happen on events. `BAG_UPDATE_DELAYED` groups a batch of changes into one scan, and only when a carried bag changed. There are no OnUpdate handlers.
 - Scans refill the existing tables and read stacks through one reused `ItemLocation`, so a scan allocates nothing.
 - Other characters' tooltip lines are built once per item and cached, up to 500 items, and so is their column layout. The current character's line is recomputed only when their data changes. Hovering an item again creates no garbage.
-- The overview and gear windows aren't created until you first open them.
+- The overview, gear and bags windows aren't created until you first open them.
 - Measured outside the game (`luajit tests/perf.lua`): about 220 KB for the addon, nearly all of it the addon's own code, plus about 9 KB per character. The icon picker's lists of every game icon are loaded only while the picker is open. Nothing grows while you play. `/af mem` shows the real figure in game.
 
 ## Development

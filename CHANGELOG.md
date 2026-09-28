@@ -1,3 +1,7 @@
+## Unreleased
+
+- **Bags and bank window:** see any character's bags or bank slot by slot, as you last saw them, with stack counts, empty and free slots, and quality borders. Pick the character from a dropdown and switch between bags, bank and bank tabs. Open it from the new bag button in the overview's title bar, by right-clicking a character, or with `/af bags` and `/af bank` (add a name for another character). Each character's slots are recorded the next time you log in on them or visit their bank; until then it shows their items with totals. Suggested by a player: thank you!
+
 ## Alts Forever 0.8.0
 
 - **Choose your tooltip icons:** pick the icons item tooltips use for bags, bank, mail and worn items, or words instead, from Options > AddOns > Alts Forever (or `/af icons`). The picker has recommended icons, a search by item or spell name, and every spell and item icon in the game to browse, with a preview. Hover an icon to see what it is.

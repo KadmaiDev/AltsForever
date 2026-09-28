@@ -303,6 +303,15 @@ function commands.find(arg)
     ns.FindItems(arg)
 end
 
+-- /af bags [name], /af bank [name]: a character's bags or bank, slot by slot.
+local function ShowBags(arg, which)
+    local key = arg == "" and ns.charKey or FindChar(arg)
+    if not key then return Print(L["No character named '%s'. Use /af list."]:format(arg)) end
+    ns.ShowBags(key, which)
+end
+function commands.bags(arg) ShowBags(arg, "bags") end
+function commands.bank(arg) ShowBags(arg, "bank") end
+
 function commands.rep()
     ns.ToggleReputation()
 end
@@ -315,6 +324,7 @@ end
 function commands.help()
     Print(L["by Kadmai. /af opens the overview. Also: /af rep | mail | list | delete Name | skillups | sendmail | minimap | stats | mem"])
     Print(L["/af find <text> searches every character's items by name."])
+    Print(L["/af bags or /af bank, with a name for another character, shows their bags or bank slot by slot."])
     Print(L["/af icons picks the icons item tooltips use for bags, bank, mail and worn items."])
     Print(L["Or use the minimap button (right-click for options)."])
 end

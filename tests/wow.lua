@@ -33,6 +33,8 @@ function M.load(files)
     M.profs = {}       -- { { name, skill, max? (default 150) }, ... } in GetProfessions() order
     M.itemClass = {}   -- [itemID] = classID (9 = recipe)
     M.itemNames = {}   -- [itemID] = name
+    M.itemQuality = {} -- [itemID] = quality (nil: not loaded yet)
+    ITEM_QUALITY_COLORS = { [2] = { r = 0.1, g = 1, b = 0.1 }, [3] = { r = 0, g = 0.44, b = 0.87 } }
     -- The open profession window: which profession, and every recipe in it. A recipe
     -- is { name, learned, prof?, item? (what the schematic says it makes), link?,
     -- grey? (maxTrivialLevel), reagents? { { itemID, qty }, ... } }.
@@ -312,6 +314,7 @@ function M.load(files)
             return id, nil, nil, nil, "icon:" .. id, M.itemClass[id]
         end,
         GetItemNameByID = function(id) return M.itemNames[id] end,
+        GetItemQualityByID = function(id) return M.itemQuality[id] end,
         GetItemInfo = function(id) return M.itemNames[id], M.itemLinks and M.itemLinks[id] end,
         RequestLoadItemDataByID = function(id)
             M.itemLoads = M.itemLoads or {}
@@ -408,6 +411,11 @@ function M.load(files)
         function root:CreateTitle(text) return add("title", text) end
         function root:CreateButton(text, fn) return add("button", text, fn) end
         function root:CreateCheckbox(text, isSelected, setSelected) return add("checkbox", text, isSelected, setSelected) end
+        function root:CreateRadio(text, isSelected, setSelected, data)
+            local item = add("radio", text, isSelected, setSelected)
+            item.data = data
+            return item
+        end
         generator(owner, root)
         M.menu = root
         return root
@@ -507,6 +515,7 @@ function M.tooltip()
         GetOwner = function(self) return self.owner end,
         IsOwned = function(self, f) return self.shown and self.owner == f end,
         SetHyperlink = function(self, link) self.hyperlink = link end,
+        SetItemByID = function(self, id) self.itemID = id end,
         IsShown = function(self) return self.shown end,
         Show = function(self) self.shown = true end,
         Hide = function(self) self.shown, self.owner = false, nil end,

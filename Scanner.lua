@@ -1,9 +1,10 @@
 -- Alts Forever scanner: keeps the current character's bags, bank and equipped items up to date.
--- Stores only itemID -> count, and refills the same tables so scans allocate nothing.
+-- Stores itemID -> count for tooltips, and each bag's and bank tab's slots for the bags
+-- window (Bags.lua), refilling the same tables so scans allocate nothing.
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 
-local wipe, pcall = wipe, pcall
+local wipe, pcall, time = wipe, pcall, time
 local issecretvalue = issecretvalue or function() return false end
 local C_Container, C_Item = C_Container, C_Item
 local GetContainerNumSlots = C_Container.GetContainerNumSlots
@@ -63,17 +64,49 @@ for _, name in ipairs({ "Bag_1", "Bag_2", "Bag_3", "Bag_4", "ReagentBag" }) do
     if bag and ok and invSlot then EQUIP_SLOTS[#EQUIP_SLOTS + 1] = invSlot end
 end
 
-function ns.ScanContainers(bags, out)
+-- A slot in the saved layout: one number, itemID * 1000 + stack size (Classic stacks
+-- stay under 1000), or 0 when empty. Numbers only, so a layout costs no strings.
+local STACK = 1000
+function ns.SlotValue(id, count)
+    if count >= STACK then count = STACK - 1 end
+    return id * STACK + count
+end
+function ns.SlotItem(value)
+    if not value or value == 0 then return nil end
+    return math.floor(value / STACK), value % STACK
+end
+
+-- Counts every item in the bags into out; with layout, also records each bag's slots
+-- in layout[bag] (an array as long as the bag; a bag with no slots is removed).
+function ns.ScanContainers(bags, out, layout)
     wipe(out)
     for i = 1, #bags do
         local bag = bags[i]
-        for slot = 1, GetContainerNumSlots(bag) or 0 do
+        local size = GetContainerNumSlots(bag) or 0
+        local slots
+        if layout then
+            slots = layout[bag]
+            if size == 0 then
+                layout[bag] = nil
+            elseif not slots then
+                slots = {}
+                layout[bag] = slots
+            end
+        end
+        for slot = 1, size do
             local id, count = ReadSlot(bag, slot)
             -- A secret value would break the whole SavedVariables write, and even
             -- testing one for truth throws, so check before anything else.
             if id and not issecretvalue(count) and count then
                 out[id] = (out[id] or 0) + count
+                if slots then slots[slot] = ns.SlotValue(id, count) end
+            elseif slots then
+                slots[slot] = 0
             end
+        end
+        -- The bag got smaller (swapped for a smaller one).
+        if slots then
+            for slot = #slots, size + 1, -1 do slots[slot] = nil end
         end
     end
 end
@@ -86,14 +119,19 @@ function ns.ScanEquip(out)
     end
 end
 
+-- The bags window's lists, in display order (Bags.lua).
+ns.CARRIED_BAGS, ns.BANK_TABS = BAGS, BANK_BAGS
+
 function ns.StartScanner()
     local char = ns.char
     local bagsDirty, bankDirty, bankOpen = false, false, false
 
     local function ScanBags()
         bagsDirty = false
-        ns.ScanContainers(BAGS, char.bags)
+        char.layout = char.layout or {}
+        ns.ScanContainers(BAGS, char.bags, char.layout)
         ns.version = ns.version + 1
+        ns.BagsWindowChanged()
     end
 
     -- Bank contents can only be read while the bank is open; outside that the tabs
@@ -101,8 +139,11 @@ function ns.StartScanner()
     local function ScanBank()
         bankDirty = false
         char.bank = char.bank or {}
-        ns.ScanContainers(BANK_BAGS, char.bank)
+        char.layout = char.layout or {}
+        ns.ScanContainers(BANK_BAGS, char.bank, char.layout)
+        char.bankAt = time()
         ns.version = ns.version + 1
+        ns.BagsWindowChanged()
     end
 
     local function BankOpened()

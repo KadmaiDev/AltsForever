@@ -38,6 +38,7 @@ Columns.lua
 Overview.lua
 Bars.lua
 Gear.lua
+Bags.lua
 Icons.lua
 Tooltip.lua
 Options.lua
