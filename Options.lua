@@ -186,6 +186,9 @@ end
 
 local function RegisterSettings()
     local f = CreateFrame("Frame", "AltsForeverOptionsPanel")
+    -- Hidden until the Options window shows it: a new frame starts shown, so its Show()
+    -- there fired no OnShow and the page came up blank until you left it and came back.
+    f:Hide()
     f:SetScript("OnShow", function(self)
         if not self.built then
             self.built = true

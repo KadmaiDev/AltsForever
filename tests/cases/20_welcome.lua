@@ -8,6 +8,15 @@ function showOptionsPage()
     return page.frame
 end
 
+test("the Options page is built the first time the Options window shows it", function()
+    wow.load(FILES)
+    wow.login(nil)
+    local f = wow.settings.frame
+    eq(f:IsShown(), false, "starts hidden, so the window's Show() fires OnShow")
+    f:Show() -- what the Options window does when you pick Alts Forever
+    assert(f.built and f.logo, "not blank on the first visit")
+end)
+
 test("Options > AddOns > Alts Forever: logo, Open overview, and the four settings as tick boxes", function()
     wow.load(FILES)
     wow.login(nil)
