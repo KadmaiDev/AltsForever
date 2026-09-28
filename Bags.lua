@@ -246,11 +246,17 @@ function Fill()
         local s = sections[n]
         local h = Header(n)
         local title = SectionName(c, s.bag)
-        h:SetText(how == "slots" and (title .. GREY .. "  (" .. s.used .. " / " .. (s.to - s.from + 1) .. ")|r") or title)
+        if how == "slots" then
+            h:SetText(title .. GREY .. "  (" .. s.used .. " / " .. (s.to - s.from + 1) .. ")|r")
+        else
+            -- Totals only: say so beside the heading (too long for the bottom row).
+            h:SetText(title .. GREY .. "   " .. (view == "bank" and L["Totals only: visit the bank on this character to see its slots."]
+                or L["Totals only: log in on this character to see its slots."]) .. "|r")
+        end
         h:ClearAllPoints()
         h:SetPoint("TOPLEFT", frame.content, "TOPLEFT", 0, -y)
         h:Show()
-        h.line:Show()
+        h.line:SetShown(how == "slots")
         y = y + HEADER
         for i = s.from, s.to do
             local k = i - s.from
@@ -276,10 +282,7 @@ function Fill()
             or L["No bags recorded yet.\nLog in on this character once."]) .. "|r")
     end
     frame.empty:SetShown(not how)
-    if how == "counts" then
-        frame.info:SetText(GREY .. (view == "bank" and L["Totals only: visit the bank on this character to see its slots."]
-            or L["Totals only: log in on this character to see its slots."]) .. "|r")
-    elseif how == "slots" then
+    if how == "slots" then
         frame.info:SetText(L["%d of %d slots free"]:format(free, shown))
     else
         frame.info:SetText("")
@@ -388,9 +391,9 @@ local function CreateWindow()
     f.info = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.info:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD + 2, 12)
     f.seen = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    f.seen:SetPoint("BOTTOM", f, "BOTTOM", 0, 12)
     f.money = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     f.money:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 2, 11)
+    f.seen:SetPoint("RIGHT", f.money, "LEFT", -20, 0)
     for _, fs in ipairs({ f.empty, f.info, f.seen, f.money }) do ns.SkinText(fs) end
 
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverBagsFrame" end

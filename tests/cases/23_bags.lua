@@ -124,8 +124,9 @@ test("all in one or by bag (remembered), bank tabs as sections, and money at the
     eq(tarn.isSelected(tarn.data), false)
     tarn.setSelected(tarn.data)
     eq(bagsGrid(), "500x40", "one slot per item, with its total")
-    eq(bagsHeadings(), "Bank", "no slot numbers for totals")
-    assert(f.info.text:find("Totals only", 1, true), f.info.text)
+    eq(bagsHeadings(), "Bank|cff9d9d9d   Totals only: visit the bank on this character to see its slots.|r",
+        "the note beside the heading, not in the bottom row where it ran into Last seen")
+    eq(f.info.text, "")
     eq(f.money.text, "12345c")
     f.bags.scripts.OnClick(f.bags)
     eq(bagsGrid(), "600x1")
