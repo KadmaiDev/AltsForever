@@ -1,5 +1,6 @@
 ## Unreleased
 
+- **Fixed: with EllesmereUI's bank, the Alts Forever button covered its Show Bags button.** It now sits at the left end of the header's buttons, in the bags and the bank.
 - **Fixed: the minimap button could be dragged out of a minimap button collector** (EllesmereUI's tray, MinimapButtonButton and the like). While one holds it, the collector decides where it sits; dragging only moves it round the minimap when it's on the minimap itself. Hiding it with "Show minimap button" also updates MinimapButtonButton's grid.
 
 ## Alts Forever 0.9.0

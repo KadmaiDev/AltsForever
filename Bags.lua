@@ -534,6 +534,30 @@ local function Shortcut(parent, which, size, round)
     return b
 end
 
+-- The left end of a header's row of buttons: from `start` (the search box), each next
+-- button is the shown one anchored by its RIGHT to the previous one's LEFT (EllesmereUI:
+-- sort, then Show Bags, then anything another addon chained on). Following the anchors
+-- rather than fixed offsets keeps working when EllesmereUI adds, hides or moves a button
+-- (its bank's Show Bags button, not stored anywhere, was covered on 2026-09-29).
+local function RowEnd(start)
+    local parent, current = start:GetParent(), start
+    for _ = 1, 20 do
+        local found
+        for _, child in ipairs({ parent:GetChildren() }) do
+            if child ~= current and child:IsShown() and child.GetPoint then
+                for i = 1, (child.GetNumPoints and child:GetNumPoints() or 1) do
+                    local point, rel, relPoint = child:GetPoint(i)
+                    if point == "RIGHT" and rel == current and relPoint == "LEFT" then found = child end
+                end
+            end
+        end
+        if not found then return current end
+        current = found
+    end
+    return current
+end
+ns.HeaderRowEnd = RowEnd
+
 -- Where each window gets its button. Each returns the button, or nil if the window
 -- (or the part it's placed beside) isn't there yet. EllesmereUI's fields are not its
 -- official API: they're checked before use.
@@ -563,22 +587,22 @@ local PLACES = {
         ns.SkinSlot(b)
         return b
     end,
-    -- EllesmereUI's bags: left of its bags button (which is left of sort and search).
+    -- EllesmereUI's bags: at the left end of its header row (left of Show Bags and sort).
     EUI_MainBagFrame = function()
         local f = _G.EUI_MainBagFrame
-        local anchor = f and f._bagsBtn
-        if not (anchor and anchor.GetParent) then return end
-        local b = Shortcut(anchor:GetParent(), "bags", 24, true)
-        b:SetPoint("RIGHT", anchor, "LEFT", -6, 0)
+        local search = f and f._searchBox
+        if not (search and search.GetParent) then return end
+        local b = Shortcut(search:GetParent(), "bags", 24, true)
+        b:SetPoint("RIGHT", RowEnd(search), "LEFT", -6, 0)
         return b
     end,
-    -- EllesmereUI's bank: left of its sort button, which sits 13 px left of the search box.
+    -- EllesmereUI's bank: the same, left of its sort and Show Bags buttons.
     EUI_BankFrame = function()
         local f = _G.EUI_BankFrame
         local search = f and f._searchBox
         if not (search and search.GetParent) then return end
         local b = Shortcut(search:GetParent(), "bank", 24, true)
-        b:SetPoint("RIGHT", search, "LEFT", -13 - 24 - 6, 0)
+        b:SetPoint("RIGHT", RowEnd(search), "LEFT", -6, 0)
         return b
     end,
 }

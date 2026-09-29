@@ -190,10 +190,15 @@ end
 test("shortcuts: Blizzard's bag menus get an entry; the bank, ElvUI and EllesmereUI a button in their header", function()
     local ns = wow.load(FILES)
     wow.ns = ns
-    -- EllesmereUI's bags header: its bags button (internal field) sits left of sort and search.
+    -- EllesmereUI's bags header, as its code builds it: search, then sort 13 px to its left,
+    -- then Show Bags 6 px left of sort (the search box is an internal field).
     local eui = CreateFrame("Frame", "EUI_MainBagFrame")
     local header = CreateFrame("Frame", nil, eui)
+    eui._searchBox = CreateFrame("EditBox", nil, header)
+    local sort = CreateFrame("Button", nil, header)
+    sort:SetPoint("RIGHT", eui._searchBox, "LEFT", -13, 0)
     eui._bagsBtn = CreateFrame("Button", nil, header)
+    eui._bagsBtn:SetPoint("RIGHT", sort, "LEFT", -6, 0)
     CreateFrame("Frame", "ElvUI_ContainerFrame")
     wow.login(nil)
     wow.fire("PLAYER_ENTERING_WORLD")
@@ -237,11 +242,28 @@ test("shortcuts: Blizzard's bag menus get an entry; the bank, ElvUI and Ellesmer
     eq(AltsForeverBagsFrame.bank.highlightLocked, true, "opened on the bank")
     bank.scripts.OnClick(bank)
     eq(AltsForeverBagsFrame:IsShown(), true, "a second click leaves it open")
-    -- EllesmereUI's bank, found later (opening bags checks again): left of its sort button.
+    -- EllesmereUI's bank, found later (opening bags checks again): its header has sort and a
+    -- Show Bags button that isn't stored anywhere; ours goes left of both, not on top.
     local euiBank = CreateFrame("Frame", "EUI_BankFrame")
-    euiBank._searchBox = CreateFrame("EditBox", nil, CreateFrame("Frame", nil, euiBank))
+    local bankHeader = CreateFrame("Frame", nil, euiBank)
+    euiBank._searchBox = CreateFrame("EditBox", nil, bankHeader)
+    local bankSort = CreateFrame("Button", nil, bankHeader)
+    bankSort:SetPoint("RIGHT", euiBank._searchBox, "LEFT", -13, 0)
+    local bankBags = CreateFrame("Button", nil, bankHeader)
+    bankBags:SetPoint("RIGHT", bankSort, "LEFT", -6, 0)
     ToggleAllBags()
-    eq(s.EUI_BankFrame.point[2], euiBank._searchBox)
+    eq(s.EUI_BankFrame.point[2], bankBags, "left of Show Bags")
+    eq(s.EUI_BankFrame.point[4], -6)
+    eq(ns.HeaderRowEnd(euiBank._searchBox), s.EUI_BankFrame, "another addon chaining on would go left of ours")
+    -- With sort turned off (an EllesmereUI setting) it's hidden and Show Bags sits by the search box.
+    local head = CreateFrame("Frame")
+    local search = CreateFrame("EditBox", nil, head)
+    local hiddenSort = CreateFrame("Button", nil, head)
+    hiddenSort:SetPoint("RIGHT", search, "LEFT", -13, 0)
+    hiddenSort:Hide()
+    local bagsButton = CreateFrame("Button", nil, head)
+    bagsButton:SetPoint("RIGHT", search, "LEFT", -13, 0)
+    eq(ns.HeaderRowEnd(search), bagsButton, "the shown one, not the hidden sort")
     eq(s.ContainerFrameCombinedBags, nil, "never a button outside a window")
 end)
 

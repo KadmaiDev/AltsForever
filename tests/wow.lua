@@ -189,6 +189,12 @@ function M.load(files)
     function frameMethods:GetChildren() return unpack(self.children or {}) end
     function frameMethods:GetParent() return self.parent end
     function frameMethods:SetParent(p) self.parent = p end
+    function frameMethods:GetChildren()
+        local list = {}
+        for _, f in ipairs(M.frames) do if f.parent == self then list[#list + 1] = f end end
+        return unpack(list)
+    end
+    function frameMethods:GetNumPoints() return self.point and 1 or 0 end
     function frameMethods:SetHeight(h) self.height = h end
     function frameMethods:SetWidth(w) self.width = w end
     function frameMethods:SetToplevel(on) self.toplevel = on end
