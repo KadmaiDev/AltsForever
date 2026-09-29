@@ -188,6 +188,7 @@ function M.load(files)
     end
     function frameMethods:GetChildren() return unpack(self.children or {}) end
     function frameMethods:GetParent() return self.parent end
+    function frameMethods:SetParent(p) self.parent = p end
     function frameMethods:SetHeight(h) self.height = h end
     function frameMethods:SetWidth(w) self.width = w end
     function frameMethods:SetToplevel(on) self.toplevel = on end
@@ -395,9 +396,11 @@ function M.load(files)
     M.button("ContainerFrameCombinedBagsGoldButton")
     M.button("ContainerFrame1MoneyFrameCopperButton")
     BankPanelGoldButton = nil
-    hooksecurefunc = function(name, hook)
-        local orig = _G[name]
-        _G[name] = function(...)
+    -- hooksecurefunc(name, hook) for a global, or (table, name, hook) for a method.
+    hooksecurefunc = function(t, name, hook)
+        if type(t) ~= "table" then t, name, hook = _G, t, name end
+        local orig = t[name]
+        t[name] = function(...)
             orig(...)
             hook(...)
         end

@@ -304,12 +304,20 @@ local function FollowCursor()
     Place(ns.db.minimapAngle)
 end
 
+-- True while a button collector holds the button (EllesmereUI's tray, MinimapButtonButton
+-- or any other that moved it off the minimap): it places the button itself, so dragging it
+-- round the minimap edge would fight it (the owner's report, 2026-09-29; as in Keystance).
+local function Collected()
+    return mmButton ~= nil and mmButton:GetParent() ~= Minimap
+end
+ns.MinimapButtonCollected = Collected
+
 local function ButtonTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddLine("Alts Forever")
     GameTooltip:AddLine(L["Click: open the overview"], 1, 1, 1)
     GameTooltip:AddLine(L["Right-click: options"], 1, 1, 1)
-    GameTooltip:AddLine(L["Drag: move around the minimap"], 1, 1, 1)
+    if not Collected() then GameTooltip:AddLine(L["Drag: move around the minimap"], 1, 1, 1) end
     GameTooltip:Show()
 end
 
@@ -346,7 +354,9 @@ function ns.CreateMinimapButton()
     end)
     b:SetScript("OnEnter", ButtonTooltip)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    b:SetScript("OnDragStart", function(self) self:SetScript("OnUpdate", FollowCursor) end)
+    b:SetScript("OnDragStart", function(self)
+        if not Collected() then self:SetScript("OnUpdate", FollowCursor) end
+    end)
     b:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
     mmButton = b
     Place(ns.db.minimapAngle or DEFAULT_ANGLE)
@@ -355,7 +365,11 @@ end
 function ns.SetMinimapButton(on)
     ns.db.minimapHidden = not on or nil
     if on then ns.CreateMinimapButton() end
-    if mmButton then mmButton:SetShown(on) end
+    -- Show and Hide rather than SetShown: MinimapButtonButton hooks those two to lay its
+    -- grid out again, so hiding the button doesn't leave a gap there.
+    if mmButton then
+        if on then mmButton:Show() else mmButton:Hide() end
+    end
 end
 
 ---------------------------------------------------------------------------

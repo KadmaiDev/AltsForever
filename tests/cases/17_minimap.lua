@@ -74,3 +74,30 @@ test("the minimap button and addon list use our logo, shipped with the addon", f
         f:close()
     end
 end)
+
+test("held by a button collector (EllesmereUI's tray, MinimapButtonButton...), the button can't be dragged round the minimap", function()
+    wow.load(FILES)
+    wow.login(nil)
+    local b = AltsForeverMinimapButton
+    eq(b:GetParent(), Minimap)
+    b.scripts.OnDragStart(b)
+    assert(b.scripts.OnUpdate, "on the minimap itself: dragging works")
+    b.scripts.OnDragStop(b)
+    -- MinimapButtonButton moves collected buttons into a container under its own button,
+    -- and lays its grid out again when the button's own Show or Hide runs.
+    local main = CreateFrame("Frame", "MinimapButtonButtonButton", UIParent)
+    b:SetParent(CreateFrame("Frame", nil, main))
+    local layouts = 0
+    hooksecurefunc(b, "Show", function() layouts = layouts + 1 end)
+    hooksecurefunc(b, "Hide", function() layouts = layouts + 1 end)
+    b.scripts.OnDragStart(b)
+    eq(b.scripts.OnUpdate, nil, "not dragged: the collector places it")
+    b.scripts.OnEnter(b)
+    for _, line in ipairs(GameTooltip.lines) do assert(not tostring(line[1]):find("Drag", 1, true), "no drag hint") end
+    SlashCmdList.ALTSFOREVER("minimap")
+    eq(b:IsShown(), false)
+    eq(layouts, 1, "hidden through Hide, so its grid follows")
+    SlashCmdList.ALTSFOREVER("minimap")
+    eq(b:IsShown(), true)
+    eq(layouts, 2)
+end)
