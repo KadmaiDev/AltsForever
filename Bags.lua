@@ -116,9 +116,21 @@ ns.BagsSectionName = SectionName
 ---------------------------------------------------------------------------
 -- Window
 ---------------------------------------------------------------------------
-local Fill
+local Fill, Place
 
 local function SlotEnter(b)
+    -- With the Gamepad UI, focus moving onto a slot scrolls it into view (with its
+    -- section's heading when scrolling up): the D-pad has no mouse wheel.
+    if ns.GamepadUI() and b.top then
+        local visible = frame.holder:GetHeight()
+        if b.top < scroll then
+            scroll = max(0, b.top - HEADER)
+            Place()
+        elseif b.top + SIZE > scroll + visible then
+            scroll = b.top + SIZE - visible
+            Place()
+        end
+    end
     if not b.id then return end
     GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
     GameTooltip:SetItemByID(b.id)
@@ -230,7 +242,7 @@ local function MaxView()
     return max(h > 0 and floor(h * 0.7) - TOP - BOTTOM or 560, MIN_VIEW)
 end
 
-local function Place()
+Place = function()
     -- While the player drags the grip, the window keeps the height they're dragging to.
     local visible = sizing and max(frame:GetHeight() - TOP - BOTTOM, MIN_VIEW) or max(min(contentHeight, MaxView()), MIN_VIEW)
     scroll = max(0, min(scroll, contentHeight - visible))
@@ -278,6 +290,7 @@ function Fill()
         for i = s.from, s.to do
             local k = i - s.from
             local b = Slot(i)
+            b.top = y + floor(k / cols) * (SIZE + GAP)
             b:ClearAllPoints()
             b:SetPoint("TOPLEFT", frame.content, "TOPLEFT", k % cols * (SIZE + GAP), -y - floor(k / cols) * (SIZE + GAP))
             ShowSlot(b, ids[i], counts[i])
@@ -440,6 +453,7 @@ local function CreateWindow()
         ns.db.bagsHeight = max(floor(f:GetHeight() - TOP - BOTTOM), MIN_VIEW)
         Fill()
     end)
+    ns.GamepadIgnore(grip) -- mouse only
     f.grip = grip
     -- While dragging, the grid reflows as soon as another column fits.
     f:SetScript("OnSizeChanged", function(self, width)
@@ -462,6 +476,7 @@ local function CreateWindow()
     local sounds = SOUNDKIT or {}
     f:HookScript("OnShow", function() if sounds.IG_BACKPACK_OPEN then PlaySound(sounds.IG_BACKPACK_OPEN) end end)
     f:HookScript("OnHide", function() if sounds.IG_BACKPACK_CLOSE then PlaySound(sounds.IG_BACKPACK_CLOSE) end end)
+    ns.GamepadWindow(f)
 end
 
 -- Opens the window on a character's bags or bank; the same again closes it.

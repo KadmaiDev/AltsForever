@@ -1,3 +1,11 @@
+## Unreleased
+
+- **Controller support (Forever's Gamepad UI):** Alts Forever's windows now work with the D-pad. Focus jumps into a window when it opens, the D-pad moves between its buttons and shows their tooltips, A presses, B closes, and LT/RT switch between open windows.
+  - Open the overview or the bags window with a key binding (Key Bindings > AddOns > Alts Forever) or a macro of `/af` or `/af bags` on a gamepad action bar.
+  - A on a character in the overview opens their menu, which now also has Gear (the right-click menu has it too).
+  - The Reputation panel and the icon picker have page buttons, and the bags window scrolls to the slot you move onto.
+  - With the mouse and keyboard nothing changes.
+
 ## Alts Forever 0.9.1
 
 - **Fixed: with EllesmereUI's bank, the Alts Forever button covered its Show Bags button.** It now sits at the left end of the header's buttons, in the bags and the bank.

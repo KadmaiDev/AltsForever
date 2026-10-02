@@ -167,6 +167,7 @@ local function Row(i)
     row:EnableMouse(true)
     row:SetScript("OnEnter", RowTooltip)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ns.GamepadFocusable(row) -- its tooltip shows when the D-pad reaches it
     row.name = Cell(row, 4, NAME_WIDTH)
     row.cells = {}
     rows[i] = row
@@ -205,6 +206,11 @@ local function Fill()
     end
     panel.empty:SetShown(#factions == 0)
     local shown = math.min(VISIBLE_ROWS, #factions)
+    local more = #factions > VISIBLE_ROWS
+    panel.up:SetShown(more)
+    panel.down:SetShown(more)
+    panel.up:SetEnabled(offset > 0)
+    panel.down:SetEnabled(offset < #factions - VISIBLE_ROWS)
     panel.footer:SetText(#factions > VISIBLE_ROWS
         and (GREY .. (offset + 1) .. "-" .. (offset + shown) .. " " .. L["of %d (scroll for more)"]:format(#factions) .. "|r") or "")
     panel:SetHeight(52 + math.max(shown, 3) * ROW_HEIGHT + 30)
@@ -241,9 +247,21 @@ local function CreatePanel()
     f.empty:SetText(GREY .. L["No reputation recorded yet.\nLog in on each character once."] .. "|r")
     f.footer = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.footer:SetPoint("BOTTOM", f, "BOTTOM", 0, 10)
+    -- Page buttons for long lists (the mouse wheel scrolls too).
+    f.down = ns.PageButton(f, false, function()
+        offset = offset + VISIBLE_ROWS
+        Fill()
+    end)
+    f.down:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -10, 6)
+    f.up = ns.PageButton(f, true, function()
+        offset = offset - VISIBLE_ROWS
+        Fill()
+    end)
+    f.up:SetPoint("RIGHT", f.down, "LEFT", -2, 0)
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverRepFrame" end
     ns.SkinWindow(f)
     f:Hide()
+    ns.GamepadWindow(f)
 end
 
 -- Opens the panel beside the overview if it's open; again closes it.

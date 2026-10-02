@@ -226,6 +226,14 @@ function ns.OpenSettings()
     return true
 end
 
+-- Builds the Options page ahead of its first showing (Gamepad.lua: with the Gamepad UI on).
+function ns.PrebuildOptions()
+    if canvas and not canvas.built then
+        canvas.built = true
+        BuildCanvas(canvas)
+    end
+end
+
 function ns.HasSettings() return category ~= nil end
 function ns.OptionsPanel() return canvas end
 
@@ -258,6 +266,7 @@ function ns.ShowCharacterMenu(owner, key)
     if not (c and MenuUtil and MenuUtil.CreateContextMenu) then return end
     MenuUtil.CreateContextMenu(owner, function(_, root)
         root:CreateTitle(ns.ColoredName(key, c))
+        root:CreateButton(L["Gear"], function() ns.ShowGear(key) end)
         root:CreateButton(L["Bags"], function() ns.ShowBags(key, "bags") end)
         root:CreateButton(L["Bank"], function() ns.ShowBags(key, "bank") end)
         local forget = root:CreateButton(L["Forget %s..."]:format(c.name or key), function()

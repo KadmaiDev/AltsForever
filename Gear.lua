@@ -167,6 +167,7 @@ local function CreatePanel()
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverGearFrame" end
     ns.SkinWindow(f)
     f:Hide()
+    ns.GamepadWindow(f)
 end
 
 local function Fill()

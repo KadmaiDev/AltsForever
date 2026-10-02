@@ -42,6 +42,17 @@ Hovering a recipe (pattern, schematic, formula...) lists your characters who hav
 
 ![Recipe tooltips showing Known, Can learn and Needs skill, and a Can craft line](media/professions.png)
 
+## Playing with a controller
+
+Item tooltips (counts, Can craft, skill-ups) work with any input. With Forever's Gamepad UI on (Options > Gameplay > Gamepad), Alts Forever's windows join it like the game's own: focus jumps into a window when it opens, the D-pad moves between its buttons and shows their tooltips, A presses, B closes, and LT/RT switch between open windows.
+
+- **Opening it:** put a macro with `/af` (overview) or `/af bags` (bags and bank) on a gamepad action bar, or bind "Open overview" and "Bags and bank" under Key Bindings > AddOns > Alts Forever. The Alts Forever entry in your bag's menu and the button on the bank work with the controller too.
+- **A on a character** in the overview opens their menu: Gear, Bags, Bank and Forget (with a mouse, click for gear and right-click for the menu, as before).
+- **Long lists** (reputation, the icon picker) have page buttons; in the bags window, moving onto a slot scrolls it into view.
+- Resizing the bags window and moving windows still need a mouse.
+
+Forever's controller support is in alpha and changes with each beta build, so please report anything that doesn't work.
+
 ## Languages
 
 English, German, French, Spanish (Spain and Latin America), Brazilian Portuguese, and Simplified and Traditional Chinese, following your game's language. The translations are new: if something reads oddly in your language, please say so in the comments on CurseForge.

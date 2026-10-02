@@ -207,6 +207,7 @@ ns.On("PLAYER_LOGIN", function()
     ns.StartTooltip()
     ns.StartReputation()
     ns.StartOptions()
+    ns.StartGamepad()
     ns.Welcome(newChar)
 end)
 

@@ -276,6 +276,9 @@ local function CreateRow(i)
         if button == "RightButton" then ns.ShowCharacterMenu(self, self.key) else ns.ShowGear(self.key) end
     end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    -- A on a controller: the character's menu (Gear, Bags, Bank, Forget), since a
+    -- controller has no right-click.
+    row.OnSmartNavClick = function(self) ns.ShowCharacterMenu(self, self.key) end
     rows[i] = row
     return row
 end
@@ -422,6 +425,7 @@ local function CreateWindow()
     -- Escape closes it, like Blizzard's own windows.
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverFrame" end
     f:Hide()
+    ns.GamepadWindow(f)
 end
 
 -- Opens or closes the overview; `open` only ever opens it (menus, settings page).

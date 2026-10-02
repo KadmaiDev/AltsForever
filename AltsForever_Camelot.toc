@@ -44,3 +44,4 @@ Tooltip.lua
 Options.lua
 Reputation.lua
 Skin.lua
+Gamepad.lua

@@ -138,6 +138,8 @@ local function Render()
     end
     local first = picker.offset * COLS + 1
     picker.counter:SetText(total > 0 and L["%d-%d of %d"]:format(first, min(total, first + COLS * ROWS - 1), total) or "")
+    picker.pageUp:SetEnabled(picker.offset > 0)
+    picker.pageDown:SetEnabled(picker.offset < maxOffset)
     picker.slider.updating = true
     picker.slider:SetMinMaxValues(0, maxOffset)
     picker.slider:SetValue(picker.offset)
@@ -337,8 +339,19 @@ local function CreatePicker()
     end
     local slider = CreateFrame("Slider", nil, f)
     slider:SetOrientation("VERTICAL")
-    slider:SetPoint("TOPLEFT", grid, "TOPRIGHT", 8, 0)
-    slider:SetPoint("BOTTOMLEFT", grid, "BOTTOMRIGHT", 8, 0)
+    slider:SetPoint("TOPLEFT", grid, "TOPRIGHT", 8, -22)
+    slider:SetPoint("BOTTOMLEFT", grid, "BOTTOMRIGHT", 8, 22)
+    -- Page buttons at either end (a controller can press these, not drag the slider).
+    f.pageUp = ns.PageButton(f, true, function()
+        picker.offset = picker.offset - ROWS
+        Render()
+    end)
+    f.pageUp:SetPoint("TOPLEFT", grid, "TOPRIGHT", 6, 0)
+    f.pageDown = ns.PageButton(f, false, function()
+        picker.offset = picker.offset + ROWS
+        Render()
+    end)
+    f.pageDown:SetPoint("BOTTOMLEFT", grid, "BOTTOMRIGHT", 6, 0)
     slider:SetWidth(16)
     local track = slider:CreateTexture(nil, "BACKGROUND")
     track:SetPoint("TOP", 0, 0)
@@ -369,6 +382,7 @@ local function CreatePicker()
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverIconPicker" end
     ns.SkinWindow(f)
     f:Hide()
+    ns.GamepadWindow(f)
 end
 
 -- Opens the picker for a place ("bags", "bank", "mail" or "equip").

@@ -11,7 +11,7 @@ local KNOWN_EVENTS = {
     ADDON_LOADED = true, PLAYER_LOGIN = true, PLAYER_LOGOUT = true,
     BAG_UPDATE = true, BAG_UPDATE_DELAYED = true, BAG_CONTAINER_UPDATE = true,
     PLAYER_EQUIPMENT_CHANGED = true,
-    BANKFRAME_OPENED = true, BANKFRAME_CLOSED = true,
+    BANKFRAME_OPENED = true, BANKFRAME_CLOSED = true, INPUT_DEVICE_INTERFACE_TRANSITION = true,
     MAIL_SHOW = true, MAIL_CLOSED = true, MAIL_INBOX_UPDATE = true,
     MAIL_SEND_SUCCESS = true, MAIL_FAILED = true,
     PLAYER_MONEY = true,
@@ -166,7 +166,7 @@ function M.load(files)
     end }
     local function newObject(kind, name)
         local f = setmetatable({ kind = kind, events = {}, scripts = {}, shown = true }, frameMeta)
-        if name then _G[name] = f end
+        if name then _G[name], f.frameName = f, name end
         return f
     end
     function frameMethods:RegisterEvent(event)
@@ -189,6 +189,9 @@ function M.load(files)
     function frameMethods:GetChildren() return unpack(self.children or {}) end
     function frameMethods:GetParent() return self.parent end
     function frameMethods:SetParent(p) self.parent = p end
+    function frameMethods:GetName() return self.frameName end
+    function frameMethods:SetEnabled(on) self.enabled = on and true or false end
+    function frameMethods:IsEnabled() return self.enabled ~= false end
     function frameMethods:GetChildren()
         local list = {}
         for _, f in ipairs(M.frames) do if f.parent == self then list[#list + 1] = f end end
@@ -251,6 +254,17 @@ function M.load(files)
     end
     M.missingTemplates = {}
     ToggleAllBags = function() end
+    -- Forever's Gamepad UI (as Blizzard's code behaves, per the WowController guide): the
+    -- interface style, the focus manager our windows report to, and the navigator's marks.
+    M.gamepadUI, M.focus = false, {}
+    Enum.InputDeviceInterfaceType = { Mkb = 0, Gamepad = 1 }
+    C_InputInterfaceStyle = { GetCurrentStyle = function() return M.gamepadUI and 1 or 0 end }
+    GamepadMode = { FrameControlsManager = {
+        FrameShown = function(_, f) M.focus[#M.focus + 1] = { "shown", f } end,
+        FrameHidden = function(_, f) M.focus[#M.focus + 1] = { "hidden", f } end,
+    } }
+    SmartNavigation_MarkFrameFocusable = function(f) f.smartNavigationCanFocus = true end
+    SmartNavigation_MarkFrameIgnored = function(f) f.smartNavigationIgnored = true end
     SOUNDKIT = { IG_BACKPACK_OPEN = 862, IG_BACKPACK_CLOSE = 863 }
     M.sounds = {}
     PlaySound = function(id) M.sounds[#M.sounds + 1] = id end

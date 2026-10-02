@@ -1,0 +1,8 @@
+<Bindings>
+	<Binding name="ALTSFOREVER_OVERVIEW" header="ALTSFOREVER" category="ADDONS">
+		AltsForever_Binding("overview")
+	</Binding>
+	<Binding name="ALTSFOREVER_BAGS" category="ADDONS">
+		AltsForever_Binding("bags")
+	</Binding>
+</Bindings>

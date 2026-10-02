@@ -27,7 +27,7 @@ import urllib.error
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOCS = ["AltsForever.toc", "AltsForever_Camelot.toc"]
-EXTRA = ["LICENSE", "media/icon.tga", "media/minimap.tga", "media/blank.tga", "media/logo.tga"]  # the logo: addon list, minimap button; a spacer for lining up tooltip columns
+EXTRA = ["LICENSE", "Bindings.xml", "media/icon.tga", "media/minimap.tga", "media/blank.tga", "media/logo.tga"]  # the logo: addon list, minimap button; a spacer for lining up tooltip columns
 ALLOWED = (".toc", ".lua")
 
 PROJECT_ID = 1709551
