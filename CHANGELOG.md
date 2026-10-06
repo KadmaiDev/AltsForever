@@ -1,4 +1,4 @@
-## Unreleased
+## Alts Forever 0.10.0
 
 - **Upgrades for your characters:** hovering an item you could pass on (binds when equipped, not yet bound) lists which of your characters it would be an upgrade for, the slot and by how much, e.g. "Hands · +18%", or "empty slot". Characters up to 5 levels short show in grey with the level they can wear it at. A recipe shows the same for the item it makes ("Makes an upgrade for"); if that item binds on pickup, only characters who know the recipe or can learn it are listed. Items that are yours alone (bind on pickup or soulbound) show your own row.
   - Each character is judged by their role: the talent tab they've put most points in (melee, ranged, caster, healer, tank or feral, depending on class), or their class's usual levelling role under 10 points. Right-click a character in the overview and pick Upgrade role to choose it yourself, or type `/af role Name healer` (`auto` follows talents again).
