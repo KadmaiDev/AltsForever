@@ -214,6 +214,7 @@ function ns.StartGear()
             retries = retries + 1
             C_Timer.After(2, Scan)
         end
+        if ns.UpgradesChanged then ns.UpgradesChanged() end
         if panel and panel:IsShown() and shownKey == ns.charKey then Fill() end
     end
     -- Not at logout: by then the game may already report empty slots.

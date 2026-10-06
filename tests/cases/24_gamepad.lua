@@ -48,7 +48,7 @@ test("in combat a window opens without focus (Blizzard's bindings can't be chang
     wow.inCombat = nil
 end)
 
-test("A on an overview row opens that character's menu: Gear, Bags, Bank, Forget", function()
+test("A on an overview row opens that character's menu: Gear, Bags, Bank, Upgrade role, Forget", function()
     local ns = wow.load(FILES)
     wow.login({ v = 2, chars = { ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { level = 20, bags = {} }) } })
     ns.ToggleOverview()
@@ -57,7 +57,7 @@ test("A on an overview row opens that character's menu: Gear, Bags, Bank, Forget
     row:OnSmartNavClick()
     local texts = {}
     for _, item in ipairs(wow.menu.items) do texts[#texts + 1] = item.text end
-    eq(table.concat(texts, " | "), "[DRUID]Tarn Moon | Gear | Bags | Bank | Forget Tarn Moon...")
+    eq(table.concat(texts, " | "), "[DRUID]Tarn Moon | Gear | Bags | Bank | Upgrade role | Forget Tarn Moon...")
     wow.menuItem("Gear").fn()
     eq(AltsForeverGearFrame:IsShown(), true)
 end)

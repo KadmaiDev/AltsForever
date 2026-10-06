@@ -1,5 +1,10 @@
 ## Unreleased
 
+- **Upgrades for your characters:** hovering an item you could pass on (binds when equipped, not yet bound) lists which of your characters it would be an upgrade for, the slot and by how much, e.g. "Hands · +18%", or "empty slot". Characters up to 5 levels short show in grey with the level they can wear it at. A recipe shows the same for the item it makes ("Makes an upgrade for"); if that item binds on pickup, only characters who know the recipe or can learn it are listed. Items that are yours alone (bind on pickup or soulbound) show your own row.
+  - Each character is judged by their role: the talent tab they've put most points in (melee, ranged, caster, healer, tank or feral, depending on class), or their class's usual levelling role under 10 points. Right-click a character in the overview and pick Upgrade role to choose it yourself, or type `/af role Name healer` (`auto` follows talents again).
+  - Armour types and the step up to mail or plate at 40, weapon types, dual wield, "Classes:" lines and profession requirements are all checked. Rings and trinkets are compared with the weaker of the two worn, a two-hander with main and off hand together.
+  - Turn it off with "Show upgrades" in the options, or `/af upgrades`.
+- **Rested XP with Legacy's Well Rested:** the rested estimate for your logged-out characters now counts Well Rested's ranks (4% faster and a 4% higher cap per rank), read from your account's Legacy tree.
 - **Controller support (Forever's Gamepad UI):** Alts Forever's windows now work with the D-pad. Focus jumps into a window when it opens, the D-pad moves between its buttons and shows their tooltips, A presses, B closes, and LT/RT switch between open windows.
   - Open the overview or the bags window with a key binding (Key Bindings > AddOns > Alts Forever) or a macro of `/af` or `/af bags` on a gamepad action bar.
   - A on a character in the overview opens their menu, which now also has Gear (the right-click menu has it too).

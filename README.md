@@ -28,6 +28,8 @@ Hovering a recipe (pattern, schematic, formula...) lists your characters who hav
 
 **Can craft:** hovering any item that one of your characters knows how to make adds a "Can craft" section listing them one per line (the current character first). This also comes from opening each profession window once.
 
+**Upgrades:** hovering an item you could pass on (binds when equipped, not yet bound) lists which of your characters it would be an upgrade for, in which slot and by how much ("Hands · +18%", or "empty slot"); characters up to 5 levels short are shown in grey with the level they can wear it at. Hovering a recipe does the same for the item it makes. Items bound to you show only your own row. Each character is judged by the stats their role values, from the talent tab they've put most points in; right-click a character in the overview (Upgrade role) or use `/af role` to choose it yourself. Alts Forever knows each character's gear from the last time you logged in on them.
+
 **Reputation:** the reputation button in the overview's title bar opens a panel with every faction down the side and your characters across, e.g. "Honored 27%"; hover a faction for exact numbers.
 
 ![The Reputation panel: factions down the side, characters across, with a faction tooltip](media/reputation-overview.png)
@@ -72,7 +74,7 @@ Options > AddOns > Alts Forever has every setting, with a short explanation of e
 
 ## Commands
 
-Everything below can also be done by clicking: **click the Alts Forever minimap button** (or Alts Forever in the minimap's addon menu) to open the overview, **right-click it** (or the cog in the overview) for options. Drag the button to move it around the minimap, or hide it from the options menu, and **right-click a character in the overview** to forget them.
+Everything below can also be done by clicking: **click the Alts Forever minimap button** (or Alts Forever in the minimap's addon menu) to open the overview, **right-click it** (or the cog in the overview) for options. Drag the button to move it around the minimap, or hide it from the options menu, and **right-click a character in the overview** to see their gear, bags or bank, choose their upgrade role, or forget them.
 
 | Command | What it does |
 |---|---|
@@ -84,6 +86,8 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af mail` | List every character's soonest mail expiry |
 | `/af list` | List stored characters |
 | `/af skillups` | Turn the skill-up details in tooltips on or off |
+| `/af upgrades` | Turn upgrades in item tooltips on or off |
+| `/af role Full Name role` | Choose what a character's upgrades are judged by: `melee`, `ranged`, `caster`, `healer`, `tank` or `feral` (whichever their class has), or `auto` to follow their talents |
 | `/af sendmail` | Turn the send-to-alt arrow at the mailbox on or off |
 | `/af minimap` | Show or hide the minimap button |
 | `/af stats` | Turn session stats on or off (off by default): XP this session and time to level on the XP bar, gold this session, today and this week on your bag gold |

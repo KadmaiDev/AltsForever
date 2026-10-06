@@ -12,7 +12,7 @@ test("minimap compartment: click opens the overview, right-click the options men
     AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
     local texts = {}
     for _, item in ipairs(wow.menu.items) do texts[#texts + 1] = item.text end
-    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Bags and bank | Show skill-up details | Send mail to alts | Show session stats | Show minimap button | Memory use | Settings...")
+    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Bags and bank | Show skill-up details | Show upgrades | Send mail to alts | Show session stats | Show minimap button | Memory use | Settings...")
     wow.menuItem("Open overview").fn()
     eq(AltsForeverFrame:IsShown(), true)
     wow.menuItem("Open overview").fn()

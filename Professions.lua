@@ -393,6 +393,14 @@ local function Status(c, p)
     return CAN_LEARN
 end
 
+-- Whether a character knows a recipe item or can learn it now (Upgrades.lua: an item it
+-- makes that binds on pickup only reaches those who can craft it).
+function ns.RecipeOpenTo(c, tt, id, data)
+    local p = ParseRecipe(tt, id, data)
+    local status = p and Status(c, p)
+    return status == KNOWN or status == CAN_LEARN
+end
+
 -- Rows are reused between hovers: keys, statuses, skills and texts in parallel arrays.
 local rowKey, rowStatus, rowSkill, rowText = {}, {}, {}, {}
 local lastId, lastVer, rows = nil, nil, 0

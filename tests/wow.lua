@@ -21,6 +21,7 @@ local KNOWN_EVENTS = {
     SKILL_LINES_CHANGED = true, TRADE_SKILL_SHOW = true, TRADE_SKILL_LIST_UPDATE = true,
     TRADE_SKILL_DATA_SOURCE_CHANGED = true, TRADE_SKILL_CLOSE = true, NEW_RECIPE_LEARNED = true,
     TIME_PLAYED_MSG = true, UNIT_NAME_UPDATE = true, UPDATE_FACTION = true,
+    TRAIT_CONFIG_UPDATED = true, GET_ITEM_INFO_RECEIVED = true,
 }
 
 -- Resets every global and loads the addon files fresh. Returns the addon namespace.
@@ -34,6 +35,11 @@ function M.load(files)
     M.itemClass = {}   -- [itemID] = classID (9 = recipe)
     M.itemNames = {}   -- [itemID] = name
     M.itemQuality = {} -- [itemID] = quality (nil: not loaded yet)
+    M.items = {}       -- [itemID] = { loc = equip location, sub = subclass, level = required level, bind = bind type }
+    M.itemStats = {}   -- [itemID or link] = { [ITEM_MOD_..._SHORT] = value }
+    M.uncached = {}    -- [itemID] = true: the game hasn't loaded it yet
+    -- Talents (class tree nodes as { posX, rank }) and Legacy ranks by node; nil = none.
+    M.talents, M.legacy = nil, nil
     ITEM_QUALITY_COLORS = { [2] = { r = 0.1, g = 1, b = 0.1 }, [3] = { r = 0, g = 0.44, b = 0.87 } }
     -- The open profession window: which profession, and every recipe in it. A recipe
     -- is { name, learned, prof?, item? (what the schematic says it makes), link?,
@@ -98,8 +104,42 @@ function M.load(files)
             CharacterBankTab_1 = 6, CharacterBankTab_2 = 7, CharacterBankTab_3 = 8 },
         TooltipDataType = { Item = 0 },
         ItemClass = { Recipe = 9 },
+        TraitConfigType = { Combat = 1, Profession = 2, Generic = 3, CamelotCombat = 4 },
     }
     ITEM_MIN_SKILL = "Requires %s (%d)"
+    ITEM_SOULBOUND = "Soulbound"
+    ITEM_CLASSES_ALLOWED = "Classes: %s"
+    LOCALIZED_CLASS_NAMES_MALE = { WARRIOR = "Warrior", PALADIN = "Paladin", HUNTER = "Hunter", ROGUE = "Rogue",
+        PRIEST = "Priest", SHAMAN = "Shaman", MAGE = "Mage", WARLOCK = "Warlock", DRUID = "Druid" }
+    LOCALIZED_CLASS_NAMES_FEMALE = LOCALIZED_CLASS_NAMES_MALE
+    INVTYPE_HEAD, INVTYPE_CHEST, INVTYPE_HAND, INVTYPE_FINGER = "Head", "Chest", "Hands", "Finger"
+    INVTYPE_CLOAK, INVTYPE_WEAPON, INVTYPE_2HWEAPON, INVTYPE_SHIELD = "Back", "One-Hand", "Two-Hand", "Off Hand"
+    INVTYPE_RANGED, INVTYPE_WEAPONOFFHAND = "Ranged", "Off Hand"
+    -- The trait system: class talents are config 101 (one tree), Legacy config 201.
+    C_Traits = {
+        GetConfigsByType = function(kind)
+            if kind == 4 and M.talents then return { 101 } end
+            if kind == 3 and M.legacy then return { 201 } end
+            return {}
+        end,
+        GetConfigInfo = function(config)
+            return config == 101 and { ID = 101, name = "Class", treeIDs = { 1091 } } or { ID = config, treeIDs = { 1187 } }
+        end,
+        GetTreeNodes = function()
+            local ids = {}
+            for i in ipairs(M.talents or {}) do ids[i] = i end
+            return ids
+        end,
+        GetNodeInfo = function(config, node)
+            if config == 101 then
+                local n = M.talents[node]
+                return { ID = node, posX = n[1], currentRank = n[2] }
+            end
+            local rank = M.legacy and M.legacy[node]
+            if rank then return { ID = node, currentRank = rank } end
+            return { ID = 0, currentRank = 0 }
+        end,
+    }
 
     GetProfessions = function()
         local idx = {}
@@ -350,11 +390,29 @@ function M.load(files)
         GetStackCount = function(loc) return slotData(loc.bag, loc.slot).count end,
         GetItemInfoInstant = function(item)
             local id = type(item) == "number" and item or tonumber(item:match("item:(%d+)"))
-            return id, nil, nil, nil, "icon:" .. id, M.itemClass[id]
+            local it = M.items[id] or {}
+            return id, nil, nil, it.loc, "icon:" .. id, M.itemClass[id], it.sub
         end,
+        GetItemStats = function(link)
+            local id = tonumber(link:match("item:(%d+)"))
+            local stats = M.itemStats[link] or M.itemStats[id]
+            if not stats then return {} end
+            local copy = {}
+            for k, v in pairs(stats) do copy[k] = v end
+            return copy
+        end,
+        IsItemDataCachedByID = function(id) return not M.uncached[id] end,
         GetItemNameByID = function(id) return M.itemNames[id] end,
         GetItemQualityByID = function(id) return M.itemQuality[id] end,
-        GetItemInfo = function(id) return M.itemNames[id], M.itemLinks and M.itemLinks[id] end,
+        -- name, link, ..., required level (5th), ..., equip location (9th), ..., bind type (14th)
+        GetItemInfo = function(item)
+            local id = type(item) == "number" and item or tonumber(item:match("item:(%d+)"))
+            M.itemInfoReads = (M.itemInfoReads or 0) + 1
+            if M.uncached[id] then return nil end
+            local it = M.items[id] or {}
+            local link = M.itemLinks and M.itemLinks[id] or (type(item) == "string" and item or nil)
+            return M.itemNames[id], link, nil, nil, it.level, nil, nil, nil, it.loc, nil, nil, M.itemClass[id], it.sub, it.bind
+        end,
         RequestLoadItemDataByID = function(id)
             M.itemLoads = M.itemLoads or {}
             M.itemLoads[#M.itemLoads + 1] = id
@@ -443,10 +501,14 @@ function M.load(files)
     M.menu = nil
     MenuUtil = { CreateContextMenu = function(owner, generator)
         local root = { owner = owner, items = {} }
-        local function add(kind, text, a, b)
-            local item = { kind = kind, text = text, fn = a, isSelected = a, setSelected = b, enabled = true }
+        local function add(kind, text, a, b, list)
+            local item = { kind = kind, text = text, fn = a, isSelected = a, setSelected = b, enabled = true, items = {} }
             function item:SetEnabled(v) self.enabled = v end
-            root.items[#root.items + 1] = item
+            -- A submenu: entries added to an item go in its own list.
+            function item:CreateRadio(t, sel, set) return add("radio", t, sel, set, self.items) end
+            function item:CreateButton(t, fn) return add("button", t, fn, nil, self.items) end
+            list = list or root.items
+            list[#list + 1] = item
             return item
         end
         function root:CreateTitle(text) return add("title", text) end
@@ -576,9 +638,9 @@ end
 
 -- Shows an item tooltip the way TooltipDataProcessor would. `text` is the item's
 -- own tooltip lines (strings), which recipe parsing reads.
-function M.hover(tt, itemID, text)
+function M.hover(tt, itemID, text, link)
     tt.lines = {}
-    local data = { id = itemID }
+    local data = { id = itemID, hyperlink = link }
     if text then
         data.lines = {}
         for i, t in ipairs(text) do data.lines[i] = { leftText = t } end
@@ -597,6 +659,16 @@ function M.recipeItem(itemID, name, prof, req, craftedReq)
     text[#text + 1] = "Use: Teaches you how to make it."
     text[#text + 1] = "Requires " .. prof .. " (" .. req .. ")"
     return text
+end
+
+-- Registers an equippable item and returns its link. opts: class (2 weapon, 4 armour),
+-- sub (subclass), loc (equip location), level (required), bind (1 pickup, 2 equip), stats.
+function M.item(id, name, opts)
+    M.itemNames[id] = name
+    M.itemClass[id] = opts.class or 4
+    M.items[id] = { loc = opts.loc, sub = opts.sub or 0, level = opts.level or 1, bind = opts.bind or 2 }
+    M.itemStats[id] = opts.stats
+    return "|cff1eff00|Hitem:" .. id .. "::::::::|h[" .. name .. "]|h|r"
 end
 
 function M.login(saved)

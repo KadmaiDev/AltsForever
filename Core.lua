@@ -200,11 +200,13 @@ ns.On("PLAYER_LOGIN", function()
     ns.StartMoney()
     ns.StartProfessions()
     ns.StartCharacter()
+    ns.StartTalents()
     ns.StartOverview()
     ns.StartBars()
     ns.StartGear()
     ns.StartBags()
     ns.StartTooltip()
+    ns.StartUpgrades()
     ns.StartReputation()
     ns.StartOptions()
     ns.StartGamepad()
@@ -281,6 +283,35 @@ function commands.skillups()
     Print(ns.db.skillupsOff and L["Skill-up details in tooltips off."] or L["Skill-up details in tooltips on."])
 end
 
+function commands.upgrades()
+    ns.SetUpgrades(not ns.UpgradesOn())
+    Print(ns.UpgradesOn() and L["Upgrades in item tooltips on."] or L["Upgrades in item tooltips off."])
+end
+
+-- /af role First Last melee|ranged|caster|healer|tank|feral|auto: the stats a character's
+-- upgrades are judged by; auto follows their talents.
+function commands.role(arg)
+    local name, word = arg:match("^(.-)%s+(%S+)$")
+    local key = name and FindChar(name)
+    if not key then return Print(L["Type /af role, a character's name and a role: melee, ranged, caster, healer, tank, feral, or auto to follow their talents."]) end
+    local c = ns.db.chars[key]
+    local choices = ns.RoleChoices(c)
+    if not choices then return Print(L["%s has only one role, so there's nothing to choose."]:format(key)) end
+    word = word:lower()
+    if word == "auto" then
+        ns.SetRole(key, nil)
+        return Print(L["Upgrades for %s now follow their talents (%s)."]:format(key, ns.RoleName(ns.AutoRole(c))))
+    end
+    local role = ns.RoleFromWord(c, word)
+    if not role then
+        local words = {}
+        for i, r in ipairs(choices) do words[i] = ns.RoleWord(r) end
+        return Print(L["%s has no role '%s'. Choose from: %s, or auto."]:format(key, word, table.concat(words, ", ")))
+    end
+    ns.SetRole(key, role)
+    Print(L["Upgrades for %s are now judged as %s."]:format(key, ns.RoleName(role)))
+end
+
 function commands.minimap()
     ns.SetMinimapButton(not ns.MinimapButtonOn())
     Print(ns.MinimapButtonOn() and L["Minimap button shown."] or L["Minimap button hidden. /af minimap brings it back."])
@@ -328,6 +359,7 @@ function commands.help()
     Print(L["/af find <text> searches every character's items by name."])
     Print(L["/af bags or /af bank, with a name for another character, shows their bags or bank slot by slot."])
     Print(L["/af icons picks the icons item tooltips use for bags, bank, mail and worn items."])
+    Print(L["/af upgrades turns upgrade hints in item tooltips on or off. /af role Name role sets what a character's upgrades are judged by (melee, ranged, caster, healer, tank, feral or auto)."])
     Print(L["Or use the minimap button (right-click for options)."])
 end
 ns.ShowHelp = commands.help

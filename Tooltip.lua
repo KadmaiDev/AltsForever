@@ -392,6 +392,7 @@ local function OnItem(tt, data)
     end
     if id then
         ns.AddRecipeLines(tt, id, data)
+        ns.AddUpgradeLines(tt, id, data)
         ns.AddCraftLines(tt, id)
         ns.AddSkillupLines(tt, id)
         ns.AddLines(tt, id)

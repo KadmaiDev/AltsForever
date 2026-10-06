@@ -12,9 +12,13 @@ local GetZoneText, GetBindLocation, GetAverageItemLevel = GetZoneText, GetBindLo
 -- Rested XP builds at 5% of a level per 8 hours logged out in an inn or city, a
 -- quarter of that anywhere else, up to 150% of a level. The inn rate was measured on
 -- Forever (about 4.9%); the rate elsewhere is the classic rule, not yet measured.
+-- Legacy's Well Rested (account-wide, 5 ranks) makes it build 4% faster and raises the
+-- cap 4% per rank (its description; whether the cap is 150% x 1.04 per rank or 150% plus
+-- 4 points is not yet checked in game: this takes the first).
 local RESTED_CAP = 1.5
 local RESTED_PER_SECOND = 0.05 / (8 * 3600)
 local AWAY_RATE = 0.25
+local WELL_RESTED_STEP = 0.04
 
 local function Plain(v)
     if v ~= nil and not issecretvalue(v) then return v end
@@ -50,8 +54,9 @@ function ns.RestedNow(c, now)
     local xpMax = c.xpMax
     if not xpMax or xpMax == 0 or not c.rested then return nil end
     if c.level and c.level >= ns.MaxLevel() then return nil end
-    local cap = xpMax * RESTED_CAP
-    local rate = xpMax * RESTED_PER_SECOND * (c.resting and 1 or AWAY_RATE)
+    local bonus = 1 + WELL_RESTED_STEP * (ns.db and ns.db.wellRested or 0)
+    local cap = xpMax * RESTED_CAP * bonus
+    local rate = xpMax * RESTED_PER_SECOND * bonus * (c.resting and 1 or AWAY_RATE)
     local elapsed = (c ~= ns.char and c.updated) and (now - c.updated) or 0
     local rested = min(cap, c.rested + elapsed * rate)
     return rested, cap, rested < cap and (cap - rested) / rate or 0

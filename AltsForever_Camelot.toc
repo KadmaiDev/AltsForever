@@ -34,12 +34,14 @@ Mail.lua
 Money.lua
 Professions.lua
 Character.lua
+Talents.lua
 Columns.lua
 Overview.lua
 Bars.lua
 Gear.lua
 Bags.lua
 Icons.lua
+Upgrades.lua
 Tooltip.lua
 Options.lua
 Reputation.lua

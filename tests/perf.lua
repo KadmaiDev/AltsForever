@@ -5,7 +5,7 @@
 package.path = "tests/?.lua;" .. package.path
 local wow = require("wow")
 local SAVED = arg[1] or "tests/fixtures/AltsForever.lua"
-local FILES = { "Locales.lua", "Locale_deDE.lua", "Locale_esES.lua", "Locale_frFR.lua", "Locale_ptBR.lua", "Locale_zhCN.lua", "Locale_zhTW.lua", "Core.lua", "Scanner.lua", "Mail.lua", "Money.lua", "Professions.lua", "Character.lua", "Columns.lua", "Overview.lua", "Bars.lua", "Gear.lua", "Bags.lua", "Icons.lua", "Tooltip.lua", "Options.lua", "Reputation.lua", "Skin.lua", "Gamepad.lua" }
+local FILES = { "Locales.lua", "Locale_deDE.lua", "Locale_esES.lua", "Locale_frFR.lua", "Locale_ptBR.lua", "Locale_zhCN.lua", "Locale_zhTW.lua", "Core.lua", "Scanner.lua", "Mail.lua", "Money.lua", "Professions.lua", "Character.lua", "Talents.lua", "Columns.lua", "Overview.lua", "Bars.lua", "Gear.lua", "Bags.lua", "Icons.lua", "Upgrades.lua", "Tooltip.lua", "Options.lua", "Reputation.lua", "Skin.lua", "Gamepad.lua" }
 
 local function out(fmt, ...) io.write(fmt:format(...), "\n") end
 local function settle()
@@ -85,6 +85,14 @@ local item = 2017
 garbage("tooltip: item already hovered", 5000, function()
     ns.AddRecipeLines(nop, item) ns.AddCraftLines(nop, item) ns.AddSkillupLines(nop, item) ns.AddLines(nop, item)
 end)
+-- An item that's an upgrade for you: its rows are kept for the last item hovered.
+local gloves = wow.item(9001, "Perf Gloves", { sub = 1, loc = "INVTYPE_HAND", stats = { ITEM_MOD_STAMINA_SHORT = 5 } })
+local upgradeData = { id = 9001, hyperlink = gloves }
+local upgradeLines = 0
+local counting = { AddLine = function() upgradeLines = upgradeLines + 1 end, AddDoubleLine = function() upgradeLines = upgradeLines + 1 end }
+ns.AddUpgradeLines(counting, 9001, upgradeData)
+garbage("tooltip: upgrade lines, item already hovered", 5000, function() ns.AddUpgradeLines(nop, 9001, upgradeData) end)
+out("    (%d upgrade lines shown)", upgradeLines)
 -- The game's tooltips have named lines, so their columns get lined up.
 local named = { AddLine = nop.AddLine, AddDoubleLine = nop.AddDoubleLine, NumLines = nop.NumLines,
     GetName = function() return "PerfTooltip" end, HookScript = function() end,

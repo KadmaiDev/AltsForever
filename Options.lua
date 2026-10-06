@@ -54,6 +54,8 @@ end
 ---------------------------------------------------------------------------
 local function SkillupsSelected() return ns.SkillupsOn() end
 local function ToggleSkillups() ns.SetSkillups(not ns.SkillupsOn()) end
+local function UpgradesSelected() return ns.UpgradesOn() end
+local function ToggleUpgrades() ns.SetUpgrades(not ns.UpgradesOn()) end
 local function SendToAltSelected() return ns.SendToAltOn() end
 local function ToggleSendToAlt() ns.SetSendToAlt(not ns.SendToAltOn()) end
 local function StatsSelected() return ns.StatsOn() end
@@ -95,6 +97,8 @@ end
 local SETTINGS = {
     { L["Show skill-up details"], SkillupsSelected, function(on) ns.SetSkillups(on) end,
         L["Show which characters can still skill up: in Can craft, on materials (Skill-ups) and in the overview. Same as /af skillups."] },
+    { L["Show upgrades"], UpgradesSelected, function(on) ns.SetUpgrades(on) end,
+        L["Item tooltips name which of your characters an item would be an upgrade for, judged by their talents. Right-click a character in the overview to change their role. Same as /af upgrades."] },
     { L["Send mail to alts"], SendToAltSelected, function(on) ns.SetSendToAlt(on) end,
         L["An arrow next to the To box at the mailbox to pick one of your characters. Same as /af sendmail."] },
     { L["Show session stats"], StatsSelected, function(on) ns.SetStats(on) end,
@@ -250,6 +254,7 @@ function ns.ShowOptionsMenu(owner, fromOverview)
         end
         root:CreateButton(L["Bags and bank"], function() ns.ShowBags(ns.charKey, "bags") end)
         root:CreateCheckbox(L["Show skill-up details"], SkillupsSelected, ToggleSkillups)
+        root:CreateCheckbox(L["Show upgrades"], UpgradesSelected, ToggleUpgrades)
         root:CreateCheckbox(L["Send mail to alts"], SendToAltSelected, ToggleSendToAlt)
         root:CreateCheckbox(L["Show session stats"], StatsSelected, ToggleStats)
         root:CreateCheckbox(L["Show minimap button"], MinimapSelected, ToggleMinimap)
@@ -269,6 +274,17 @@ function ns.ShowCharacterMenu(owner, key)
         root:CreateButton(L["Gear"], function() ns.ShowGear(key) end)
         root:CreateButton(L["Bags"], function() ns.ShowBags(key, "bags") end)
         root:CreateButton(L["Bank"], function() ns.ShowBags(key, "bank") end)
+        -- The stats their upgrades are judged by: from talents, or the player's choice.
+        local choices = ns.RoleChoices(c)
+        if choices then
+            local roles = root:CreateButton(L["Upgrade role"])
+            roles:CreateRadio(L["Automatic (%s)"]:format(ns.RoleName(ns.AutoRole(c))),
+                function() return not c.role end, function() ns.SetRole(key, nil) end)
+            for _, role in ipairs(choices) do
+                roles:CreateRadio(ns.RoleName(role), function() return c.role == role end,
+                    function() ns.SetRole(key, role) end)
+            end
+        end
         local forget = root:CreateButton(L["Forget %s..."]:format(c.name or key), function()
             ForgetDialog()
             StaticPopup_Show("ALTSFOREVER_FORGET", c.name or key, nil, key)
