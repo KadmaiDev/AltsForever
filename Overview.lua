@@ -18,9 +18,9 @@ local COLUMNS = {
     { title = L["Character"], width = 180 },
     { title = L["Level"], width = 80 },
     { title = L["Rested"], width = 70 },
-    -- Legacy points left to spend, and Well Rested's rank (both per character).
-    { title = L["Legacy"], width = 56, right = true },
+    -- Well Rested's rank beside Rested, then Legacy points spent of the total.
     { title = L["Well Rested"], width = 84, right = true },
+    { title = L["Legacy"], width = 56, right = true },
     { title = L["Gold"], width = 120, right = true },
     -- Each main profession gets a name column and a right-aligned skill column, so
     -- the skill numbers line up. The gap separates it from the right-aligned gold.
@@ -322,8 +322,8 @@ local function Refresh()
         row.pct:SetText(pct)
         cells[3]:SetText(ns.RestedText(c, now))
         local points, rank = ns.LegacyCells(c)
-        cells[4]:SetText(points)
-        cells[5]:SetText(rank)
+        cells[4]:SetText(rank)
+        cells[5]:SetText(points)
         cells[6]:SetText(c.money and GetCoinTextureString(c.money) or (GREY .. "?|r"))
         local n1, s1, n2, s2 = ns.ProfCells(c)
         cells[7]:SetText(n1)
