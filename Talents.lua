@@ -173,16 +173,12 @@ function ns.SetLegacyReminders(on)
     ns.db.legacyRemindOff = not on or nil
 end
 
--- At login: this character's unspent points, and Well Rested if it's still levelling.
+-- At login: this character's unspent points, if any.
 function ns.RemindLegacy(c)
     local n = ns.LegacyUnspent(c)
     if not (n and n > 0 and ns.LegacyRemindersOn()) then return false end
     ns.Print((n == 1 and L["You have %d Legacy point to spend on this character."]
         or L["You have %d Legacy points to spend on this character."]):format(n))
-    local rank = c.wellRested
-    if rank and rank < 5 and c.level and c.level < ns.MaxLevel() then
-        ns.Print(L["%s is at %d/5 here: each rank builds rested XP faster, up to a higher cap."]:format(ns.WellRestedName(), rank))
-    end
     return true
 end
 

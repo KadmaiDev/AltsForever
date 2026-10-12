@@ -18,9 +18,10 @@ local COLUMNS = {
     { title = L["Character"], width = 180 },
     { title = L["Level"], width = 80 },
     { title = L["Rested"], width = 70 },
-    -- Well Rested's rank beside Rested, then Legacy points spent of the total.
-    { title = L["Well Rested"], width = 84, right = true },
-    { title = L["Legacy"], width = 56, right = true },
+    -- Well Rested's rank beside Rested, then Legacy points spent of the total: short
+    -- values under wider titles, so both are centred.
+    { title = L["Well Rested"], width = 84, center = true },
+    { title = L["Legacy"], width = 60, center = true },
     { title = L["Gold"], width = 120, right = true },
     -- Each main profession gets a name column and a right-aligned skill column, so
     -- the skill numbers line up. The gap separates it from the right-aligned gold.
@@ -264,7 +265,7 @@ local function CreateCells(parent, font)
         ns.SkinText(fs)
         fs:SetPoint("LEFT", parent, "LEFT", x, 0)
         fs:SetWidth(col.width - 8)
-        fs:SetJustifyH(col.right and "RIGHT" or "LEFT")
+        fs:SetJustifyH(col.right and "RIGHT" or col.center and "CENTER" or "LEFT")
         fs:SetWordWrap(false)
         cells[i] = fs
         x = x + col.width
