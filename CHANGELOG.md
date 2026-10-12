@@ -3,6 +3,7 @@
 - **Legacy points to spend:** Legacy points are earned by your account but each character spends them separately, so it's easy to forget one. Logging in on a character with points to spend now says so in chat ("You have 13 Legacy points to spend on this character"). Earning a new point tells you how many of your characters can spend it. Thanks to the player who asked for this!
   - The overview has two new columns beside Rested, **Well Rested** (e.g. 3/5) and **Legacy** (points spent of the total each character can spend, e.g. 3/16, in gold while some are left), and hovering a character shows both. Each character's are read the next time you log in on them.
   - `/af legacy` lists every character's points and Well Rested rank. Turn the chat reminders off with "Legacy reminders" in the options, or `/af legacy off`.
+- **Where they're resting:** rested XP in the overview (and on the XP bar's list of alts) is orange for a character logged out outside an inn or city, where it builds at a quarter of the speed, so you can spot who to move. Full stays blue.
 - **Fixed: Well Rested is per character.** 0.10.0 read it as if it were account-wide, so every character's rested estimate used the rank of whoever you logged out on last. Each character now uses their own.
 
 ## Alts Forever 0.10.0

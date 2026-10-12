@@ -78,13 +78,15 @@ function ns.LevelText(c)
     return pct == "" and level or (level .. "  " .. pct)
 end
 
--- Rested as a share of a level; blue when full, "-" at max level, "?" if not recorded yet.
+-- Rested as a share of a level: blue when full, orange while filling outside an inn or city
+-- (a quarter of the speed), "-" at max level, "?" if not recorded yet.
 function ns.RestedText(c, now)
     if not c.level then return GREY .. "?|r" end
     local rested, cap = ns.RestedNow(c, now)
     if not rested then return GREY .. "-|r" end
     local pct = floor(rested / c.xpMax * 100 + 0.5)
     if rested >= cap then return "|cff4da6ff" .. pct .. "%|r" end
+    if not c.resting then return "|cffff8000" .. pct .. "%|r" end
     return pct .. "%"
 end
 
