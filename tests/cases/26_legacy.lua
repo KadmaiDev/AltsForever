@@ -155,7 +155,7 @@ test("the overview has Legacy and Well Rested columns; the row tooltip shows bot
     legacyStart(saved, { 13, 3 }, 3)
     SlashCmdList.ALTSFOREVER("")
     local rows = overviewRows()
-    eq(cell(rows[1], 5), "|cffffd1003/16|r", "spent of the total, gold while some are left")
+    eq(cell(rows[1], 5), "|cffff80003/16|r", "spent of the total, orange while some are left")
     eq(cell(rows[1], 4), "3/5")
     eq(cell(rows[2], 5), "16/16", "all spent")
     eq(cell(rows[2], 4), "5/5")

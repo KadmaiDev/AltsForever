@@ -11,7 +11,8 @@ local ipairs = ipairs
 local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
 
 local GREY = "|cff9d9d9d"
-local GOLD = "|cffffd100"
+-- Something to do on that character: rested filling slowly, Legacy points to spend.
+local ATTENTION = "|cffff8000"
 local MAX_PROFESSION = 300 -- the last rank's maximum on Forever (Classic ruleset)
 local ROW_HEIGHT = 20
 local COLUMNS = {
@@ -51,14 +52,14 @@ local function Duration(seconds)
     return L["%dh"]:format(max(h, 1))
 end
 
--- Legacy points spent of the total they can spend ("3/16", gold while some are left) and
+-- Legacy points spent of the total they can spend ("3/16", orange while some are left) and
 -- Well Rested's rank; "?" if not read yet.
 function ns.LegacyCells(c)
     local n = ns.LegacyUnspent(c)
     local points = GREY .. "?|r"
     if n then
         local text = c.legacySpent .. "/" .. ns.db.legacyPool
-        points = n > 0 and (GOLD .. text .. "|r") or text
+        points = n > 0 and (ATTENTION .. text .. "|r") or text
     end
     local rank = c.wellRested
     return points, rank and (rank .. "/5") or (GREY .. "?|r")
@@ -86,7 +87,7 @@ function ns.RestedText(c, now)
     if not rested then return GREY .. "-|r" end
     local pct = floor(rested / c.xpMax * 100 + 0.5)
     if rested >= cap then return "|cff4da6ff" .. pct .. "%|r" end
-    if not c.resting then return "|cffff8000" .. pct .. "%|r" end
+    if not c.resting then return ATTENTION .. pct .. "%|r" end
     return pct .. "%"
 end
 
@@ -203,7 +204,7 @@ local function RowTooltip(row)
     if c.wellRested then tt:AddDoubleLine(ns.WellRestedName(), c.wellRested .. "/5", 1, 0.82, 0, 1, 1, 1) end
     local unspent = ns.LegacyUnspent(c)
     if unspent then
-        tt:AddDoubleLine(L["Legacy points"], unspent > 0 and (GOLD .. L["%d to spend"]:format(unspent) .. "|r")
+        tt:AddDoubleLine(L["Legacy points"], unspent > 0 and (ATTENTION .. L["%d to spend"]:format(unspent) .. "|r")
             or L["all spent"], 1, 0.82, 0, 1, 1, 1)
     end
     if c.mailExpires then

@@ -209,7 +209,7 @@ function ns.LegacyLines()
         local c = chars[key]
         local n = ns.LegacyUnspent(c)
         local parts = {}
-        if n then parts[#parts + 1] = n > 0 and ("|cffffd100" .. L["%d to spend"]:format(n) .. "|r") or L["all spent"] end
+        if n then parts[#parts + 1] = n > 0 and ("|cffff8000" .. L["%d to spend"]:format(n) .. "|r") or L["all spent"] end
         if c.wellRested then parts[#parts + 1] = wr .. " " .. c.wellRested .. "/5" end
         list[i] = ns.ColoredName(key, c) .. ": " .. table.concat(parts, " · ")
     end
