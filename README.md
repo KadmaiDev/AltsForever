@@ -14,7 +14,7 @@ The current character always comes first. Other characters are sorted by count.
 
 Hovering the money at the bottom of your bags lists each character's gold and the total, laid out the same way (also in ElvUI's bags, and in EllesmereUI's when its own gold tracking is turned off). Hovering the **experience bar** lists your other characters still levelling, with their level, XP and rested XP, and hovering the **reputation bar** lists their standing with the faction you're watching.
 
-Type `/af` to open the **overview**: every character with level and XP, rested XP (including what they've built up since logging out), gold, main professions, zone, time played and when you last played them, with total gold and total time played at the bottom. Hover a row for details such as rested XP until full, hearthstone location and item level. **Click a row** to see that character's gear, laid out like the character panel: hover any item for its tooltip, shift-click to link it in chat. Nearly broken items are tinted red and the lowest durability is shown.
+Type `/af` to open the **overview**: every character with level and XP, rested XP (including what they've built up since logging out), Legacy points left to spend and their Well Rested rank, gold, main professions, zone, time played and when you last played them, with total gold and total time played at the bottom. Hover a row for details such as rested XP until full, hearthstone location and item level. **Click a row** to see that character's gear, laid out like the character panel: hover any item for its tooltip, shift-click to link it in chat. Nearly broken items are tinted red and the lowest durability is shown.
 
 ![The overview window with a character's details and gear panel](media/alt-overview.png)
 
@@ -29,6 +29,8 @@ Hovering a recipe (pattern, schematic, formula...) lists your characters who hav
 **Can craft:** hovering any item that one of your characters knows how to make adds a "Can craft" section listing them one per line (the current character first). This also comes from opening each profession window once.
 
 **Upgrades:** hovering an item you could pass on (binds when equipped, not yet bound) lists which of your characters it would be an upgrade for, in which slot and by how much ("Hands · +18%", or "empty slot"); characters up to 5 levels short are shown in grey with the level they can wear it at. Hovering a recipe does the same for the item it makes. Items bound to you show only your own row. Each character is judged by the stats their role values, from the talent tab they've put most points in; right-click a character in the overview (Upgrade role) or use `/af role` to choose it yourself. Alts Forever knows each character's gear from the last time you logged in on them.
+
+**Legacy points:** Legacy points are earned by your account but spent by each character separately, so Alts Forever keeps track of who still has points to spend. Logging in on a character with points to spend says so in chat (with a nudge towards Well Rested while it's still levelling), and earning a point tells you how many of your characters can spend it. The overview shows each character's points to spend and Well Rested rank, and the rested XP estimate counts each character's own ranks. `/af legacy` lists them all.
 
 **Reputation:** the reputation button in the overview's title bar opens a panel with every faction down the side and your characters across, e.g. "Honored 27%"; hover a faction for exact numbers.
 
@@ -87,6 +89,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af list` | List stored characters |
 | `/af skillups` | Turn the skill-up details in tooltips on or off |
 | `/af upgrades` | Turn upgrades in item tooltips on or off |
+| `/af legacy` | List each character's Legacy points to spend and Well Rested rank; `/af legacy on` or `off` turns the chat reminders on or off |
 | `/af role Full Name role` | Choose what a character's upgrades are judged by: `melee`, `ranged`, `caster`, `healer`, `tank` or `feral` (whichever their class has), or `auto` to follow their talents |
 | `/af sendmail` | Turn the send-to-alt arrow at the mailbox on or off |
 | `/af minimap` | Show or hide the minimap button |

@@ -21,7 +21,7 @@ local KNOWN_EVENTS = {
     SKILL_LINES_CHANGED = true, TRADE_SKILL_SHOW = true, TRADE_SKILL_LIST_UPDATE = true,
     TRADE_SKILL_DATA_SOURCE_CHANGED = true, TRADE_SKILL_CLOSE = true, NEW_RECIPE_LEARNED = true,
     TIME_PLAYED_MSG = true, UNIT_NAME_UPDATE = true, UPDATE_FACTION = true,
-    TRAIT_CONFIG_UPDATED = true, GET_ITEM_INFO_RECEIVED = true,
+    TRAIT_CONFIG_UPDATED = true, TRAIT_TREE_CURRENCY_INFO_UPDATED = true, GET_ITEM_INFO_RECEIVED = true,
 }
 
 -- Resets every global and loads the addon files fresh. Returns the addon namespace.
@@ -39,7 +39,8 @@ function M.load(files)
     M.itemStats = {}   -- [itemID or link] = { [ITEM_MOD_..._SHORT] = value }
     M.uncached = {}    -- [itemID] = true: the game hasn't loaded it yet
     -- Talents (class tree nodes as { posX, rank }) and Legacy ranks by node; nil = none.
-    M.talents, M.legacy = nil, nil
+    -- legacyPoints = { unspent, spent } as the Legacy trees' shared currency reports them.
+    M.talents, M.legacy, M.legacyPoints = nil, nil, nil
     ITEM_QUALITY_COLORS = { [2] = { r = 0.1, g = 1, b = 0.1 }, [3] = { r = 0, g = 0.44, b = 0.87 } }
     -- The open profession window: which profession, and every recipe in it. A recipe
     -- is { name, learned, prof?, item? (what the schematic says it makes), link?,
@@ -123,7 +124,10 @@ function M.load(files)
             return {}
         end,
         GetConfigInfo = function(config)
-            return config == 101 and { ID = 101, name = "Class", treeIDs = { 1091 } } or { ID = config, treeIDs = { 1187 } }
+            -- Legacy has four trees, and the first (1118) reports no points currency; the
+            -- other three do (checked in game 2026-10-12).
+            return config == 101 and { ID = 101, name = "Class", treeIDs = { 1091 } }
+                or { ID = config, treeIDs = { 1118, 1187, 1188, 1189 } }
         end,
         GetTreeNodes = function()
             local ids = {}
@@ -138,6 +142,12 @@ function M.load(files)
             local rank = M.legacy and M.legacy[node]
             if rank then return { ID = node, currentRank = rank } end
             return { ID = 0, currentRank = 0 }
+        end,
+        -- The three Legacy trees share one currency (4225, cap 16), checked in game.
+        GetTreeCurrencyInfo = function(config, tree)
+            local p = config == 201 and tree ~= 1118 and M.legacyPoints
+            if not p then return {} end
+            return { { traitCurrencyID = 4225, quantity = p[1], maxQuantity = 16, spent = p[2] } }
         end,
     }
 

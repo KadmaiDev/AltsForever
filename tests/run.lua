@@ -61,6 +61,7 @@ CASES = {
     "23_bags.lua",
     "24_gamepad.lua",
     "25_upgrades.lua",
+    "26_legacy.lua",
 }
 do
     local where = {}

@@ -288,6 +288,19 @@ function commands.upgrades()
     Print(ns.UpgradesOn() and L["Upgrades in item tooltips on."] or L["Upgrades in item tooltips off."])
 end
 
+-- /af legacy lists Legacy points to spend and Well Rested ranks; on/off sets the reminders.
+function commands.legacy(arg)
+    arg = arg:lower()
+    if arg == "on" or arg == "off" then
+        ns.SetLegacyReminders(arg == "on")
+        return Print(ns.LegacyRemindersOn() and L["Legacy reminders on."] or L["Legacy reminders off."])
+    end
+    local lines = ns.LegacyLines()
+    if #lines == 0 then return Print(L["No Legacy points read yet: log in on each character once."]) end
+    Print(L["Legacy points to spend:"])
+    for _, line in ipairs(lines) do Print("  " .. line) end
+end
+
 -- /af role First Last melee|ranged|caster|healer|tank|feral|auto: the stats a character's
 -- upgrades are judged by; auto follows their talents.
 function commands.role(arg)
@@ -360,6 +373,7 @@ function commands.help()
     Print(L["/af bags or /af bank, with a name for another character, shows their bags or bank slot by slot."])
     Print(L["/af icons picks the icons item tooltips use for bags, bank, mail and worn items."])
     Print(L["/af upgrades turns upgrade hints in item tooltips on or off. /af role Name role sets what a character's upgrades are judged by (melee, ranged, caster, healer, tank, feral or auto)."])
+    Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
     Print(L["Or use the minimap button (right-click for options)."])
 end
 ns.ShowHelp = commands.help

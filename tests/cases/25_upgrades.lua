@@ -232,33 +232,6 @@ test("the spec is read on entering the world and again when talents change", fun
     eq(ns.char.spec, 2)
 end)
 
-test("Well Rested: rested XP builds 4% faster with a 4% higher cap per rank", function()
-    local ns = wow.load(FILES)
-    wow.login(nil)
-    ns.db.wellRested = 5
-    local inn = { level = 20, xpMax = 10000, rested = 1000, resting = true, updated = NOW - 8 * HOUR }
-    eq(ns.RestedNow(inn, NOW), 1600, "500 x 1.2 in 8 hours")
-    local long = { level = 20, xpMax = 10000, rested = 0, resting = true, updated = NOW - 400 * DAY }
-    eq(select(2, ns.RestedNow(long, NOW)), 18000, "cap 150% x 1.2")
-    ns.db.wellRested = nil
-    eq(ns.RestedNow(inn, NOW), 1500, "never read: no bonus")
-end)
-
-test("Well Rested: the rank is read from the Legacy tree on entering the world and when it changes", function()
-    local ns = wow.load(FILES)
-    local node = assert(ns.WELL_RESTED_NODE, "Well Rested's trait node is known")
-    wow.legacy = { [node] = 5 }
-    wow.login(nil)
-    wow.fire("PLAYER_ENTERING_WORLD")
-    eq(ns.db.wellRested, 5)
-    wow.legacy[node] = 2
-    wow.fire("TRAIT_CONFIG_UPDATED", 201)
-    eq(ns.db.wellRested, 2)
-    wow.legacy = { [node + 1] = 4 } -- the node isn't in this config: left alone
-    wow.fire("TRAIT_CONFIG_UPDATED", 201)
-    eq(ns.db.wellRested, 2)
-end)
-
 test("gear that isn't loaded yet is asked for; the alt shows once it arrives", function()
     local items = upItems()
     upStart({ ["Tarn Moon"] = upHunter(items) })

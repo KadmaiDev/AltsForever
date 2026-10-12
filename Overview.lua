@@ -11,12 +11,16 @@ local ipairs = ipairs
 local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
 
 local GREY = "|cff9d9d9d"
+local GOLD = "|cffffd100"
 local MAX_PROFESSION = 300 -- the last rank's maximum on Forever (Classic ruleset)
 local ROW_HEIGHT = 20
 local COLUMNS = {
     { title = L["Character"], width = 180 },
     { title = L["Level"], width = 80 },
     { title = L["Rested"], width = 70 },
+    -- Legacy points left to spend, and Well Rested's rank (both per character).
+    { title = L["Legacy"], width = 56, right = true },
+    { title = L["Well Rested"], width = 84, right = true },
     { title = L["Gold"], width = 120, right = true },
     -- Each main profession gets a name column and a right-aligned skill column, so
     -- the skill numbers line up. The gap separates it from the right-aligned gold.
@@ -44,6 +48,14 @@ local function Duration(seconds)
     local d, h = floor(seconds / 86400), floor(seconds % 86400 / 3600)
     if d > 0 then return L["%dd %dh"]:format(d, h) end
     return L["%dh"]:format(max(h, 1))
+end
+
+-- Legacy points left to spend (gold if any) and Well Rested's rank; "?" if not read yet.
+function ns.LegacyCells(c)
+    local n = ns.LegacyUnspent(c)
+    local points = not n and (GREY .. "?|r") or n > 0 and (GOLD .. n .. "|r") or (GREY .. "0|r")
+    local rank = c.wellRested
+    return points, rank and (rank .. "/5") or (GREY .. "?|r")
 end
 
 -- The level and, below max level, how far into it: the overview shows them in two
@@ -180,6 +192,12 @@ local function RowTooltip(row)
             tt:AddLine(GREY .. L["Full in %s, %s"]:format(Duration(toFull), where) .. "|r")
         end
     end
+    if c.wellRested then tt:AddDoubleLine(ns.WellRestedName(), c.wellRested .. "/5", 1, 0.82, 0, 1, 1, 1) end
+    local unspent = ns.LegacyUnspent(c)
+    if unspent then
+        tt:AddDoubleLine(L["Legacy points"], unspent > 0 and (GOLD .. L["%d to spend"]:format(unspent) .. "|r")
+            or L["all spent"], 1, 0.82, 0, 1, 1, 1)
+    end
     if c.mailExpires then
         local left = c.mailExpires - now
         tt:AddDoubleLine(L["Mail expires"], ns.ExpiryColor(left) .. ns.ExpiryText(left) .. "|r", 1, 0.82, 0, 1, 1, 1)
@@ -298,16 +316,19 @@ local function Refresh()
         cells[2]:SetText(level)
         row.pct:SetText(pct)
         cells[3]:SetText(ns.RestedText(c, now))
-        cells[4]:SetText(c.money and GetCoinTextureString(c.money) or (GREY .. "?|r"))
+        local points, rank = ns.LegacyCells(c)
+        cells[4]:SetText(points)
+        cells[5]:SetText(rank)
+        cells[6]:SetText(c.money and GetCoinTextureString(c.money) or (GREY .. "?|r"))
         local n1, s1, n2, s2 = ns.ProfCells(c)
-        cells[5]:SetText(n1)
-        cells[6]:SetText(s1)
-        cells[7]:SetText(n2)
-        cells[8]:SetText(s2)
-        cells[9]:SetText(ns.MailText(c, now))
-        cells[10]:SetText(c.zone or (GREY .. "?|r"))
-        cells[11]:SetText(ns.PlayedText(c, now))
-        cells[12]:SetText(ns.SeenText(key, c, now))
+        cells[7]:SetText(n1)
+        cells[8]:SetText(s1)
+        cells[9]:SetText(n2)
+        cells[10]:SetText(s2)
+        cells[11]:SetText(ns.MailText(c, now))
+        cells[12]:SetText(c.zone or (GREY .. "?|r"))
+        cells[13]:SetText(ns.PlayedText(c, now))
+        cells[14]:SetText(ns.SeenText(key, c, now))
         total = total + (c.money or 0)
         played = played + (ns.PlayedNow(c, now) or 0)
         row:Show()
