@@ -210,3 +210,4 @@ L["No Legacy points read yet: log in on each character once."] = "Noch keine Ver
 L["Legacy points to spend:"] = "Vermächtnispunkte zu vergeben:"
 L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."] = "/af legacy listet die Vermächtnispunkte zum Vergeben und den Rang von Gut ausgeruht jedes Charakters auf; /af legacy on oder off schaltet die Erinnerungen an oder aus."
 L["Legacy"] = "Vermächtnis"
+L["Materials on your characters"] = "Materialien auf deinen Charakteren"

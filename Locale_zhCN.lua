@@ -210,3 +210,4 @@ L["No Legacy points read yet: log in on each character once."] = "尚未读取�
 L["Legacy points to spend:"] = "可分配的传承点数："
 L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."] = "/af legacy 列出每个角色可分配的传承点数和充分休息的等级；/af legacy on 或 off 开启或关闭提醒。"
 L["Legacy"] = "传承"
+L["Materials on your characters"] = "你的角色拥有的材料"

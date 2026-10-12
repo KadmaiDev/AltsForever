@@ -1,3 +1,7 @@
+## Alts Forever (next)
+
+- **Waylaid Crates:** hovering a crate lists each bundle it takes with how many of the materials your characters have between them, and who has them (you first, then most first). The total is green when there's enough to fill it.
+
 ## Alts Forever 0.11.0
 
 - **Legacy points to spend:** Legacy points are earned by your account but each character spends them separately, so it's easy to forget one. Logging in on a character with points to spend now says so in chat ("You have 13 Legacy points to spend on this character"). Earning a new point tells you how many of your characters can spend it. Thanks to the player who asked for this!

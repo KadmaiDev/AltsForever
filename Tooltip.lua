@@ -395,6 +395,7 @@ local function OnItem(tt, data)
         ns.AddUpgradeLines(tt, id, data)
         ns.AddCraftLines(tt, id)
         ns.AddSkillupLines(tt, id)
+        ns.AddCrateLines(tt, id, data)
         ns.AddLines(tt, id)
     end
 end
