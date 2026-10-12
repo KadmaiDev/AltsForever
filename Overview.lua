@@ -50,10 +50,15 @@ local function Duration(seconds)
     return L["%dh"]:format(max(h, 1))
 end
 
--- Legacy points left to spend (gold if any) and Well Rested's rank; "?" if not read yet.
+-- Legacy points spent of the total they can spend ("3/16", gold while some are left) and
+-- Well Rested's rank; "?" if not read yet.
 function ns.LegacyCells(c)
     local n = ns.LegacyUnspent(c)
-    local points = not n and (GREY .. "?|r") or n > 0 and (GOLD .. n .. "|r") or (GREY .. "0|r")
+    local points = GREY .. "?|r"
+    if n then
+        local text = c.legacySpent .. "/" .. ns.db.legacyPool
+        points = n > 0 and (GOLD .. text .. "|r") or text
+    end
     local rank = c.wellRested
     return points, rank and (rank .. "/5") or (GREY .. "?|r")
 end
