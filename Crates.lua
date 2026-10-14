@@ -1,7 +1,8 @@
 -- Alts Forever crates: Waylaid Crates (Merchant's Favor) list the bundles that fill them
 -- in their own tooltip, one "- 20 Soul Dust" per line under the Use: line (checked in
 -- game 2026-10-12, item 248689: all in one tooltip line, separated by line breaks). Under
--- them we list how many of each material your characters have between them, and who.
+-- them we list how many of each material your characters have between them, and who to
+-- get them from: just the characters needed to make up the bundle.
 --
 -- Only item IDs are stored, so the materials are matched by name: the names of items
 -- your characters own are looked up when a crate is first hovered and kept (lower-case
@@ -153,14 +154,18 @@ local function Build(p)
             end
             sort(list, ByCount)
         end
-        local who
-        for j = 1, math.min(#list, MAX_NAMES) do
+        -- Only the characters needed to fill it (who to mail from): you first, then the
+        -- most, until there's enough; at most MAX_NAMES, then how many more have some.
+        local who, have, shown = nil, 0, 0
+        for j = 1, #list do
+            if have >= b.qty or shown == MAX_NAMES then break end
             local e = list[j]
             local part = ns.ShortName(e.key, e.c) .. " " .. GREY .. e.n .. "|r"
             who = who and (who .. SEP .. part) or part
+            have, shown = have + e.n, shown + 1
         end
-        if #list > MAX_NAMES then
-            who = who .. GREY .. SEP .. L["+%d more"]:format(#list - MAX_NAMES) .. "|r"
+        if have < b.qty and #list > shown then
+            who = who .. GREY .. SEP .. L["+%d more"]:format(#list - shown) .. "|r"
         end
         local sum = total == 0 and (DIM .. "0|r") or total >= b.qty and (ENOUGH .. total .. "|r") or tostring(total)
         lefts[i] = (total >= b.qty and "" or GREY) .. b.qty .. " " .. b.name .. (total >= b.qty and "" or "|r")
