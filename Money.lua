@@ -143,11 +143,12 @@ function ns.AddMoneyLines(tt)
     sort(otherList, ByLabel)
     for _, g in ipairs(otherList) do
         sort(g, ByMoney)
-        -- Grey: gold you can't trade with from here.
-        tt:AddDoubleLine(g.label, Coins(g.total), 0.5, 0.5, 0.5, 0.5, 0.5, 0.5)
+        -- Gold you can't trade with from here: a muted gold heading, the characters in grey,
+        -- indented under it.
+        tt:AddDoubleLine(g.label, Coins(g.total), 0.75, 0.62, 0.25, 0.75, 0.62, 0.25)
         for _, key in ipairs(g) do
             local c = chars[key]
-            tt:AddDoubleLine(c.name or key, Coins(c.money), 0.5, 0.5, 0.5, 0.5, 0.5, 0.5)
+            tt:AddDoubleLine("  " .. (c.name or key), Coins(c.money), 0.5, 0.5, 0.5, 0.5, 0.5, 0.5)
         end
     end
     if ns.StatsOn() then AddStats(tt) end

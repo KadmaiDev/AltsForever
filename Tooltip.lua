@@ -33,6 +33,10 @@ local GREY = "|cffe0e0e0"
 -- the game's colour for what isn't available to you.
 local OUT = "|cff808080"
 local OUT_RGB = 0.5
+-- Their headings: a muted gold, still read as a heading (gold, like Total) but dimmed,
+-- with the names under them indented.
+local OUT_HEAD, OUT_HEAD_R, OUT_HEAD_G, OUT_HEAD_B = "|cffbf9e40", 0.75, 0.62, 0.25
+local INDENT = "  "
 local SEP = " · "
 local EMPTY = { n = 0, total = 0 }
 
@@ -168,7 +172,7 @@ local function BuildOthers(id)
                     e = e or { n = 0, total = 0 }
                     list = e
                 end
-                Insert(list, count, ns.ListName(key, c), text, parts)
+                Insert(list, count, list == e and ns.ListName(key, c) or (INDENT .. ns.ListName(key, c)), text, parts)
             end
         end
     end
@@ -220,7 +224,7 @@ local function Grid(e)
     for i = 1, e.n * 4, 4 do rows[#rows + 1] = Cells(e[i + 3], e[i]) end
     -- Each other ruleset: its heading with its total in the count column, then its rows.
     for _, g in ipairs(e.groups or EMPTY) do
-        rows[#rows + 1] = { [places * 2 + 1] = OUT .. g.total .. "|r" }
+        rows[#rows + 1] = { [places * 2 + 1] = OUT_HEAD .. g.total .. "|r" }
         for i = 1, g.n * 4, 4 do rows[#rows + 1] = Cells(g[i + 3], g[i], true) end
     end
     grid = { ver = ns.version, spec = spec, rows = rows, layouts = {} }
@@ -416,7 +420,7 @@ function ns.AddLines(tt, id)
         tt:AddDoubleLine(e[i + 1], e[i + 2], 1, 1, 1, 1, 1, 1)
     end
     for _, g in ipairs(e.groups or EMPTY) do
-        tt:AddDoubleLine(g.label, g.total, OUT_RGB, OUT_RGB, OUT_RGB, OUT_RGB, OUT_RGB, OUT_RGB)
+        tt:AddDoubleLine(g.label, g.total, OUT_HEAD_R, OUT_HEAD_G, OUT_HEAD_B, OUT_HEAD_R, OUT_HEAD_G, OUT_HEAD_B)
         for i = 1, g.n * 4, 4 do
             tt:AddDoubleLine(g[i + 1], g[i + 2], 1, 1, 1, OUT_RGB, OUT_RGB, OUT_RGB)
         end

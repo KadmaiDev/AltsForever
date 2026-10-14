@@ -72,7 +72,7 @@ test("with other rulesets shown, they come under their own heading and total", f
     eq(AltsForeverDB.otherRulesets, true)
     local text = rulesetHover(2589)
     assert(text:find("Total = 15", 1, true), "your ruleset's total only\n" .. text)
-    local pvp, grim = text:find("\nPvP = 7", 1, true), text:find("|cff808080Grim Tusk|r", 1, true)
+    local pvp, grim = text:find("\nPvP = 7", 1, true), text:find("\n  |cff808080Grim Tusk|r", 1, true)
     assert(pvp and grim and pvp < grim, "PvP heading with its total, then Grim in grey (can't trade)\n" .. text)
     assert(text:find("Old", 1, true) < pvp, "your ruleset first")
     -- Only another ruleset has it: just their heading.
@@ -103,7 +103,7 @@ test("the gold tooltip totals your ruleset; others only when shown, under their 
     ns.AddMoneyLines(tt)
     text = textOf(tt.lines)
     assert(text:find("Total = 4200c", 1, true), text)
-    assert(text:find("PvP = 500c\nGrim Tusk = 500c", 1, true), "grey, not class coloured\n" .. text)
+    assert(text:find("PvP = 500c\n  Grim Tusk = 500c", 1, true), "grey, not class coloured\n" .. text)
 end)
 
 test("gold over time is kept per ruleset", function()
@@ -209,7 +209,7 @@ test("the other faction is left out of tooltips, or under its own heading when s
     assert(text:find("Tarn", 1, true) and not text:find("Zug", 1, true), text)
     ns.SetOtherRulesets(true)
     text = rulesetHover(2589)
-    assert(text:find("Horde = 6\n|cff808080Zug Zug|r", 1, true), "headed by faction only: one ruleset; grey\n" .. text)
+    assert(text:find("Horde = 6\n  |cff808080Zug Zug|r", 1, true), "headed by faction only: one ruleset; grey\n" .. text)
     wow.itemNames[9001] = "Soul Dust"
     text = rulesetHover(CRATE, CRATE_TEXT)
     assert(not text:find("Zug", 1, true), "crates: only characters you can mail\n" .. text)
