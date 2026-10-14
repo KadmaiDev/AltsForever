@@ -301,3 +301,29 @@ test("the bags window's character list is headed by group, like the overview", f
     eq(table.concat(items, " | "), "Normal | [MAGE]Aldric | [DRUID]Tarn Moon | -- | PvP | [WARRIOR]Grim Tusk | -- | "
         .. "Not sorted yet (log in on them once) | [PRIEST]Old Timer")
 end)
+
+test("the gold history from before goes to the group with the most gold, whoever logs in first", function()
+    wow.load(FILES)
+    wow.now = NOW
+    wow.player.realm = PVP -- you: Aldric, a small PvP Alliance character
+    wow.money = 100
+    local yesterday = math.floor(NOW / 86400) - 1
+    local history = { [yesterday] = 5000 }
+    wow.login({ v = 2, goldDays = history, chars = {
+        ["Rich Main"] = alt("Rich Main", "WARRIOR", { faction = "Horde", money = 90000 }),
+    } })
+    eq(AltsForeverDB.goldGroup, nil, "Horde has more gold: the history waits for them")
+    eq(AltsForeverDB.goldDays[yesterday], 5000)
+    local mine
+    for day, total in pairs(AltsForeverDB.goldDaysBy[PVP .. "|Alliance"]) do mine = total end
+    eq(mine, 100, "your own group's history starts fresh")
+    -- The Horde main logs in: their group takes the history.
+    local saved = AltsForeverDB
+    wow.load(FILES)
+    wow.now = NOW
+    wow.player.name, wow.player.realm, wow.player.class, wow.player.faction = "Rich Main", PVE, "WARRIOR", "Horde"
+    wow.money = 90000
+    wow.login(saved)
+    eq(AltsForeverDB.goldGroup, PVE .. "|Horde")
+    eq(AltsForeverDB.goldDays[yesterday], 5000, "the old days kept")
+end)

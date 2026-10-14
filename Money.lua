@@ -37,9 +37,10 @@ local KEEP_DAYS = 400
 local dayOffset, today, nextDay = 0, nil, 0
 local sessionStart -- this character's gold at login
 -- This ruleset and faction's history: they can't trade with others, so each keeps its own.
--- db.goldDays is db.goldGroup's (the first group seen since groups were recorded, which
--- adopts the history from before); any other group's is db.goldDaysBy[group], keyed
--- "realm|faction".
+-- db.goldDays is db.goldGroup's; any other group's is db.goldDaysBy[group], keyed
+-- "realm|faction". The history from before groups were recorded (all characters' gold)
+-- goes to the group with the most gold, almost always the player's main one, whoever
+-- they log in on first: until a character of that group logs in, it waits unclaimed.
 local days
 
 -- For keeping the session across /reload (Character.lua).
@@ -246,6 +247,27 @@ local function HookElvUIBags()
     area:HookScript("OnLeave", OnLeave)
 end
 
+-- Whether this character's group has the most gold: their faction has more than the
+-- other, and no other ruleset known for that faction has more than theirs. (Right after
+-- updating, other characters' rulesets aren't known yet; their faction always is.)
+function ns.RichestGroup(char)
+    local byFaction, byRealm = {}, {}
+    for _, c in pairs(ns.db.chars) do
+        local m = c.money or 0
+        if c.faction then byFaction[c.faction] = (byFaction[c.faction] or 0) + m end
+        if c.realm and c.faction == char.faction then byRealm[c.realm] = (byRealm[c.realm] or 0) + m end
+    end
+    local mine = char.faction and byFaction[char.faction] or 0
+    for f, m in pairs(byFaction) do
+        if f ~= char.faction and m > mine then return false end
+    end
+    local here = char.realm and byRealm[char.realm] or 0
+    for realm, m in pairs(byRealm) do
+        if realm ~= char.realm and m > here then return false end
+    end
+    return true
+end
+
 function ns.StartMoney()
     local char = ns.char
 
@@ -255,7 +277,8 @@ function ns.StartMoney()
     local db = ns.db
     local group = (char.realm or "") .. "|" .. (char.faction or "")
     db.goldDays = db.goldDays or {}
-    if db.goldGroup and db.goldGroup ~= group then
+    if not db.goldGroup and ns.RichestGroup(char) then db.goldGroup = group end
+    if db.goldGroup ~= group then
         db.goldDaysBy = db.goldDaysBy or {}
         db.goldDaysBy[group] = db.goldDaysBy[group] or {}
         days = db.goldDaysBy[group]

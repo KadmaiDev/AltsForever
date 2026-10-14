@@ -373,7 +373,7 @@ function M.load(files)
         return M.player.name
     end
     UnitClass = function() return "Mage", M.player.class end
-    UnitFactionGroup = function() return "Alliance" end
+    UnitFactionGroup = function() return M.player.faction or "Alliance" end
     GetNormalizedRealmName = function() return M.player.realm end
     GetRealmName = function() return M.player.realm end
     UpdateAddOnMemoryUsage = function() end
