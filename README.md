@@ -10,7 +10,7 @@ A World of Warcraft: Forever addon (interface 16001) that adds a total and a per
 
 Locations are shown as icons: a linen bag (bags), banker (bank), mailbox (mail) and white shirt (wearing). You can pick your own icons, or words instead, with `/af icons`.
 
-The current character always comes first. Other characters are sorted by count.
+The current character always comes first. Other characters are sorted by count. Already have counts from a bag addon such as Baganator? Turn ours off with **Show item counts** in the options (or `/af counts`); everything else in the tooltip stays.
 
 Hovering the money at the bottom of your bags lists each character's gold and the total, laid out the same way (also in ElvUI's bags, and in EllesmereUI's when its own gold tracking is turned off). Hovering the **experience bar** lists your other characters still levelling, with their level, XP and rested XP, and hovering the **reputation bar** lists their standing with the faction you're watching.
 
@@ -103,6 +103,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af list` | List stored characters |
 | `/af skillups` | Turn the skill-up details in tooltips on or off |
 | `/af upgrades` | Turn upgrades in item tooltips on or off |
+| `/af counts` | Turn the item counts in tooltips on or off, e.g. if Baganator or Bagnon already shows them (Can craft, skill-ups, upgrades and crates stay) |
 | `/af rulesets` | Show or hide your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; hidden by default |
 | `/af legacy` | List each character's Legacy points to spend and Well Rested rank; `/af legacy on` or `off` turns the chat reminders on or off |
 | `/af role Full Name role` | Choose what a character's upgrades are judged by: `melee`, `ranged`, `caster`, `healer`, `tank` or `feral` (whichever their class has), or `auto` to follow their talents |

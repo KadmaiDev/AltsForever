@@ -1,3 +1,7 @@
+## Alts Forever (next)
+
+- **Show item counts** (options, or `/af counts`): turn off the item counts in tooltips if another addon, such as Baganator or Bagnon, already shows them, so you don't see two lists. Can craft, skill-ups, upgrades and Waylaid Crates stay.
+
 ## Alts Forever 0.12.0
 
 - **Rulesets and factions kept apart:** Normal, PvP, Roleplaying and Hardcore each have their own auction house and mail, and mail never crosses factions, so those characters can't trade with yours. Alts Forever now notes each character's ruleset when you log in on them. Thanks to the player who asked for this!

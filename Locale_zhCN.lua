@@ -224,3 +224,8 @@ L["Tooltips also list your characters on other rulesets (Normal, PvP...) and the
 L["Click to show these characters."] = "点击显示这些角色。"
 L["Click to hide these characters."] = "点击隐藏这些角色。"
 L["Needed"] = "需要"
+L["Item counts in tooltips on."] = "鼠标提示中的物品数量已开启。"
+L["Item counts in tooltips off."] = "鼠标提示中的物品数量已关闭。"
+L["/af counts turns the item counts in tooltips on or off (if another addon, such as Baganator, already shows them)."] = "/af counts 开启或关闭鼠标提示中的物品数量(如果其他插件,例如 Baganator,已经显示了)。"
+L["Show item counts"] = "显示物品数量"
+L["Item tooltips list how many of the item each of your characters has, and where. Turn this off if another addon, such as Baganator, already shows them; Can craft, skill-ups, upgrades and crates stay. Same as /af counts."] = "物品鼠标提示会列出你每个角色拥有该物品的数量和位置。如果其他插件(例如 Baganator)已经显示,可以关闭此项;可制造、技能提升、装备提升和箱子仍会显示。等同于 /af counts。"

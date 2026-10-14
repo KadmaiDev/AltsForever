@@ -379,6 +379,15 @@ function ns.FindItems(text, retried)
     if loading > 0 then ns.Print(L["Some item names were still loading; try again in a moment."]) end
 end
 
+-- The item count lines can be turned off ("Show item counts", /af counts), e.g. for players
+-- whose bag addon (Baganator, Bagnon) already lists counts across characters. Everything
+-- else in item tooltips (Can craft, skill-ups, upgrades, crates, recipes) stays.
+function ns.CountsOn() return not ns.db.countsOff end
+
+function ns.SetCounts(on)
+    ns.db.countsOff = not on or nil
+end
+
 function ns.InvalidateCache()
     wipe(cache)
     wipe(names)
@@ -461,7 +470,7 @@ local function OnItem(tt, data)
         ns.AddCraftLines(tt, id)
         ns.AddSkillupLines(tt, id)
         ns.AddCrateLines(tt, id, data)
-        ns.AddLines(tt, id)
+        if not ns.db.countsOff then ns.AddLines(tt, id) end
     end
 end
 

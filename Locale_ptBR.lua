@@ -224,3 +224,8 @@ L["Tooltips also list your characters on other rulesets (Normal, PvP...) and the
 L["Click to show these characters."] = "Clique para mostrar estes personagens."
 L["Click to hide these characters."] = "Clique para ocultar estes personagens."
 L["Needed"] = "Necessário"
+L["Item counts in tooltips on."] = "Quantidades de itens nas dicas ativadas."
+L["Item counts in tooltips off."] = "Quantidades de itens nas dicas desativadas."
+L["/af counts turns the item counts in tooltips on or off (if another addon, such as Baganator, already shows them)."] = "/af counts ativa ou desativa as quantidades de itens nas dicas (se outro addon, como o Baganator, já as mostra)."
+L["Show item counts"] = "Mostrar quantidades de itens"
+L["Item tooltips list how many of the item each of your characters has, and where. Turn this off if another addon, such as Baganator, already shows them; Can craft, skill-ups, upgrades and crates stay. Same as /af counts."] = "As dicas de itens mostram quantos cada um dos seus personagens tem, e onde. Desative se outro addon, como o Baganator, já as mostra; Pode fabricar, ganhos de perícia, melhorias e caixas continuam. Igual a /af counts."

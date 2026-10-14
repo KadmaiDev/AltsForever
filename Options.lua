@@ -52,6 +52,8 @@ end
 ---------------------------------------------------------------------------
 -- Menus
 ---------------------------------------------------------------------------
+local function CountsSelected() return ns.CountsOn() end
+local function ToggleCounts() ns.SetCounts(not ns.CountsOn()) end
 local function SkillupsSelected() return ns.SkillupsOn() end
 local function ToggleSkillups() ns.SetSkillups(not ns.SkillupsOn()) end
 local function UpgradesSelected() return ns.UpgradesOn() end
@@ -99,6 +101,8 @@ local function Tooltip(owner, title, text)
 end
 
 local SETTINGS = {
+    { L["Show item counts"], CountsSelected, function(on) ns.SetCounts(on) end,
+        L["Item tooltips list how many of the item each of your characters has, and where. Turn this off if another addon, such as Baganator, already shows them; Can craft, skill-ups, upgrades and crates stay. Same as /af counts."] },
     { L["Show skill-up details"], SkillupsSelected, function(on) ns.SetSkillups(on) end,
         L["Show which characters can still skill up: in Can craft, on materials (Skill-ups) and in the overview. Same as /af skillups."] },
     { L["Show upgrades"], UpgradesSelected, function(on) ns.SetUpgrades(on) end,
@@ -261,6 +265,7 @@ function ns.ShowOptionsMenu(owner, fromOverview)
             root:CreateButton(L["Open overview"], function() ns.ToggleOverview(true) end)
         end
         root:CreateButton(L["Bags and bank"], function() ns.ShowBags(ns.charKey, "bags") end)
+        root:CreateCheckbox(L["Show item counts"], CountsSelected, ToggleCounts)
         root:CreateCheckbox(L["Show skill-up details"], SkillupsSelected, ToggleSkillups)
         root:CreateCheckbox(L["Show upgrades"], UpgradesSelected, ToggleUpgrades)
         root:CreateCheckbox(L["Send mail to alts"], SendToAltSelected, ToggleSendToAlt)

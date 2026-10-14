@@ -372,6 +372,11 @@ function commands.mail()
     if not ns.PrintMailWarnings(math.huge) then Print(L["No mail with items or gold on record."]) end
 end
 
+function commands.counts()
+    ns.SetCounts(not ns.CountsOn())
+    Print(ns.CountsOn() and L["Item counts in tooltips on."] or L["Item counts in tooltips off."])
+end
+
 function commands.skillups()
     ns.SetSkillups(not ns.SkillupsOn())
     Print(ns.db.skillupsOff and L["Skill-up details in tooltips off."] or L["Skill-up details in tooltips on."])
@@ -470,6 +475,7 @@ end
 function commands.help()
     Print(L["by Kadmai. /af opens the overview. Also: /af rep | mail | list | delete Name | skillups | sendmail | minimap | stats | mem"])
     Print(L["/af find <text> searches every character's items by name."])
+    Print(L["/af counts turns the item counts in tooltips on or off (if another addon, such as Baganator, already shows them)."])
     Print(L["/af bags or /af bank, with a name for another character, shows their bags or bank slot by slot."])
     Print(L["/af icons picks the icons item tooltips use for bags, bank, mail and worn items."])
     Print(L["/af upgrades turns upgrade hints in item tooltips on or off. /af role Name role sets what a character's upgrades are judged by (melee, ranged, caster, healer, tank, feral or auto)."])

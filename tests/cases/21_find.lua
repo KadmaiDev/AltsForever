@@ -66,3 +66,23 @@ test("/af find shows at most 10 items", function()
     eq(items, 10)
     assert(wow.printed[#wow.printed]:find("and 4 more", 1, true), wow.printed[#wow.printed])
 end)
+
+test("item counts in tooltips can be turned off (another addon shows them); the rest of the tooltip stays", function()
+    local ns = wow.load(FILES)
+    wow.setBag(0, 16, { { 2589, 3 } })
+    wow.login({ v = 2, chars = { ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { bags = { [2589] = 7 } }) } })
+    assert(textOf(wow.hover(GameTooltip, 2589)):find("Total = 10", 1, true))
+    SlashCmdList.ALTSFOREVER("counts")
+    eq(AltsForeverDB.countsOff, true)
+    local text = textOf(wow.hover(GameTooltip, 2589))
+    assert(not text:find("Total", 1, true) and not text:find("Tarn", 1, true), "no counts\n" .. text)
+    -- Crate lines aren't counts: they stay.
+    wow.itemNames[2589] = "Linen Cloth"
+    text = textOf(wow.hover(GameTooltip, 248690, { "Waylaid Crate: Apprentice Textiles",
+        "Use: Fill the crate with any bundle from the following list:\n- 20 Linen Cloth", "Requires Level 10" }))
+    assert(text:find("Materials on your characters", 1, true), text)
+    ns.ShowOptionsMenu(UIParent)
+    wow.menuItem("Show item counts").setSelected()
+    eq(AltsForeverDB.countsOff, nil)
+    assert(textOf(wow.hover(GameTooltip, 2589)):find("Total = 10", 1, true), "back on")
+end)
