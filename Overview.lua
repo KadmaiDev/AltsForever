@@ -133,36 +133,32 @@ function ns.SeenText(key, c, now)
     return t and ns.FormatAgo(now - t) or (GREY .. "?|r")
 end
 
--- The ruleset group a character is shown in: their realm name, or "?" until they log in
--- once (Core.lua).
-local UNSORTED = "?"
-function ns.RulesetGroup(c) return c.realm or UNSORTED end
-
 -- Character keys in display order: you first, then by level, then by name. Once two
--- rulesets are known, your ruleset's characters come first, then each other ruleset's,
--- then any not sorted yet; ns.overviewSplit says so (the overview then heads each one).
+-- rulesets or both factions are known, your group's characters come first, then each
+-- other group's, then any whose ruleset isn't known yet; ns.overviewSplit says so (the
+-- overview then heads each group).
 local order = {}
+local parts = {}
+local function Group(c) return ns.GroupKey(c, parts[1], parts[2]) end
+
 function ns.OverviewOrder()
     local chars = ns.db.chars
     for i = #order, 1, -1 do order[i] = nil end
-    local seen, split = nil, false
-    for key, c in pairs(chars) do
+    for key in pairs(chars) do
         if key ~= ns.charKey then order[#order + 1] = key end
-        if c.realm then
-            if seen and seen ~= c.realm then split = true end
-            seen = c.realm
-        end
     end
+    parts[1], parts[2] = ns.GroupParts()
+    local split = parts[1] or parts[2]
     ns.overviewSplit = split
-    local mine = ns.RulesetGroup(ns.char)
+    local mine = Group(ns.char)
     local function Rank(g)
         if g == mine then return 0 end
-        return g == UNSORTED and 2 or 1
+        return g:sub(1, 2) == "?|" and 2 or 1
     end
     table.sort(order, function(a, b)
         local ca, cb = chars[a], chars[b]
         if split then
-            local ga, gb = ns.RulesetGroup(ca), ns.RulesetGroup(cb)
+            local ga, gb = Group(ca), Group(cb)
             if ga ~= gb then
                 local ra, rb = Rank(ga), Rank(gb)
                 if ra ~= rb then return ra < rb end
@@ -367,20 +363,20 @@ local function Refresh()
     local gold = {}
     if split then
         for _, key in ipairs(keys) do
-            local g = ns.RulesetGroup(chars[key])
+            local g = Group(chars[key])
             gold[g] = (gold[g] or 0) + (chars[key].money or 0)
         end
     end
     local slot, nHeads, group = 0, 0, nil
     for i, key in ipairs(keys) do
         local c = chars[key]
-        if split and ns.RulesetGroup(c) ~= group then
-            group = ns.RulesetGroup(c)
+        if split and Group(c) ~= group then
+            group = Group(c)
             nHeads = nHeads + 1
             slot = slot + 1
             local head = heads[nHeads] or CreateHead(nHeads)
             Place(head, slot)
-            head.label:SetText(ns.RulesetLabel(group ~= "?" and group or nil))
+            head.label:SetText(ns.GroupLabel(c, parts[1], parts[2]))
             head.gold:SetText(GetCoinTextureString(gold[group]))
             head:Show()
         end

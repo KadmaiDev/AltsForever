@@ -162,20 +162,24 @@ end
 -- one realm name for it (the owner's Normal characters: "ClassicBetaPvE2"). Characters on
 -- different rulesets can't mail or trade, so each character's realm name is recorded at
 -- login and characters are grouped by it. A character not logged in since (no realm yet)
--- counts as being on yours, so nothing disappears until they log in once.
+-- counts as being on yours, so nothing disappears until they log in once. Mail never
+-- crosses factions either, on any ruleset, so the other faction is treated the same way.
 ---------------------------------------------------------------------------
 function ns.PlayerRealm()
     local realm = GetNormalizedRealmName and GetNormalizedRealmName()
     if type(realm) == "string" and not issecretvalue(realm) and realm ~= "" then return realm end
 end
 
--- On a different ruleset from the character you're on (known for both).
+-- Out of mail's reach from the character you're on: another ruleset or the other faction
+-- (each known for both).
 function ns.Elsewhere(c)
-    local mine = ns.char and ns.char.realm
-    return c.realm ~= nil and mine ~= nil and c.realm ~= mine
+    local me = ns.char
+    if not me or c == me then return false end
+    if c.realm and me.realm and c.realm ~= me.realm then return true end
+    return c.faction ~= nil and me.faction ~= nil and c.faction ~= me.faction
 end
 
--- Characters on other rulesets are left out of tooltips unless the player shows them.
+-- Characters out of reach are left out of tooltips unless the player shows them.
 function ns.OtherRulesetsOn() return ns.db.otherRulesets == true end
 function ns.Hidden(c) return not ns.db.otherRulesets and ns.Elsewhere(c) end
 
@@ -208,6 +212,41 @@ function ns.RulesetLabel(realm)
         end
     end
     return base
+end
+
+-- What tells your characters' groups apart: rulesets once two are known, factions once
+-- both are played. Neither: one group, no headings.
+function ns.GroupParts()
+    local realm, faction, byRealm, byFaction
+    for _, c in pairs(ns.db.chars) do
+        if c.realm then
+            if realm and realm ~= c.realm then byRealm = true end
+            realm = c.realm
+        end
+        if c.faction then
+            if faction and faction ~= c.faction then byFaction = true end
+            faction = c.faction
+        end
+    end
+    return byRealm or false, byFaction or false
+end
+
+-- A character's group for the parts in use (from GroupParts), and its heading, e.g.
+-- "PvP · Horde". A realm not known yet is "?".
+function ns.GroupKey(c, byRealm, byFaction)
+    return (byRealm and (c.realm or "?") or "") .. "|" .. (byFaction and (c.faction or "?") or "")
+end
+
+local function FactionName(f)
+    local name = type(f) == "string" and _G["FACTION_" .. f:upper()]
+    return type(name) == "string" and name or f or "?"
+end
+
+function ns.GroupLabel(c, byRealm, byFaction)
+    local ruleset = byRealm and ns.RulesetLabel(c.realm)
+    local faction = byFaction and FactionName(c.faction)
+    if ruleset and faction then return ruleset .. " · " .. faction end
+    return ruleset or faction or ""
 end
 
 -- Bank and mail stay nil until first seen, so "never scanned" differs from "empty".
@@ -340,8 +379,8 @@ end
 
 function commands.rulesets()
     ns.SetOtherRulesets(not ns.OtherRulesetsOn())
-    Print(ns.OtherRulesetsOn() and L["Characters on other rulesets are shown in tooltips."]
-        or L["Characters on other rulesets are hidden in tooltips."])
+    Print(ns.OtherRulesetsOn() and L["Characters on other rulesets or factions are shown in tooltips."]
+        or L["Characters on other rulesets or factions are hidden in tooltips."])
 end
 
 function commands.upgrades()
@@ -435,7 +474,7 @@ function commands.help()
     Print(L["/af icons picks the icons item tooltips use for bags, bank, mail and worn items."])
     Print(L["/af upgrades turns upgrade hints in item tooltips on or off. /af role Name role sets what a character's upgrades are judged by (melee, ranged, caster, healer, tank, feral or auto)."])
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
-    Print(L["/af rulesets shows or hides your characters on other rulesets (Normal, PvP...) in tooltips; they can't trade with this one."])
+    Print(L["/af rulesets shows or hides your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; they can't trade with this one."])
     Print(L["Or use the minimap button (right-click for options)."])
 end
 ns.ShowHelp = commands.help

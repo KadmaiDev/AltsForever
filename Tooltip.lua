@@ -127,21 +127,25 @@ end
 
 local function ByLabel(a, b) return a.label < b.label end
 
--- Your ruleset's characters; with other rulesets shown, theirs in e.groups, one list per
--- ruleset (each with its own total: they can't trade with yours).
+-- Characters you can mail; with the others shown, theirs in e.groups, one list per
+-- ruleset and faction (each with its own total: they can't trade with yours).
 local function BuildOthers(id)
-    local e, groups
+    local e, groups, byRealm, byFaction
     for key, c in pairs(ns.db.chars) do
         if key ~= ns.charKey and not ns.Hidden(c) then
             local count, text, parts = ns.Describe(c, id)
             if count > 0 then
                 local list
                 if ns.Elsewhere(c) then
-                    groups = groups or {}
-                    list = groups[c.realm]
+                    if not groups then
+                        groups = {}
+                        byRealm, byFaction = ns.GroupParts()
+                    end
+                    local g = ns.GroupKey(c, byRealm, byFaction)
+                    list = groups[g]
                     if not list then
-                        list = { n = 0, total = 0, label = ns.RulesetLabel(c.realm) }
-                        groups[c.realm] = list
+                        list = { n = 0, total = 0, label = ns.GroupLabel(c, byRealm, byFaction) }
+                        groups[g] = list
                         groups[#groups + 1] = list
                     end
                 else

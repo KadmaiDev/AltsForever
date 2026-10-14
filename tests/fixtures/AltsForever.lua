@@ -5,7 +5,7 @@ AltsForeverDB = {
 ["name"] = "Veyla Dawnmere",
 ["realm"] = "TestRealm",
 ["class"] = "PALADIN",
-["faction"] = "Horde",
+["faction"] = "Alliance",
 ["bags"] = {
 [6948] = 1,
 },

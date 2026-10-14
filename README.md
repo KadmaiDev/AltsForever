@@ -72,12 +72,12 @@ The bank and inbox are read when you open them; until then that character shows 
 
 Install it from CurseForge, or link or copy this folder to `<WoW Forever>\Interface\AddOns\AltsForever`. The folder in `AddOns` must be named `AltsForever`.
 
-## Rulesets
+## Rulesets and factions
 
-Each ruleset (Normal, PvP, Roleplaying, Hardcore) has its own auction house and mail, so characters on different rulesets can't trade. Alts Forever notes each character's ruleset when you log in on them:
+Each ruleset (Normal, PvP, Roleplaying, Hardcore) has its own auction house and mail, and mail never crosses factions, so characters on another ruleset or the other faction can't trade with yours. Alts Forever notes each character's ruleset when you log in on them:
 
-- The overview groups your characters by ruleset, each with its own gold total.
-- Item and gold tooltips, Can craft, skill-ups, upgrades and the XP and reputation bars list only characters on the ruleset you're playing. Turn on **Show other rulesets** (or `/af rulesets`) to see the others too, under their own heading and total.
+- The overview groups your characters by ruleset and faction (e.g. "Normal · Horde"), each with its own gold total.
+- Item and gold tooltips, Can craft, skill-ups, upgrades and the XP and reputation bars list only characters you can mail. Turn on **Show other rulesets and factions** (or `/af rulesets`) to see the others too, under their own heading and total.
 - Send to alt and Waylaid Crates only ever count characters you can mail.
 
 Characters you haven't logged in on since updating count as being on yours until you do.
@@ -101,7 +101,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af list` | List stored characters |
 | `/af skillups` | Turn the skill-up details in tooltips on or off |
 | `/af upgrades` | Turn upgrades in item tooltips on or off |
-| `/af rulesets` | Show or hide your characters on other rulesets (Normal, PvP...) in tooltips; hidden by default |
+| `/af rulesets` | Show or hide your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; hidden by default |
 | `/af legacy` | List each character's Legacy points to spend and Well Rested rank; `/af legacy on` or `off` turns the chat reminders on or off |
 | `/af role Full Name role` | Choose what a character's upgrades are judged by: `melee`, `ranged`, `caster`, `healer`, `tank` or `feral` (whichever their class has), or `auto` to follow their talents |
 | `/af sendmail` | Turn the send-to-alt arrow at the mailbox on or off |

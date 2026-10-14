@@ -25,7 +25,7 @@ test("Options > AddOns > Alts Forever: logo, Open overview, and the seven settin
     eq(f.logo.texture, "Interface\\AddOns\\AltsForever\\media\\logo.tga", "the full logo")
     local names = {}
     for _, check in ipairs(f.checks) do names[#names + 1] = check.label.text end
-    eq(table.concat(names, " | "), "Show skill-up details | Show upgrades | Send mail to alts | Show session stats | Legacy reminders | Show other rulesets | Show minimap button")
+    eq(table.concat(names, " | "), "Show skill-up details | Show upgrades | Send mail to alts | Show session stats | Legacy reminders | Show other rulesets and factions | Show minimap button")
     -- The tick boxes show and change the same settings as the menu and commands.
     local stats, minimap = f.checks[4], f.checks[7]
     eq(stats:GetChecked(), false, "session stats off by default")

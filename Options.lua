@@ -109,8 +109,8 @@ local SETTINGS = {
         L["Off by default. Your XP bar shows this session's XP and time to level; your bag gold shows gold gained or lost this session, today and this week. Same as /af stats."] },
     { L["Legacy reminders"], LegacySelected, function(on) ns.SetLegacyReminders(on) end,
         L["Says in chat when the character you log in on has Legacy points to spend, and when you earn one. Same as /af legacy on or off."] },
-    { L["Show other rulesets"], RulesetsSelected, function(on) ns.SetOtherRulesets(on) end,
-        L["Tooltips also list your characters on other rulesets (Normal, PvP...), under their own heading. They can't trade or mail with this one, so they're hidden by default; the overview always shows everyone. Same as /af rulesets."] },
+    { L["Show other rulesets and factions"], RulesetsSelected, function(on) ns.SetOtherRulesets(on) end,
+        L["Tooltips also list your characters on other rulesets (Normal, PvP...) and the other faction, under their own heading. They can't trade or mail with this one, so they're hidden by default; the overview always shows everyone. Same as /af rulesets."] },
     { L["Show minimap button"], MinimapSelected, function(on) ns.SetMinimapButton(on) end,
         L["Same as /af minimap. Alts Forever is also in the minimap's addon menu."] },
 }
@@ -266,7 +266,7 @@ function ns.ShowOptionsMenu(owner, fromOverview)
         root:CreateCheckbox(L["Send mail to alts"], SendToAltSelected, ToggleSendToAlt)
         root:CreateCheckbox(L["Show session stats"], StatsSelected, ToggleStats)
         root:CreateCheckbox(L["Legacy reminders"], LegacySelected, ToggleLegacy)
-        root:CreateCheckbox(L["Show other rulesets"], RulesetsSelected, ToggleRulesets)
+        root:CreateCheckbox(L["Show other rulesets and factions"], RulesetsSelected, ToggleRulesets)
         root:CreateCheckbox(L["Show minimap button"], MinimapSelected, ToggleMinimap)
         root:CreateButton(L["Memory use"], function() ns.RunCommand("mem") end)
         -- Wrapped: a menu button's return value is read as a MenuResponse, and

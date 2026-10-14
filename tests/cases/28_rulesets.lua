@@ -112,7 +112,7 @@ test("gold over time is kept per ruleset", function()
     local today
     for day in pairs(days) do today = day end
     eq(days[today], 4200, "your ruleset's total")
-    eq(AltsForeverDB.goldRealm, PVE, "the history from before belongs to the first ruleset seen")
+    eq(AltsForeverDB.goldGroup, PVE .. "|Alliance", "the history from before belongs to the first group seen")
     -- Logging in on the PvP character: its own history.
     local saved = AltsForeverDB
     wow.load(FILES)
@@ -121,7 +121,7 @@ test("gold over time is kept per ruleset", function()
     wow.money = 800
     wow.login(saved)
     eq(AltsForeverDB.goldDays[today], 4200, "Normal's history untouched")
-    eq(AltsForeverDB.goldDaysBy[PVP][today], 1000, "Grim 800, and Old (not sorted yet) 200")
+    eq(AltsForeverDB.goldDaysBy[PVP .. "|Alliance"][today], 1000, "Grim 800, and Old (not sorted yet) 200")
 end)
 
 test("send to alt never offers characters on another ruleset", function()
@@ -179,6 +179,57 @@ end)
 test("the setting is in the options menu", function()
     local ns = rulesetStart()
     ns.ShowOptionsMenu(UIParent)
-    wow.menuItem("Show other rulesets").setSelected()
+    wow.menuItem("Show other rulesets and factions").setSelected()
     eq(AltsForeverDB.otherRulesets, true)
+end)
+
+-- Mail never crosses factions either: the other faction is kept apart the same way.
+function factionAlts()
+    return { v = 2, chars = {
+        ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { realm = PVE, faction = "Alliance", level = 20, money = 3000,
+            bags = { [2589] = 10, [9001] = 20 } }),
+        ["Zug Zug"] = alt("Zug Zug", "SHAMAN", { realm = PVE, faction = "Horde", level = 25, money = 700,
+            bags = { [2589] = 6, [9001] = 40 } }),
+    } }
+end
+
+function factionStart()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.player.realm = PVE
+    wow.money = 1000
+    wow.login(factionAlts())
+    return ns
+end
+
+test("the other faction is left out of tooltips, or under its own heading when shown", function()
+    local ns = factionStart()
+    local text = rulesetHover(2589)
+    assert(text:find("Tarn", 1, true) and not text:find("Zug", 1, true), text)
+    ns.SetOtherRulesets(true)
+    text = rulesetHover(2589)
+    assert(text:find("Horde = 6\n[SHAMAN]Zug Zug", 1, true), "headed by faction only: one ruleset\n" .. text)
+    wow.itemNames[9001] = "Soul Dust"
+    text = rulesetHover(CRATE, CRATE_TEXT)
+    assert(not text:find("Zug", 1, true), "crates: only characters you can mail\n" .. text)
+    local keys = {}
+    for _, e in ipairs(ns.SendToAltEntries()) do keys[#keys + 1] = e.key end
+    eq(table.concat(keys, ","), "Tarn Moon")
+end)
+
+test("the overview heads each faction; with two rulesets too, both are named", function()
+    local ns = factionStart()
+    SlashCmdList.ALTSFOREVER("")
+    local heads = {}
+    for _, f in ipairs(wow.frames) do
+        if rawget(f, "label") and rawget(f, "gold") and f.shown then heads[#heads + 1] = f.label.text .. " " .. f.gold.text end
+    end
+    eq(table.concat(heads, " | "), "Alliance 4000c | Horde 700c")
+    AltsForeverDB.chars["Grim Tusk"] = alt("Grim Tusk", "WARRIOR", { realm = PVP, faction = "Horde", level = 18, money = 500 })
+    ns.RefreshOverview()
+    heads = {}
+    for _, f in ipairs(wow.frames) do
+        if rawget(f, "label") and rawget(f, "gold") and f.shown then heads[#heads + 1] = f.label.text .. " " .. f.gold.text end
+    end
+    eq(table.concat(heads, " | "), "Normal · Alliance 4000c | Normal · Horde 700c | PvP · Horde 500c")
 end)

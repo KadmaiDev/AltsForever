@@ -36,9 +36,10 @@ local DAY = 86400
 local KEEP_DAYS = 400
 local dayOffset, today, nextDay = 0, nil, 0
 local sessionStart -- this character's gold at login
--- This ruleset's history: rulesets can't trade, so each keeps its own. db.goldDays is the
--- ruleset of db.goldRealm (the first one seen since rulesets were recorded, which adopts
--- the history from before); any other ruleset's is db.goldDaysBy[realm].
+-- This ruleset and faction's history: they can't trade with others, so each keeps its own.
+-- db.goldDays is db.goldGroup's (the first group seen since groups were recorded, which
+-- adopts the history from before); any other group's is db.goldDaysBy[group], keyed
+-- "realm|faction".
 local days
 
 -- For keeping the session across /reload (Character.lua).
@@ -106,14 +107,16 @@ function ns.AddMoneyLines(tt)
     wipe(others)
     wipe(otherList)
     local n, total = 0, 0
+    local byRealm, byFaction = ns.GroupParts()
     for key, c in pairs(chars) do
         local m = c.money
         if m and m > 0 and key ~= ns.charKey and not ns.Hidden(c) then
             if ns.Elsewhere(c) then
-                local g = others[c.realm]
+                local gk = ns.GroupKey(c, byRealm, byFaction)
+                local g = others[gk]
                 if not g then
-                    g = { label = ns.RulesetLabel(c.realm), total = 0 }
-                    others[c.realm] = g
+                    g = { label = ns.GroupLabel(c, byRealm, byFaction), total = 0 }
+                    others[gk] = g
                     otherList[#otherList + 1] = g
                 end
                 g[#g + 1] = key
@@ -245,14 +248,15 @@ function ns.StartMoney()
     -- Local time's offset from UTC, so days start at local midnight.
     local now = time()
     dayOffset = now - time(date("!*t", now))
-    local db, realm = ns.db, char.realm
+    local db = ns.db
+    local group = (char.realm or "") .. "|" .. (char.faction or "")
     db.goldDays = db.goldDays or {}
-    if realm and db.goldRealm and db.goldRealm ~= realm then
+    if db.goldGroup and db.goldGroup ~= group then
         db.goldDaysBy = db.goldDaysBy or {}
-        db.goldDaysBy[realm] = db.goldDaysBy[realm] or {}
-        days = db.goldDaysBy[realm]
+        db.goldDaysBy[group] = db.goldDaysBy[group] or {}
+        days = db.goldDaysBy[group]
     else
-        db.goldRealm = db.goldRealm or realm
+        db.goldGroup = group
         days = db.goldDays
     end
 
