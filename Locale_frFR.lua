@@ -223,3 +223,4 @@ L["Show other rulesets and factions"] = "Afficher les autres modes de jeu et fac
 L["Tooltips also list your characters on other rulesets (Normal, PvP...) and the other faction, under their own heading. They can't trade or mail with this one, so they're hidden by default; the overview always shows everyone. Same as /af rulesets."] = "Les infobulles listent aussi vos personnages des autres modes de jeu (Normal, JcJ...) et de l'autre faction, sous leur propre titre. Ils ne peuvent ni échanger ni s'envoyer du courrier avec celui-ci, ils sont donc masqués par défaut ; l'aperçu montre toujours tout le monde. Comme /af rulesets."
 L["Click to show these characters."] = "Cliquez pour afficher ces personnages."
 L["Click to hide these characters."] = "Cliquez pour masquer ces personnages."
+L["Needed"] = "Requis"

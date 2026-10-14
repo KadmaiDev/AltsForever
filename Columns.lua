@@ -107,30 +107,46 @@ function ns.MeasureColumns(tt, rows, spec, font, size, flags)
         font = font, size = size, flags = flags }
 end
 
--- Hides a tooltip's cells.
-function ns.ClearColumns(tt)
-    local pool = pools[tt]
-    if not pool then return end
+-- A tooltip can hold more than one block of columns (an item's counts and a crate's
+-- materials), each with its own cells; a block is named by any key (nil = "main").
+local function Clear(pool)
     for i = 1, pool.used do pool[i]:Hide() end
     pool.used = 0
+end
+
+-- Hides a tooltip's cells: one block's, or every block's.
+function ns.ClearColumns(tt, block)
+    local blocks = pools[tt]
+    if not blocks then return end
+    if block ~= nil then
+        if blocks[block] then Clear(blocks[block]) end
+        return
+    end
+    for _, pool in pairs(blocks) do Clear(pool) end
 end
 
 local function ClearOnHide(tt) ns.ClearColumns(tt) end
 
 -- Places rows' cells on lines first, first + 1, ... with a layout from MeasureColumns,
--- replacing whatever cells the tooltip had. Returns true if a line's text changed (the
--- tooltip then needs a Show to fit it).
-function ns.PlaceColumns(tt, first, rows, spec, layout)
-    local pool = pools[tt]
-    if not pool then
-        pool = { used = 0 }
-        pools[tt] = pool
+-- replacing the cells the block had. Returns true if a line's text changed (the tooltip
+-- then needs a Show to fit it).
+function ns.PlaceColumns(tt, first, rows, spec, layout, block)
+    local blocks = pools[tt]
+    if not blocks then
+        blocks = {}
+        pools[tt] = blocks
         if tt.HookScript then
             tt:HookScript("OnTooltipCleared", ClearOnHide)
             tt:HookScript("OnHide", ClearOnHide)
         end
     end
-    ns.ClearColumns(tt)
+    block = block or "main"
+    local pool = blocks[block]
+    if not pool then
+        pool = { used = 0 }
+        blocks[block] = pool
+    end
+    Clear(pool)
     local used, changed = 0, false
     local widths, right = layout.widths, layout.right
     for i, cells in ipairs(rows) do
@@ -169,15 +185,16 @@ end
 -- Lines up the right-hand columns of the rows added from line `first` on; leaves the
 -- plain text if the tooltip's text can't be measured. Each row is { name, value... };
 -- labels[col] is text shown before that column's value (e.g. "rested"). Columns are
--- right-aligned, except those marked in `lefts` (e.g. notes of different lengths).
+-- right-aligned, except those marked in `lefts` (e.g. notes of different lengths). `block`
+-- names the block of cells (see PlaceColumns). Returns true if the tooltip needs a Show.
 -- Our lines take the font of the tooltip's second line (its body text): a line the
 -- tooltip hasn't needed before gets a new font string, which a UI addon that restyled
 -- the existing ones (EllesmereUI) hasn't reached, so it would show in the game's font.
-local function Align(tt, first, rows, labels, lefts)
+local function Align(tt, first, rows, labels, lefts, block)
     local body = ns.LineText(tt, "TextLeft", 2)
     local font, size, flags
     if body and body.GetFont then font, size, flags = body:GetFont() end
-    if not ns.UsableFont(font, size, flags) then return end
+    if not ns.UsableFont(font, size, flags) then return false end
     for line = first - 1, first + #rows - 1 do
         for _, side in ipairs({ "TextLeft", "TextRight" }) do
             local text = ns.LineText(tt, side, line)
@@ -205,7 +222,7 @@ local function Align(tt, first, rows, labels, lefts)
         cellRows[i] = cells
     end
     local layout = ns.MeasureColumns(tt, cellRows, spec, font, size, flags)
-    if layout then ns.PlaceColumns(tt, first, cellRows, spec, layout) end
+    return layout and ns.PlaceColumns(tt, first, cellRows, spec, layout, block) or false
 end
 
 ns.AlignColumns = Align

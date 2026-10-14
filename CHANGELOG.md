@@ -5,7 +5,7 @@
   - Tooltips (items, gold, Can craft, skill-ups, upgrades, XP and reputation bars) and `/af find` list only characters you can mail. Turn on "Show other rulesets and factions" in the options, or `/af rulesets`, to see the others too, under their own heading and total.
   - Send to alt only offers characters you can mail, and gold today and this week (session stats) are counted per ruleset and faction.
   - Characters you haven't logged in on since updating count as being on yours until you do.
-- **Waylaid Crates:** hovering a crate lists each bundle it takes with how many of the materials your characters have between them, and who to get them from: just the characters needed to make up the bundle (you first, then whoever has most). The total is green when there's enough to fill it.
+- **Waylaid Crates:** hovering a crate adds a grid of the materials it takes: a column per material, how many are needed, a row for each of your characters who has any, and the total, in green when there's enough to fill it.
 
 ## Alts Forever 0.11.0
 
