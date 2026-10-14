@@ -75,6 +75,7 @@ test("with other rulesets shown, they come under their own heading and total", f
     local pvp, grim = text:find("\nPvP = 7", 1, true), text:find("\n  |cff808080Grim Tusk|r", 1, true)
     assert(pvp and grim and pvp < grim, "PvP heading with its total, then Grim in grey (can't trade)\n" .. text)
     assert(text:find("Old", 1, true) < pvp, "your ruleset first")
+    assert(text:find("\n \nPvP = 7", 1, true), "a blank line before the other rulesets\n" .. text)
     -- Only another ruleset has it: just their heading.
     AltsForeverDB.chars["Tarn Moon"].bags[2589] = nil
     AltsForeverDB.chars["Old Timer"].bank[2589] = nil
@@ -103,7 +104,7 @@ test("the gold tooltip totals your ruleset; others only when shown, under their 
     ns.AddMoneyLines(tt)
     text = textOf(tt.lines)
     assert(text:find("Total = 4200c", 1, true), text)
-    assert(text:find("PvP = 500c\n  Grim Tusk = 500c", 1, true), "grey, not class coloured\n" .. text)
+    assert(text:find("\n \nPvP = 500c\n  Grim Tusk = 500c", 1, true), "after a blank line; grey, not class coloured\n" .. text)
 end)
 
 test("gold over time is kept per ruleset", function()
@@ -267,4 +268,26 @@ test("clicking a group heading collapses it to the heading, and opens it again",
     heads[2].scripts.OnClick(heads[2])
     eq(#overviewRows(), 4)
     eq(AltsForeverDB.collapsedGroups, nil, "nothing left collapsed: nothing saved")
+end)
+
+test("with other rulesets shown, the columns still land on the right lines, none on the gap", function()
+    wow.load(FILES)
+    local rights = columnTooltip()
+    wow.now = NOW
+    wow.player.realm = PVE
+    wow.setBag(0, 16, { { 2589, 1 } })
+    wow.login(rulesetAlts())
+
+    SlashCmdList.ALTSFOREVER("rulesets")
+    local lines = wow.hover(GameTooltip, 2589)
+    local gap, grim
+    for i, l in ipairs(lines) do
+        if l[1] == " " and i > 2 then gap = i end
+        if l[1] == "  |cff808080Grim Tusk|r" then grim = i end
+    end
+    assert(gap and grim and gap < grim, textOf(lines))
+    eq(#cellsOn(rights[gap]), 0, "nothing on the blank line")
+    local cells = cellsOn(rights[grim])
+    eq(cells[1].text, "|cff8080807|r", "Grim's count, in grey, on Grim's line")
+    eq(cellsOn(rights[grim - 1])[1].text, "|cffbf9e407|r", "the heading's total, in muted gold")
 end)

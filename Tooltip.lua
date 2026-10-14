@@ -222,7 +222,9 @@ local function Grid(e)
     local rows = {}
     if curCount > 0 and curParts then rows[1] = Cells(curParts, curCount) end
     for i = 1, e.n * 4, 4 do rows[#rows + 1] = Cells(e[i + 3], e[i]) end
-    -- Each other ruleset: its heading with its total in the count column, then its rows.
+    -- Each other ruleset: its heading with its total in the count column, then its rows,
+    -- after a blank line (a row without cells) if any of yours come first.
+    if e.groups and #rows > 0 then rows[#rows + 1] = {} end
     for _, g in ipairs(e.groups or EMPTY) do
         rows[#rows + 1] = { [places * 2 + 1] = OUT_HEAD .. g.total .. "|r" }
         for i = 1, g.n * 4, 4 do rows[#rows + 1] = Cells(g[i + 3], g[i], true) end
@@ -419,6 +421,7 @@ function ns.AddLines(tt, id)
     for i = 1, e.n * 4, 4 do
         tt:AddDoubleLine(e[i + 1], e[i + 2], 1, 1, 1, 1, 1, 1)
     end
+    if e.groups and rows > 0 then tt:AddLine(" ") end
     for _, g in ipairs(e.groups or EMPTY) do
         tt:AddDoubleLine(g.label, g.total, OUT_HEAD_R, OUT_HEAD_G, OUT_HEAD_B, OUT_HEAD_R, OUT_HEAD_G, OUT_HEAD_B)
         for i = 1, g.n * 4, 4 do

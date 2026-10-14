@@ -141,6 +141,7 @@ function ns.AddMoneyLines(tt)
         tt:AddDoubleLine(ns.ColoredName(key, chars[key]), Coins(chars[key].money), 1, 1, 1, 1, 1, 1)
     end
     sort(otherList, ByLabel)
+    if #otherList > 0 then tt:AddLine(" ") end
     for _, g in ipairs(otherList) do
         sort(g, ByMoney)
         -- Gold you can't trade with from here: a muted gold heading, the characters in grey,
