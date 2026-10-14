@@ -60,3 +60,16 @@ test("crate totals follow your bags, and names that load later", function()
     text = textOf(wow.hover(GameTooltip, CRATE, CRATE_TEXT))
     assert(text:find("2 Large Glowing Shard = [MAGE]Aldric |cffe0e0e03|r    |cff20ff203|r", 1, true), text)
 end)
+
+test("a crate first seen half-loaded (auction house) gets its lines once the tooltip fills in", function()
+    crateStart()
+    wow.uncached[CRATE] = true
+    local text = textOf(wow.hover(GameTooltip, CRATE, { "Retrieving item information" }))
+    assert(not text:find("Materials on your characters", 1, true), text)
+    wow.uncached[CRATE] = nil
+    wow.itemSpell[CRATE] = 1302999
+    text = textOf(wow.hover(GameTooltip, CRATE, { "Waylaid Crate: Journeyman Curiosities", "Requires Level 10" }))
+    assert(not text:find("Materials on your characters", 1, true), "loaded, but its Use: line not yet")
+    text = textOf(wow.hover(GameTooltip, CRATE, CRATE_TEXT))
+    assert(text:find("Materials on your characters", 1, true), "read again, not remembered as empty\n" .. text)
+end)

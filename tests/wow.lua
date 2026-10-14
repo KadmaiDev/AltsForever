@@ -38,6 +38,7 @@ function M.load(files)
     M.items = {}       -- [itemID] = { loc = equip location, sub = subclass, level = required level, bind = bind type }
     M.itemStats = {}   -- [itemID or link] = { [ITEM_MOD_..._SHORT] = value }
     M.uncached = {}    -- [itemID] = true: the game hasn't loaded it yet
+    M.itemSpell = {}   -- [itemID] = spellID: the item has a Use: effect
     -- Talents (class tree nodes as { posX, rank }) and Legacy ranks by node; nil = none.
     -- legacyPoints = { unspent, spent } as the Legacy trees' shared currency reports them.
     M.talents, M.legacy, M.legacyPoints = nil, nil, nil
@@ -412,6 +413,7 @@ function M.load(files)
             return copy
         end,
         IsItemDataCachedByID = function(id) return not M.uncached[id] end,
+        GetItemSpell = function(id) if M.itemSpell[id] then return "Use", M.itemSpell[id] end end,
         GetItemNameByID = function(id) return M.itemNames[id] end,
         GetItemQualityByID = function(id) return M.itemQuality[id] end,
         -- name, link, ..., required level (5th), ..., equip location (9th), ..., bind type (14th)

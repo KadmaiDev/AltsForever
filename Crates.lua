@@ -39,6 +39,16 @@ local function LineText(tt, data, i)
     return (text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
 end
 
+-- Whether a tooltip without a bundle list is the whole story. An item the game hasn't
+-- loaded (often the case in the auction house) first shows a partial tooltip, and its
+-- Use: line can come a moment later; remembering "no list" then would hide the crate's
+-- lines for the session.
+local function Complete(id, sawUse)
+    if C_Item.IsItemDataCachedByID and not C_Item.IsItemDataCachedByID(id) then return false end
+    if sawUse then return true end
+    return not (C_Item.GetItemSpell and C_Item.GetItemSpell(id))
+end
+
 local function Parse(tt, id, data)
     local p = parsed[id]
     if p ~= nil then return p end
@@ -61,6 +71,7 @@ local function Parse(tt, id, data)
             end
         end
     end
+    if not p and not Complete(id, inUse) then return false end -- read again next time
     if parsedCount >= 200 then
         wipe(parsed)
         parsedCount = 0
