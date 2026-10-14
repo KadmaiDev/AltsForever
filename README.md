@@ -14,9 +14,9 @@ The current character always comes first. Other characters are sorted by count.
 
 Hovering the money at the bottom of your bags lists each character's gold and the total, laid out the same way (also in ElvUI's bags, and in EllesmereUI's when its own gold tracking is turned off). Hovering the **experience bar** lists your other characters still levelling, with their level, XP and rested XP, and hovering the **reputation bar** lists their standing with the faction you're watching.
 
-Type `/af` to open the **overview**: every character with level and XP, rested XP (including what they've built up since logging out), Legacy points left to spend and their Well Rested rank, gold, main professions, zone, time played and when you last played them, with total gold and total time played at the bottom. Hover a row for details such as rested XP until full, hearthstone location and item level. **Click a row** to see that character's gear, laid out like the character panel: hover any item for its tooltip, shift-click to link it in chat. Nearly broken items are tinted red and the lowest durability is shown.
+Type `/af` to open the **overview**: every character with level and XP, rested XP (including what they've built up since logging out), Legacy points left to spend and their Well Rested rank, gold, main professions, zone, time played and when you last played them, with total time played at the bottom. With characters on more than one ruleset or both factions, they're grouped under headings such as "Normal · Horde", each with its gold total; click a heading to collapse it. Hover a row for details such as rested XP until full, hearthstone location and item level. **Click a row** to see that character's gear, laid out like the character panel: hover any item for its tooltip, shift-click to link it in chat. Nearly broken items are tinted red and the lowest durability is shown.
 
-![The overview window with a character's details and gear panel](media/alt-overview.png)
+![The overview window, grouped by ruleset and faction, with a character's details and gear panel](media/alt-overview.png)
 
 **Bags and bank:** your own bags and bank (an entry in the bag's portrait menu, or a small Alts Forever button in the header of Blizzard's bank and of ElvUI's and EllesmereUI's bags and bank), the bag button in the overview's title bar (or `/af bags`, `/af bank`, or right-click a character) opens a window showing any character's bags or bank slot by slot, as you last saw them: each stack with its count, empty slots, how many slots are free, and a coloured border for uncommon and better items. Everything shows in one grid, or tick **By bag** for a section per bag or bank tab, e.g. "Red Linen Bag (7 / 8)". The character's gold is at the bottom. Drag the bottom-right corner to resize: the width sets the slots per row (10 to 30), the height how tall it gets before scrolling, and both are remembered. Pick the character from the dropdown and switch between Bags and Bank. Hover an item for its tooltip, shift-click to link it. A character's slots are recorded the next time you log in on them (bags) or visit their bank; until then the window shows one slot per item with its total.
 
@@ -44,9 +44,11 @@ Hovering a recipe (pattern, schematic, formula...) lists your characters who hav
 
 **Skill-ups across your alts:** "Can craft" marks characters who'd still get a skill-up from making the item ("Tarnia Moonwhisper · skill-ups to 115"), and hovering a material lists the recipes your characters can still skill up with it, under "Skill-ups" ("Heavy Linen Bandage   Tarnia · to 115"): you first, then your other characters, 2 recipes each with the most skill-ups left, up to 6 lines. The overview's row tooltip counts each profession's recipes that still give skill-ups, or says "train to skill up" for a character at their rank's maximum (e.g. 75/75), who is left out of the skill-up lines until they train. It all comes from the game when a profession window is opened; `/af skillups` turns it off.
 
+![Recipe tooltips showing Known, Can learn and Needs skill, and a Can craft line](media/professions.png)
+
 **Waylaid Crates:** hovering a crate adds a grid of the materials it takes: a column per material (its icon, in the crate's order), how many are needed, a row for each of your characters who has any (you first, then whoever has most; up to 10) and the total. A character's count is green when they have enough to fill it alone, and the total is green when your characters have enough between them.
 
-![Recipe tooltips showing Known, Can learn and Needs skill, and a Can craft line](media/professions.png)
+<img src="media/waylaid.png" alt="A Waylaid Crate tooltip with a grid of its materials: what's needed, each character's count and the totals" width="390">
 
 ## Playing with a controller
 
