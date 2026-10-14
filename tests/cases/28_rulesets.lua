@@ -291,3 +291,13 @@ test("with other rulesets shown, the columns still land on the right lines, none
     eq(cells[1].text, "|cff8080807|r", "Grim's count, in grey, on Grim's line")
     eq(cellsOn(rights[grim - 1])[1].text, "|cffbf9e407|r", "the heading's total, in muted gold")
 end)
+
+test("the bags window's character list is headed by group, like the overview", function()
+    rulesetStart()
+    SlashCmdList.ALTSFOREVER("bags")
+    AltsForeverBagsFrame.who.scripts.OnClick(AltsForeverBagsFrame.who)
+    local items = {}
+    for _, item in ipairs(wow.menu.items) do items[#items + 1] = item.kind == "divider" and "--" or item.text end
+    eq(table.concat(items, " | "), "Normal | [MAGE]Aldric | [DRUID]Tarn Moon | -- | PvP | [WARRIOR]Grim Tusk | -- | "
+        .. "Not sorted yet (log in on them once) | [PRIEST]Old Timer")
+end)

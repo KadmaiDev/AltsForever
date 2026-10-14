@@ -321,10 +321,21 @@ function Fill()
     frame.money:SetText(c.money and GetCoinTextureString(c.money) or "")
 end
 
+-- Every character, in the overview's order and, as there, headed by ruleset and faction
+-- when you have more than one group.
 local function PickCharacter(owner)
     MenuUtil.CreateContextMenu(owner, function(_, root)
-        for _, key in ipairs(ns.OverviewOrder()) do
-            root:CreateRadio(ns.ColoredName(key, ns.db.chars[key]),
+        local chars, keys = ns.db.chars, ns.OverviewOrder()
+        local byRealm, byFaction = ns.GroupParts()
+        local group
+        for _, key in ipairs(keys) do
+            local c = chars[key]
+            if ns.overviewSplit and ns.GroupKey(c, byRealm, byFaction) ~= group then
+                if group then root:CreateDivider() end
+                group = ns.GroupKey(c, byRealm, byFaction)
+                root:CreateTitle(ns.GroupLabel(c, byRealm, byFaction))
+            end
+            root:CreateRadio(ns.ColoredName(key, c),
                 function(k) return k == shownKey end,
                 function(k)
                     shownKey, scroll = k, 0
