@@ -133,7 +133,8 @@ local function Build(p)
         local list, total = {}, 0
         if b.id then
             for key, c in pairs(chars) do
-                local n = ns.Describe(c, b.id)
+                -- Only your ruleset: materials can't be mailed between rulesets.
+                local n = not ns.Elsewhere(c) and ns.Describe(c, b.id) or 0
                 if n > 0 then
                     list[#list + 1] = { key = key, c = c, n = n, you = key == ns.charKey }
                     total = total + n

@@ -156,9 +156,63 @@ function ns.AdoptFirstName(chars, name, class)
     end
 end
 
+---------------------------------------------------------------------------
+-- Rulesets. Forever has no realm list, but each ruleset (Normal, PvP, Roleplaying,
+-- Hardcore) is its own world with its own auction house and mail, and the client reports
+-- one realm name for it (the owner's Normal characters: "ClassicBetaPvE2"). Characters on
+-- different rulesets can't mail or trade, so each character's realm name is recorded at
+-- login and characters are grouped by it. A character not logged in since (no realm yet)
+-- counts as being on yours, so nothing disappears until they log in once.
+---------------------------------------------------------------------------
+function ns.PlayerRealm()
+    local realm = GetNormalizedRealmName and GetNormalizedRealmName()
+    if type(realm) == "string" and not issecretvalue(realm) and realm ~= "" then return realm end
+end
+
+-- On a different ruleset from the character you're on (known for both).
+function ns.Elsewhere(c)
+    local mine = ns.char and ns.char.realm
+    return c.realm ~= nil and mine ~= nil and c.realm ~= mine
+end
+
+-- Characters on other rulesets are left out of tooltips unless the player shows them.
+function ns.OtherRulesetsOn() return ns.db.otherRulesets == true end
+function ns.Hidden(c) return not ns.db.otherRulesets and ns.Elsewhere(c) end
+
+function ns.SetOtherRulesets(on)
+    ns.db.otherRulesets = on and true or nil
+    ns.InvalidateCache()
+    if ns.UpgradesChanged then ns.UpgradesChanged() end
+end
+
+-- The ruleset's name from the realm name the client reports, in the player's language;
+-- a realm name that doesn't say is shown as it is.
+local function RulesetBase(realm)
+    local r = realm:lower()
+    if r:find("hardcore", 1, true) then return L["Hardcore"] end
+    if r:find("pvp%d*$") then return L["PvP"] end
+    if r:find("rp%d*$") or r:find("roleplay", 1, true) then return L["Roleplaying"] end
+    if r:find("pve%d*$") or r:find("normal", 1, true) then return L["Normal"] end
+    return realm
+end
+
+-- Two realms with the same ruleset (the beta has "ClassicBetaPvE" and "...PvE2") are
+-- told apart by their realm names.
+function ns.RulesetLabel(realm)
+    if not realm then return L["Not sorted yet (log in on them once)"] end
+    local base = RulesetBase(realm)
+    if base == realm then return realm end
+    for _, c in pairs(ns.db.chars) do
+        if c.realm and c.realm ~= realm and RulesetBase(c.realm) == base then
+            return base .. " (" .. realm .. ")"
+        end
+    end
+    return base
+end
+
 -- Bank and mail stay nil until first seen, so "never scanned" differs from "empty".
 -- Characters are keyed by full name ("First Last"), which is unique in a region.
-function ns.InitChar(db, name, class, faction)
+function ns.InitChar(db, name, class, faction, realm)
     local key = name
     local c = db.chars[key]
     if type(c) ~= "table" then
@@ -166,6 +220,7 @@ function ns.InitChar(db, name, class, faction)
         db.chars[key] = c
     end
     c.name, c.class, c.faction = name, class, faction
+    if realm then c.realm = realm end
     c.bags = c.bags or {}
     c.equip = c.equip or {}
     return key, c
@@ -194,7 +249,7 @@ ns.On("PLAYER_LOGIN", function()
     local name = ns.PlayerName()
     ns.AdoptFirstName(ns.db.chars, name, class)
     local newChar = ns.db.chars[name] == nil
-    ns.charKey, ns.char = ns.InitChar(ns.db, name, class, UnitFactionGroup("player"))
+    ns.charKey, ns.char = ns.InitChar(ns.db, name, class, UnitFactionGroup("player"), ns.PlayerRealm())
     ns.StartScanner()
     ns.StartMail()
     ns.StartMoney()
@@ -281,6 +336,12 @@ end
 function commands.skillups()
     ns.SetSkillups(not ns.SkillupsOn())
     Print(ns.db.skillupsOff and L["Skill-up details in tooltips off."] or L["Skill-up details in tooltips on."])
+end
+
+function commands.rulesets()
+    ns.SetOtherRulesets(not ns.OtherRulesetsOn())
+    Print(ns.OtherRulesetsOn() and L["Characters on other rulesets are shown in tooltips."]
+        or L["Characters on other rulesets are hidden in tooltips."])
 end
 
 function commands.upgrades()
@@ -374,6 +435,7 @@ function commands.help()
     Print(L["/af icons picks the icons item tooltips use for bags, bank, mail and worn items."])
     Print(L["/af upgrades turns upgrade hints in item tooltips on or off. /af role Name role sets what a character's upgrades are judged by (melee, ranged, caster, healer, tank, feral or auto)."])
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
+    Print(L["/af rulesets shows or hides your characters on other rulesets (Normal, PvP...) in tooltips; they can't trade with this one."])
     Print(L["Or use the minimap button (right-click for options)."])
 end
 ns.ShowHelp = commands.help

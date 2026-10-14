@@ -4,7 +4,7 @@ local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
 
-local pairs, select, sort, type, wipe, GetMoney = pairs, select, table.sort, type, wipe, GetMoney
+local pairs, ipairs, select, sort, type, wipe, GetMoney = pairs, ipairs, select, table.sort, type, wipe, GetMoney
 local floor, time, date = math.floor, time, date
 local issecretvalue = issecretvalue or function() return false end
 local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
@@ -36,6 +36,10 @@ local DAY = 86400
 local KEEP_DAYS = 400
 local dayOffset, today, nextDay = 0, nil, 0
 local sessionStart -- this character's gold at login
+-- This ruleset's history: rulesets can't trade, so each keeps its own. db.goldDays is the
+-- ruleset of db.goldRealm (the first one seen since rulesets were recorded, which adopts
+-- the history from before); any other ruleset's is db.goldDaysBy[realm].
+local days
 
 -- For keeping the session across /reload (Character.lua).
 function ns.SessionGold() return sessionStart end
@@ -44,14 +48,13 @@ function ns.SetSessionGold(copper) sessionStart = copper end
 local function AccountTotal()
     local total = 0
     for _, c in pairs(ns.db.chars) do
-        if c.money then total = total + c.money end
+        if c.money and not ns.Elsewhere(c) then total = total + c.money end
     end
     return total
 end
 
 local function RecordDay()
     local now = time()
-    local days = ns.db.goldDays
     if not today or now >= nextDay then
         today = floor((now + dayOffset) / DAY)
         nextDay = (today + 1) * DAY - dayOffset
@@ -65,7 +68,7 @@ end
 -- The change in total gold since the latest day at least `back` days before today
 -- (1: today; 7: this week), or nil if there's no such day yet.
 local function ChangeSince(back)
-    local days, best = ns.db.goldDays, nil
+    local best
     for day in pairs(days) do
         if day <= today - back and (not best or day > best) then best = day end
     end
@@ -93,16 +96,33 @@ end
 -- A "Gold" title, then the same layout as item tooltips: total (only when more
 -- than one character has gold), the current character, then others by amount; then
 -- gold over time if session stats are on.
+local others = {} -- [realm] = { label, total, keys... }, other rulesets when shown
+local otherList = {}
+local function ByLabel(a, b) return a.label < b.label end
+
 function ns.AddMoneyLines(tt)
     chars = ns.db.chars
     wipe(order)
+    wipe(others)
+    wipe(otherList)
     local n, total = 0, 0
     for key, c in pairs(chars) do
         local m = c.money
-        if m and m > 0 and key ~= ns.charKey then
-            n = n + 1
-            order[n] = key
-            total = total + m
+        if m and m > 0 and key ~= ns.charKey and not ns.Hidden(c) then
+            if ns.Elsewhere(c) then
+                local g = others[c.realm]
+                if not g then
+                    g = { label = ns.RulesetLabel(c.realm), total = 0 }
+                    others[c.realm] = g
+                    otherList[#otherList + 1] = g
+                end
+                g[#g + 1] = key
+                g.total = g.total + m
+            else
+                n = n + 1
+                order[n] = key
+                total = total + m
+            end
         end
     end
     sort(order, ByMoney)
@@ -116,6 +136,14 @@ function ns.AddMoneyLines(tt)
     for i = 1, n do
         local key = order[i]
         tt:AddDoubleLine(ns.ColoredName(key, chars[key]), Coins(chars[key].money), 1, 1, 1, 1, 1, 1)
+    end
+    sort(otherList, ByLabel)
+    for _, g in ipairs(otherList) do
+        sort(g, ByMoney)
+        tt:AddDoubleLine(g.label, Coins(g.total), 1, 0.82, 0, 1, 1, 1)
+        for _, key in ipairs(g) do
+            tt:AddDoubleLine(ns.ColoredName(key, chars[key]), Coins(chars[key].money), 1, 1, 1, 1, 1, 1)
+        end
     end
     if ns.StatsOn() then AddStats(tt) end
 end
@@ -217,7 +245,16 @@ function ns.StartMoney()
     -- Local time's offset from UTC, so days start at local midnight.
     local now = time()
     dayOffset = now - time(date("!*t", now))
-    ns.db.goldDays = ns.db.goldDays or {}
+    local db, realm = ns.db, char.realm
+    db.goldDays = db.goldDays or {}
+    if realm and db.goldRealm and db.goldRealm ~= realm then
+        db.goldDaysBy = db.goldDaysBy or {}
+        db.goldDaysBy[realm] = db.goldDaysBy[realm] or {}
+        days = db.goldDaysBy[realm]
+    else
+        db.goldRealm = db.goldRealm or realm
+        days = db.goldDays
+    end
 
     local function Update()
         local m = GetMoney()

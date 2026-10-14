@@ -10,7 +10,7 @@ local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
 
-local pairs, wipe, type, pcall, floor, max = pairs, wipe, type, pcall, math.floor, math.max
+local pairs, wipe, type, pcall, floor, max, sort = pairs, wipe, type, pcall, math.floor, math.max, table.sort
 local issecretvalue = issecretvalue or function() return false end
 local GetItemInfoInstant = C_Item.GetItemInfoInstant
 
@@ -115,27 +115,49 @@ function ns.Describe(c, id)
 end
 
 -- Rows are stored flat as count, left, right, parts and kept sorted highest count first.
+local function Insert(e, count, left, text, parts)
+    local i = e.n
+    while i > 0 and e[i * 4 - 3] < count do
+        e[i * 4 + 1], e[i * 4 + 2], e[i * 4 + 3], e[i * 4 + 4] = e[i * 4 - 3], e[i * 4 - 2], e[i * 4 - 1], e[i * 4]
+        i = i - 1
+    end
+    e[i * 4 + 1], e[i * 4 + 2], e[i * 4 + 3], e[i * 4 + 4] = count, left, text, parts
+    e.n, e.total = e.n + 1, e.total + count
+end
+
+local function ByLabel(a, b) return a.label < b.label end
+
+-- Your ruleset's characters; with other rulesets shown, theirs in e.groups, one list per
+-- ruleset (each with its own total: they can't trade with yours).
 local function BuildOthers(id)
-    local e, n, total
+    local e, groups
     for key, c in pairs(ns.db.chars) do
-        if key ~= ns.charKey then
+        if key ~= ns.charKey and not ns.Hidden(c) then
             local count, text, parts = ns.Describe(c, id)
             if count > 0 then
-                if not e then e, n, total = {}, 0, 0 end
-                total = total + count
-                local i = n
-                while i > 0 and e[i * 4 - 3] < count do
-                    e[i * 4 + 1], e[i * 4 + 2], e[i * 4 + 3], e[i * 4 + 4] = e[i * 4 - 3], e[i * 4 - 2], e[i * 4 - 1], e[i * 4]
-                    i = i - 1
+                local list
+                if ns.Elsewhere(c) then
+                    groups = groups or {}
+                    list = groups[c.realm]
+                    if not list then
+                        list = { n = 0, total = 0, label = ns.RulesetLabel(c.realm) }
+                        groups[c.realm] = list
+                        groups[#groups + 1] = list
+                    end
+                else
+                    e = e or { n = 0, total = 0 }
+                    list = e
                 end
-                e[i * 4 + 1], e[i * 4 + 2], e[i * 4 + 3], e[i * 4 + 4] = count, ColoredName(key, c), text, parts
-                n = n + 1
+                Insert(list, count, ColoredName(key, c), text, parts)
             end
         end
     end
-    if not e then return EMPTY end
-    e.n, e.total = n, total
-    return e
+    if groups then
+        e = e or { n = 0, total = 0 }
+        sort(groups, ByLabel)
+        e.groups = groups
+    end
+    return e or EMPTY
 end
 
 ---------------------------------------------------------------------------
@@ -155,6 +177,9 @@ local function Grid(e)
     if grid and grid.ver == ns.version then return grid end
     local places = curCount > 0 and curParts and #curParts / 2 or 0
     for i = 1, e.n * 4, 4 do places = max(places, #e[i + 3] / 2) end
+    for _, g in ipairs(e.groups or EMPTY) do
+        for i = 1, g.n * 4, 4 do places = max(places, #g[i + 3] / 2) end
+    end
     local spec = {}
     for p = 1, places do
         spec[#spec + 1] = { gap = GAP, justify = "LEFT" }           -- icon
@@ -173,6 +198,11 @@ local function Grid(e)
     local rows = {}
     if curCount > 0 and curParts then rows[1] = Cells(curParts, curCount) end
     for i = 1, e.n * 4, 4 do rows[#rows + 1] = Cells(e[i + 3], e[i]) end
+    -- Each other ruleset: its heading with its total in the count column, then its rows.
+    for _, g in ipairs(e.groups or EMPTY) do
+        rows[#rows + 1] = { [places * 2 + 1] = tostring(g.total) }
+        for i = 1, g.n * 4, 4 do rows[#rows + 1] = Cells(g[i + 3], g[i]) end
+    end
     grid = { ver = ns.version, spec = spec, rows = rows, layouts = {} }
     e.grid = grid
     return grid
@@ -274,9 +304,11 @@ function ns.FindItems(text, retried)
     local needle = text:lower()
     local chars, ids = ns.db.chars, {}
     for _, c in pairs(chars) do
-        for i = 1, #LOCS do
-            local t = c[LOCS[i]]
-            if t then for id in pairs(t) do ids[id] = true end end
+        if not ns.Hidden(c) then
+            for i = 1, #LOCS do
+                local t = c[LOCS[i]]
+                if t then for id in pairs(t) do ids[id] = true end end
+            end
         end
     end
     local found, loading = {}, 0
@@ -297,7 +329,7 @@ function ns.FindItems(text, retried)
     for _, f in ipairs(found) do
         local list, total = {}, 0
         for key, c in pairs(chars) do
-            local n = ns.Describe(c, f.id)
+            local n = not ns.Hidden(c) and ns.Describe(c, f.id) or 0
             if n > 0 then
                 list[#list + 1] = { key = key, c = c, n = n }
                 total = total + n
@@ -349,7 +381,7 @@ function ns.AddLines(tt, id)
     end
 
     local rows = e.n + (curCount > 0 and 1 or 0)
-    if rows == 0 then return end
+    if rows == 0 and not e.groups then return end
 
     tt:AddLine(" ")
     local first = tt.NumLines and tt:NumLines() + 1
@@ -362,6 +394,12 @@ function ns.AddLines(tt, id)
     end
     for i = 1, e.n * 4, 4 do
         tt:AddDoubleLine(e[i + 1], e[i + 2], 1, 1, 1, 1, 1, 1)
+    end
+    for _, g in ipairs(e.groups or EMPTY) do
+        tt:AddDoubleLine(g.label, g.total, 1, 0.82, 0, 1, 1, 1)
+        for i = 1, g.n * 4, 4 do
+            tt:AddDoubleLine(g[i + 1], g[i + 2], 1, 1, 1, 1, 1, 1)
+        end
     end
 
     -- Columns only when others have it too (on your own there's nothing to line up),

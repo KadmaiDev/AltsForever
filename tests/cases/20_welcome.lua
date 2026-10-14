@@ -17,7 +17,7 @@ test("the Options page is built the first time the Options window shows it", fun
     assert(f.built and f.logo, "not blank on the first visit")
 end)
 
-test("Options > AddOns > Alts Forever: logo, Open overview, and the six settings as tick boxes", function()
+test("Options > AddOns > Alts Forever: logo, Open overview, and the seven settings as tick boxes", function()
     wow.load(FILES)
     wow.login(nil)
     eq(wow.settings.name, "Alts Forever")
@@ -25,9 +25,9 @@ test("Options > AddOns > Alts Forever: logo, Open overview, and the six settings
     eq(f.logo.texture, "Interface\\AddOns\\AltsForever\\media\\logo.tga", "the full logo")
     local names = {}
     for _, check in ipairs(f.checks) do names[#names + 1] = check.label.text end
-    eq(table.concat(names, " | "), "Show skill-up details | Show upgrades | Send mail to alts | Show session stats | Legacy reminders | Show minimap button")
+    eq(table.concat(names, " | "), "Show skill-up details | Show upgrades | Send mail to alts | Show session stats | Legacy reminders | Show other rulesets | Show minimap button")
     -- The tick boxes show and change the same settings as the menu and commands.
-    local stats, minimap = f.checks[4], f.checks[6]
+    local stats, minimap = f.checks[4], f.checks[7]
     eq(stats:GetChecked(), false, "session stats off by default")
     eq(minimap:GetChecked(), true)
     stats:SetChecked(true)

@@ -45,7 +45,7 @@ function ns.AddRepLines(tt, fresh)
     local rows = {}
     for _, key in ipairs(ns.OverviewOrder()) do
         local c = ns.db.chars[key]
-        local value = key ~= ns.charKey and c.reps and c.reps[id]
+        local value = key ~= ns.charKey and not ns.Hidden(c) and c.reps and c.reps[id]
         if value then
             local level, low, high = ns.Standing(value)
             local color = "|cff" .. COLORS[level]

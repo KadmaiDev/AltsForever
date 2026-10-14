@@ -133,16 +133,43 @@ function ns.SeenText(key, c, now)
     return t and ns.FormatAgo(now - t) or (GREY .. "?|r")
 end
 
--- Character keys in display order: you first, then by level, then by name.
+-- The ruleset group a character is shown in: their realm name, or "?" until they log in
+-- once (Core.lua).
+local UNSORTED = "?"
+function ns.RulesetGroup(c) return c.realm or UNSORTED end
+
+-- Character keys in display order: you first, then by level, then by name. Once two
+-- rulesets are known, your ruleset's characters come first, then each other ruleset's,
+-- then any not sorted yet; ns.overviewSplit says so (the overview then heads each one).
 local order = {}
 function ns.OverviewOrder()
     local chars = ns.db.chars
     for i = #order, 1, -1 do order[i] = nil end
+    local seen, split = nil, false
     for key, c in pairs(chars) do
         if key ~= ns.charKey then order[#order + 1] = key end
+        if c.realm then
+            if seen and seen ~= c.realm then split = true end
+            seen = c.realm
+        end
+    end
+    ns.overviewSplit = split
+    local mine = ns.RulesetGroup(ns.char)
+    local function Rank(g)
+        if g == mine then return 0 end
+        return g == UNSORTED and 2 or 1
     end
     table.sort(order, function(a, b)
-        local la, lb = chars[a].level or 0, chars[b].level or 0
+        local ca, cb = chars[a], chars[b]
+        if split then
+            local ga, gb = ns.RulesetGroup(ca), ns.RulesetGroup(cb)
+            if ga ~= gb then
+                local ra, rb = Rank(ga), Rank(gb)
+                if ra ~= rb then return ra < rb end
+                return ga < gb
+            end
+        end
+        local la, lb = ca.level or 0, cb.level or 0
         if la ~= lb then return la > lb end
         return a < b
     end)
@@ -153,7 +180,7 @@ end
 ---------------------------------------------------------------------------
 -- Window
 ---------------------------------------------------------------------------
-local frame, rows, footer
+local frame, rows, heads, footer
 
 local NO_LABELS, NOTE_LEFT = {}, { [2] = true }
 -- Gathering professions by their game IDs (Fishing 356, Herbalism 182, Skinning 393), so
@@ -310,14 +337,56 @@ local function CreateRow(i)
     return row
 end
 
+-- A ruleset's heading row: its name, and its gold total under the Gold column.
+local function CreateHead(i)
+    local head = CreateFrame("Frame", nil, frame)
+    head:SetHeight(ROW_HEIGHT)
+    local texts = CreateCells(head, "GameFontNormalSmall")
+    -- The name may run on past the narrow columns before Gold (empty in a heading).
+    local width = -8
+    for c = 1, 5 do width = width + COLUMNS[c].width + (COLUMNS[c + 1].gap or 0) end
+    texts[1]:SetWidth(width)
+    head.label, head.gold = texts[1], texts[6]
+    heads[i] = head
+    return head
+end
+
+local function Place(f, slot)
+    f:ClearAllPoints()
+    f:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -54 - (slot - 1) * ROW_HEIGHT)
+    f:SetPoint("RIGHT", frame, "RIGHT", -4, 0)
+end
+
 local function Refresh()
     local now = time()
     local chars = ns.db.chars
     local keys = ns.OverviewOrder()
+    local split = ns.overviewSplit
     local total, played = 0, 0
+    -- Gold per ruleset, for the headings.
+    local gold = {}
+    if split then
+        for _, key in ipairs(keys) do
+            local g = ns.RulesetGroup(chars[key])
+            gold[g] = (gold[g] or 0) + (chars[key].money or 0)
+        end
+    end
+    local slot, nHeads, group = 0, 0, nil
     for i, key in ipairs(keys) do
         local c = chars[key]
+        if split and ns.RulesetGroup(c) ~= group then
+            group = ns.RulesetGroup(c)
+            nHeads = nHeads + 1
+            slot = slot + 1
+            local head = heads[nHeads] or CreateHead(nHeads)
+            Place(head, slot)
+            head.label:SetText(ns.RulesetLabel(group ~= "?" and group or nil))
+            head.gold:SetText(GetCoinTextureString(gold[group]))
+            head:Show()
+        end
+        slot = slot + 1
         local row = rows[i] or CreateRow(i)
+        Place(row, slot)
         local cells = row.cells
         row.key = key
         cells[1]:SetText(ns.ColoredName(key, c))
@@ -343,11 +412,14 @@ local function Refresh()
         row:Show()
     end
     for i = #keys + 1, #rows do rows[i]:Hide() end
+    for i = nHeads + 1, #heads do heads[i]:Hide() end
     -- With only one character there's nothing to compare yet: say how to add the others.
     frame.credit:SetText(#keys == 1 and (GREY .. L["Log in on your other characters once to add them here."] .. "|r")
         or L["Alts Forever by Kadmai"])
-    footer:SetText(L["Total played: %s"]:format(ns.FormatPlayed(played)) .. "     " .. L["Total gold: %s"]:format(GetCoinTextureString(total)))
-    frame:SetHeight(54 + #keys * ROW_HEIGHT + 32)
+    -- Split by ruleset, each heading has its gold: one total would mix what can't be traded.
+    footer:SetText(L["Total played: %s"]:format(ns.FormatPlayed(played))
+        .. (split and "" or ("     " .. L["Total gold: %s"]:format(GetCoinTextureString(total)))))
+    frame:SetHeight(54 + slot * ROW_HEIGHT + 32)
 end
 
 local function CreateWindow()
@@ -369,7 +441,7 @@ local function CreateWindow()
         close:SetPoint("TOPRIGHT", -4, -4)
     end
     frame = f
-    rows = {}
+    rows, heads = {}, {}
     f:SetSize(width, 200)
     f:SetPoint("CENTER")
     f:SetFrameStrata("HIGH")

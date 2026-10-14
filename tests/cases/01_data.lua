@@ -30,7 +30,9 @@ test("version 1 data (Name-Realm keys) is upgraded to full-name keys", function(
     eq(ns.charKey, "Kadra Stormfield")
     local c = AltsForeverDB.chars["Kadra Stormfield"]
     eq(c, ns.char, "you are matched to your upgraded entry, not a new one")
-    eq(c.bank[100], 3); eq(c.played, 500); eq(c.realm, nil); eq(c.class, "MAGE")
+    eq(c.bank[100], 3); eq(c.played, 500); eq(c.class, "MAGE")
+    eq(c.realm, "Realm", "the ruleset this login reports, not the old key's")
+    eq(AltsForeverDB.chars["Brakka"].realm, nil, "old realm names are dropped")
     eq(AltsForeverDB.chars["Brakka"].bank[100], 7, "a name missing from the entry comes from its key")
     eq(AltsForeverDB.chars["Brakka"].name, "Brakka")
     local n = 0

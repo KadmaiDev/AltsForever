@@ -402,7 +402,7 @@ local function Build(info, link, onlyYou, recipeID, tt, data)
     rows = 0
     if not info then return end
     for key, c in pairs(ns.db.chars) do
-        local ok = not onlyYou or key == ns.charKey
+        local ok = (not onlyYou or key == ns.charKey) and not ns.Hidden(c)
         if ok and recipeID then ok = ns.RecipeOpenTo(c, tt, recipeID, data) end
         if ok then
             local gain, empty, at = Compare(c, info, link)
