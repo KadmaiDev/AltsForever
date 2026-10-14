@@ -144,7 +144,7 @@ test("crates count only your ruleset's materials, even with other rulesets shown
     ns.SetOtherRulesets(true)
     wow.itemNames[9001] = "Soul Dust"
     local text = rulesetHover(CRATE, CRATE_TEXT)
-    assert(text:find("[DRUID]Tarn = |cffe0e0e020|r", 1, true), text)
+    assert(text:find("[DRUID]Tarn = |cff20ff2020|r", 1, true), "enough alone: green\n" .. text)
     assert(text:find("Total = |cff20ff2020|r", 1, true), text)
     assert(not text:find("Grim", 1, true), text)
 end)

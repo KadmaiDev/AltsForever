@@ -25,7 +25,8 @@ end
 
 -- A grid cell list as the plain text shows it: cells two spaces apart.
 function crateCells(...) return table.concat({ ... }, "  ") end
-function crateIcon(id) return "|T" .. id .. ":0:0:0:0:64:64:5:59:5:59|t" end
+function crateIcon(id) return "|T" .. id .. ":16:16:0:0:64:64:5:59:5:59|t" end
+CRATE_UNKNOWN = crateIcon("Interface\\Icons\\INV_Misc_QuestionMark")
 function crateNum(n) return CW .. n .. "|r" end
 function crateNone() return CD .. "-|r" end
 
@@ -33,14 +34,14 @@ test("a Waylaid Crate shows a grid: a column per material, a row per character w
     crateStart()
     local text = textOf(wow.hover(GameTooltip, CRATE, CRATE_TEXT))
     local want = table.concat({
-        "Materials on your characters = " .. crateCells(crateIcon(111), CD .. "?|r", crateIcon(333), CD .. "?|r"),
+        "Materials on your characters = " .. crateCells(crateIcon(111), CRATE_UNKNOWN, crateIcon(333), CRATE_UNKNOWN),
         CD .. "Needed|r = " .. crateCells(CD .. "20|r", CD .. "4|r", CD .. "6|r", CD .. "2|r"),
         "[MAGE]Aldric = " .. crateCells(crateNone(), crateNone(), crateNum(4), crateNone()),
         "[DRUID]Tarnia = " .. crateCells(crateNum(14), crateNone(), crateNum(1), crateNone()),
         "[PALADIN]Vespera = " .. crateCells(crateNum(12), crateNone(), crateNum(2), crateNone()),
         "Total = " .. crateCells(CG .. "26|r", CD .. "0|r", CG .. "7|r", CD .. "0|r"),
     }, "\n")
-    assert(text:find(want, 1, true), "you first, then most; green where there's enough; '?' for a material nobody has\n" .. text)
+    assert(text:find(want, 1, true), "you first, then most; green where there's enough; a question mark for a material nobody has\n" .. text)
 end)
 
 test("other items get no crate lines", function()
@@ -65,7 +66,8 @@ test("crate totals follow your bags, and names that load later", function()
     wow.fire("BAG_UPDATE", 0)
     wow.fire("BAG_UPDATE_DELAYED")
     text = textOf(wow.hover(GameTooltip, CRATE, CRATE_TEXT))
-    assert(text:find("[MAGE]Aldric = " .. crateCells(crateNone(), crateNone(), crateNum(4), crateNum(3)), 1, true), text)
+    assert(text:find("[MAGE]Aldric = " .. crateCells(crateNone(), crateNone(), crateNum(4), CG .. "3|r"), 1, true),
+        "3 of the 2 needed: green, Aldric can fill it alone\n" .. text)
     assert(text:find("Total = " .. crateCells(CG .. "26|r", CD .. "0|r", CG .. "7|r", CG .. "3|r"), 1, true), text)
 end)
 

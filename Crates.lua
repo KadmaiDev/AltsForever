@@ -22,7 +22,10 @@ local USE = ITEM_SPELL_TRIGGER_ONUSE or "Use:"
 local MAX_ROWS = 10 -- characters; more are counted in the totals and a "+n more" row
 local GREY, DIM, ENOUGH = "|cffe0e0e0", "|cff9d9d9d", "|cff20ff20"
 local NO_LABELS = {}
-local CROP = ":0:0:0:0:64:64:5:59:5:59|t"
+-- Header icons at 16 px (text-sized ones were too small to tell materials apart), cropped.
+local CROP = ":16:16:0:0:64:64:5:59:5:59|t"
+-- A material none of your characters has ever had has no known item ID, so no icon.
+local UNKNOWN_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 ---------------------------------------------------------------------------
 -- The crate's bundles, parsed once per item: { { qty, name, lname, id } ... } or false.
@@ -143,8 +146,8 @@ end
 
 local function Icon(id)
     local icon = id and C_Item.GetItemIconByID and C_Item.GetItemIconByID(id)
-    if icon and not issecretvalue(icon) then return "|T" .. icon .. CROP end
-    return DIM .. "?|r"
+    if not icon or issecretvalue(icon) then icon = UNKNOWN_ICON end
+    return "|T" .. icon .. CROP
 end
 
 local function Build(p)
@@ -179,7 +182,11 @@ local function Build(p)
     for j = 1, math.min(#list, MAX_ROWS) do
         local e = list[j]
         local row = { ns.ShortName(e.key, e.c) }
-        for i = 1, n do row[i + 1] = e[i] and (GREY .. e[i] .. "|r") or (DIM .. "-|r") end
+        -- Green: this character has enough to fill it alone, no mail needed.
+        for i = 1, n do
+            local have = e[i]
+            row[i + 1] = not have and (DIM .. "-|r") or ((have >= p[i].qty and ENOUGH or GREY) .. have .. "|r")
+        end
         rows[#rows + 1] = row
     end
     if #list > MAX_ROWS then
