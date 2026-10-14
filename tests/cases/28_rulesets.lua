@@ -233,3 +233,37 @@ test("the overview heads each faction; with two rulesets too, both are named", f
     end
     eq(table.concat(heads, " | "), "Normal · Alliance 4000c | Normal · Horde  | PvP · Horde ")
 end)
+
+-- The overview's group headings, shown, in order.
+function overviewHeads()
+    local list = {}
+    for _, f in ipairs(wow.frames) do
+        if rawget(f, "label") and rawget(f, "gold") and f.shown then list[#list + 1] = f end
+    end
+    return list
+end
+
+test("clicking a group heading collapses it to the heading, and opens it again", function()
+    rulesetStart()
+    SlashCmdList.ALTSFOREVER("")
+    eq(#overviewRows(), 4)
+    local normal = overviewHeads()[1]
+    eq(normal.icon.texture, "Interface\\Buttons\\UI-MinusButton-Up")
+    normal.scripts.OnClick(normal)
+    local rows = overviewRows()
+    eq(#rows, 2, "Aldric and Tarn hidden")
+    eq(cell(rows[1], 1), "[WARRIOR]Grim Tusk")
+    local heads = overviewHeads()
+    eq(heads[1].label.text, "Normal  |cff9d9d9d(2)|r")
+    eq(heads[1].icon.texture, "Interface\\Buttons\\UI-PlusButton-Up")
+    eq(heads[2].gold.text, "", "an open group of one: no total")
+    heads[2].scripts.OnClick(heads[2])
+    eq(overviewHeads()[2].gold.text, "500c", "collapsed: its total, as its row is hidden")
+    eq(AltsForeverDB.collapsedGroups[heads[1].group], true, "kept between sessions")
+    heads[1].scripts.OnEnter(heads[1])
+    assert(textOf(GameTooltip.lines):find("Click to show these characters.", 1, true))
+    heads[1].scripts.OnClick(heads[1])
+    heads[2].scripts.OnClick(heads[2])
+    eq(#overviewRows(), 4)
+    eq(AltsForeverDB.collapsedGroups, nil, "nothing left collapsed: nothing saved")
+end)

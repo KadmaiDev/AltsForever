@@ -221,3 +221,5 @@ L["Characters on other rulesets or factions are hidden in tooltips."] = "Persona
 L["/af rulesets shows or hides your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; they can't trade with this one."] = "/af rulesets mostra ou oculta seus personagens de outros modos de jogo (Normal, JxJ...) ou da outra facção nas dicas; eles não podem negociar com este."
 L["Show other rulesets and factions"] = "Mostrar outros modos de jogo e facções"
 L["Tooltips also list your characters on other rulesets (Normal, PvP...) and the other faction, under their own heading. They can't trade or mail with this one, so they're hidden by default; the overview always shows everyone. Same as /af rulesets."] = "As dicas também listam seus personagens de outros modos de jogo (Normal, JxJ...) e da outra facção, sob seu próprio título. Eles não podem negociar nem trocar correio com este, então ficam ocultos por padrão; o resumo sempre mostra todos. Igual a /af rulesets."
+L["Click to show these characters."] = "Clique para mostrar estes personagens."
+L["Click to hide these characters."] = "Clique para ocultar estes personagens."

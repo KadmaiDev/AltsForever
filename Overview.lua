@@ -334,12 +334,41 @@ local function CreateRow(i)
 end
 
 -- A group's heading row: its name, and its gold total under the Gold column, with a faint
--- line above it and some space (SECTION_GAP) before every group but the first.
+-- line above it and some space (SECTION_GAP) before every group but the first. Clicking
+-- it collapses the group to just the heading, or opens it again (db.collapsedGroups,
+-- by group key, kept between sessions).
 local SECTION_GAP = 10
+local PLUS, MINUS = "Interface\\Buttons\\UI-PlusButton-Up", "Interface\\Buttons\\UI-MinusButton-Up"
+
+local function ToggleGroup(head)
+    local db = ns.db
+    db.collapsedGroups = db.collapsedGroups or {}
+    db.collapsedGroups[head.group] = not db.collapsedGroups[head.group] or nil
+    if next(db.collapsedGroups) == nil then db.collapsedGroups = nil end
+    ns.RefreshOverview()
+end
+
+local function HeadTooltip(head)
+    GameTooltip:SetOwner(head, "ANCHOR_TOPLEFT")
+    GameTooltip:AddLine(head.label:GetText())
+    GameTooltip:AddLine(head.collapsed and L["Click to show these characters."] or L["Click to hide these characters."], 1, 1, 1)
+    GameTooltip:Show()
+end
 
 local function CreateHead(i)
-    local head = CreateFrame("Frame", nil, frame)
+    local head = CreateFrame("Button", nil, frame)
     head:SetHeight(ROW_HEIGHT)
+    local hl = head:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.08)
+    head:RegisterForClicks("LeftButtonUp")
+    head:SetScript("OnClick", ToggleGroup)
+    head:SetScript("OnEnter", HeadTooltip)
+    head:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    local icon = head:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(12, 12)
+    icon:SetPoint("LEFT", head, "LEFT", -1, 0)
+    head.icon = icon
     local line = head:CreateTexture(nil, "ARTWORK")
     line:SetColorTexture(1, 1, 1, 0.12)
     line:SetHeight(1)
@@ -378,25 +407,33 @@ local function Refresh()
             count[g] = (count[g] or 0) + 1
         end
     end
-    local y, nHeads, group = 0, 0, nil
+    local collapsed = ns.db.collapsedGroups or {}
+    local y, nHeads, group, hidden = 0, 0, nil, false
     for i, key in ipairs(keys) do
         local c = chars[key]
         if split and Group(c) ~= group then
             group = Group(c)
+            hidden = collapsed[group] == true
             if nHeads > 0 then y = y + SECTION_GAP end
             nHeads = nHeads + 1
             local head = heads[nHeads] or CreateHead(nHeads)
             Place(head, y)
+            head.group, head.collapsed = group, hidden
+            head.icon:SetTexture(hidden and PLUS or MINUS)
             head.line:SetShown(nHeads > 1)
-            head.label:SetText(ns.GroupLabel(c, parts[1], parts[2]))
-            -- A total only when there's something to add up: one character's is on their row.
-            head.gold:SetText(count[group] > 1 and GetCoinTextureString(gold[group]) or "")
+            local label = ns.GroupLabel(c, parts[1], parts[2])
+            head.label:SetText(hidden and (label .. "  " .. GREY .. "(" .. count[group] .. ")|r") or label)
+            -- A total only when there's something to add up: one character's is on their row,
+            -- unless the group is collapsed.
+            head.gold:SetText((hidden or count[group] > 1) and GetCoinTextureString(gold[group]) or "")
             head:Show()
             y = y + ROW_HEIGHT
         end
         local row = rows[i] or CreateRow(i)
-        Place(row, y)
-        y = y + ROW_HEIGHT
+        if not hidden then
+            Place(row, y)
+            y = y + ROW_HEIGHT
+        end
         local cells = row.cells
         row.key = key
         cells[1]:SetText(ns.ColoredName(key, c))
@@ -419,7 +456,7 @@ local function Refresh()
         cells[14]:SetText(ns.SeenText(key, c, now))
         total = total + (c.money or 0)
         played = played + (ns.PlayedNow(c, now) or 0)
-        row:Show()
+        row:SetShown(not hidden)
     end
     for i = #keys + 1, #rows do rows[i]:Hide() end
     for i = nHeads + 1, #heads do heads[i]:Hide() end

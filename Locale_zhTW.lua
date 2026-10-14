@@ -221,3 +221,5 @@ L["Characters on other rulesets or factions are hidden in tooltips."] = "滑鼠�
 L["/af rulesets shows or hides your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; they can't trade with this one."] = "/af rulesets 在滑鼠提示中顯示或隱藏你在其他規則伺服器(一般、PvP……)或另一陣營的角色;他們無法與目前角色交易。"
 L["Show other rulesets and factions"] = "顯示其他規則伺服器和陣營"
 L["Tooltips also list your characters on other rulesets (Normal, PvP...) and the other faction, under their own heading. They can't trade or mail with this one, so they're hidden by default; the overview always shows everyone. Same as /af rulesets."] = "滑鼠提示也會在獨立的標題下列出你在其他規則伺服器(一般、PvP……)和另一陣營的角色。他們無法與目前角色交易或互寄郵件,因此預設隱藏;總覽一律顯示所有角色。等同於 /af rulesets。"
+L["Click to show these characters."] = "點擊顯示這些角色。"
+L["Click to hide these characters."] = "點擊隱藏這些角色。"

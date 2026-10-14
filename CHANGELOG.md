@@ -1,7 +1,7 @@
 ## Alts Forever (next)
 
 - **Rulesets and factions kept apart:** Normal, PvP, Roleplaying and Hardcore each have their own auction house and mail, and mail never crosses factions, so those characters can't trade with yours. Alts Forever now notes each character's ruleset when you log in on them. Thanks to the player who asked for this!
-  - The overview groups your characters by ruleset and faction (e.g. "Normal · Horde"), each with its own gold total.
+  - The overview groups your characters by ruleset and faction (e.g. "Normal · Horde"), each with its own gold total. Click a group's heading to collapse it.
   - Tooltips (items, gold, Can craft, skill-ups, upgrades, XP and reputation bars) and `/af find` list only characters you can mail. Turn on "Show other rulesets and factions" in the options, or `/af rulesets`, to see the others too, under their own heading and total.
   - Send to alt only offers characters you can mail, and gold today and this week (session stats) are counted per ruleset and faction.
   - Characters you haven't logged in on since updating count as being on yours until you do.
