@@ -333,10 +333,19 @@ local function CreateRow(i)
     return row
 end
 
--- A ruleset's heading row: its name, and its gold total under the Gold column.
+-- A group's heading row: its name, and its gold total under the Gold column, with a faint
+-- line above it and some space (SECTION_GAP) before every group but the first.
+local SECTION_GAP = 10
+
 local function CreateHead(i)
     local head = CreateFrame("Frame", nil, frame)
     head:SetHeight(ROW_HEIGHT)
+    local line = head:CreateTexture(nil, "ARTWORK")
+    line:SetColorTexture(1, 1, 1, 0.12)
+    line:SetHeight(1)
+    line:SetPoint("TOPLEFT", head, "TOPLEFT", 8, 0)
+    line:SetPoint("TOPRIGHT", head, "TOPRIGHT", -8, 0)
+    head.line = line
     local texts = CreateCells(head, "GameFontNormalSmall")
     -- The name may run on past the narrow columns before Gold (empty in a heading).
     local width = -8
@@ -347,9 +356,10 @@ local function CreateHead(i)
     return head
 end
 
-local function Place(f, slot)
+-- Places a row or heading y below the column titles.
+local function Place(f, y)
     f:ClearAllPoints()
-    f:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -54 - (slot - 1) * ROW_HEIGHT)
+    f:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -54 - y)
     f:SetPoint("RIGHT", frame, "RIGHT", -4, 0)
 end
 
@@ -359,30 +369,34 @@ local function Refresh()
     local keys = ns.OverviewOrder()
     local split = ns.overviewSplit
     local total, played = 0, 0
-    -- Gold per ruleset, for the headings.
-    local gold = {}
+    -- Gold and characters per group, for the headings.
+    local gold, count = {}, {}
     if split then
         for _, key in ipairs(keys) do
             local g = Group(chars[key])
             gold[g] = (gold[g] or 0) + (chars[key].money or 0)
+            count[g] = (count[g] or 0) + 1
         end
     end
-    local slot, nHeads, group = 0, 0, nil
+    local y, nHeads, group = 0, 0, nil
     for i, key in ipairs(keys) do
         local c = chars[key]
         if split and Group(c) ~= group then
             group = Group(c)
+            if nHeads > 0 then y = y + SECTION_GAP end
             nHeads = nHeads + 1
-            slot = slot + 1
             local head = heads[nHeads] or CreateHead(nHeads)
-            Place(head, slot)
+            Place(head, y)
+            head.line:SetShown(nHeads > 1)
             head.label:SetText(ns.GroupLabel(c, parts[1], parts[2]))
-            head.gold:SetText(GetCoinTextureString(gold[group]))
+            -- A total only when there's something to add up: one character's is on their row.
+            head.gold:SetText(count[group] > 1 and GetCoinTextureString(gold[group]) or "")
             head:Show()
+            y = y + ROW_HEIGHT
         end
-        slot = slot + 1
         local row = rows[i] or CreateRow(i)
-        Place(row, slot)
+        Place(row, y)
+        y = y + ROW_HEIGHT
         local cells = row.cells
         row.key = key
         cells[1]:SetText(ns.ColoredName(key, c))
@@ -415,7 +429,7 @@ local function Refresh()
     -- Split by ruleset, each heading has its gold: one total would mix what can't be traded.
     footer:SetText(L["Total played: %s"]:format(ns.FormatPlayed(played))
         .. (split and "" or ("     " .. L["Total gold: %s"]:format(GetCoinTextureString(total)))))
-    frame:SetHeight(54 + slot * ROW_HEIGHT + 32)
+    frame:SetHeight(54 + y + 32)
 end
 
 local function CreateWindow()

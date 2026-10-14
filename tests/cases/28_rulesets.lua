@@ -160,7 +160,7 @@ test("the overview heads each ruleset with its gold; one ruleset, no headings", 
     for _, f in ipairs(wow.frames) do
         if rawget(f, "label") and rawget(f, "gold") and f.shown then heads[#heads + 1] = f.label.text .. " " .. f.gold.text end
     end
-    eq(table.concat(heads, " | "), "Normal 4000c | PvP 500c | Not sorted yet (log in on them once) 200c")
+    eq(table.concat(heads, " | "), "Normal 4000c | PvP  | Not sorted yet (log in on them once) ", "a total only for two or more")
     assert(not AltsForeverFrame.footer.text:find("gold", 1, true), "no mixed gold total")
     -- One ruleset only: as before.
     wow.load(FILES)
@@ -224,12 +224,12 @@ test("the overview heads each faction; with two rulesets too, both are named", f
     for _, f in ipairs(wow.frames) do
         if rawget(f, "label") and rawget(f, "gold") and f.shown then heads[#heads + 1] = f.label.text .. " " .. f.gold.text end
     end
-    eq(table.concat(heads, " | "), "Alliance 4000c | Horde 700c")
+    eq(table.concat(heads, " | "), "Alliance 4000c | Horde ")
     AltsForeverDB.chars["Grim Tusk"] = alt("Grim Tusk", "WARRIOR", { realm = PVP, faction = "Horde", level = 18, money = 500 })
     ns.RefreshOverview()
     heads = {}
     for _, f in ipairs(wow.frames) do
         if rawget(f, "label") and rawget(f, "gold") and f.shown then heads[#heads + 1] = f.label.text .. " " .. f.gold.text end
     end
-    eq(table.concat(heads, " | "), "Normal · Alliance 4000c | Normal · Horde 700c | PvP · Horde 500c")
+    eq(table.concat(heads, " | "), "Normal · Alliance 4000c | Normal · Horde  | PvP · Horde ")
 end)
