@@ -481,7 +481,7 @@ function ns.AddUpgradeLines(tt, id, data)
     local chars = ns.db.chars
     for i = 1, rows do
         local key = rowKey[i]
-        tt:AddDoubleLine(ns.ColoredName(key, chars[key]), rowText[i], 1, 1, 1, 1, 1, 1)
+        tt:AddDoubleLine(ns.ListName(key, chars[key]), rowText[i], 1, 1, 1, 1, 1, 1)
     end
 end
 

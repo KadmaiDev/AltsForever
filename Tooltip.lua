@@ -29,6 +29,10 @@ local TOTAL = L["Total"]
 -- The breakdown: light grey, a step softer than the white totals but readable on
 -- Blizzard's see-through tooltip as well as darker UI skins.
 local GREY = "|cffe0e0e0"
+-- Characters you can't trade with (another ruleset or faction, when shown): all grey,
+-- the game's colour for what isn't available to you.
+local OUT = "|cff808080"
+local OUT_RGB = 0.5
 local SEP = " · "
 local EMPTY = { n = 0, total = 0 }
 
@@ -83,6 +87,13 @@ end
 
 ns.ColoredName = ColoredName
 
+-- A name in a tooltip's list of characters: grey for one you can't trade with (shown only
+-- with "Show other rulesets and factions" on), class coloured otherwise.
+function ns.ListName(key, c)
+    if ns.Elsewhere(c) then return OUT .. (c.name or key) .. "|r" end
+    return ColoredName(key, c)
+end
+
 -- First name only, in class colour, for narrow columns.
 function ns.ShortName(key, c)
     local s = shortNames[key]
@@ -91,6 +102,11 @@ function ns.ShortName(key, c)
         shortNames[key] = s
     end
     return s
+end
+
+function ns.ListShortName(key, c)
+    if ns.Elsewhere(c) then return OUT .. ((c.name or key):match("^(%S+)") or key) .. "|r" end
+    return ns.ShortName(key, c)
 end
 
 -- Returns the character's total for an item, the right-hand text (a grey breakdown
@@ -152,7 +168,7 @@ local function BuildOthers(id)
                     e = e or { n = 0, total = 0 }
                     list = e
                 end
-                Insert(list, count, ColoredName(key, c), text, parts)
+                Insert(list, count, ns.ListName(key, c), text, parts)
             end
         end
     end
@@ -190,13 +206,13 @@ local function Grid(e)
         spec[#spec + 1] = { gap = ICON_GAP, justify = "RIGHT" }     -- its number
     end
     spec[#spec + 1] = { gap = GAP * 2, justify = "RIGHT" }          -- the count
-    local function Cells(parts, count)
+    local function Cells(parts, count, out)
         local cells, offset = {}, (places - #parts / 2) * 2
         for k = 1, #parts, 2 do
             cells[offset + k] = parts[k]
-            cells[offset + k + 1] = GREY .. parts[k + 1] .. "|r"
+            cells[offset + k + 1] = (out and OUT or GREY) .. parts[k + 1] .. "|r"
         end
-        cells[places * 2 + 1] = tostring(count)
+        cells[places * 2 + 1] = out and (OUT .. count .. "|r") or tostring(count)
         return cells
     end
     local rows = {}
@@ -204,8 +220,8 @@ local function Grid(e)
     for i = 1, e.n * 4, 4 do rows[#rows + 1] = Cells(e[i + 3], e[i]) end
     -- Each other ruleset: its heading with its total in the count column, then its rows.
     for _, g in ipairs(e.groups or EMPTY) do
-        rows[#rows + 1] = { [places * 2 + 1] = tostring(g.total) }
-        for i = 1, g.n * 4, 4 do rows[#rows + 1] = Cells(g[i + 3], g[i]) end
+        rows[#rows + 1] = { [places * 2 + 1] = OUT .. g.total .. "|r" }
+        for i = 1, g.n * 4, 4 do rows[#rows + 1] = Cells(g[i + 3], g[i], true) end
     end
     grid = { ver = ns.version, spec = spec, rows = rows, layouts = {} }
     e.grid = grid
@@ -400,9 +416,9 @@ function ns.AddLines(tt, id)
         tt:AddDoubleLine(e[i + 1], e[i + 2], 1, 1, 1, 1, 1, 1)
     end
     for _, g in ipairs(e.groups or EMPTY) do
-        tt:AddDoubleLine(g.label, g.total, 1, 0.82, 0, 1, 1, 1)
+        tt:AddDoubleLine(g.label, g.total, OUT_RGB, OUT_RGB, OUT_RGB, OUT_RGB, OUT_RGB, OUT_RGB)
         for i = 1, g.n * 4, 4 do
-            tt:AddDoubleLine(g[i + 1], g[i + 2], 1, 1, 1, 1, 1, 1)
+            tt:AddDoubleLine(g[i + 1], g[i + 2], 1, 1, 1, OUT_RGB, OUT_RGB, OUT_RGB)
         end
     end
 

@@ -55,7 +55,7 @@ function ns.AddRepLines(tt, fresh)
                 pct = color .. floor((value - low) * 100 / (high - low)) .. "%|r"
                 progress = GREY .. (value - low) .. " / " .. (high - low) .. "|r"
             end
-            rows[#rows + 1] = { ns.ColoredName(key, c), label, pct, progress }
+            rows[#rows + 1] = { ns.ListName(key, c), label, pct, progress }
         end
     end
     local title

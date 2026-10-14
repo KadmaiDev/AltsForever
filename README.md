@@ -77,7 +77,7 @@ Install it from CurseForge, or link or copy this folder to `<WoW Forever>\Interf
 Each ruleset (Normal, PvP, Roleplaying, Hardcore) has its own auction house and mail, and mail never crosses factions, so characters on another ruleset or the other faction can't trade with yours. Alts Forever notes each character's ruleset when you log in on them:
 
 - The overview groups your characters by ruleset and faction (e.g. "Normal · Horde"), each with its own gold total. Click a group's heading to collapse it; it stays collapsed until you click it again.
-- Item and gold tooltips, Can craft, skill-ups, upgrades and the XP and reputation bars list only characters you can mail. Turn on **Show other rulesets and factions** (or `/af rulesets`) to see the others too, under their own heading and total.
+- Item and gold tooltips, Can craft, skill-ups, upgrades and the XP and reputation bars list only characters you can mail. Turn on **Show other rulesets and factions** (or `/af rulesets`) to see the others too, in grey (they can't trade with you) under their own heading and total.
 - Send to alt and Waylaid Crates only ever count characters you can mail.
 
 Characters you haven't logged in on since updating count as being on yours until you do.

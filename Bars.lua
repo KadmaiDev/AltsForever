@@ -59,7 +59,7 @@ function ns.AddXPLines(tt, fresh)
         local c = chars[key]
         if key ~= ns.charKey and not ns.Hidden(c) and c.level and c.level < maxLevel then
             local xp = (c.xpMax and c.xpMax > 0) and (GREY .. floor(c.xp * 100 / c.xpMax) .. "%|r") or ""
-            rows[#rows + 1] = { ns.ColoredName(key, c), tostring(c.level), xp, ns.RestedText(c, now) }
+            rows[#rows + 1] = { ns.ListName(key, c), tostring(c.level), xp, ns.RestedText(c, now) }
         end
     end
     local me = ns.char

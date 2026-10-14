@@ -456,7 +456,7 @@ function ns.AddRecipeLines(tt, id, data)
     local chars = ns.db.chars
     for i = 1, rows do
         local key = rowKey[i]
-        tt:AddDoubleLine(ns.ColoredName(key, chars[key]), rowText[i], 1, 1, 1, 1, 1, 1)
+        tt:AddDoubleLine(ns.ListName(key, chars[key]), rowText[i], 1, 1, 1, 1, 1, 1)
     end
 end
 
@@ -496,7 +496,7 @@ local function FindCrafters(id)
             for prof, items in pairs(c.crafts) do
                 local lname = items[id]
                 if lname then
-                    local text = ns.ColoredName(key, c)
+                    local text = ns.ListName(key, c)
                     -- Saves from before 0.3.0 hold true here, so the grey point is unknown.
                     local grey = skillups and type(lname) == "string" and ns.RecipeGrey(prof, lname)
                     local skill = grey and SkillFor(c, prof)
@@ -594,7 +594,7 @@ local function FindUses(id)
                 end
             end
             if l1 then
-                local who = ns.ShortName(key, c) .. LIGHT .. " · "
+                local who = ns.ListShortName(key, c) .. LIGHT .. " · "
                 local block = { key = key, best = l1, "  " .. n1, who .. L["to %s"]:format(g1) .. "|r" }
                 if l2 then block[3], block[4] = "  " .. n2, who .. L["to %s"]:format(g2) .. "|r" end
                 blocks = blocks or {}
