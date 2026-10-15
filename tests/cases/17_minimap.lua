@@ -134,20 +134,3 @@ test("without a data broker library, nothing is made and nothing breaks", functi
     LibStub = nil
     assert(AltsForeverMinimapButton, "the rest of login ran: the minimap button is there")
 end)
-
-test("turning a hidden minimap button on after login says to reload so a collector (EllesmereUI...) can gather it", function()
-    wow.load(FILES)
-    wow.login({ v = 2, chars = {}, minimapHidden = true })
-    eq(AltsForeverMinimapButton, nil)
-    wow.printed = {}
-    SlashCmdList.ALTSFOREVER("minimap")
-    assert(AltsForeverMinimapButton, "made now")
-    eq(#wow.printed, 1, table.concat(wow.printed, "\n"))
-    assert(wow.printed[1]:find("/reload", 1, true), wow.printed[1])
-    -- Hidden and shown again: the button already exists, so no reload is needed.
-    SlashCmdList.ALTSFOREVER("minimap")
-    wow.printed = {}
-    SlashCmdList.ALTSFOREVER("minimap")
-    eq(#wow.printed, 1)
-    assert(wow.printed[1]:find("Minimap button shown.", 1, true) and not wow.printed[1]:find("/reload", 1, true), wow.printed[1])
-end)

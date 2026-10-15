@@ -402,22 +402,14 @@ function ns.CreateMinimapButton()
     Place(ns.db.minimapAngle or DEFAULT_ANGLE)
 end
 
--- A hidden button is never made, so turning it on after login makes it now: a collector
--- (EllesmereUI's minimap tray, MiniMinimap's bin) gathers buttons around login and leaves
--- it on the minimap edge until a reload (the owner saw this with EllesmereUI, 2026-10-15).
--- Says so, and returns true, when that happens.
 function ns.SetMinimapButton(on)
     ns.db.minimapHidden = not on or nil
-    local made = on and not mmButton
     if on then ns.CreateMinimapButton() end
-    made = made and mmButton ~= nil
-    if made then ns.Print(L["Minimap button shown. If your minimap gathers addon buttons (EllesmereUI, MiniMinimap...), /reload to put it there."]) end
     -- Show and Hide rather than SetShown: MinimapButtonButton hooks those two to lay its
     -- grid out again, so hiding the button doesn't leave a gap there.
     if mmButton then
         if on then mmButton:Show() else mmButton:Hide() end
     end
-    return made
 end
 
 ---------------------------------------------------------------------------
