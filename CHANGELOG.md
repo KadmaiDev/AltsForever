@@ -1,4 +1,4 @@
-## Alts Forever (next)
+## Alts Forever 0.13.0
 
 - **Show item counts** (options, or `/af counts`): turn off the item counts in tooltips if another addon, such as Baganator or Bagnon, already shows them, so you don't see two lists. Can craft, skill-ups, upgrades and Waylaid Crates stay.
 - **Data broker launcher:** with a data broker display such as Bazooka, Titan Panel or ChocolateBar, Alts Forever shows up there: click for the overview, right-click for options. Hide the minimap button and it stays. Thanks to the player who asked for this!
