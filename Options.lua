@@ -413,6 +413,33 @@ function ns.SetMinimapButton(on)
 end
 
 ---------------------------------------------------------------------------
+-- Data broker: a launcher for display addons such as Bazooka, Titan Panel or ChocolateBar
+-- (a player's request, 2026-10-15), with the minimap button's clicks and tooltip. We
+-- embed no libraries: the launcher is made only if a display addon has loaded
+-- LibDataBroker-1.1, checked at PLAYER_LOGIN, when every addon has loaded. Hiding the
+-- minimap button doesn't touch it.
+---------------------------------------------------------------------------
+local BROKER = "Alts Forever"
+
+function ns.StartBroker()
+    local ldb = type(LibStub) == "table" and LibStub.GetLibrary and LibStub:GetLibrary("LibDataBroker-1.1", true)
+    if not ldb or ldb:GetDataObjectByName(BROKER) then return end
+    ldb:NewDataObject(BROKER, {
+        type = "launcher",
+        label = BROKER,
+        icon = ICON,
+        OnClick = function(_, button)
+            if button == "RightButton" then ns.ShowOptionsMenu(UIParent) else ns.ToggleOverview() end
+        end,
+        OnTooltipShow = function(tt)
+            tt:AddLine("Alts Forever")
+            tt:AddLine(L["Click: open the overview"], 1, 1, 1)
+            tt:AddLine(L["Right-click: options"], 1, 1, 1)
+        end,
+    })
+end
+
+---------------------------------------------------------------------------
 -- Minimap addon compartment (functions named in the .toc)
 ---------------------------------------------------------------------------
 function AltsForever_OnAddonCompartmentClick(_, button, frame)

@@ -90,7 +90,7 @@ Options > AddOns > Alts Forever has every setting, with a short explanation of e
 
 ## Commands
 
-Everything below can also be done by clicking: **click the Alts Forever minimap button** (or Alts Forever in the minimap's addon menu) to open the overview, **right-click it** (or the cog in the overview) for options. Drag the button to move it around the minimap, or hide it from the options menu, and **right-click a character in the overview** to see their gear, bags or bank, choose their upgrade role, or forget them.
+Everything below can also be done by clicking: **click the Alts Forever minimap button** (or Alts Forever in the minimap's addon menu) to open the overview, **right-click it** (or the cog in the overview) for options. Drag the button to move it around the minimap, or hide it from the options menu. With a data broker display such as Bazooka, Titan Panel or ChocolateBar, Alts Forever is there too (click and right-click work the same), so you can hide the minimap button and keep it there. And **right-click a character in the overview** to see their gear, bags or bank, choose their upgrade role, or forget them.
 
 | Command | What it does |
 |---|---|
@@ -108,7 +108,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af legacy` | List each character's Legacy points to spend and Well Rested rank; `/af legacy on` or `off` turns the chat reminders on or off |
 | `/af role Full Name role` | Choose what a character's upgrades are judged by: `melee`, `ranged`, `caster`, `healer`, `tank` or `feral` (whichever their class has), or `auto` to follow their talents |
 | `/af sendmail` | Turn the send-to-alt arrow at the mailbox on or off |
-| `/af minimap` | Show or hide the minimap button |
+| `/af minimap` | Show or hide the minimap button (the data broker launcher stays) |
 | `/af stats` | Turn session stats on or off (off by default): XP this session and time to level on the XP bar, gold this session, today and this week on your bag gold |
 | `/af delete Full Name` | Forget a character, e.g. `/af delete Thessa Oakenbrook` |
 | `/af mem` | Show the addon's memory use |

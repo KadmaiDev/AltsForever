@@ -101,3 +101,36 @@ test("held by a button collector (EllesmereUI's tray, MinimapButtonButton...), t
     eq(b:IsShown(), true)
     eq(layouts, 2)
 end)
+
+test("with a data broker display (Bazooka...) loaded, a launcher opens the overview and options; hiding the minimap button leaves it", function()
+    -- A display addon's copy of LibStub and LibDataBroker-1.1; we embed neither.
+    local objects = {}
+    local ldb = {
+        GetDataObjectByName = function(_, name) return objects[name] end,
+        NewDataObject = function(_, name, obj) objects[name] = obj return obj end,
+    }
+    LibStub = { GetLibrary = function(_, major, silent) return major == "LibDataBroker-1.1" and ldb or nil end }
+    wow.load(FILES)
+    wow.login({ v = 2, chars = {}, minimapHidden = true })
+    LibStub = nil
+    local o = objects["Alts Forever"]
+    assert(o, "launcher made")
+    eq(o.type, "launcher")
+    assert(o.icon:find("minimap.tga", 1, true), o.icon)
+    eq(AltsForeverMinimapButton, nil, "the minimap button stays hidden (never made)")
+    o.OnClick(nil, "LeftButton")
+    eq(AltsForeverFrame:IsShown(), true)
+    o.OnClick(nil, "RightButton")
+    eq(wow.menu.items[1].text, "Alts Forever", "right-click: options menu")
+    GameTooltip.lines = {}
+    o.OnTooltipShow(GameTooltip)
+    eq(GameTooltip.lines[1][1], "Alts Forever")
+end)
+
+test("without a data broker library, nothing is made and nothing breaks", function()
+    LibStub = { GetLibrary = function() return nil end }
+    wow.load(FILES)
+    wow.login(nil)
+    LibStub = nil
+    assert(AltsForeverMinimapButton, "the rest of login ran: the minimap button is there")
+end)
