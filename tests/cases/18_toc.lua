@@ -44,7 +44,7 @@ test("only one copy runs: a second copy stays off, and the running copy keeps it
     wow.fire("ADDON_LOADED", "AltsForeverDev")
     eq(AltsForeverDB, mine, "the running copy's data is what gets saved")
     wow.fire("PLAYER_LOGIN")
-    eq(#wow.postCalls, hooks + 1, "one set of tooltip hooks: the running copy's")
+    eq(#wow.postCalls, hooks + 2, "one set of tooltip hooks (items, trainer spells): the running copy's")
     assert(table.concat(wow.printed, "\n"):find("two copies are enabled (AltsForever and AltsForeverDev)", 1, true),
         table.concat(wow.printed, "\n"))
 end)

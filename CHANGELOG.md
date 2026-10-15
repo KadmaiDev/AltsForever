@@ -1,6 +1,7 @@
 ## Alts Forever (next)
 
 - **Show item counts** (options, or `/af counts`): turn off the item counts in tooltips if another addon, such as Baganator or Bagnon, already shows them, so you don't see two lists. Can craft, skill-ups, upgrades and Waylaid Crates stay.
+- **Upgrades at the profession trainer:** hovering a recipe in a trainer's list now shows which of your characters the item it makes would be an upgrade for, like recipe items already did. If the item binds on pickup, only you are listed.
 
 ## Alts Forever 0.12.0
 

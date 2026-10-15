@@ -2,7 +2,9 @@
 -- equipped, not yet bound), or a recipe that makes one, which of your characters it would
 -- be an upgrade for, in which slot and by about how much. An item that's yours alone (bind
 -- on pickup or soulbound) shows your own row only; a recipe whose item binds on pickup,
--- only the characters who know the recipe or can learn it.
+-- only the characters who know the recipe or can learn it. A profession trainer's recipe
+-- (its tooltip is the spell's, checked in game 2026-10-15) is judged on the item it makes,
+-- like a recipe item; one that binds on pickup shows only you, the one learning it.
 --
 -- An item's score is its stats (C_Item.GetItemStats) times what each stat is worth to the
 -- character's role. It's an upgrade when it beats what they wear in that slot (their gear
@@ -384,7 +386,7 @@ end
 -- The last item's rows, in reused arrays: character key, gain, right-hand text.
 local rowKey, rowGain, rowText = {}, {}, {}
 local rows = 0
-local lastLink, lastId, lastOnly, lastVer, lastCraft, lastLevel, lastHeader
+local lastLink, lastId, lastKind, lastOnly, lastVer, lastCraft, lastLevel, lastHeader
 
 local function Before(i, j)
     local me = ns.charKey
@@ -444,6 +446,36 @@ local function Soulbound(data)
     return false
 end
 
+-- The rows for an item link, and the lines. kind: "item" (the item itself), "recipe" (a
+-- recipe item, id; link = what it makes) or "trainer" (a trainer's recipe; link = what it
+-- makes).
+local function AddRows(tt, id, link, data, kind)
+    local onlyYou = kind == "item" and Soulbound(data)
+    local me = ns.char
+    if link ~= lastLink or id ~= lastId or kind ~= lastKind or onlyYou ~= lastOnly or version ~= lastVer
+        or ns.craftVersion ~= lastCraft or me.level ~= lastLevel then
+        lastLink, lastId, lastKind, lastOnly, lastVer, lastCraft, lastLevel = link, id, kind, onlyYou, version, ns.craftVersion, me.level
+        local info = Describe(link, data, kind == "recipe")
+        local recipeID
+        if info then
+            if info.bind ~= BIND_ON_EQUIP then
+                if kind == "recipe" then recipeID = id else onlyYou = true end
+            end
+            lastHeader = kind == "item" and L["Upgrade for"] or L["Makes an upgrade for"]
+        end
+        Build(info, link, onlyYou, recipeID, tt, data)
+        if info == nil then lastLink = nil end -- not loaded yet: try again next time
+    end
+    if rows == 0 then return end
+    tt:AddLine(" ")
+    tt:AddLine(lastHeader, 1, 0.82, 0)
+    local chars = ns.db.chars
+    for i = 1, rows do
+        local key = rowKey[i]
+        tt:AddDoubleLine(ns.ListName(key, chars[key]), rowText[i], 1, 1, 1, 1, 1, 1)
+    end
+end
+
 function ns.AddUpgradeLines(tt, id, data)
     if not ns.UpgradesOn() then return end
     local _, _, _, _, _, class = GetItemInfoInstant(id)
@@ -459,30 +491,23 @@ function ns.AddUpgradeLines(tt, id, data)
         link = Plain(l)
         if type(link) ~= "string" then return end
     end
-    local onlyYou = not recipe and Soulbound(data)
-    local me = ns.char
-    if link ~= lastLink or id ~= lastId or onlyYou ~= lastOnly or version ~= lastVer
-        or ns.craftVersion ~= lastCraft or me.level ~= lastLevel then
-        lastLink, lastId, lastOnly, lastVer, lastCraft, lastLevel = link, id, onlyYou, version, ns.craftVersion, me.level
-        local info = Describe(link, data, recipe)
-        local recipeID
-        if info then
-            if info.bind ~= BIND_ON_EQUIP then
-                if recipe then recipeID = id else onlyYou = true end
-            end
-            lastHeader = recipe and L["Makes an upgrade for"] or L["Upgrade for"]
-        end
-        Build(info, link, onlyYou, recipeID, tt, data)
-        if info == nil then lastLink = nil end -- not loaded yet: try again next time
-    end
-    if rows == 0 then return end
-    tt:AddLine(" ")
-    tt:AddLine(lastHeader, 1, 0.82, 0)
-    local chars = ns.db.chars
-    for i = 1, rows do
-        local key = rowKey[i]
-        tt:AddDoubleLine(ns.ListName(key, chars[key]), rowText[i], 1, 1, 1, 1, 1, 1)
-    end
+    AddRows(tt, id, link, data, recipe and "recipe" or "item")
+end
+
+-- A trainer's recipe: a spell tooltip built by C_TooltipInfo.GetTrainerService(index)
+-- (the tooltip's processingInfo names the getter and its index), whose item
+-- GetTrainerServiceItemLink(index) links (checked in game 2026-10-15, Copper Dagger).
+local function OnSpell(tt, data)
+    if tt ~= GameTooltip or tt:IsForbidden() or not ns.UpgradesOn() then return end
+    local info = tt.processingInfo
+    if type(info) ~= "table" or info.getterName ~= "GetTrainerService" or not GetTrainerServiceItemLink then return end
+    local index = type(info.getterArgs) == "table" and info.getterArgs[1]
+    if issecretvalue(index) or type(index) ~= "number" then return end
+    local link = GetTrainerServiceItemLink(index)
+    if issecretvalue(link) or type(link) ~= "string" then return end
+    local id, _, _, _, _, class = GetItemInfoInstant(link)
+    if not id or not (class == WEAPON_CLASS or class == ARMOR_CLASS) then return end
+    AddRows(tt, id, link, data, "trainer")
 end
 
 ---------------------------------------------------------------------------
@@ -510,5 +535,9 @@ end
 
 function ns.StartUpgrades()
     ns.On("GET_ITEM_INFO_RECEIVED", ItemArrived)
+    local spell = Enum.TooltipDataType and Enum.TooltipDataType.Spell
+    if spell and TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall then
+        TooltipDataProcessor.AddTooltipPostCall(spell, OnSpell)
+    end
     if C_Timer and C_Timer.After then C_Timer.After(10, Prewarm) end
 end

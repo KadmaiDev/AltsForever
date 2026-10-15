@@ -172,6 +172,27 @@ test("a recipe is judged on the item it makes; one that binds on pickup lists on
     eq(upHover(4348, nil, wow.recipeItem(4348, "Pattern: Nothing", "Tailoring", 75)), "", "no item linked")
 end)
 
+test("a trainer's recipe (a spell tooltip) is judged on the item it makes; bind on pickup shows only you", function()
+    local items = upItems()
+    local boe = upItem(5070, "Heavy Woolen Cloak", { sub = 1, loc = "INVTYPE_CLOAK", stats = { ITEM_MOD_STAMINA_SHORT = 3 } })
+    local bop = upItem(5071, "Bound Cloak", { sub = 1, loc = "INVTYPE_CLOAK", bind = 1, stats = { ITEM_MOD_STAMINA_SHORT = 3 } })
+    local ns = upStart({ ["Tarn Moon"] = upHunter(items) })
+    wow.trainerLinks = { [4] = boe, [5] = bop }
+    local rows, header = upRows(wow.hoverTrainer(GameTooltip, 4, 8880, { "Tailoring: Heavy Woolen Cloak", "Heavy Woolen Cloak" }))
+    eq(header, "Makes an upgrade for")
+    eq(rows, "[MAGE]Aldric = Back · empty slot\n[HUNTER]Tarn Moon = Back · empty slot")
+    eq(upRows(wow.hoverTrainer(GameTooltip, 5, 8881)), "[MAGE]Aldric = Back · empty slot", "only you learn it")
+    eq(upRows(wow.hoverTrainer(GameTooltip, 6, 8882)), "", "no item: a spell, not a recipe")
+    -- Other spell tooltips (spellbook, action bars) aren't the trainer's: nothing added.
+    GameTooltip.lines = {}
+    for _, pc in ipairs(wow.postCalls) do
+        if pc.kind == Enum.TooltipDataType.Spell then pc.fn(GameTooltip, { type = 1, id = 8880 }) end
+    end
+    eq(#GameTooltip.lines, 0)
+    ns.SetUpgrades(false)
+    eq(upRows(wow.hoverTrainer(GameTooltip, 4, 8880)), "", "setting off")
+end)
+
 test("talents pick the role, a choice from the menu or /af role overrides it", function()
     local items = upItems()
     local healRing = upItem(5080, "Healing Ring", { loc = "INVTYPE_FINGER", stats = { ITEM_MOD_SPELL_HEALING_DONE_SHORT = 10 } })

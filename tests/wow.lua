@@ -50,6 +50,8 @@ function M.load(files)
     M.frames = {}
     M.printed = {}
     M.postCalls = {}
+    M.trainerLinks = {}
+    GetTrainerServiceItemLink = function(index) return M.trainerLinks[index] end
     M.player = { name = "Aldric", realm = "Realm", class = "MAGE" }
 
     wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
@@ -104,7 +106,7 @@ function M.load(files)
     Enum = {
         BagIndex = { Keyring = -2, Backpack = 0, Bag_1 = 1, Bag_2 = 2, Bag_3 = 3, Bag_4 = 4, ReagentBag = 5,
             CharacterBankTab_1 = 6, CharacterBankTab_2 = 7, CharacterBankTab_3 = 8 },
-        TooltipDataType = { Item = 0 },
+        TooltipDataType = { Item = 0, Spell = 1 },
         ItemClass = { Recipe = 9 },
         TraitConfigType = { Combat = 1, Profession = 2, Generic = 3, CamelotCombat = 4 },
     }
@@ -657,7 +659,24 @@ function M.hover(tt, itemID, text, link)
         data.lines = {}
         for i, t in ipairs(text) do data.lines[i] = { leftText = t } end
     end
-    for _, pc in ipairs(M.postCalls) do pc.fn(tt, data) end
+    for _, pc in ipairs(M.postCalls) do
+        if pc.kind == Enum.TooltipDataType.Item then pc.fn(tt, data) end
+    end
+    return tt.lines
+end
+
+-- Shows a profession trainer's recipe the way the game does: a spell tooltip built by
+-- C_TooltipInfo.GetTrainerService(index), whose crafted item GetTrainerServiceItemLink
+-- gives (M.trainerLinks[index]).
+function M.hoverTrainer(tt, index, spellID, text)
+    tt.lines = {}
+    local data = { type = 1, id = spellID, lines = {} }
+    for i, t in ipairs(text or {}) do data.lines[i] = { leftText = t } end
+    tt.processingInfo = { getterName = "GetTrainerService", getterArgs = { index } }
+    for _, pc in ipairs(M.postCalls) do
+        if pc.kind == Enum.TooltipDataType.Spell then pc.fn(tt, data) end
+    end
+    tt.processingInfo = nil
     return tt.lines
 end
 
