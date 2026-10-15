@@ -432,7 +432,7 @@ function commands.role(arg)
 end
 
 function commands.minimap()
-    ns.SetMinimapButton(not ns.MinimapButtonOn())
+    if ns.SetMinimapButton(not ns.MinimapButtonOn()) then return end -- made just now: it said where it is
     Print(ns.MinimapButtonOn() and L["Minimap button shown."] or L["Minimap button hidden. /af minimap brings it back."])
 end
 

@@ -2,6 +2,7 @@
 
 - **Show item counts** (options, or `/af counts`): turn off the item counts in tooltips if another addon, such as Baganator or Bagnon, already shows them, so you don't see two lists. Can craft, skill-ups, upgrades and Waylaid Crates stay.
 - **Data broker launcher:** with a data broker display such as Bazooka, Titan Panel or ChocolateBar, Alts Forever shows up there: click for the overview, right-click for options. Hide the minimap button and it stays. Thanks to the player who asked for this!
+- Turning a hidden minimap button back on now says to `/reload` if your minimap gathers addon buttons (EllesmereUI, MiniMinimap): they only gather them at login, so until then it sits on the minimap's edge.
 - **Upgrades at the profession trainer:** hovering a recipe in a trainer's list now shows which of your characters the item it makes would be an upgrade for, like recipe items already did. If the item binds on pickup, only you are listed.
 
 ## Alts Forever 0.12.0
