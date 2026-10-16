@@ -1,5 +1,6 @@
 ## Alts Forever (next)
 
+- **Upgrades shown as arrows:** instead of a percentage, an upgrade now shows one green arrow for minor, two for decent and three for major. It's judged against everything the character wears, not just the item it replaces, so +1 Agility over a cloak with only armour no longer shows as +583%.
 - **Craftable upgrades on the character sheet:** a small anvil appears beside a gear slot when you or one of your alts can craft an upgrade for it that you can wear now and that binds when equipped. Armour is only the heaviest type you wear (no leather for a warrior), and only characters who can mail you count. Hover the anvil to see the best few and who makes them; click it to see them all (shift-click one to link it).
 
 ## Alts Forever 0.13.0

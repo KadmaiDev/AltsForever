@@ -35,10 +35,7 @@ local dollKey, dollRetry = nil, false
 local panel
 local buttons = {}
 
-local function GainText(e)
-    if e.gain ~= math.huge then return "+" .. floor(e.gain + 0.5) .. "%" end
-    return e.empty and L["empty slot"] or L["big upgrade"]
-end
+local function GainText(e) return ns.GainLabel(e.gain, e.empty) end
 
 ---------------------------------------------------------------------------
 -- The panel of item buttons
@@ -117,7 +114,7 @@ local function ShowPanel(glyph)
         local color = q and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q]
         if color then b.border:SetVertexColor(color.r, color.g, color.b) end
         b.border:SetShown(color ~= nil)
-        b.gain:SetText(e.gain ~= math.huge and GainText(e) or "")
+        b.gain:SetText(ns.GainArrows(e.gain))
         b:ClearAllPoints()
         local col, row = (i - 1) % PER_ROW, floor((i - 1) / PER_ROW)
         b:SetPoint("TOPLEFT", PAD + col * (SIZE + GAP), -(PAD + TITLE + row * (SIZE + GAP)))
@@ -153,7 +150,7 @@ local function GlyphEnter(g)
     GameTooltip:AddLine(L["Your characters can craft"], 1, 0.82, 0)
     for i = 1, min(#list, SHOWN_IN_TOOLTIP) do
         local e = list[i]
-        GameTooltip:AddDoubleLine(e.link, "|cff20ff20" .. GainText(e) .. "|r · " .. ns.ListName(e.key, ns.db.chars[e.key]), 1, 1, 1, 1, 1, 1)
+        GameTooltip:AddDoubleLine(e.link, GainText(e) .. " · " .. ns.ListName(e.key, ns.db.chars[e.key]), 1, 1, 1, 1, 1, 1)
     end
     GameTooltip:AddLine(L["Click: show them"], 1, 1, 1)
     GameTooltip:Show()

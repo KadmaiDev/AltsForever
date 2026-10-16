@@ -23,6 +23,7 @@ function upRows(lines)
         elseif inBlock then
             if left == " " then break end
             out[#out + 1] = left .. " = " .. tostring(line[2]):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+                :gsub("|A.-|a", "^"):gsub("|T.-|t", "^")
         end
     end
     return table.concat(out, "\n"), header
@@ -68,7 +69,7 @@ test("a BoE item lists who it's an upgrade for, best gain first, with the slot a
     eq(header, "Upgrade for")
     -- Hunter: 6 agi x 2.4 + 3 sta x 0.4 = 15.6 against 2 agi x 2.4 = 4.8. Warrior: 9.9
     -- against 4 str x 2 = 8. The rogue is 10 levels short; the mage can't wear leather.
-    eq(rows, "[HUNTER]Tarn Moon = Hands · +225%\n[WARRIOR]Vesp Ash = Hands · +24%")
+    eq(rows, "[HUNTER]Tarn Moon = Hands · ^^^\n[WARRIOR]Vesp Ash = Hands · ^^^")
 end)
 
 test("an empty slot, and an alt up to 5 levels short as 'at level N'; further off, nothing", function()
@@ -77,7 +78,7 @@ test("an empty slot, and an alt up to 5 levels short as 'at level N'; further of
         ["Tarn Moon"] = upHunter(items, { level = 16, gear = {} }),
         ["Vesp Ash"] = alt("Vesp Ash", "WARRIOR", { level = 14, gear = {} }),
     })
-    eq(upHover(5001, items.gloves), "[HUNTER]Tarn Moon = Hands · empty slot · at level 20")
+    eq(upHover(5001, items.gloves), "[HUNTER]Tarn Moon = Hands · ^^^ · empty slot · at level 20")
 end)
 
 test("mail and plate wait for level 40; armour a class never wears shows nothing", function()
@@ -90,7 +91,7 @@ test("mail and plate wait for level 40; armour a class never wears shows nothing
         ["Young Guard"] = alt("Young Guard", "WARRIOR", { level = 34, gear = {} }),
         ["Sly"] = alt("Sly", "ROGUE", { level = 40, gear = {} }),
     })
-    eq(upHover(5010, plate), "[WARRIOR]Old Guard = Chest · empty slot\n[WARRIOR]Vesp Ash = Chest · empty slot · at level 40")
+    eq(upHover(5010, plate), "[WARRIOR]Old Guard = Chest · ^^^ · empty slot\n[WARRIOR]Vesp Ash = Chest · ^^^ · empty slot · at level 40")
 end)
 
 test("a ring is compared with the weaker of the two worn", function()
@@ -99,16 +100,18 @@ test("a ring is compared with the weaker of the two worn", function()
     local strong = upItem(5021, "Strong Ring", { loc = "INVTYPE_FINGER", bind = 1, stats = { ITEM_MOD_AGILITY_SHORT = 10 } })
     local weak = upItem(5022, "Weak Ring", { loc = "INVTYPE_FINGER", bind = 1, stats = { ITEM_MOD_AGILITY_SHORT = 4 } })
     upStart({ ["Tarn Moon"] = upHunter(items, { gear = { [11] = strong, [12] = weak } }) })
-    eq(upHover(5020, ring), "[HUNTER]Tarn Moon = Finger · +25%")
+    eq(upHover(5020, ring), "[HUNTER]Tarn Moon = Finger · ^^", "7% of all she wears: decent")
     upStart({ ["Tarn Moon"] = upHunter(items, { gear = { [11] = ring, [12] = weak } }) })
     eq(upHover(5020, ring), "", "already wearing one")
 end)
 
-test("already wearing one, or a gain under 3%: no row", function()
+test("already wearing one, or a gain under 1% of all they wear: no row", function()
     local items = upItems()
-    local same = upItem(5030, "Agile Gloves", { sub = 2, loc = "INVTYPE_HAND", stats = { ITEM_MOD_AGILITY_SHORT = 2.05 } })
+    local same = upItem(5030, "Agile Gloves", { sub = 2, loc = "INVTYPE_HAND", stats = { ITEM_MOD_AGILITY_SHORT = 2.01 } })
+    local bit = upItem(5031, "Bit Better Gloves", { sub = 2, loc = "INVTYPE_HAND", stats = { ITEM_MOD_AGILITY_SHORT = 2.05 } })
     upStart({ ["Tarn Moon"] = upHunter(items) })
-    eq(upHover(5030, same), "", "2.5% better")
+    eq(upHover(5030, same), "", "0.5% better")
+    eq(upHover(5031, bit), "[HUNTER]Tarn Moon = Hands · ^", "2.5% better: minor")
     eq(upHover(5002, items.oldGloves), "", "the same gloves")
 end)
 
@@ -121,8 +124,8 @@ test("a two-hander is compared with main and off hand together; a one-hander nev
     local dagger = upItem(5042, "Dagger", { class = 2, sub = 15, loc = "INVTYPE_WEAPON",
         stats = { ITEM_MOD_AGILITY_SHORT = 5 } })
     upStart({ ["Tarn Moon"] = upHunter(items, { gear = { [16] = sword, [17] = sword } }) })
-    eq(upHover(5040, staff), "[HUNTER]Tarn Moon = Two-Hand · +67%", "10 agi against 3 + 3")
-    eq(upHover(5042, dagger), "[HUNTER]Tarn Moon = One-Hand · +67%", "a dual wielder: either hand")
+    eq(upHover(5040, staff), "[HUNTER]Tarn Moon = Two-Hand · ^^^", "10 agi against 3 + 3")
+    eq(upHover(5042, dagger), "[HUNTER]Tarn Moon = One-Hand · ^^^", "a dual wielder: either hand")
     upStart({ ["Tarn Moon"] = upHunter(items, { gear = { [16] = staff } }) })
     eq(upHover(5042, dagger), "", "against a two-hander")
 end)
@@ -134,10 +137,10 @@ test("bind on pickup and soulbound items show only you", function()
     local cloak = upItem(5051, "Wool Cloak", { sub = 1, loc = "INVTYPE_CLOAK",
         stats = { ITEM_MOD_STAMINA_SHORT = 4 } })
     upStart({ ["Tarn Moon"] = upHunter(items), ["Abe"] = alt("Abe", "WARRIOR", { level = 20, gear = {} }) })
-    eq(upHover(5050, robe), "[MAGE]Aldric = Chest · empty slot", "bind on pickup")
-    eq(upHover(5051, cloak), "[MAGE]Aldric = Back · empty slot\n[WARRIOR]Abe = Back · empty slot\n[HUNTER]Tarn Moon = Back · empty slot",
+    eq(upHover(5050, robe), "[MAGE]Aldric = Chest · ^^^ · empty slot", "bind on pickup")
+    eq(upHover(5051, cloak), "[MAGE]Aldric = Back · ^^^ · empty slot\n[WARRIOR]Abe = Back · ^^^ · empty slot\n[HUNTER]Tarn Moon = Back · ^^^ · empty slot",
         "a cloak anyone can wear: you first, then by gain and name")
-    eq(upHover(5051, cloak, { "Wool Cloak", "Soulbound" }), "[MAGE]Aldric = Back · empty slot", "soulbound")
+    eq(upHover(5051, cloak, { "Wool Cloak", "Soulbound" }), "[MAGE]Aldric = Back · ^^^ · empty slot", "soulbound")
 end)
 
 test("a 'Classes:' line and a profession requirement are respected", function()
@@ -150,8 +153,8 @@ test("a 'Classes:' line and a profession requirement are respected", function()
         ["Tarn Moon"] = upHunter(items, { profs = { Engineering = 120 } }),
         ["Sly"] = alt("Sly", "ROGUE", { level = 25, gear = {} }),
     })
-    eq(upHover(5060, hunterOnly, { "Tracker's Gloves", "Classes: Hunter" }), "[HUNTER]Tarn Moon = Hands · +300%")
-    eq(upHover(5061, goggles, { "Goggles", "Requires Engineering (100)" }), "[HUNTER]Tarn Moon = Head · empty slot")
+    eq(upHover(5060, hunterOnly, { "Tracker's Gloves", "Classes: Hunter" }), "[HUNTER]Tarn Moon = Hands · ^^^")
+    eq(upHover(5061, goggles, { "Goggles", "Requires Engineering (100)" }), "[HUNTER]Tarn Moon = Head · ^^^ · empty slot")
 end)
 
 test("a recipe is judged on the item it makes; one that binds on pickup lists only who can learn it", function()
@@ -166,9 +169,9 @@ test("a recipe is judged on the item it makes; one that binds on pickup lists on
     local text = wow.recipeItem(4346, "Pattern: Heavy Woolen Cloak", "Tailoring", 75)
     local rows, header = upHover(4346, boe, text)
     eq(header, "Makes an upgrade for")
-    eq(rows, "[MAGE]Aldric = Back · empty slot\n[WARLOCK]Tailor = Back · empty slot\n[HUNTER]Tarn Moon = Back · empty slot")
+    eq(rows, "[MAGE]Aldric = Back · ^^^ · empty slot\n[WARLOCK]Tailor = Back · ^^^ · empty slot\n[HUNTER]Tarn Moon = Back · ^^^ · empty slot")
     text = wow.recipeItem(4347, "Pattern: Bound Cloak", "Tailoring", 75)
-    eq(upHover(4347, bop, text), "[WARLOCK]Tailor = Back · empty slot", "only the tailor can make it")
+    eq(upHover(4347, bop, text), "[WARLOCK]Tailor = Back · ^^^ · empty slot", "only the tailor can make it")
     eq(upHover(4348, nil, wow.recipeItem(4348, "Pattern: Nothing", "Tailoring", 75)), "", "no item linked")
 end)
 
@@ -180,8 +183,8 @@ test("a trainer's recipe (a spell tooltip) is judged on the item it makes; bind 
     wow.trainerLinks = { [4] = boe, [5] = bop }
     local rows, header = upRows(wow.hoverTrainer(GameTooltip, 4, 8880, { "Tailoring: Heavy Woolen Cloak", "Heavy Woolen Cloak" }))
     eq(header, "Makes an upgrade for")
-    eq(rows, "[MAGE]Aldric = Back · empty slot\n[HUNTER]Tarn Moon = Back · empty slot")
-    eq(upRows(wow.hoverTrainer(GameTooltip, 5, 8881)), "[MAGE]Aldric = Back · empty slot", "only you learn it")
+    eq(rows, "[MAGE]Aldric = Back · ^^^ · empty slot\n[HUNTER]Tarn Moon = Back · ^^^ · empty slot")
+    eq(upRows(wow.hoverTrainer(GameTooltip, 5, 8881)), "[MAGE]Aldric = Back · ^^^ · empty slot", "only you learn it")
     eq(upRows(wow.hoverTrainer(GameTooltip, 6, 8882)), "", "no item: a spell, not a recipe")
     -- Other spell tooltips (spellbook, action bars) aren't the trainer's: nothing added.
     GameTooltip.lines = {}
@@ -203,7 +206,7 @@ test("talents pick the role, a choice from the menu or /af role overrides it", f
     c.spec = 2
     ns.UpgradesChanged()
     eq(ns.RoleOf(c), "healer", "Holy tab")
-    eq(upHover(5080, healRing), "[PRIEST]Pria = Finger · empty slot")
+    eq(upHover(5080, healRing), "[PRIEST]Pria = Finger · ^^^ · empty slot")
     SlashCmdList.ALTSFOREVER("role pria caster")
     eq(c.role, "caster")
     eq(upHover(5080, healRing), "", "the choice wins over talents")
@@ -262,7 +265,7 @@ test("gear that isn't loaded yet is asked for; the alt shows once it arrives", f
     eq(wow.itemLoads[1], 5002)
     wow.uncached[5002] = nil
     wow.fire("GET_ITEM_INFO_RECEIVED", 5002, true)
-    eq(upHover(5001, items.gloves), "[HUNTER]Tarn Moon = Hands · +225%")
+    eq(upHover(5001, items.gloves), "[HUNTER]Tarn Moon = Hands · ^^^")
 end)
 
 test("hovering the same item again works nothing out again; your new gear does", function()
@@ -274,10 +277,10 @@ test("hovering the same item again works nothing out again; your new gear does",
     upHover(5001, items.gloves)
     eq(wow.itemInfoReads, first, "nothing looked up again")
     local cloak = upItem(5051, "Wool Cloak", { sub = 1, loc = "INVTYPE_CLOAK", stats = { ITEM_MOD_STAMINA_SHORT = 4 } })
-    eq(upHover(5051, cloak), "[MAGE]Aldric = Back · empty slot\n[HUNTER]Tarn Moon = Back · empty slot")
+    eq(upHover(5051, cloak), "[MAGE]Aldric = Back · ^^^ · empty slot\n[HUNTER]Tarn Moon = Back · ^^^ · empty slot")
     wow.gearLinks[15], wow.inventory[15] = cloak, 5051
     wow.fire("PLAYER_EQUIPMENT_CHANGED", 15)
-    eq(upHover(5051, cloak), "[HUNTER]Tarn Moon = Back · empty slot", "you wear one now")
+    eq(upHover(5051, cloak), "[HUNTER]Tarn Moon = Back · ^^^ · empty slot", "you wear one now")
 end)
 
 test("the setting turns upgrades off and on: /af upgrades, the menu and the Options page", function()
@@ -289,5 +292,5 @@ test("the setting turns upgrades off and on: /af upgrades, the menu and the Opti
     ns.ShowOptionsMenu(UIParent)
     wow.menuItem("Show upgrades").setSelected()
     eq(AltsForeverDB.upgradesOff, nil)
-    eq(upHover(5001, items.gloves), "[HUNTER]Tarn Moon = Hands · +225%")
+    eq(upHover(5001, items.gloves), "[HUNTER]Tarn Moon = Hands · ^^^")
 end)

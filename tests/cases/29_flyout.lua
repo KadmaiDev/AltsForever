@@ -27,7 +27,9 @@ function flyStart()
         ["Smith"] = alt("Smith", "PALADIN", { realm = "Realm", crafts = { Blacksmithing = {
             [6001] = "linked gloves", [6002] = "leather gloves", [6003] = "bound mail gloves", [6007] = "plate gloves",
             [6008] = "future helm" },
-            Tailoring = { [6006] = "woolen cape" } } }),
+            Tailoring = { [6006] = "woolen cape" },
+            -- Left over from 0.2.x: the same items, as `true`, under a profession that doesn't make them.
+            Cooking = { [6001] = true, [6006] = true } } }),
         ["Far Away"] = alt("Far Away", "WARRIOR", { realm = "Elsewhere", crafts = { Blacksmithing = { [6005] = "far gloves" } } }),
     } })
     return ns
@@ -44,6 +46,11 @@ test("craftable upgrades: the heaviest armour you wear, bind on pickup only your
     eq(list[1].gain, math.huge, "nothing worn there")
     -- A cloak is cloth for everyone: not held to the heaviest type.
     eq(ns.CraftableUpgrades(15)[1].id, 6006)
+    eq(ns.CraftableUpgrades(15)[1].prof, "Tailoring", "not the leftover Cooking entry")
+    local crafts = { Cooking = { [1] = true, [2] = true }, Leatherworking = { [1] = "embossed leather cloak" } }
+    eq(ns.CraftProf(crafts, "Cooking", 1), "Leatherworking", "the entry with the recipe's name wins")
+    eq(ns.CraftProf(crafts, "Leatherworking", 1), "Leatherworking")
+    eq(ns.CraftProf(crafts, "Cooking", 2), "Cooking", "a lone old entry stands")
     local head = ns.CraftableUpgrades(1)
     eq(#head, 1)
     eq(head[1].at, 28, "the helm, from level 28")

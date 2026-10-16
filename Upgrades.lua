@@ -24,11 +24,11 @@ local GetItemInfoInstant, GetItemInfo, GetItemStats = C_Item.GetItemInfoInstant,
 
 local RECIPE_CLASS, WEAPON_CLASS, ARMOR_CLASS = 9, 2, 4
 local BIND_ON_EQUIP = 2
-local MIN_GAIN = 3      -- % below which a gain is noise
+local MIN_GAIN = 1      -- % (of the character's whole gear score) below which a gain is noise
 local MAX_ROWS = 5
 local LEVEL_AHEAD = 5   -- characters up to this many levels short show as "at level N"
 local MAX_SCORES = 2000 -- cached scores before the cache starts again
-local NEW = math.huge   -- the gain for an empty slot
+local NEW = math.huge   -- the gain when nothing the character wears scores yet
 local GREEN, GREY = "|cff20ff20", "|cff9d9d9d"
 
 -- Stats as GetItemStats names them (checked in game 2026-10-05 for strength, spirit, spell
@@ -326,9 +326,12 @@ local function WornLoc(link)
     return loc
 end
 
--- For one character: the gain (% or NEW: nothing worn there, or nothing that scores),
--- whether the slot is empty, and the level they can wear it from if that's above theirs;
--- nil if it's no upgrade for them, false if some of their gear isn't loaded yet.
+-- For one character: the gain, as a % of the score of everything they wear (NEW if nothing
+-- they wear scores yet), whether the slot is empty, the level they can wear it from if
+-- that's above theirs, and the slot it does best in; nil if it's no upgrade for them, false
+-- if some of their gear isn't loaded yet. Against the whole gear score, not the item it
+-- replaces: low-level gear often has only armour, which scores next to nothing, so +1
+-- Agility over it read as +583% (the owner's report, 2026-10-16).
 local function Compare(c, info, link)
     local cls = CLASSES[c.class]
     local gear, level = c.gear, c.level
@@ -351,6 +354,14 @@ local function Compare(c, info, link)
         local worn = gear[slot]
         if worn and GetItemInfoInstant(worn) == info.id then return nil end -- already wearing one
     end
+    local total = 0
+    for slot, worn in pairs(gear) do
+        if slot ~= 4 and slot ~= 19 then -- shirt and tabard
+            local score = ns.ItemScore(worn, role)
+            if score == nil then return false end
+            total = total + score
+        end
+    end
     local mainLoc = WornLoc(gear[16])
     local best, empty, bestSlot
     for _, slot in ipairs(slots) do
@@ -372,13 +383,13 @@ local function Compare(c, info, link)
                 worn = WornScore(gear[slot], role)
                 if worn == nil then return false end
             end
-            local gain = worn > 0 and (new - worn) * 100 / worn or NEW
+            local gain = total > 0 and (new - worn) * 100 / total or NEW
             if not best or gain > best then
                 best, empty, bestSlot = gain, not gear[slot], slot
             end
         end
     end
-    if not best or best < MIN_GAIN then return nil end
+    if not best or (best < MIN_GAIN and not empty) then return nil end -- anything beats an empty slot
     return best, empty, need > level and need or nil, bestSlot
 end
 
@@ -397,6 +408,37 @@ local function Before(i, j)
     return rowKey[i] < rowKey[j]
 end
 
+-- How big an upgrade is, shown as one to three green arrows rather than a % (the owner's
+-- idea, 2026-10-16: a % was hard to judge): minor under 4% of the character's whole gear
+-- score, decent under 10%, major from 10% (or when nothing they wear scores yet).
+local DECENT, MAJOR = 4, 10
+
+function ns.GainTier(gain)
+    if gain >= MAJOR then return 3 end
+    if gain >= DECENT then return 2 end
+    return 1
+end
+
+-- The game's green bag-upgrade arrow, or an arrow icon if this client hasn't that atlas.
+local arrow
+local function Arrow()
+    if not arrow then
+        local atlas = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("bags-greenarrow")
+        arrow = atlas and "|A:bags-greenarrow:12:12|a" or "|TInterface\\Icons\\Misc_ArrowlUp:12:12:0:0:64:64:5:59:5:59|t"
+    end
+    return arrow
+end
+
+function ns.GainArrows(gain)
+    return Arrow():rep(ns.GainTier(gain))
+end
+
+-- The arrows, and "· empty slot" when there's nothing in it.
+function ns.GainLabel(gain, empty)
+    local arrows = ns.GainArrows(gain)
+    return empty and arrows .. " · " .. L["empty slot"] or arrows
+end
+
 local function SlotName(loc)
     local name = _G[loc]
     return type(name) == "string" and name or ""
@@ -413,8 +455,7 @@ local function Build(info, link, onlyYou, recipeID, tt, data)
             if gain then
                 rows = rows + 1
                 rowKey[rows], rowGain[rows] = key, gain
-                local text = SlotName(info.loc) .. " · "
-                    .. (gain ~= NEW and ("+" .. floor(gain + 0.5) .. "%") or empty and L["empty slot"] or L["big upgrade"])
+                local text = SlotName(info.loc) .. " · " .. ns.GainLabel(gain, empty)
                 if at then
                     text = GREY .. text .. " · " .. L["at level %d"]:format(at) .. "|r"
                 else
@@ -538,6 +579,19 @@ local function InSlot(loc, slot)
     return false
 end
 
+-- The profession an item is really crafted with: crafts from before 0.3.0 hold `true`, and
+-- 0.2.x filed some under every profession the character has (the owner's save, 2026-10-16:
+-- Leatherworking items also under Cooking, Skinning, Fishing and First Aid), so the entry
+-- with the recipe's name wins; a lone `true` stands.
+local function CraftProf(crafts, prof, id)
+    if type(crafts[prof][id]) == "string" then return prof end
+    for other, items in pairs(crafts) do
+        if type(items[id]) == "string" then return other end
+    end
+    return prof
+end
+ns.CraftProf = CraftProf
+
 local function Better(a, b)
     if a.gain ~= b.gain then return a.gain > b.gain end
     return a.id < b.id
@@ -564,8 +618,11 @@ function ns.CraftableUpgrades(slot, out)
     end)
     local done, pending = {}, false
     for _, key in ipairs(keys) do
-        for prof, items in pairs(ns.db.chars[key].crafts or {}) do
+        local crafts = ns.db.chars[key].crafts or {}
+        for prof, items in pairs(crafts) do
             for id in pairs(items) do
+                if CraftProf(crafts, prof, id) ~= prof then id = nil end -- counted under its own
+                if id then
                 local _, _, _, loc, _, class, sub = GetItemInfoInstant(id)
                 local armour = class == ARMOR_CLASS and sub and sub >= 1 and sub <= 4 and loc ~= "INVTYPE_CLOAK"
                 if not done[id] and (class == ARMOR_CLASS or class == WEAPON_CLASS) and (not slot and SLOTS[loc] or InSlot(loc, slot))
@@ -590,6 +647,7 @@ function ns.CraftableUpgrades(slot, out)
                             end
                         end
                     end
+                end
                 end
             end
         end
