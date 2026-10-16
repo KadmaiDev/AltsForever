@@ -187,6 +187,25 @@ function ns.SlotEdge(b, r, g, bl, a)
     return true
 end
 
+-- The bags window's background, with EllesmereUI's bags in use: theirs, not the standard
+-- window shell, which is about half as bright (measured on the owner's screenshots,
+-- 2026-10-16: the two windows looked different side by side). Their bags draw EllesmereUI's
+-- panel texture with 25% black over it. The file isn't part of the API: if it ever goes, the
+-- texture draws nothing and the shell shows through.
+local BAGS_BG = "Interface\\AddOns\\EllesmereUI\\media\\modern_blizz.png"
+
+function ns.SkinBagsWindow(f)
+    if not (skin and _G.EUI_MainBagFrame) or f.euiBg then return end
+    local bg = f:CreateTexture(nil, "BACKGROUND", nil, 6)
+    bg:SetPoint("TOPLEFT", 1, -1)
+    bg:SetPoint("BOTTOMRIGHT", -1, 1)
+    bg:SetTexture(BAGS_BG)
+    local shade = f:CreateTexture(nil, "BACKGROUND", nil, 7)
+    shade:SetAllPoints(bg)
+    shade:SetColorTexture(0, 0, 0, 0.25)
+    f.euiBg = bg
+end
+
 -- A section heading in the bags window: EllesmereUI's are light grey, not gold.
 function ns.SkinHeading(fs)
     if skin then skin.Font(fs, 0.9, 0.9, 0.9) else ns.SkinText(fs) end

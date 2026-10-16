@@ -677,6 +677,7 @@ local function CreateWindow()
 
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverBagsFrame" end
     ns.SkinWindow(f)
+    ns.SkinBagsWindow(f)
     f:Hide()
     f:SetPoint("CENTER")
     -- The game's own bag sounds, however the window is opened or closed (Esc too); hooked

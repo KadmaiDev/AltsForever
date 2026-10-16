@@ -60,6 +60,20 @@ test("with EllesmereUI, the bags window's slots look like its bags: square icons
     eq(table.concat(empty.empty.tint, ","), "0.27,0.27,0.27", "tinted down to EllesmereUI's dark copy")
     eq(empty.icon.texture, nil, "not at full strength in the icon")
     eq(table.concat(empty.edges[1].tint, ","), "0,0,0")
+    eq(AltsForeverBagsFrame.euiBg, nil, "EllesmereUI's bags not in use: the standard window")
+end)
+
+test("with EllesmereUI's bags in use, the bags window has their background", function()
+    wow.withEllesmere = true
+    local ns = wow.load(FILES)
+    EUI_MainBagFrame = CreateFrame("Frame", "EUI_MainBagFrame", UIParent)
+    wow.login(nil)
+    wow.skinCallback(wow.skinFacade)
+    ns.ShowBags(ns.charKey, "bags")
+    local bg = AltsForeverBagsFrame.euiBg
+    assert(bg, "drawn")
+    eq(bg.texture, "Interface\\AddOns\\EllesmereUI\\media\\modern_blizz.png")
+    EUI_MainBagFrame = nil
 end)
 
 test("without EllesmereUI the bags window keeps Blizzard's slot art", function()
