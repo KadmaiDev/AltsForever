@@ -1,11 +1,11 @@
 <Bindings>
-	<Binding name="ALTSFOREVER_OVERVIEW" header="ALTSFOREVER" category="ADDONS">
+	<Binding name="ALTSFOREVER_OVERVIEW" category="Alts Forever">
 		AltsForever_Binding("overview")
 	</Binding>
-	<Binding name="ALTSFOREVER_BAGS" category="ADDONS">
+	<Binding name="ALTSFOREVER_BAGS" category="Alts Forever">
 		AltsForever_Binding("bags")
 	</Binding>
-	<Binding name="ALTSFOREVER_SEARCH" category="ADDONS">
+	<Binding name="ALTSFOREVER_SEARCH" category="Alts Forever">
 		AltsForever_Binding("search")
 	</Binding>
 </Bindings>

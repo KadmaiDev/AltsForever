@@ -110,13 +110,23 @@ test("the bags window: focus moving onto a slot scrolls it into view; the resize
     eq(f.content.point[5], 0, "back to the top, heading included")
 end)
 
-test("key bindings: open the overview and the bags window (for a controller button or macro)", function()
+test("key bindings: the overview, bags window and search, in their own Alts Forever section", function()
     local ns = wow.load(FILES)
     wow.login(nil)
     local xml = assert(io.open("Bindings.xml")):read("*a")
-    assert(xml:find('AltsForever_Binding("overview")', 1, true) and xml:find('AltsForever_Binding("bags")', 1, true))
-    eq(BINDING_HEADER_ALTSFOREVER, "Alts Forever")
+    for _, which in ipairs({ "overview", "bags", "search" }) do
+        assert(xml:find('AltsForever_Binding("' .. which .. '")', 1, true), which)
+    end
+    -- Every binding in our own section, not untitled under AddOns.
+    local bindings, ours = 0, 0
+    for attrs in xml:gmatch("<Binding (.-)>") do
+        bindings = bindings + 1
+        if attrs:find('category="Alts Forever"', 1, true) then ours = ours + 1 end
+    end
+    eq(bindings, 3)
+    eq(ours, 3)
     eq(BINDING_NAME_ALTSFOREVER_OVERVIEW, "Open overview")
+    eq(BINDING_NAME_ALTSFOREVER_SEARCH, "Search your characters")
     AltsForever_Binding("overview")
     eq(AltsForeverFrame:IsShown(), true)
     AltsForever_Binding("bags")

@@ -81,8 +81,9 @@ function ns.PageButton(parent, up, onClick)
 end
 
 -- Key bindings (Bindings.xml): put on a controller button, or reach them with a macro of
--- /af, /af bags or /afs on a gamepad action bar.
-BINDING_HEADER_ALTSFOREVER = "Alts Forever"
+-- /af, /af bags or /afs on a gamepad action bar. They have their own "Alts Forever" section
+-- in Key Bindings (category="Alts Forever", as EllesmereUI and Dungeon Journal do); under
+-- category="ADDONS" they sat untitled among other addons' (owner, 2026-10-16).
 BINDING_NAME_ALTSFOREVER_OVERVIEW = L["Open overview"]
 BINDING_NAME_ALTSFOREVER_BAGS = L["Bags and bank"]
 BINDING_NAME_ALTSFOREVER_SEARCH = L["Search your characters"]
