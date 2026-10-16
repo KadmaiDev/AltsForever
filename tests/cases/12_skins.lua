@@ -34,6 +34,45 @@ test("with EllesmereUI, every window takes its look when first created", functio
     assert(skinnedWith("Shell", AltsForeverRepFrame), "reputation panel")
 end)
 
+test("with EllesmereUI, the bags window's slots look like its bags: square icons, a quality edge, faint empty squares", function()
+    wow.withEllesmere = true
+    local ns = wow.load(FILES)
+    wow.setBag(0, 4, { [1] = { 100, 20 }, [3] = { 200, 1 } })
+    wow.itemQuality[200] = 3
+    wow.login(nil)
+    wow.skinCallback(wow.skinFacade)
+    ns.ShowBags(ns.charKey, "bags")
+    local byId, empty = {}, nil
+    for _, b in ipairs({ AltsForeverBagsFrame.content:GetChildren() }) do
+        if b:IsShown() and b.icon then
+            if b.id then byId[b.id] = b else empty = empty or b end
+        end
+    end
+    local rare, unknown = byId[200], byId[100]
+    assert(skinnedWith("SquareIcon", rare.icon), "the icon squared by EllesmereUI")
+    eq(rare.border:IsShown(), false, "not Blizzard's round frame")
+    eq(table.concat(rare.edges[1].tint, ","), "0,0.44,0.87", "edge in the item's quality colour")
+    eq(table.concat(unknown.edges[1].tint, ","), "0.25,0.25,0.25", "grey while its quality isn't known")
+    eq(rare.empty:IsShown(), false)
+    eq(empty.empty:IsShown(), true, "an empty slot is a faint square")
+    eq(empty.icon.texture, nil, "without Blizzard's empty-slot art")
+    eq(table.concat(empty.edges[1].tint, ","), "0,0,0")
+end)
+
+test("without EllesmereUI the bags window keeps Blizzard's slot art", function()
+    local ns = wow.load(FILES)
+    wow.setBag(0, 2, { [1] = { 200, 1 } })
+    wow.itemQuality[200] = 3
+    wow.login(nil)
+    ns.ShowBags(ns.charKey, "bags")
+    for _, b in ipairs({ AltsForeverBagsFrame.content:GetChildren() }) do
+        if b:IsShown() and b.icon then
+            eq(b.edges, nil)
+            if not b.id then eq(b.icon.texture, "Interface\\PaperDoll\\UI-Backpack-EmptySlot") end
+        end
+    end
+end)
+
 test("a window opened before EllesmereUI's callback is skinned when it arrives", function()
     wow.withEllesmere = true
     wow.load(FILES)

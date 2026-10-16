@@ -127,6 +127,63 @@ function ns.SkinSlot(b)
     if not skin and Elv() then pcall(ElvIconButton, b, b.icon) end
 end
 
+-- A slot in the bags window. With EllesmereUI, the look of its bags beside it (owner,
+-- 2026-10-16: the two windows looked different): the icon squared by its API, a 1 px edge we
+-- colour by quality (ns.SlotEdge), an outlined count, and an empty slot drawn as a faint
+-- square, as its bags draw theirs (its bag addon's own textures aren't part of the API, so
+-- the square is ours). ElvUI: its icon button, as elsewhere.
+local WHITE = "Interface\\Buttons\\WHITE8X8"
+local COUNT_SIZE = 11 -- EllesmereUI's bags' default count size
+
+local function EuiSlot(b)
+    if skin.SquareIcon then skin.SquareIcon(b.icon) end
+    b.border:SetTexture(nil)
+    b.border:Hide()
+    b.empty = b:CreateTexture(nil, "BACKGROUND", nil, 1)
+    b.empty:SetAllPoints()
+    b.empty:SetColorTexture(1, 1, 1, 0.06)
+    b.empty:Hide()
+    -- Its bags' edges are one screen pixel; they take it from their pixel helper (not part
+    -- of the API: read only, else 1).
+    local pp = EllesmereUI and EllesmereUI.PP
+    local px = type(pp) == "table" and type(pp.mult) == "number" and pp.mult > 0 and pp.mult or 1
+    local edges = {}
+    for i = 1, 4 do
+        local t = b:CreateTexture(nil, "OVERLAY", nil, 2)
+        t:SetTexture(WHITE)
+        edges[i] = t
+    end
+    edges[1]:SetPoint("TOPLEFT"); edges[1]:SetPoint("TOPRIGHT"); edges[1]:SetHeight(px)
+    edges[2]:SetPoint("BOTTOMLEFT"); edges[2]:SetPoint("BOTTOMRIGHT"); edges[2]:SetHeight(px)
+    edges[3]:SetPoint("TOPLEFT"); edges[3]:SetPoint("BOTTOMLEFT"); edges[3]:SetWidth(px)
+    edges[4]:SetPoint("TOPRIGHT"); edges[4]:SetPoint("BOTTOMRIGHT"); edges[4]:SetWidth(px)
+    b.edges = edges
+    skin.Font(b.count)
+    local path = b.count:GetFont()
+    if type(path) == "string" then b.count:SetFont(path, COUNT_SIZE, "OUTLINE") end
+end
+
+function ns.SkinBagSlot(b)
+    if skin then
+        pcall(EuiSlot, b)
+    elseif Elv() then
+        pcall(ElvIconButton, b, b.icon)
+    end
+end
+
+-- Colours a bags-window slot's edge in EllesmereUI's look; false if it hasn't got that look.
+function ns.SlotEdge(b, r, g, bl, a)
+    local edges = b.edges
+    if not edges then return false end
+    for i = 1, 4 do edges[i]:SetVertexColor(r, g, bl, a) end
+    return true
+end
+
+-- A section heading in the bags window: EllesmereUI's are light grey, not gold.
+function ns.SkinHeading(fs)
+    if skin then skin.Font(fs, 0.9, 0.9, 0.9) else ns.SkinText(fs) end
+end
+
 -- The mail window's "send to alt" arrow (ElvUI only: it restyles the mail window itself).
 -- ElvUI gives the To box a bordered backdrop, so the arrow gets a small gap from it.
 function ns.SkinArrow(b, anchor)

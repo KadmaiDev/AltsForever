@@ -166,7 +166,7 @@ local function Slot(i)
     b:SetScript("OnEnter", SlotEnter)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
     b:SetScript("OnClick", SlotClick)
-    ns.SkinSlot(b)
+    ns.SkinBagSlot(b)
     slots[i] = b
     return b
 end
@@ -176,7 +176,7 @@ local function Header(i)
     local h = headers[i]
     if h then return h end
     h = frame.content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    ns.SkinText(h)
+    ns.SkinHeading(h)
     h.line = frame.content:CreateTexture(nil, "ARTWORK")
     h.line:SetHeight(1)
     h.line:SetColorTexture(1, 1, 1, 0.12)
@@ -212,15 +212,26 @@ local function ShowSlot(b, id, count)
     b.border:SetAlpha(dim)
     b.count:SetAlpha(dim)
     if not id then
-        b.icon:SetTexture(EMPTY_SLOT)
         b.count:SetText("")
         b.border:Hide()
+        -- EllesmereUI's look: a faint square with a dark edge.
+        if b.empty then
+            b.icon:SetTexture(nil)
+            b.empty:Show()
+            ns.SlotEdge(b, 0, 0, 0, 0.3 * dim)
+        else
+            b.icon:SetTexture(EMPTY_SLOT)
+        end
         return
     end
+    if b.empty then b.empty:Hide() end
     b.icon:SetTexture(GetItemIconByID(id) or 134400)
     b.count:SetText(count > 1 and count or "")
     local q = Quality(id)
-    local color = q and q >= 2 and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q]
+    -- EllesmereUI's look: every quality has its colour on the edge, grey until it's known.
+    local qc = q and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q]
+    if ns.SlotEdge(b, qc and qc.r or 0.25, qc and qc.g or 0.25, qc and qc.b or 0.25, dim) then return end
+    local color = q and q >= 2 and qc
     if color then
         b.border:SetVertexColor(color.r, color.g, color.b)
         b.border:Show()
