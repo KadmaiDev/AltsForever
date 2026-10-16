@@ -324,10 +324,13 @@ end
 -- height as you step through them, so the arrows stay under the mouse (owner, 2026-10-16:
 -- the window resizing made them hard to click).
 local litHeight
+-- With the search docked beside it: the tallest of the bags and bank shown since, never less,
+-- so the window doesn't jump as the search lights one item after another (owner, 2026-10-16).
+local held
 
 Place = function()
     -- While the player drags the grip, the window keeps the height they're dragging to.
-    local want = max(contentHeight, litHeight or 0)
+    local want = max(contentHeight, litHeight or 0, held or 0)
     local visible = sizing and max(frame:GetHeight() - TOP - BOTTOM, MIN_VIEW) or max(min(want, MaxView()), MIN_VIEW)
     scroll = max(0, min(scroll, contentHeight - visible))
     frame.content:ClearAllPoints()
@@ -356,6 +359,7 @@ function Fill()
         end
         litHeight = tallest
     end
+    if held then held = max(held, ContentHeight(c, "bags", split), ContentHeight(c, "bank", split)) end
     local how = ns.BagsContents(c, view, split)
     frame.who:SetText(ns.ColoredName(shownKey, c))
     for _, v in ipairs({ "bags", "bank" }) do
@@ -666,6 +670,7 @@ local function CreateWindow()
     f:HookScript("OnShow", function() if sounds.IG_BACKPACK_OPEN then PlaySound(sounds.IG_BACKPACK_OPEN) end end)
     f:HookScript("OnHide", function()
         lit = nil
+        if held then held = 0 end
         if sounds.IG_BACKPACK_CLOSE then PlaySound(sounds.IG_BACKPACK_CLOSE) end
     end)
     ns.GamepadWindow(f)
@@ -718,6 +723,13 @@ function ns.BagsRestore(oldLit, oldView)
 end
 
 function ns.BagsWindow() return frame end
+
+-- The search docked beside the window (true) or gone (false): one height while it's there.
+function ns.BagsHold(on)
+    if (held ~= nil) == (on and true or false) then return end
+    held = on and 0 or nil
+    if frame and frame:IsShown() then Fill() end
+end
 
 -- The scanner calls this after each bags or bank scan; money changes too.
 function ns.BagsWindowChanged()

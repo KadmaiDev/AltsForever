@@ -2,7 +2,7 @@
 -- (the owner's idea, 2026-10-16, after trying EasyFind and Forever Spotlight; theirs search
 -- the whole game, ours your characters). One row per item: how many, who has them, who can
 -- make it. Enter opens the bags window on the character who has it (you first, else the
--- most), with it lit up; Shift+Enter links it in chat. Only item IDs are stored, so names
+-- most), with it lit up, and the search stays open beside it; Shift+Enter links it in chat. Only item IDs are stored, so names
 -- are looked up when the window opens and let go when it closes:
 -- nothing is kept or runs while it's shut.
 local _, ns = ...
@@ -29,11 +29,12 @@ local selected, offset = 1, 0
 local retried
 -- With the bags window open, the search works on it (owner, 2026-10-16): only the character
 -- it shows (scopeKey; "All characters" widens it), docked beside it, and the selected item
--- lit there as you go (previewed). Closed without picking, the bags go back as they were
--- (savedLit, savedView). The last search is kept for the next opening (this session only).
-local scopeKey, savedLit, savedView, previewed, picked, docked
+-- lit there as you go (previewed). Closed, the bags go back to what was last picked, or as
+-- they were (savedLit, savedView). The last search is kept for the next opening (this
+-- session only).
+local scopeKey, savedLit, savedView, previewed, docked
 local lastText = ""
-local ApplyScope
+local ApplyScope, Dock
 
 local function ItemName(id)
     local name = C_Item.GetItemNameByID(id)
@@ -264,18 +265,32 @@ end
 
 -- Enter or a click: the bags or bank of whoever has it (you first, else the most), with it
 -- lit up; worn, their gear; only in the mail, said so. Nobody has it: link it.
--- Closing after a pick: what's lit in the bags window stays (Escape or the close button put
--- it back instead).
-local function Leave()
-    picked = true
+-- The search stays open beside the bags window (owner, 2026-10-16), so the next one is a
+-- click away; what's lit now is what closing it goes back to.
+local function Kept()
+    savedLit, savedView = ns.BagsState()
+    previewed = savedLit
+    box:SetFocus()
+end
+
+local function Open(key, view, id)
+    local opening = not ns.BagsShownKey()
+    ns.ShowBags(key, view, id)
+    if opening then Dock() end
+    Kept()
+end
+
+-- Their gear is another window: the search makes way for it.
+local function Gear(key)
     frame:Hide()
+    ns.ShowGear(key)
 end
 
 local function Pick(e, link)
     if not e then return end
     if link then return Link(e) end
     -- The bags window open on someone who has it: lit up there, where you're looking.
-    if ns.BagsShownKey() and ns.BagsPreview(e.id) then return Leave() end
+    if ns.BagsShownKey() and ns.BagsPreview(e.id) then return Kept() end
     local h = e.holders[1]
     for _, x in ipairs(e.holders) do
         if x.key == ns.charKey then
@@ -285,13 +300,12 @@ local function Pick(e, link)
     end
     if not h then return Link(e) end
     local c = h.c
-    Leave()
     if c.bags and c.bags[e.id] then
-        ns.ShowBags(h.key, "bags", e.id)
+        Open(h.key, "bags", e.id)
     elseif c.bank and c.bank[e.id] then
-        ns.ShowBags(h.key, "bank", e.id)
+        Open(h.key, "bank", e.id)
     elseif c.equip and c.equip[e.id] then
-        ns.ShowGear(h.key)
+        Gear(h.key)
     else
         ns.Print(L["%s has it in the mail."]:format(ns.ListName(h.key, c)))
     end
@@ -340,22 +354,13 @@ local function HolderMenu(row)
             local inBags, inBank = c.bags and c.bags[id] or 0, c.bank and c.bank[id] or 0
             local inMail, worn = c.mail and c.mail[id] or 0, c.equip and c.equip[id] or 0
             if inBags > 0 then
-                root:CreateButton(L["%s: %d in bags"]:format(who, inBags), function()
-                    Leave()
-                    ns.ShowBags(key, "bags", id)
-                end)
+                root:CreateButton(L["%s: %d in bags"]:format(who, inBags), function() Open(key, "bags", id) end)
             end
             if inBank > 0 then
-                root:CreateButton(L["%s: %d in the bank"]:format(who, inBank), function()
-                    Leave()
-                    ns.ShowBags(key, "bank", id)
-                end)
+                root:CreateButton(L["%s: %d in the bank"]:format(who, inBank), function() Open(key, "bank", id) end)
             end
             if worn > 0 then
-                root:CreateButton(L["%s: wearing it"]:format(who), function()
-                    Leave()
-                    ns.ShowGear(key)
-                end)
+                root:CreateButton(L["%s: wearing it"]:format(who), function() Gear(key) end)
             end
             if inMail > 0 then
                 -- The bags window doesn't show mail: said, not opened.
@@ -606,9 +611,10 @@ local function CreateWindow()
     end)
     f:SetScript("OnHide", function()
         lastText = box:GetText() or ""
-        -- Closed without picking: the bags window as it was before.
-        if not picked and previewed ~= nil then ns.BagsRestore(savedLit, savedView) end
-        previewed, picked = nil, false
+        -- The bags window back to what was last picked, or as it was before.
+        if previewed ~= savedLit then ns.BagsRestore(savedLit, savedView) end
+        previewed = nil
+        ns.BagsHold(false)
         box:ClearFocus()
         pool, names = nil, nil
         wipe(matches)
@@ -639,7 +645,7 @@ end
 
 -- Beside the bags window when it's open (right of it if there's room, else left), so
 -- neither covers the other; otherwise where it always opens.
-local function Dock()
+Dock = function()
     local bags = ns.BagsWindow()
     if bags and bags:IsShown() then
         frame:ClearAllPoints()
@@ -651,6 +657,7 @@ local function Dock()
             frame:SetPoint("TOPLEFT", bags, "TOPRIGHT", 4, 0)
         end
         docked = true
+        ns.BagsHold(true)
     elseif docked then
         frame:ClearAllPoints()
         frame:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
@@ -667,7 +674,7 @@ function ns.ToggleSearch(text)
     if not frame:IsShown() then
         scopeKey = ns.BagsShownKey()
         savedLit, savedView = ns.BagsState()
-        previewed, picked = nil, false
+        previewed = savedLit
         ApplyScope()
         Dock()
         if text == "" then text = lastText end

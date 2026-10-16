@@ -92,8 +92,9 @@ test("Enter opens the bags of whoever has it, lit up (you first); arrows move; S
     local box = AltsForeverSearchBox
     -- Aldric (you) has 5 in the bank: that's what opens, with the linen lit up.
     box.scripts.OnEnterPressed(box)
-    eq(AltsForeverSearchFrame:IsShown(), false, "the search closes")
+    eq(AltsForeverSearchFrame:IsShown(), true, "the search stays open")
     eq(AltsForeverBagsFrame:IsShown(), true)
+    eq(AltsForeverSearchFrame.point[2], AltsForeverBagsFrame, "beside the bags window it opened")
     eq(ns.BagsHighlight(), 2589)
     eq(AltsForeverBagsFrame.who.text:find("Aldric", 1, true) ~= nil, true)
     -- With the bags window closed, the search is everyone's again: the bolt is in Tarn's bags.
@@ -121,7 +122,8 @@ test("Enter opens the bags of whoever has it, lit up (you first); arrows move; S
     for _, slot in ipairs({ AltsForeverBagsFrame.content:GetChildren() }) do
         if slot.id and slot:IsShown() then eq(slot.icon:GetAlpha(), 1, "every slot back") end
     end
-    -- The bags window's own search button.
+    -- The bags window's own search button (it closes an open search, as the binding does).
+    AltsForeverSearchFrame:Hide()
     local search = AltsForeverBagsFrame.searchButton
     search.scripts.OnClick(search)
     eq(AltsForeverSearchFrame:IsShown(), true)
@@ -238,7 +240,7 @@ test("the highlight stays as you switch; the arrows step through everyone who ha
     row.scripts.OnClick(row, "RightButton")
     eq(menuTexts(), "Linen Cloth | [DRUID]Tarn Moon: 20 in bags | [MAGE]Aldric: 5 in the bank | Link in chat")
     wow.menu.items[2].fn()
-    eq(AltsForeverSearchFrame:IsShown(), false)
+    eq(AltsForeverSearchFrame:IsShown(), true)
     assert(f.who.text:find("Tarn Moon", 1, true))
     eq(ns.BagsHighlight(), 2589)
 end)
@@ -297,6 +299,11 @@ test("with the bags window open the search works on it: that character only, bes
     local ns = searchStart()
     wow.item(2592, "Wool Cloth", {})
     AltsForeverDB.chars["Tarn Moon"].bank = { [2592] = 4 }
+    -- A bank much taller than the bags, to see the window keep one height.
+    for i = 1, 70 do
+        wow.item(40000 + i, "Junk " .. i, {})
+        AltsForeverDB.chars["Tarn Moon"].bank[40000 + i] = 1
+    end
     ns.ShowBags("Tarn Moon", "bags")
     local bags = AltsForeverBagsFrame
     bags.searchButton.scripts.OnClick(bags.searchButton)
@@ -316,6 +323,11 @@ test("with the bags window open the search works on it: that character only, bes
     eq(ns.BagsHighlight(), 2592)
     eq(select(2, ns.BagsState()), "bank")
     assert(bags.who.text:find("Tarn Moon", 1, true), "never another character")
+    -- One height while the search is beside it, whichever of the two it shows.
+    local tall = bags:GetHeight()
+    box.scripts.OnArrowPressed(box, "UP")
+    eq(select(2, ns.BagsState()), "bags")
+    eq(bags:GetHeight(), tall, "doesn't jump between bags and bank")
     assert(f.status.text:find("Escape", 1, true), "says what Enter and Escape do here")
     -- Escape: the bags as they were.
     box.scripts.OnEscapePressed(box)
@@ -326,8 +338,14 @@ test("with the bags window open the search works on it: that character only, bes
     bags.searchButton.scripts.OnClick(bags.searchButton)
     eq(box.text, "cloth")
     box.scripts.OnEnterPressed(box)
-    eq(f:IsShown(), false)
+    eq(f:IsShown(), true, "still open for the next one")
     eq(ns.BagsHighlight(), 2589, "kept")
+    -- Looking at another, then closing: back to the one picked.
+    box.scripts.OnArrowPressed(box, "DOWN")
+    eq(ns.BagsHighlight(), 2592)
+    box.scripts.OnEscapePressed(box)
+    eq(ns.BagsHighlight(), 2589, "the pick stays lit")
+    eq(select(2, ns.BagsState()), "bags")
     assert(bags.who.text:find("Tarn Moon", 1, true))
     -- All characters: Aldric's linen too; an item Tarn hasn't got leaves the bags as they were.
     bags.searchButton.scripts.OnClick(bags.searchButton)
