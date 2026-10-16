@@ -234,13 +234,13 @@ end
 -- shadowed frame (a stretched map-border atlas); their bags draw the same texture with only
 -- 25% black and a 1 px dark grey line. So: the shell without its frame (noBorder, part of
 -- the API), the texture at their brightness between the shell's backdrop and its title strip
--- (one texture, tinted 0.65: their 0.75 measured 10-20% lighter than their bags on the
--- owner's screenshot, 2026-10-16, the texture stretching differently over our window), and
--- the line. The file isn't part of the API: if
+-- (one texture, tinted 0.7: their 0.75 measured lighter than their bags on one of the owner's
+-- screenshots and 0.65 darker on the next, 2026-10-16; the scene behind moves the readings),
+-- and the line. The file isn't part of the API: if
 -- it ever goes, the texture draws nothing and the shell's own backdrop shows through.
 local BAGS_BG = "Interface\\AddOns\\EllesmereUI\\media\\modern_blizz.png"
 local LINE = 0.1 -- their bags' border colour
-local BAGS_TINT = 0.65
+local BAGS_TINT = 0.7
 
 local function EuiBags() return skin and _G.EUI_MainBagFrame and true or false end
 
