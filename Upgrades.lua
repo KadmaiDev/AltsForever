@@ -24,7 +24,6 @@ local GetItemInfoInstant, GetItemInfo, GetItemStats = C_Item.GetItemInfoInstant,
 
 local RECIPE_CLASS, WEAPON_CLASS, ARMOR_CLASS = 9, 2, 4
 local BIND_ON_EQUIP = 2
-local MIN_GAIN = 1      -- % (of the character's whole gear score) below which a gain is noise
 local MAX_ROWS = 5
 local LEVEL_AHEAD = 5   -- characters up to this many levels short show as "at level N"
 local MAX_SCORES = 2000 -- cached scores before the cache starts again
@@ -389,7 +388,9 @@ local function Compare(c, info, link)
             end
         end
     end
-    if not best or (best < MIN_GAIN and not empty) then return nil end -- anything beats an empty slot
+    -- Any real gain shows, the small ones as one arrow (a 1% cut-off hid valid boots and
+    -- capes on a level 16 alt, the owner's report 2026-10-16).
+    if not best or (best <= 0 and not empty) then return nil end -- anything beats an empty slot
     return best, empty, need > level and need or nil, bestSlot
 end
 
