@@ -66,6 +66,15 @@ test("the character sheet puts an anvil beside slots with a craftable upgrade yo
     eq(head, nil, "the helm needs level 28: not wearable yet")
     eq(hands.point[1], "LEFT", "outside the right-hand column")
     eq(back.point[1], "RIGHT", "outside the left-hand column")
+    -- The best upgrade's chevrons on the anvil: nothing worn in the hands, so major.
+    eq(hands.tier.texture, "Interface\\AddOns\\AltsForever\\media\\up3.tga")
+    -- Shipped with the addon, and drawn.
+    local release = assert(io.open("tools/release.py")):read("*a")
+    for n = 1, 3 do
+        assert(release:find('"media/up' .. n .. '.tga"', 1, true), "up" .. n .. ".tga ships")
+        local f = assert(io.open("media/up" .. n .. ".tga", "rb"), "up" .. n .. ".tga exists")
+        f:close()
+    end
     -- Hovering the anvil: the best few, and who makes them.
     hands.scripts.OnEnter(hands)
     local text = {}

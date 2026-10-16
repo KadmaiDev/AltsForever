@@ -2,7 +2,8 @@
 -- button sits just outside a slot (left of the left column, right of the right column,
 -- below the weapons; the inner sides can hold a UI addon's stat text) when you or one of
 -- your characters who can mail you can craft an upgrade for it that you can wear now and
--- that binds when equipped (owner, 2026-10-16). Hover it for the best few; click it for
+-- that binds when equipped (owner, 2026-10-16), with the best one's chevrons on its corner
+-- (minor, decent, major). Hover it for the best few; click it for
 -- all of them as item buttons beside it. Upgrades.lua picks them (ns.CraftableUpgrades).
 -- (Before, the list sat under the game's Alt-hover equipment flyout; the owner preferred
 -- a button to click.)
@@ -65,8 +66,9 @@ local function ItemButton(i)
     b.border = b:CreateTexture(nil, "OVERLAY")
     b.border:SetAllPoints()
     b.border:SetTexture(BORDER)
-    b.gain = b:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-    b.gain:SetPoint("BOTTOMRIGHT", -2, 2)
+    b.tier = b:CreateTexture(nil, "OVERLAY", nil, 2)
+    b.tier:SetSize(16, 16)
+    b.tier:SetPoint("BOTTOMRIGHT", 1, -1)
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.15)
@@ -114,7 +116,7 @@ local function ShowPanel(glyph)
         local color = q and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q]
         if color then b.border:SetVertexColor(color.r, color.g, color.b) end
         b.border:SetShown(color ~= nil)
-        b.gain:SetText(ns.GainArrows(e.gain))
+        b.tier:SetTexture(ns.GainTexture(e.gain))
         b:ClearAllPoints()
         local col, row = (i - 1) % PER_ROW, floor((i - 1) / PER_ROW)
         b:SetPoint("TOPLEFT", PAD + col * (SIZE + GAP), -(PAD + TITLE + row * (SIZE + GAP)))
@@ -178,6 +180,10 @@ local function Glyph(b, side)
     g.icon = g:CreateTexture(nil, "ARTWORK")
     g.icon:SetAllPoints()
     g.icon:SetTexture(ANVIL)
+    -- The best upgrade's chevrons on the anvil's corner, so each slot can be judged at a glance.
+    g.tier = g:CreateTexture(nil, "OVERLAY")
+    g.tier:SetSize(14, 14)
+    g.tier:SetPoint("BOTTOMRIGHT", g, "BOTTOMRIGHT", 5, -4)
     local hl = g:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
     hl:SetTexture(ANVIL)
@@ -224,6 +230,7 @@ local function RefreshDoll()
                 if g then
                     g.slot = slot
                     g:SetShown(has)
+                    if has then g.tier:SetTexture(ns.GainTexture(bySlot[slot][1].gain)) end -- best first
                 end
             end
         end

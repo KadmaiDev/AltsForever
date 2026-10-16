@@ -14,7 +14,7 @@
 --
 -- Scores are cached per item link and role (numbers only); the rows for the last item are
 -- kept, so the tooltip refreshing while you hover rebuilds nothing.
-local _, ns = ...
+local ADDON, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
 
@@ -420,19 +420,16 @@ function ns.GainTier(gain)
     return 1
 end
 
--- The game's green bag-upgrade arrow, or an arrow icon if this client hasn't that atlas.
-local arrow
-local function Arrow()
-    if not arrow then
-        local atlas = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("bags-greenarrow")
-        arrow = atlas and "|A:bags-greenarrow:12:12|a" or "|TInterface\\Icons\\Misc_ArrowlUp:12:12:0:0:64:64:5:59:5:59|t"
-    end
-    return arrow
+-- One to three green chevrons stacked like rank stripes (media/up1-3.tga, drawn by
+-- tools/make_chevrons.py; the owner's idea, 2026-10-16): the picture, and as text.
+local CHEVRONS, CHEVRON_TEXT = {}, {}
+for tier = 1, 3 do
+    CHEVRONS[tier] = "Interface\\AddOns\\" .. ADDON .. "\\media\\up" .. tier .. ".tga"
+    CHEVRON_TEXT[tier] = "|T" .. CHEVRONS[tier] .. ":16:16|t"
 end
 
-function ns.GainArrows(gain)
-    return Arrow():rep(ns.GainTier(gain))
-end
+function ns.GainTexture(gain) return CHEVRONS[ns.GainTier(gain)] end
+function ns.GainArrows(gain) return CHEVRON_TEXT[ns.GainTier(gain)] end
 
 -- The arrows, and "· empty slot" when there's nothing in it.
 function ns.GainLabel(gain, empty)

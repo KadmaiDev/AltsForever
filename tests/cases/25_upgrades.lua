@@ -23,7 +23,7 @@ function upRows(lines)
         elseif inBlock then
             if left == " " then break end
             out[#out + 1] = left .. " = " .. tostring(line[2]):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-                :gsub("|A.-|a", "^"):gsub("|T.-|t", "^")
+                :gsub("|T[^|]-up(%d)%.tga[^|]-|t", function(n) return ("^"):rep(tonumber(n)) end)
         end
     end
     return table.concat(out, "\n"), header
