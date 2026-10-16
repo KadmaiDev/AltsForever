@@ -474,14 +474,12 @@ function commands.icons()
     if not ns.OpenSettings() then ns.OpenIconPicker("bags") end
 end
 
-function commands.find(arg)
-    ns.FindItems(arg)
-end
-
--- /af search [text] (or /afs): the search window (Search.lua).
+-- /af search [text], /af find [text] or /afs: the search window (Search.lua). /af find
+-- listed matches in chat until the window came (owner, 2026-10-16: both do the same now).
 function commands.search(arg)
     ns.ToggleSearch(arg)
 end
+commands.find = commands.search
 
 -- /af bags [name], /af bank [name]: a character's bags or bank, slot by slot.
 local function ShowBags(arg, which)
@@ -504,7 +502,6 @@ end
 function commands.help()
     Print(L["by Kadmai. /af opens the overview. Also: /af rep | mail | list | delete Name | skillups | sendmail | minimap | stats | mem"])
     Print(L["/af search (or /afs), with or without a name, finds an item on any of your characters, or who can craft it."])
-    Print(L["/af find <text> searches every character's items by name."])
     Print(L["/af counts turns the item counts in tooltips on or off (if another addon, such as Baganator, already shows them)."])
     Print(L["/af bags or /af bank, with a name for another character, shows their bags or bank slot by slot."])
     Print(L["/af icons picks the icons item tooltips use for bags, bank, mail and worn items."])

@@ -3,7 +3,7 @@
 -- the whole game, ours your characters). One row per item: how many, who has them, who can
 -- make it. Enter opens the bags window on the character who has it (you first, else the
 -- most), with it lit up; Shift+Enter links it in chat. Only item IDs are stored, so names
--- are looked up when the window opens, as /af find does, and let go when it closes:
+-- are looked up when the window opens and let go when it closes:
 -- nothing is kept or runs while it's shut.
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
