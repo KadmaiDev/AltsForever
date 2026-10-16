@@ -183,7 +183,12 @@ local function Glyph(b, side)
     -- The best upgrade's chevrons on the anvil's corner, so each slot can be judged at a glance.
     g.tier = g:CreateTexture(nil, "OVERLAY")
     g.tier:SetSize(18, 18)
-    g.tier:SetPoint("BOTTOMRIGHT", g, "BOTTOMRIGHT", 7, -5)
+    -- On the outer side, away from the item icon (it overlapped the left column's icons).
+    if side == "left" then
+        g.tier:SetPoint("RIGHT", g, "LEFT", 3, -2)
+    else
+        g.tier:SetPoint("LEFT", g, "RIGHT", -3, -2)
+    end
     local hl = g:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
     hl:SetTexture(ANVIL)
