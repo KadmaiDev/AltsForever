@@ -110,7 +110,7 @@ test("the character sheet puts an anvil beside slots with a craftable upgrade yo
     eq(AltsForeverDB.anvilsOff, true)
     eq(hands:IsShown(), false, "anvils off")
     ns.ShowOptionsMenu(UIParent)
-    wow.menuItem("Show craftable upgrades on the character sheet").setSelected()
+    pageBox("Show craftable upgrades on the character sheet").setSelected()
     eq(AltsForeverDB.anvilsOff, nil)
     eq(hands:IsShown(), true, "back on")
 end)

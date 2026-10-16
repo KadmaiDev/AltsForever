@@ -302,7 +302,7 @@ test("the setting turns upgrades off and on: /af upgrades, the menu and the Opti
     eq(AltsForeverDB.upgradesOff, true)
     eq(upHover(5001, items.gloves), "")
     ns.ShowOptionsMenu(UIParent)
-    wow.menuItem("Show upgrades").setSelected()
+    pageBox("Show upgrades").setSelected()
     eq(AltsForeverDB.upgradesOff, nil)
     eq(upHover(5001, items.gloves), "[HUNTER]Tarn Moon = Hands · ^^^")
 end)

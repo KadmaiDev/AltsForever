@@ -120,7 +120,7 @@ test("Legacy reminders can be turned off: /af legacy off, the menu and the Optio
     wow.fire("TRAIT_TREE_CURRENCY_INFO_UPDATED", 1187)
     eq(legacyPrinted():find("earned", 1, true), nil, "no announcement")
     ns.ShowOptionsMenu(UIParent)
-    wow.menuItem("Legacy reminders").setSelected()
+    pageBox("Legacy reminders").setSelected()
     eq(AltsForeverDB.legacyRemindOff, nil)
     SlashCmdList.ALTSFOREVER("legacy off")
     SlashCmdList.ALTSFOREVER("legacy on")

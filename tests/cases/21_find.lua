@@ -82,7 +82,7 @@ test("item counts in tooltips can be turned off (another addon shows them); the 
         "Use: Fill the crate with any bundle from the following list:\n- 20 Linen Cloth", "Requires Level 10" }))
     assert(text:find("Materials on your characters", 1, true), text)
     ns.ShowOptionsMenu(UIParent)
-    wow.menuItem("Show item counts").setSelected()
+    pageBox("Show item counts").setSelected()
     eq(AltsForeverDB.countsOff, nil)
     assert(textOf(wow.hover(GameTooltip, 2589)):find("Total = 10", 1, true), "back on")
 end)

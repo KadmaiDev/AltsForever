@@ -26,6 +26,29 @@ function R(breakdown, n)
     return "|cffe0e0e0" .. breakdown .. "|r    " .. n
 end
 
+-- A tick box on the Options page by its label, used like a menu item: the set-once
+-- settings left the options menu for the page (2026-10-16).
+function pageBox(label)
+    local page = AltsForeverOptionsPanel
+    page:Show()
+    page.scripts.OnShow(page) -- shows what's set now
+    for _, check in ipairs(page.checks) do
+        if check.label.text == label then
+            return { kind = "checkbox",
+                isSelected = function()
+                    page.scripts.OnShow(page)
+                    return check:GetChecked()
+                end,
+                setSelected = function()
+                    page.scripts.OnShow(page)
+                    check:SetChecked(not check:GetChecked())
+                    check.scripts.OnClick(check)
+                end }
+        end
+    end
+    error("no tick box " .. label)
+end
+
 -- A saved character, in the stored shape.
 function alt(name, class, data)
     data.name, data.class = name, class

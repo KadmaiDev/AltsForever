@@ -23,7 +23,6 @@ end
 -- Scale (the owner's wish, same day): EllesmereUIDB.panelScale, read only, not part of its
 -- official API. Its options panel is pinned to screen pixels times that; with its
 -- pixel-perfect UI scale (0.53 is 1440p's) UIParent is too, so the two match exactly.
-ns.SCALES = { 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5 }
 local MIN_SCALE, MAX_SCALE = 0.5, 3
 local windows = {}
 
@@ -138,23 +137,15 @@ end
 -- Menus
 ---------------------------------------------------------------------------
 local function CountsSelected() return ns.CountsOn() end
-local function ToggleCounts() ns.SetCounts(not ns.CountsOn()) end
 local function SkillupsSelected() return ns.SkillupsOn() end
-local function ToggleSkillups() ns.SetSkillups(not ns.SkillupsOn()) end
 local function UpgradesSelected() return ns.UpgradesOn() end
-local function ToggleUpgrades() ns.SetUpgrades(not ns.UpgradesOn()) end
 local function AnvilsSelected() return ns.AnvilsOn() end
-local function ToggleAnvils() ns.SetAnvils(not ns.AnvilsOn()) end
 local function SendToAltSelected() return ns.SendToAltOn() end
-local function ToggleSendToAlt() ns.SetSendToAlt(not ns.SendToAltOn()) end
 local function StatsSelected() return ns.StatsOn() end
-local function ToggleStats() ns.SetStats(not ns.StatsOn()) end
 local function LegacySelected() return ns.LegacyRemindersOn() end
-local function ToggleLegacy() ns.SetLegacyReminders(not ns.LegacyRemindersOn()) end
 local function RulesetsSelected() return ns.OtherRulesetsOn() end
 local function ToggleRulesets() ns.SetOtherRulesets(not ns.OtherRulesetsOn()) end
 local function MinimapSelected() return ns.MinimapButtonOn() end
-local function ToggleMinimap() ns.SetMinimapButton(not ns.MinimapButtonOn()) end
 
 ---------------------------------------------------------------------------
 -- Options > AddOns > Alts Forever
@@ -187,25 +178,26 @@ local function Tooltip(owner, title, text)
     GameTooltip:Show()
 end
 
+-- The tick boxes, in this order in f.checks; `section` is where the page puts each one.
 local SETTINGS = {
     { L["Show item counts"], CountsSelected, function(on) ns.SetCounts(on) end,
-        L["Item tooltips list how many of the item each of your characters has, and where. Turn this off if another addon, such as Baganator, already shows them; Can craft, skill-ups, upgrades and crates stay. Same as /af counts."] },
+        L["Item tooltips list how many of the item each of your characters has, and where. Turn this off if another addon, such as Baganator, already shows them; Can craft, skill-ups, upgrades and crates stay. Same as /af counts."], section = "tooltips" },
     { L["Show skill-up details"], SkillupsSelected, function(on) ns.SetSkillups(on) end,
-        L["Show which characters can still skill up: in Can craft, on materials (Skill-ups) and in the overview. Same as /af skillups."] },
+        L["Show which characters can still skill up: in Can craft, on materials (Skill-ups) and in the overview. Same as /af skillups."], section = "tooltips" },
     { L["Show upgrades"], UpgradesSelected, function(on) ns.SetUpgrades(on) end,
-        L["Item tooltips name which of your characters an item would be an upgrade for, judged by their talents. Right-click a character in the overview to change their role. Same as /af upgrades."] },
+        L["Item tooltips name which of your characters an item would be an upgrade for, judged by their talents. Right-click a character in the overview to change their role. Same as /af upgrades."], section = "tooltips" },
     { L["Show craftable upgrades on the character sheet"], AnvilsSelected, function(on) ns.SetAnvils(on) end,
-        L["An anvil beside a slot on your character sheet means you or an alt can craft an upgrade for it that you can wear now and that binds when equipped. Hover or click it to see which. Same as /af anvils."] },
+        L["An anvil beside a slot on your character sheet means you or an alt can craft an upgrade for it that you can wear now and that binds when equipped. Hover or click it to see which. Same as /af anvils."], section = "extras" },
     { L["Send mail to alts"], SendToAltSelected, function(on) ns.SetSendToAlt(on) end,
-        L["An arrow next to the To box at the mailbox to pick one of your characters. Same as /af sendmail."] },
+        L["An arrow next to the To box at the mailbox to pick one of your characters. Same as /af sendmail."], section = "extras" },
     { L["Show session stats"], StatsSelected, function(on) ns.SetStats(on) end,
-        L["Off by default. Your XP bar shows this session's XP and time to level; your bag gold shows gold gained or lost this session, today and this week. Same as /af stats."] },
+        L["Off by default. Your XP bar shows this session's XP and time to level; your bag gold shows gold gained or lost this session, today and this week. Same as /af stats."], section = "extras" },
     { L["Legacy reminders"], LegacySelected, function(on) ns.SetLegacyReminders(on) end,
-        L["Says in chat when the character you log in on has Legacy points to spend, and when you earn one. Same as /af legacy on or off."] },
+        L["Says in chat when the character you log in on has Legacy points to spend, and when you earn one. Same as /af legacy on or off."], section = "extras" },
     { L["Show other rulesets and factions"], RulesetsSelected, function(on) ns.SetOtherRulesets(on) end,
-        L["Tooltips also list your characters on other rulesets (Normal, PvP...) and the other faction, under their own heading. They can't trade or mail with this one, so they're hidden by default; the overview always shows everyone. Same as /af rulesets."] },
+        L["Tooltips also list your characters on other rulesets (Normal, PvP...) and the other faction, under their own heading. They can't trade or mail with this one, so they're hidden by default; the overview always shows everyone. Same as /af rulesets."], section = "tooltips" },
     { L["Show minimap button"], MinimapSelected, function(on) ns.SetMinimapButton(on) end,
-        L["Same as /af minimap. Alts Forever is also in the minimap's addon menu."] },
+        L["Same as /af minimap. Alts Forever is also in the minimap's addon menu."], section = "display" },
 }
 
 local function RefreshCanvas(f)
@@ -227,6 +219,48 @@ function ns.RefreshOptionsIcons()
     if canvas and canvas.built then RefreshCanvas(canvas) end
 end
 
+-- A section's gold heading, at a point on the page.
+local function Heading(f, text, ...)
+    local h = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    h:SetPoint(...)
+    h:SetText(text)
+    ns.SkinText(h)
+    return h
+end
+
+-- The section's tick boxes under its heading; returns the last one.
+local function Checks(f, section, above)
+    local first = true -- under the heading, rather than under another tick box
+    for i, entry in ipairs(SETTINGS) do
+        if entry.section == section then
+            local check = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+            check:SetSize(26, 26)
+            check:SetPoint("TOPLEFT", above, "BOTTOMLEFT", first and -2 or 0, first and -6 or -2)
+            first = false
+            local label = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            label:SetPoint("LEFT", check, "RIGHT", 4, 0)
+            label:SetText(entry[1])
+            check.label = label
+            check:SetScript("OnClick", function(self)
+                entry[3](self:GetChecked() and true or false)
+                RefreshCanvas(f)
+            end)
+            check:SetScript("OnEnter", function(self) Tooltip(self, entry[1], entry[4]) end)
+            check:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            ns.SkinCheck(check)
+            ns.SkinText(label)
+            f.checks[i] = check
+            above = check
+        end
+    end
+    return above
+end
+
+-- The page (the owner's redesign, 2026-10-16: one column had run off the bottom): the
+-- logo, title and Open overview across the top, then two columns. Left: what tooltips
+-- show and their icons. Right: the extras, then the minimap button and window size.
+local TOP, GAP = -100, 20
+
 local function BuildCanvas(f)
     local logo = f:CreateTexture(nil, "ARTWORK")
     logo:SetSize(56, 56)
@@ -239,9 +273,13 @@ local function BuildCanvas(f)
     local by = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     by:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -4)
     by:SetText(L["All your alts at a glance, by Kadmai"])
+    local help = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    help:SetPoint("TOPLEFT", by, "BOTTOMLEFT", 0, -4)
+    help:SetText(L["Type /af help for every command."])
+    for _, fs in ipairs({ title, by, help }) do ns.SkinText(fs) end
     local open = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    open:SetSize(200, 24)
-    open:SetPoint("TOPLEFT", logo, "BOTTOMLEFT", 0, -16)
+    open:SetSize(180, 24)
+    open:SetPoint("TOPRIGHT", f, "TOPRIGHT", -16, -32)
     open:SetText(L["Open overview"])
     open:SetScript("OnClick", OpenOverviewFromOptions)
     open:SetScript("OnEnter", function(self)
@@ -251,39 +289,46 @@ local function BuildCanvas(f)
     f.open = open
     ns.SkinButton(open)
     f.checks = {}
-    local above = open
-    for i, entry in ipairs(SETTINGS) do
-        local check = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
-        check:SetSize(26, 26)
-        check:SetPoint("TOPLEFT", above, "BOTTOMLEFT", i == 1 and -2 or 0, i == 1 and -14 or -4)
+
+    -- Left column: tooltips, then their icons.
+    local tips = Heading(f, L["Tooltips"], "TOPLEFT", f, "TOPLEFT", 18, TOP)
+    local above = Checks(f, "tooltips", tips)
+    local heading = Heading(f, L["Tooltip icons"], "TOPLEFT", above, "BOTTOMLEFT", 2, -GAP)
+    f.icons = {}
+    local row = heading
+    for i, place in ipairs(ns.ICON_PLACES) do
+        local change = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+        change:SetSize(100, 22)
+        change:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 0, i == 1 and -8 or -4)
+        change:SetText(L["Change..."])
+        change:SetScript("OnClick", function() ns.OpenIconPicker(place) end)
+        ns.SkinButton(change)
         local label = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        label:SetPoint("LEFT", check, "RIGHT", 4, 0)
-        label:SetText(entry[1])
-        check.label = label
-        check:SetScript("OnClick", function(self)
-            entry[3](self:GetChecked() and true or false)
-            RefreshCanvas(f)
-        end)
-        check:SetScript("OnEnter", function(self) Tooltip(self, entry[1], entry[4]) end)
-        check:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        ns.SkinCheck(check)
+        label:SetPoint("LEFT", change, "RIGHT", 10, 0)
         ns.SkinText(label)
-        f.checks[i] = check
-        above = check
+        f.icons[place] = label
+        row = change
     end
+
+    -- Right column, from the page's middle: extras, then the minimap button and window size.
+    local extras = Heading(f, L["Extras"], "TOPLEFT", f, "TOP", 10, TOP)
+    above = Checks(f, "extras", extras)
+    local display = Heading(f, L["Minimap and windows"], "TOPLEFT", above, "BOTTOMLEFT", 2, -GAP)
+    above = Checks(f, "display", display)
     -- Window size: a slider in 5% steps with the size beside it (as EllesmereUI's Window
     -- Scale), plain (no template, as Advanced Graphics Tuner's) so it looks the same in any skin.
-    local sizeLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    sizeLabel:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 2, -18)
+    local sizeLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    sizeLabel:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 4, -8)
     sizeLabel:SetText(L["Window size"])
+    ns.SkinText(sizeLabel)
     local slider = CreateFrame("Slider", nil, f)
     slider:SetOrientation("HORIZONTAL")
-    slider:SetSize(200, 16)
+    slider:SetSize(160, 16)
     slider:SetHitRectInsets(0, 0, -4, -4)
     -- - and + either side, a step each: a controller's D-pad can't drag a slider.
     local smaller = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
     smaller:SetSize(24, 22)
-    smaller:SetPoint("TOPLEFT", sizeLabel, "BOTTOMLEFT", 0, -8)
+    smaller:SetPoint("TOPLEFT", sizeLabel, "BOTTOMLEFT", 0, -6)
     smaller:SetText("-")
     slider:SetPoint("LEFT", smaller, "RIGHT", 8, 0)
     local bigger = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
@@ -304,6 +349,7 @@ local function BuildCanvas(f)
     slider:SetObeyStepOnDrag(true)
     local scaleText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     scaleText:SetPoint("LEFT", bigger, "RIGHT", 10, 0)
+    ns.SkinText(scaleText)
     slider:SetScript("OnValueChanged", function(_, value)
         if f.filling then return end
         scaleText:SetText(ns.ScaleText(ns.SetWindowScale(value / 100)))
@@ -324,10 +370,10 @@ local function BuildCanvas(f)
         ns.SkinButton(b)
     end
     -- With EllesmereUI: follow its Window Scale (the default) or not. Moving the slider
-    -- chooses our own size, which unticks it.
+    -- chooses our own size, which unticks it. Hidden without EllesmereUI.
     local follow = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
     follow:SetSize(26, 26)
-    follow:SetPoint("TOPLEFT", smaller, "BOTTOMLEFT", -2, -8)
+    follow:SetPoint("TOPLEFT", smaller, "BOTTOMLEFT", -2, -6)
     local followLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     followLabel:SetPoint("LEFT", follow, "RIGHT", 4, 0)
     followLabel:SetText(L["Same as EllesmereUI's Window Scale"])
@@ -341,35 +387,7 @@ local function BuildCanvas(f)
     follow:SetScript("OnLeave", function() GameTooltip:Hide() end)
     ns.SkinCheck(follow)
     ns.SkinText(followLabel)
-    ns.SkinText(sizeLabel)
-    ns.SkinText(scaleText)
     f.slider, f.scaleText, f.followEui, f.smaller, f.bigger = slider, scaleText, follow, smaller, bigger
-    -- The icons below sit under the tick box only when it's there.
-    above = ns.HasEllesmereScale() and follow or smaller
-    -- Tooltip icons: each place's current icon (or word) and a Change... button.
-    local heading = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    heading:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 2, -18)
-    heading:SetText(L["Tooltip icons"])
-    f.icons = {}
-    local row = heading
-    for i, place in ipairs(ns.ICON_PLACES) do
-        local change = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-        change:SetSize(100, 22)
-        change:SetPoint("TOPLEFT", row, "BOTTOMLEFT", i == 1 and 0 or 0, i == 1 and -8 or -4)
-        change:SetText(L["Change..."])
-        change:SetScript("OnClick", function() ns.OpenIconPicker(place) end)
-        ns.SkinButton(change)
-        local label = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        label:SetPoint("LEFT", change, "RIGHT", 10, 0)
-        ns.SkinText(label)
-        f.icons[place] = label
-        row = change
-    end
-    above = row
-    local help = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    help:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 2, -16)
-    help:SetText(L["Type /af help for every command."])
-    for _, fs in ipairs({ title, by, help }) do ns.SkinText(fs) end
 end
 
 local function RegisterSettings()
@@ -437,28 +455,21 @@ function ns.ShowOptionsMenu(owner, fromOverview)
             root:CreateButton(L["Open overview"], function() ns.ToggleOverview(true) end)
         end
         root:CreateButton(L["Bags and bank"], function() ns.ShowBags(ns.charKey, "bags") end)
-        root:CreateCheckbox(L["Show item counts"], CountsSelected, ToggleCounts)
-        root:CreateCheckbox(L["Show skill-up details"], SkillupsSelected, ToggleSkillups)
-        root:CreateCheckbox(L["Show upgrades"], UpgradesSelected, ToggleUpgrades)
-        root:CreateCheckbox(L["Show craftable upgrades on the character sheet"], AnvilsSelected, ToggleAnvils)
-        root:CreateCheckbox(L["Send mail to alts"], SendToAltSelected, ToggleSendToAlt)
-        root:CreateCheckbox(L["Show session stats"], StatsSelected, ToggleStats)
-        root:CreateCheckbox(L["Legacy reminders"], LegacySelected, ToggleLegacy)
+        -- Only what's switched back and forth while playing; the set-once settings are on
+        -- the Options page (the owner's call, 2026-10-16: the menu had grown to 15 entries).
+        -- Without a page (its registration failed), the menu has them all instead.
         root:CreateCheckbox(L["Show other rulesets and factions"], RulesetsSelected, ToggleRulesets)
-        root:CreateCheckbox(L["Show minimap button"], MinimapSelected, ToggleMinimap)
-        local size = root:CreateButton(L["Window size"])
-        if ns.HasEllesmereScale() then
-            size:CreateRadio(L["Same as EllesmereUI (%s)"]:format(ns.ScaleText(EllesmereScale())),
-                ns.FollowsEllesmere, ns.FollowEllesmere)
+        if ns.HasSettings() then
+            -- Wrapped: a menu button's return value is read as a MenuResponse, and
+            -- OpenSettings' true kept the menu open.
+            root:CreateButton(L["Settings..."], function() ns.OpenSettings() end)
+        else
+            for _, entry in ipairs(SETTINGS) do
+                if entry[2] ~= RulesetsSelected then
+                    root:CreateCheckbox(entry[1], entry[2], function() entry[3](not entry[2]()) end)
+                end
+            end
         end
-        for _, s in ipairs(ns.SCALES) do
-            size:CreateRadio(ns.ScaleText(s), function() return ns.db.scale == s or (ns.db.scale == nil and not ns.HasEllesmereScale() and s == 1) end,
-                function() ns.SetWindowScale(s) end)
-        end
-        root:CreateButton(L["Memory use"], function() ns.RunCommand("mem") end)
-        -- Wrapped: a menu button's return value is read as a MenuResponse, and
-        -- OpenSettings' true kept the menu open.
-        if ns.HasSettings() then root:CreateButton(L["Settings..."], function() ns.OpenSettings() end) end
     end)
 end
 

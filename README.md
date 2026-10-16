@@ -88,7 +88,7 @@ Characters you haven't logged in on since updating count as being on yours until
 
 ## Settings
 
-Options > AddOns > Alts Forever has every setting, with a short explanation of each. The same settings are in the minimap button's right-click menu and the cog in the overview, and every one has a slash command. **Window size** makes Alts Forever's windows bigger or smaller (50% to 300%), on top of the game's UI scale: handy if you play at a small UI scale. With EllesmereUI, it follows EllesmereUI's Window Scale until you choose a size of your own (`/af scale eui` to follow it again).
+Options > AddOns > Alts Forever has every setting, with a short explanation of each: what tooltips show and their icons on the left, the extras, minimap button and window size on the right. The minimap button's right-click menu and the cog in the overview keep to what you switch while playing (Open overview, Bags and bank, Show other rulesets and factions) and Settings... for the rest, and every setting has a slash command. **Window size** makes Alts Forever's windows bigger or smaller (50% to 300%), on top of the game's UI scale: handy if you play at a small UI scale. With EllesmereUI, it follows EllesmereUI's Window Scale until you choose a size of your own (`/af scale eui` to follow it again).
 
 ## Commands
 

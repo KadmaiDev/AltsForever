@@ -12,7 +12,7 @@ test("minimap compartment: click opens the overview, right-click the options men
     AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
     local texts = {}
     for _, item in ipairs(wow.menu.items) do texts[#texts + 1] = item.text end
-    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Bags and bank | Show item counts | Show skill-up details | Show upgrades | Show craftable upgrades on the character sheet | Send mail to alts | Show session stats | Legacy reminders | Show other rulesets and factions | Show minimap button | Window size | Memory use | Settings...")
+    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Bags and bank | Show other rulesets and factions | Settings...")
     wow.menuItem("Open overview").fn()
     eq(AltsForeverFrame:IsShown(), true)
     wow.menuItem("Open overview").fn()
@@ -32,20 +32,27 @@ test("minimap compartment: click opens the overview, right-click the options men
     assert(GameTooltip.lines[3][1]:find("Right-click", 1, true))
 end)
 
-test("options menu: skill-up details tick box and memory", function()
-    wow.load(FILES)
+test("options menu: only what's switched while playing, then Settings...; without an Options page, every setting", function()
+    local ns = wow.load(FILES)
     wow.login(nil)
     SlashCmdList.ALTSFOREVER("")
     AltsForeverFrame.cog.scripts.OnClick(AltsForeverFrame.cog)
-    local box = wow.menuItem("Show skill-up details")
+    eq(wow.menuItem("Show skill-up details"), nil, "set once: on the Options page")
+    local box = wow.menuItem("Show other rulesets and factions")
+    eq(box.kind, "checkbox"); eq(box.isSelected(), false)
+    box.setSelected()
+    eq(AltsForeverDB.otherRulesets, true)
+    -- The Options page couldn't be registered: the menu offers every setting itself.
+    ns = wow.load(FILES)
+    Settings.RegisterCanvasLayoutCategory = nil
+    wow.login(nil)
+    ns.ShowOptionsMenu(UIParent)
+    eq(wow.menuItem("Settings..."), nil)
+    box = wow.menuItem("Show skill-up details")
     eq(box.kind, "checkbox"); eq(box.isSelected(), true)
     box.setSelected()
     eq(AltsForeverDB.skillupsOff, true); eq(box.isSelected(), false)
-    box.setSelected()
-    eq(AltsForeverDB.skillupsOff, nil)
-    wow.printed = {}
-    wow.menuItem("Memory use").fn()
-    assert(table.concat(wow.printed, "\n"):find("Memory", 1, true), "same as /af mem")
+    eq(#wow.menu.items, 3 + 9, "the title, Open overview, Bags and bank, the nine settings")
 end)
 
 test("right-click a character in the overview to forget them, after confirming", function()
@@ -88,7 +95,7 @@ test("no addon file assigns one of Blizzard's globals (that taints Blizzard's co
     end
 end)
 
-test("window size: /af scale, the menu and the Options slider scale every window of ours, kept on screen", function()
+test("window size: /af scale and the Options slider scale every window of ours, kept on screen", function()
     local ns = wow.load(FILES)
     wow.login({ v = 2, chars = { ["Tarn Moon"] = alt("Tarn Moon", "DRUID", {}) } })
     ns.ToggleOverview(true)
@@ -111,14 +118,8 @@ test("window size: /af scale, the menu and the Options slider scale every window
     eq(AltsForeverDB.scale, 3)
     SlashCmdList.ALTSFOREVER("scale big")
     eq(AltsForeverDB.scale, 3)
-    -- The menu's sizes (no EllesmereUI: nothing to follow).
-    ns.ShowOptionsMenu(UIParent)
-    local texts = {}
-    for _, item in ipairs(wow.menuItem("Window size").items) do texts[#texts + 1] = item.text end
-    eq(table.concat(texts, " "), "75% 90% 100% 110% 125% 150% 175% 200% 250%")
-    wow.menuItem("Window size").items[3].setSelected()
-    eq(AltsForeverDB.scale, 1)
-    eq(wow.menuItem("Window size").items[3].isSelected(), true)
+    SlashCmdList.ALTSFOREVER("scale 100")
+    eq(AltsForeverDB.scale, 1, "chosen, so kept even if EllesmereUI turns up")
     eq(f:GetScale(), 1)
     eq(AltsForeverBagsFrame:GetScale(), 1)
     -- The Options page: a slider in %, showing the size.
@@ -153,15 +154,10 @@ test("window size follows EllesmereUI's Window Scale until you choose your own",
     ns.ToggleOverview(true)
     EllesmereUI:SetPanelScale(1.75)
     eq(f:GetScale(), 1.75, "follows its slider")
-    -- The menu: Same as EllesmereUI first, ticked.
-    ns.ShowOptionsMenu(UIParent)
-    local size = wow.menuItem("Window size")
-    eq(size.items[1].text, "Same as EllesmereUI (175%)")
-    eq(size.items[1].isSelected(), true)
     -- Our own size wins, even when EllesmereUI's changes.
     SlashCmdList.ALTSFOREVER("scale 120")
     eq(f:GetScale(), 1.2)
-    eq(size.items[1].isSelected(), false)
+    eq(ns.FollowsEllesmere(), false)
     EllesmereUI:SetPanelScale(2)
     eq(f:GetScale(), 1.2, "ours stays")
     -- The Options page: the tick box shows which, and ticking it follows again.

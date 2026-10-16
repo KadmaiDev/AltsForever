@@ -1,3 +1,9 @@
+## Alts Forever (next)
+
+- **Options page tidied:** two columns with headings (tooltips and their icons on the left; extras, minimap button and window size on the right), so nothing runs off the bottom.
+- **Shorter options menu:** right-clicking the minimap button (or the overview's cog) now offers Open overview, Bags and bank, Show other rulesets and factions and Settings…; the settings you only set once are on the Options page. Memory use is still `/af mem`.
+- **Controller:** the character sheet's anvils work with the Gamepad UI (A opens the list with focus in it, B closes it), and the window size has - and + buttons.
+
 ## Alts Forever 0.14.0
 
 - **Upgrades shown as chevrons:** instead of a percentage, an upgrade now shows one green chevron for minor, two stacked for decent and three for major. It's judged against everything the character wears, not just the item it replaces, so +1 Agility over a cloak with only armour no longer shows as +583%.

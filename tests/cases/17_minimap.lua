@@ -36,7 +36,7 @@ test("the minimap button can be hidden from the options menu, and stays hidden",
     wow.load(FILES)
     wow.login(nil)
     AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
-    local box = wow.menuItem("Show minimap button")
+    local box = pageBox("Show minimap button")
     eq(box.isSelected(), true)
     box.setSelected()
     eq(AltsForeverMinimapButton:IsShown(), false)
@@ -47,7 +47,7 @@ test("the minimap button can be hidden from the options menu, and stays hidden",
     wow.login(saved)
     eq(AltsForeverMinimapButton, nil)
     AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
-    wow.menuItem("Show minimap button").setSelected()
+    pageBox("Show minimap button").setSelected()
     eq(AltsForeverMinimapButton:IsShown(), true, "turned back on: made now")
 end)
 
