@@ -137,6 +137,7 @@ local version = 0 -- bumped when anything an upgrade depends on changes
 
 function ns.UpgradesChanged()
     version = version + 1
+    if ns.CharacterSheetChanged then ns.CharacterSheetChanged() end
 end
 
 function ns.UpgradesOn() return not ns.db.upgradesOff end
@@ -351,7 +352,7 @@ local function Compare(c, info, link)
         if worn and GetItemInfoInstant(worn) == info.id then return nil end -- already wearing one
     end
     local mainLoc = WornLoc(gear[16])
-    local best, empty
+    local best, empty, bestSlot
     for _, slot in ipairs(slots) do
         local ok = true
         if slot == 17 and loc == "INVTYPE_WEAPON" then
@@ -373,12 +374,12 @@ local function Compare(c, info, link)
             end
             local gain = worn > 0 and (new - worn) * 100 / worn or NEW
             if not best or gain > best then
-                best, empty = gain, not gear[slot]
+                best, empty, bestSlot = gain, not gear[slot], slot
             end
         end
     end
     if not best or best < MIN_GAIN then return nil end
-    return best, empty, need > level and need or nil
+    return best, empty, need > level and need or nil, bestSlot
 end
 
 ---------------------------------------------------------------------------
@@ -542,9 +543,10 @@ local function Better(a, b)
     return a.id < b.id
 end
 
--- Fills `out` with { id, link, gain, empty, at, key (who crafts it), prof }, best gain
--- first, and returns it and whether some item data is still loading (ask again shortly).
--- Runs when the flyout opens, never per frame.
+-- Fills `out` with { id, link, gain, empty, at, slot (where it does best), boe, key (who
+-- crafts it), prof }, best gain first, and returns it and whether some item data is still
+-- loading (ask again shortly). slot nil: every slot. Runs when the flyout or character
+-- sheet opens, never per frame.
 function ns.CraftableUpgrades(slot, out)
     out = out or {}
     wipe(out)
@@ -566,7 +568,7 @@ function ns.CraftableUpgrades(slot, out)
             for id in pairs(items) do
                 local _, _, _, loc, _, class, sub = GetItemInfoInstant(id)
                 local armour = class == ARMOR_CLASS and sub and sub >= 1 and sub <= 4 and loc ~= "INVTYPE_CLOAK"
-                if not done[id] and (class == ARMOR_CLASS or class == WEAPON_CLASS) and InSlot(loc, slot)
+                if not done[id] and (class == ARMOR_CLASS or class == WEAPON_CLASS) and (not slot and SLOTS[loc] or InSlot(loc, slot))
                     and not (armour and sub ~= heaviest) then
                     local _, link = GetItemInfo(id)
                     if not link then
@@ -579,11 +581,12 @@ function ns.CraftableUpgrades(slot, out)
                             pending = true
                         elseif info and (info.bind == BIND_ON_EQUIP or key == myKey) then
                             done[id] = true
-                            local gain, empty, at = Compare(me, info, link)
+                            local gain, empty, at, best = Compare(me, info, link)
                             if gain == false then
                                 pending = true
                             elseif gain then
-                                out[#out + 1] = { id = id, link = link, gain = gain, empty = empty, at = at, key = key, prof = prof }
+                                out[#out + 1] = { id = id, link = link, gain = gain, empty = empty, at = at, slot = best,
+                                    boe = info.bind == BIND_ON_EQUIP, key = key, prof = prof }
                             end
                         end
                     end

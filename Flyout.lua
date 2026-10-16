@@ -1,8 +1,11 @@
--- Alts Forever: upgrades your characters can craft, under the game's equipment flyout
--- (hold Alt over a slot on the character sheet). The flyout lists what's in your bags;
--- below it, a row of what you or your alts can craft that would be an upgrade in that
--- slot (Upgrades.lua picks them). It's a frame of our own anchored to the flyout: nothing
--- is added to Blizzard's flyout, whose buttons equip items.
+-- Alts Forever: upgrades your characters can craft, on the character sheet.
+--  * Under the game's equipment flyout (hold Alt over a slot): the flyout lists what's in
+--    your bags; below it, a row of what you or your alts can craft that would be an
+--    upgrade in that slot (Upgrades.lua picks them). A frame of our own anchored to the
+--    flyout: nothing is added to Blizzard's flyout, whose buttons equip items.
+--  * On the slots themselves: a small anvil where one can be crafted that you can wear now
+--    and that binds when equipped (so whoever makes it can mail it), and hovering the slot
+--    lists the best few (owner, 2026-10-16).
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
@@ -136,8 +139,93 @@ local function OnFlyout(itemButton)
     Fill(slot)
 end
 
+---------------------------------------------------------------------------
+-- The slots on the character sheet
+---------------------------------------------------------------------------
+local SLOT_NAMES = { "Head", "Neck", "Shoulder", "Back", "Chest", "Wrist", "Hands", "Waist", "Legs", "Feet",
+    "Finger0", "Finger1", "Trinket0", "Trinket1", "MainHand", "SecondaryHand", "Ranged" }
+local MARK = "Interface\\Minimap\\Tracking\\Repair" -- the anvil
+local SHOWN_IN_TOOLTIP = 3
+local marks = {}  -- our anvil texture per slot button
+local bySlot = {} -- slot -> wearable, bind-on-equip craftable upgrades, best first
+local all = {}
+local dollKey, dollRetry = nil, false
+
+local function Mark(b)
+    local m = b:CreateTexture(nil, "OVERLAY", nil, 7)
+    m:SetSize(16, 16)
+    m:SetPoint("TOPRIGHT", b, "TOPRIGHT", 3, 3)
+    m:SetTexture(MARK)
+    marks[b] = m
+    return m
+end
+
+local function RefreshDoll()
+    if not (ns.char and PaperDollFrame and PaperDollFrame:IsVisible()) then return end
+    local on = ns.UpgradesOn()
+    local key = ns.UpgradesVersion() .. ":" .. (ns.craftVersion or 0) .. ":" .. (ns.char.level or 0) .. ":" .. tostring(on)
+    if key == dollKey then return end
+    local pending = false
+    wipe(bySlot)
+    if on then
+        all, pending = ns.CraftableUpgrades(nil, all)
+        for _, e in ipairs(all) do
+            if e.boe and not e.at and e.slot then
+                local t = bySlot[e.slot]
+                if not t then
+                    t = {}
+                    bySlot[e.slot] = t
+                end
+                t[#t + 1] = e
+            end
+        end
+    end
+    dollKey = not pending and key or nil
+    for _, name in ipairs(SLOT_NAMES) do
+        local b = _G["Character" .. name .. "Slot"]
+        local slot = b and b.GetID and b:GetID()
+        if type(slot) == "number" then
+            local has = bySlot[slot] ~= nil
+            local m = marks[b] or (has and Mark(b))
+            if m then m:SetShown(has) end
+        end
+    end
+    if pending and not dollRetry and C_Timer and C_Timer.After then
+        dollRetry = true
+        C_Timer.After(1, function()
+            dollRetry = false
+            RefreshDoll()
+        end)
+    end
+end
+ns.CharacterSheetChanged = RefreshDoll
+
+-- Hovering a marked slot: the best few under the game's own tooltip.
+local function SlotEnter(b)
+    local slot = b:GetID()
+    local list = type(slot) == "number" and bySlot[slot]
+    if not list or not ns.UpgradesOn() or GameTooltip:GetOwner() ~= b then return end
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine(L["Your characters can craft"], 1, 0.82, 0)
+    for i = 1, min(#list, SHOWN_IN_TOOLTIP) do
+        local e = list[i]
+        local gain = e.gain ~= math.huge and "+" .. floor(e.gain + 0.5) .. "%" or (e.empty and L["empty slot"] or L["big upgrade"])
+        GameTooltip:AddDoubleLine(e.link, "|cff20ff20" .. gain .. "|r · " .. ns.ListName(e.key, ns.db.chars[e.key]), 1, 1, 1, 1, 1, 1)
+    end
+    GameTooltip:Show()
+end
+
 function ns.StartFlyout()
-    if type(EquipmentFlyout_Show) ~= "function" or not EquipmentFlyoutFrame then return end
-    hooksecurefunc("EquipmentFlyout_Show", OnFlyout)
-    EquipmentFlyoutFrame:HookScript("OnHide", Hide)
+    if type(EquipmentFlyout_Show) == "function" and EquipmentFlyoutFrame then
+        hooksecurefunc("EquipmentFlyout_Show", OnFlyout)
+        EquipmentFlyoutFrame:HookScript("OnHide", Hide)
+    end
+    if PaperDollFrame then
+        PaperDollFrame:HookScript("OnShow", RefreshDoll)
+        -- The slots' own OnEnter scripts were set before we loaded, so hook each button.
+        for _, name in ipairs(SLOT_NAMES) do
+            local b = _G["Character" .. name .. "Slot"]
+            if b and b.HookScript then b:HookScript("OnEnter", SlotEnter) end
+        end
+    end
 end
