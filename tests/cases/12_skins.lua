@@ -76,7 +76,7 @@ test("with EllesmereUI's bags in use, the bags window has their background", fun
     local bg = AltsForeverBagsFrame.euiBg
     assert(bg, "drawn")
     eq(bg.texture, "Interface\\AddOns\\EllesmereUI\\media\\modern_blizz.png")
-    eq(table.concat(bg.tint, ","), "0.7,0.7,0.7", "as dark as their bags look")
+    eq(table.concat(bg.tint, ","), "0.65,0.65,0.65", "as dark as their bags look")
     -- The shell without its shadowed frame (its title strip stays), and a thin line instead.
     local opts
     for _, call in ipairs(wow.skinned) do
