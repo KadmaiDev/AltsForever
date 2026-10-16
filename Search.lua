@@ -459,13 +459,13 @@ Render = function()
     else
         frame.status:SetText(GREY .. L["Enter: open their bags · Right-click: choose whose · Shift+Enter: link in chat"] .. "|r")
     end
-    -- The selected item lit in the open bags window, in place, if the character it shows has
-    -- it; if not, the bags as they were.
+    -- The selected item lit in the open bags window, in place ("not here" if the character it
+    -- shows hasn't got it); with nothing selected, the bags as they were.
     if ns.BagsShownKey() and frame:IsShown() then
         local id = matches[selected] and matches[selected].id
         if id ~= previewed then
             previewed = id
-            if not (id and ns.BagsPreview(id)) then ns.BagsRestore(savedLit, savedView) end
+            if id then ns.BagsPreview(id) else ns.BagsRestore(savedLit, savedView) end
         end
     end
 end

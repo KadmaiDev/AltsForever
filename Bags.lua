@@ -699,20 +699,21 @@ function ns.BagsShownKey() return frame and frame:IsShown() and shownKey or nil 
 function ns.BagsState() return lit, view end
 
 -- Lights an item up on the character shown, in place: their bags or bank, wherever it is
--- (switching between the two, never to another character). False, and nothing changed,
--- if they haven't got it.
+-- (switching between the two, never to another character). If they haven't got it there it's
+-- lit all the same, "not here" with the arrows to whoever has (the owner saw an item in the
+-- mail bring back the one picked before, 2026-10-16), and it returns false.
 function ns.BagsPreview(id)
     local c = frame and frame:IsShown() and ns.db.chars[shownKey]
     if not c then return false end
     local other = view == "bags" and "bank" or "bags"
     local here, there = c[view] and c[view][id], c[other] and c[other][id]
-    if not (here or there) then return false end
-    if lit == id and here then return true end
-    if not here then view = other end
+    local has = (here or there) and true or false
+    if lit == id and (here or not has) then return has end
+    if there and not here then view = other end
     lit, scroll = id, 0
     Fill()
     ScrollToLit()
-    return true
+    return has
 end
 
 function ns.BagsRestore(oldLit, oldView)

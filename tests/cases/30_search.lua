@@ -347,13 +347,18 @@ test("with the bags window open the search works on it: that character only, bes
     eq(ns.BagsHighlight(), 2589, "the pick stays lit")
     eq(select(2, ns.BagsState()), "bags")
     assert(bags.who.text:find("Tarn Moon", 1, true))
-    -- All characters: Aldric's linen too; an item Tarn hasn't got leaves the bags as they were.
+    -- All characters: Aldric's linen too; an item Tarn hasn't got is lit all the same, not here.
     bags.searchButton.scripts.OnClick(bags.searchButton)
     f.widen.scripts.OnClick(f.widen)
     eq(f.title.text, "Search your characters")
     eq(f.widen:IsShown(), false)
     searchType("silk")
-    eq(ns.BagsHighlight(), 2589, "Tarn's bags hold no silk: left as they were")
+    eq(ns.BagsHighlight(), 4306, "Tarn's silk is in the mail: lit anyway")
+    eq(bags.stop.text, "not here")
+    assert(bags.who.text:find("Tarn Moon", 1, true), "still Tarn")
+    -- Nothing matching: the bags as they were.
+    searchType("zzz")
+    eq(ns.BagsHighlight(), 2589)
     -- @craft is about everyone: it widens by itself.
     f:Hide()
     bags.searchButton.scripts.OnClick(bags.searchButton)
