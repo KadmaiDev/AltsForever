@@ -86,7 +86,7 @@ Characters you haven't logged in on since updating count as being on yours until
 
 ## Settings
 
-Options > AddOns > Alts Forever has every setting, with a short explanation of each. The same settings are in the minimap button's right-click menu and the cog in the overview, and every one has a slash command.
+Options > AddOns > Alts Forever has every setting, with a short explanation of each. The same settings are in the minimap button's right-click menu and the cog in the overview, and every one has a slash command. **Window size** makes Alts Forever's windows bigger or smaller (50% to 300%), on top of the game's UI scale: handy if you play at a small UI scale.
 
 ## Commands
 
@@ -109,6 +109,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af legacy` | List each character's Legacy points to spend and Well Rested rank; `/af legacy on` or `off` turns the chat reminders on or off |
 | `/af role Full Name role` | Choose what a character's upgrades are judged by: `melee`, `ranged`, `caster`, `healer`, `tank` or `feral` (whichever their class has), or `auto` to follow their talents |
 | `/af sendmail` | Turn the send-to-alt arrow at the mailbox on or off |
+| `/af scale 150` | Make Alts Forever's windows 150% of their size (any size from 50 to 300); on its own, shows the size |
 | `/af minimap` | Show or hide the minimap button (the data broker launcher stays) |
 | `/af stats` | Turn session stats on or off (off by default): XP this session and time to level on the XP bar, gold this session, today and this week on your bag gold |
 | `/af delete Full Name` | Forget a character, e.g. `/af delete Thessa Oakenbrook` |

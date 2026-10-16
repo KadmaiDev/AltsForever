@@ -12,7 +12,7 @@ test("minimap compartment: click opens the overview, right-click the options men
     AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
     local texts = {}
     for _, item in ipairs(wow.menu.items) do texts[#texts + 1] = item.text end
-    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Bags and bank | Show item counts | Show skill-up details | Show upgrades | Show craftable upgrades on the character sheet | Send mail to alts | Show session stats | Legacy reminders | Show other rulesets and factions | Show minimap button | Memory use | Settings...")
+    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Bags and bank | Show item counts | Show skill-up details | Show upgrades | Show craftable upgrades on the character sheet | Send mail to alts | Show session stats | Legacy reminders | Show other rulesets and factions | Show minimap button | Window size | Memory use | Settings...")
     wow.menuItem("Open overview").fn()
     eq(AltsForeverFrame:IsShown(), true)
     wow.menuItem("Open overview").fn()
@@ -86,4 +86,47 @@ test("no addon file assigns one of Blizzard's globals (that taints Blizzard's co
             end
         end
     end
+end)
+
+test("window size: /af scale, the menu and the Options slider scale every window of ours, kept on screen", function()
+    local ns = wow.load(FILES)
+    wow.login({ v = 2, chars = { ["Tarn Moon"] = alt("Tarn Moon", "DRUID", {}) } })
+    ns.ToggleOverview(true)
+    local f = AltsForeverFrame
+    eq(f:GetScale(), 1)
+    -- Moved somewhere: its centre on screen stays put when the size changes.
+    f:ClearAllPoints()
+    f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", 100, 700)
+    f.center = { 400, 500 }
+    SlashCmdList.ALTSFOREVER("scale 150")
+    eq(AltsForeverDB.scale, 1.5)
+    eq(f:GetScale(), 1.5)
+    eq(table.concat({ f:GetPoint() }, " ", 3, 5), "BOTTOMLEFT " .. 400 / 1.5 .. " " .. 500 / 1.5)
+    assert(wow.printed[#wow.printed]:find("Window size: 150%.", 1, true), wow.printed[#wow.printed])
+    -- Windows opened later start at that size.
+    ns.ShowBags(ns.charKey, "bags")
+    eq(AltsForeverBagsFrame:GetScale(), 1.5)
+    -- Kept between 50% and 300%; nonsense changes nothing.
+    SlashCmdList.ALTSFOREVER("scale 1000")
+    eq(AltsForeverDB.scale, 3)
+    SlashCmdList.ALTSFOREVER("scale big")
+    eq(AltsForeverDB.scale, 3)
+    -- The menu's sizes; 100% is stored as nothing.
+    ns.ShowOptionsMenu(UIParent)
+    local texts = {}
+    for _, item in ipairs(wow.menuItem("Window size").items) do texts[#texts + 1] = item.text end
+    eq(table.concat(texts, " "), "75% 90% 100% 110% 125% 150% 175% 200% 250%")
+    wow.menuItem("Window size").items[3].setSelected()
+    eq(AltsForeverDB.scale, nil)
+    eq(f:GetScale(), 1)
+    eq(AltsForeverBagsFrame:GetScale(), 1)
+    -- The Options page: a slider in %, showing the size.
+    local page = ns.OptionsPanel()
+    page:Show()
+    eq(page.slider:GetValue(), 100)
+    eq(page.scaleText.text, "100%")
+    page.slider:SetValue(125)
+    eq(AltsForeverDB.scale, 1.25)
+    eq(f:GetScale(), 1.25)
+    eq(page.scaleText.text, "125%")
 end)

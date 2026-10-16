@@ -262,6 +262,7 @@ local function CreatePanel()
     ns.SkinWindow(f)
     f:Hide()
     ns.GamepadWindow(f)
+    ns.ScaleWindow(f)
 end
 
 -- Opens the panel beside the overview if it's open; again closes it.

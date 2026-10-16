@@ -251,6 +251,17 @@ function M.load(files)
         return unpack(list)
     end
     function frameMethods:GetNumPoints() return self.point and 1 or 0 end
+    function frameMethods:SetScale(s) self.scale = s end
+    function frameMethods:GetScale() return self.scale or 1 end
+    function frameMethods:GetCenter() if self.center then return unpack(self.center) end end
+    function frameMethods:SetMinMaxValues(lo, hi) self.min, self.max = lo, hi end
+    function frameMethods:GetValue() return self.value end
+    function frameMethods:SetValue(v)
+        v = math.max(self.min or v, math.min(self.max or v, v))
+        if v == self.value then return end
+        self.value = v
+        if self.scripts.OnValueChanged then self.scripts.OnValueChanged(self, v, true) end
+    end
     function frameMethods:SetHeight(h) self.height = h end
     function frameMethods:SetWidth(w) self.width = w end
     function frameMethods:SetToplevel(on) self.toplevel = on end

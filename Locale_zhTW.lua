@@ -236,3 +236,7 @@ L["Craftable upgrades on the character sheet off."] = "角色面板上的可製�
 L["/af anvils shows or hides the anvils on your character sheet that mark upgrades you or your alts can craft."] = "/af anvils 顯示或隱藏角色面板上的鐵砧,它們標出你或你的分身可以製造的裝備提升。"
 L["Show craftable upgrades on the character sheet"] = "在角色面板上顯示可製造的提升"
 L["An anvil beside a slot on your character sheet means you or an alt can craft an upgrade for it that you can wear now and that binds when equipped. Hover or click it to see which. Same as /af anvils."] = "角色面板上某個欄位旁的鐵砧表示你或某個分身可以為它製造一件提升:你現在就能穿戴,且裝備後綁定。滑鼠懸停或點擊即可查看。等同於 /af anvils。"
+L["Window size"] = "視窗大小"
+L["Makes Alts Forever's windows (overview, bags, reputation, gear, icons, craftable upgrades) bigger or smaller, on top of the game's UI scale. Tooltips follow the game's. Same as /af scale."] = "在遊戲介面縮放之外,放大或縮小 Alts Forever 的視窗(總覽、背包、聲望、裝備、圖示、可製造提升)。滑鼠提示沿用遊戲的縮放。等同於 /af scale。"
+L["Window size: %s. /af scale and a size from 50 to 300 changes it."] = "視窗大小:%s。輸入 /af scale 加 50 到 300 之間的數值可更改。"
+L["/af scale 150 makes Alts Forever's windows one and a half times their size (any size from 50 to 300), on top of the game's UI scale."] = "/af scale 150 將 Alts Forever 的視窗放大到一倍半(可設 50 到 300 之間任意大小),在遊戲介面縮放之外生效。"

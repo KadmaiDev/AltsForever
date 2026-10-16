@@ -17,6 +17,45 @@ function ns.SetSkillups(on)
     ns.InvalidateCache()
 end
 
+-- Window size (a player's request, 2026-10-16: they play at UI scale 0.53): our own
+-- windows scaled together, on top of the game's UI scale. Tooltips follow the game's.
+ns.SCALES = { 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5 }
+local MIN_SCALE, MAX_SCALE = 0.5, 3
+local windows = {}
+
+function ns.WindowScale() return ns.db.scale or 1 end
+
+-- Positions are in a window's own scaled units: one placed against the screen keeps its
+-- centre where it was. One anchored to another of ours (gear, reputation) follows that.
+local function Rescale(f, scale)
+    local old = f:GetScale() or 1
+    if old == scale then return end
+    local x, y = f:GetCenter()
+    local _, rel = f:GetPoint()
+    f:SetScale(scale)
+    if x and y and (rel == nil or rel == UIParent) then
+        f:ClearAllPoints()
+        f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x * old / scale, y * old / scale)
+    end
+end
+
+-- Each window, once, when it's created.
+function ns.ScaleWindow(f)
+    windows[#windows + 1] = f
+    f:SetScale(ns.WindowScale())
+end
+
+-- Sets the size (1 = 100%), kept between 50% and 300%; returns what it was set to.
+function ns.SetWindowScale(scale)
+    scale = math.max(MIN_SCALE, math.min(MAX_SCALE, math.floor(scale * 100 + 0.5) / 100))
+    ns.db.scale = scale ~= 1 and scale or nil
+    for _, f in ipairs(windows) do Rescale(f, scale) end
+    if ns.BagsWindowChanged then ns.BagsWindowChanged() end -- its default height is a share of the screen
+    return scale
+end
+
+function ns.ScaleText(scale) return ("%d%%"):format(math.floor((scale or ns.WindowScale()) * 100 + 0.5)) end
+
 -- Removes a character; returns false and a reason if it can't.
 function ns.ForgetCharacter(key)
     if not ns.db.chars[key] then return false, L["No character named '%s'."]:format(tostring(key)) end
@@ -125,6 +164,12 @@ local SETTINGS = {
 
 local function RefreshCanvas(f)
     for i, check in ipairs(f.checks) do check:SetChecked(SETTINGS[i][2]() and true or false) end
+    if f.slider then
+        f.filling = true -- setting it isn't the player moving it
+        f.slider:SetValue(ns.WindowScale() * 100)
+        f.filling = nil
+        f.scaleText:SetText(ns.ScaleText())
+    end
     for place, label in pairs(f.icons or {}) do
         label:SetText(ns.PlaceName(place) .. ":  " .. ns.PlaceMarkup(place) .. " 23")
     end
@@ -178,6 +223,42 @@ local function BuildCanvas(f)
         f.checks[i] = check
         above = check
     end
+    -- Window size: a slider in 5% steps with the size beside it (as EllesmereUI's Window
+    -- Scale), plain (no template, as Advanced Graphics Tuner's) so it looks the same in any skin.
+    local sizeLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    sizeLabel:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 2, -18)
+    sizeLabel:SetText(L["Window size"])
+    local slider = CreateFrame("Slider", nil, f)
+    slider:SetOrientation("HORIZONTAL")
+    slider:SetSize(200, 16)
+    slider:SetHitRectInsets(0, 0, -4, -4)
+    slider:SetPoint("TOPLEFT", sizeLabel, "BOTTOMLEFT", 0, -10)
+    local track = slider:CreateTexture(nil, "BACKGROUND")
+    track:SetPoint("LEFT")
+    track:SetPoint("RIGHT")
+    track:SetHeight(4)
+    track:SetColorTexture(1, 1, 1, 0.18)
+    local thumb = slider:CreateTexture(nil, "OVERLAY")
+    thumb:SetSize(10, 16)
+    thumb:SetColorTexture(1, 0.82, 0, 0.95)
+    slider:SetThumbTexture(thumb)
+    slider:SetMinMaxValues(MIN_SCALE * 100, MAX_SCALE * 100)
+    slider:SetValueStep(5)
+    slider:SetObeyStepOnDrag(true)
+    local scaleText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    scaleText:SetPoint("LEFT", slider, "RIGHT", 10, 0)
+    slider:SetScript("OnValueChanged", function(_, value)
+        if f.filling then return end
+        scaleText:SetText(ns.ScaleText(ns.SetWindowScale(value / 100)))
+    end)
+    slider:SetScript("OnEnter", function(self)
+        Tooltip(self, L["Window size"], L["Makes Alts Forever's windows (overview, bags, reputation, gear, icons, craftable upgrades) bigger or smaller, on top of the game's UI scale. Tooltips follow the game's. Same as /af scale."])
+    end)
+    slider:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ns.SkinText(sizeLabel)
+    ns.SkinText(scaleText)
+    f.slider, f.scaleText = slider, scaleText
+    above = slider
     -- Tooltip icons: each place's current icon (or word) and a Change... button.
     local heading = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     heading:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 2, -18)
@@ -278,6 +359,10 @@ function ns.ShowOptionsMenu(owner, fromOverview)
         root:CreateCheckbox(L["Legacy reminders"], LegacySelected, ToggleLegacy)
         root:CreateCheckbox(L["Show other rulesets and factions"], RulesetsSelected, ToggleRulesets)
         root:CreateCheckbox(L["Show minimap button"], MinimapSelected, ToggleMinimap)
+        local size = root:CreateButton(L["Window size"])
+        for _, s in ipairs(ns.SCALES) do
+            size:CreateRadio(ns.ScaleText(s), function() return ns.WindowScale() == s end, function() ns.SetWindowScale(s) end)
+        end
         root:CreateButton(L["Memory use"], function() ns.RunCommand("mem") end)
         -- Wrapped: a menu button's return value is read as a MenuResponse, and
         -- OpenSettings' true kept the menu open.

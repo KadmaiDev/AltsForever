@@ -92,6 +92,7 @@ local function BuildPanel()
     panel.title:SetText(L["Your characters can craft"])
     ns.SkinText(panel.title)
     panel:Hide()
+    ns.ScaleWindow(panel)
 end
 
 local function HidePanel()

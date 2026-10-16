@@ -383,6 +383,7 @@ local function CreatePicker()
     ns.SkinWindow(f)
     f:Hide()
     ns.GamepadWindow(f)
+    ns.ScaleWindow(f)
 end
 
 -- Opens the picker for a place ("bags", "bank", "mail" or "equip").

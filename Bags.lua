@@ -235,10 +235,10 @@ local function ColsFor(width)
 end
 
 -- The tallest the slot area gets before it scrolls: as the player sized it, or by
--- default 70% of the screen.
+-- default 70% of the screen (in the window's own units: it may be scaled, Options.lua).
 local function MaxView()
     if ns.db.bagsHeight then return max(ns.db.bagsHeight, MIN_VIEW) end
-    local h = UIParent and UIParent:GetHeight() or 0
+    local h = UIParent and UIParent:GetHeight() / ns.WindowScale() or 0
     return max(h > 0 and floor(h * 0.7) - TOP - BOTTOM or 560, MIN_VIEW)
 end
 
@@ -488,6 +488,7 @@ local function CreateWindow()
     f:HookScript("OnShow", function() if sounds.IG_BACKPACK_OPEN then PlaySound(sounds.IG_BACKPACK_OPEN) end end)
     f:HookScript("OnHide", function() if sounds.IG_BACKPACK_CLOSE then PlaySound(sounds.IG_BACKPACK_CLOSE) end end)
     ns.GamepadWindow(f)
+    ns.ScaleWindow(f)
 end
 
 -- Opens the window on a character's bags or bank; the same again closes it.

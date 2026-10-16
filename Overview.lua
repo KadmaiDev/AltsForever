@@ -575,6 +575,7 @@ local function CreateWindow()
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverFrame" end
     f:Hide()
     ns.GamepadWindow(f)
+    ns.ScaleWindow(f)
 end
 
 -- Opens or closes the overview; `open` only ever opens it (menus, settings page).

@@ -168,6 +168,7 @@ local function CreatePanel()
     ns.SkinWindow(f)
     f:Hide()
     ns.GamepadWindow(f)
+    ns.ScaleWindow(f)
 end
 
 local function Fill()
