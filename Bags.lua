@@ -28,6 +28,9 @@ local slots, headers = {}, {}
 local shownKey, view = nil, "bags"
 local sizing = false
 local scroll, contentHeight = 0, 0
+-- An item the search (Search.lua) opened this window for: its slots lit, the rest dimmed,
+-- until you pick another character or view, or close the window.
+local lit
 local loadRetry = false
 
 ---------------------------------------------------------------------------
@@ -203,6 +206,10 @@ end
 
 local function ShowSlot(b, id, count)
     b.id = id or nil
+    local dim = lit and id ~= lit and 0.25 or 1
+    b.icon:SetAlpha(dim)
+    b.border:SetAlpha(dim)
+    b.count:SetAlpha(dim)
     if not id then
         b.icon:SetTexture(EMPTY_SLOT)
         b.count:SetText("")
@@ -338,7 +345,7 @@ local function PickCharacter(owner)
             root:CreateRadio(ns.ColoredName(key, c),
                 function(k) return k == shownKey end,
                 function(k)
-                    shownKey, scroll = k, 0
+                    shownKey, scroll, lit = k, 0, nil
                     Fill()
                 end, key)
         end
@@ -351,7 +358,7 @@ local function ViewButton(name, text, x)
     b:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -30)
     b:SetText(text)
     b:SetScript("OnClick", function()
-        view, scroll = name, 0
+        view, scroll, lit = name, 0, nil
         Fill()
     end)
     ns.SkinButton(b)
@@ -486,21 +493,37 @@ local function CreateWindow()
     -- after the Hide above, so creating the window makes no sound.
     local sounds = SOUNDKIT or {}
     f:HookScript("OnShow", function() if sounds.IG_BACKPACK_OPEN then PlaySound(sounds.IG_BACKPACK_OPEN) end end)
-    f:HookScript("OnHide", function() if sounds.IG_BACKPACK_CLOSE then PlaySound(sounds.IG_BACKPACK_CLOSE) end end)
+    f:HookScript("OnHide", function()
+        lit = nil
+        if sounds.IG_BACKPACK_CLOSE then PlaySound(sounds.IG_BACKPACK_CLOSE) end
+    end)
     ns.GamepadWindow(f)
     ns.ScaleWindow(f)
 end
 
 -- Opens the window on a character's bags or bank; the same again closes it.
-function ns.ShowBags(key, which)
+-- Opens a character's bags or bank; the same again closes it. With `highlight` (an item ID,
+-- from the search) it stays open, lights that item up and scrolls to it.
+function ns.ShowBags(key, which, highlight)
     if not frame then CreateWindow() end
     key, which = key or ns.charKey, which or "bags"
-    if frame:IsShown() and shownKey == key and view == which then return frame:Hide() end
+    if not highlight and frame:IsShown() and shownKey == key and view == which then return frame:Hide() end
     if shownKey ~= key or view ~= which then scroll = 0 end
-    shownKey, view = key, which
+    shownKey, view, lit = key, which, highlight
     Fill()
+    if highlight then
+        for i = 1, shown do
+            if ids[i] == highlight and slots[i] and slots[i].top then
+                scroll = max(0, slots[i].top - HEADER)
+                Place()
+                break
+            end
+        end
+    end
     frame:Show()
 end
+
+function ns.BagsHighlight() return lit end
 
 function ns.BagsWindow() return frame end
 

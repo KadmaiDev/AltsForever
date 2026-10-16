@@ -382,6 +382,16 @@ function M.load(files)
     M.modified, M.chatLinks = false, {}
     IsModifiedClick = function() return M.modified end
     HandleModifiedItemClick = function(link) M.chatLinks[#M.chatLinks + 1] = link end
+    -- Shift held (M.shift); a link put into the chat box being typed in (M.chatOpen), or a
+    -- chat box opened with it.
+    M.shift, M.chatOpen, M.openedChat = false, false, {}
+    IsShiftKeyDown = function() return M.shift end
+    ChatEdit_InsertLink = function(link)
+        if not M.chatOpen then return false end
+        M.chatLinks[#M.chatLinks + 1] = link
+        return true
+    end
+    ChatFrame_OpenChat = function(text) M.openedChat[#M.openedChat + 1] = text end
 
     -- Like build 70009: first name and surname as two values. oneValueNames gives the
     -- older behaviour, the full name as one value.

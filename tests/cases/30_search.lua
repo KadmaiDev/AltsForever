@@ -1,0 +1,157 @@
+-- Tests: the search window (Search.lua): items your characters have or can craft.
+-- Loaded by tests/run.lua.
+
+-- Logs in as Aldric with Tarn Moon (has linen), Smith (makes gloves) and Far Away (another
+-- ruleset: hidden, as in tooltips).
+function searchStart()
+    local ns = wow.load(FILES)
+    wow.item(2589, "Linen Cloth", {})
+    wow.item(2996, "Bolt of Linen Cloth", {})
+    wow.item(6001, "Linked Gloves", { sub = 3, loc = "INVTYPE_HAND" })
+    wow.item(6005, "Far Gloves", { sub = 3, loc = "INVTYPE_HAND" })
+    wow.item(4306, "Silk Cloth", {})
+    wow.login({ v = 2, chars = {
+        ["Aldric"] = alt("Aldric", "MAGE", { realm = "Realm", bags = {}, bank = { [2589] = 5 } }),
+        ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { realm = "Realm", bags = { [2589] = 20, [2996] = 3 }, mail = { [4306] = 2 } }),
+        ["Smith"] = alt("Smith", "PALADIN", { realm = "Realm", bags = {},
+            crafts = { Blacksmithing = { [6001] = "linked gloves" }, Tailoring = { [2996] = "bolt of linen cloth" } } }),
+        ["Far Away"] = alt("Far Away", "WARRIOR", { realm = "Elsewhere", bags = { [6005] = 1, [2589] = 99 } }),
+    } })
+    return ns
+end
+
+-- Types into the search box, as the player would.
+function searchType(text)
+    AltsForeverSearchBox:SetText(text)
+    AltsForeverSearchBox.scripts.OnTextChanged(AltsForeverSearchBox, true)
+end
+
+local function plain(s) return (s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
+
+-- The rows shown, as "Name = detail", colour codes removed.
+function searchRows()
+    local out = {}
+    for _, row in ipairs({ AltsForeverSearchFrame:GetChildren() }) do
+        if row.entry and row:IsShown() then out[#out + 1] = row.name.text .. " = " .. plain(row.detail.text) end
+    end
+    return table.concat(out, "\n")
+end
+
+test("search finds items your characters have or can craft: best matches first, who has them and who makes them", function()
+    searchStart()
+    SlashCmdList.ALTSFOREVERSEARCH("linen")
+    eq(AltsForeverSearchFrame:IsShown(), true)
+    -- The name's start before a later word; Far Away's 99 aren't counted (another ruleset).
+    eq(searchRows(), "Linen Cloth = 25 [DRUID]Tarn 20, [MAGE]Aldric 5\n"
+        .. "Bolt of Linen Cloth = 3 [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
+    -- Made by a recipe, owned by nobody.
+    searchType("glo")
+    eq(searchRows(), "Linked Gloves = none owned · can craft: [PALADIN]Smith (Blacksmithing)", "not Far Away's gloves")
+    -- Anywhere in the name; every word, in any order.
+    searchType("nen")
+    eq(searchRows(), "Linen Cloth = 25 [DRUID]Tarn 20, [MAGE]Aldric 5\nBolt of Linen Cloth = 3 [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
+    searchType("cloth bolt")
+    eq(searchRows(), "Bolt of Linen Cloth = 3 [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
+    -- @owned and @craft narrow it (any start of the word).
+    searchType("@craft l")
+    eq(searchRows(), "Linked Gloves = none owned · can craft: [PALADIN]Smith (Blacksmithing)\nBolt of Linen Cloth = 3 [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)",
+        "starts with it, then a later word")
+    searchType("@own linen")
+    eq(searchRows(), "Linen Cloth = 25 [DRUID]Tarn 20, [MAGE]Aldric 5\nBolt of Linen Cloth = 3 [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
+    -- Nothing typed yet, or nothing found: it says so.
+    searchType("")
+    eq(searchRows(), "")
+    assert(AltsForeverSearchFrame.status.text:find("@owned or @craft", 1, true))
+    searchType("zzz")
+    assert(AltsForeverSearchFrame.status.text:find("Nothing matching 'zzz'", 1, true))
+    -- With other rulesets shown, as in tooltips.
+    SlashCmdList.ALTSFOREVER("rulesets")
+    AltsForeverSearchFrame:Hide()
+    SlashCmdList.ALTSFOREVERSEARCH("far")
+    eq(searchRows(), "Far Gloves = 1 Far 1")
+end)
+
+test("Enter opens the bags of whoever has it, lit up (you first); arrows move; Shift+Enter or nobody owning it links it", function()
+    local ns = searchStart()
+    SlashCmdList.ALTSFOREVERSEARCH("linen")
+    local box = AltsForeverSearchBox
+    -- Aldric (you) has 5 in the bank: that's what opens, with the linen lit up.
+    box.scripts.OnEnterPressed(box)
+    eq(AltsForeverSearchFrame:IsShown(), false, "the search closes")
+    eq(AltsForeverBagsFrame:IsShown(), true)
+    eq(ns.BagsHighlight(), 2589)
+    eq(AltsForeverBagsFrame.who.text:find("Aldric", 1, true) ~= nil, true)
+    -- Another character's bags: switching view clears the highlight.
+    SlashCmdList.ALTSFOREVERSEARCH("linen")
+    box.scripts.OnArrowPressed(box, "DOWN")
+    box.scripts.OnEnterPressed(box)
+    eq(ns.BagsHighlight(), 2996, "the bolt, in Tarn's bags")
+    assert(AltsForeverBagsFrame.who.text:find("Tarn Moon", 1, true))
+    local alpha = {}
+    for _, slot in ipairs({ AltsForeverBagsFrame.content:GetChildren() }) do
+        if slot.id and slot:IsShown() then alpha[slot.id] = slot.icon:GetAlpha() end
+    end
+    eq(alpha[2996], 1, "lit")
+    eq(alpha[2589], 0.25, "the rest dimmed")
+    AltsForeverBagsFrame:Hide()
+    eq(ns.BagsHighlight(), nil, "closed: gone")
+    -- Shift+Enter: linked (chat closed: one opens with it).
+    SlashCmdList.ALTSFOREVERSEARCH("linen")
+    wow.shift = true
+    box.scripts.OnEnterPressed(box)
+    wow.shift = false
+    assert(wow.openedChat[1]:find("Linen Cloth", 1, true), "linked")
+    eq(AltsForeverSearchFrame:IsShown(), true, "linking leaves it open")
+    -- Nobody has it: Enter links it, into the chat box being typed in.
+    wow.chatOpen = true
+    searchType("linked")
+    box.scripts.OnEnterPressed(box)
+    assert(wow.chatLinks[#wow.chatLinks]:find("Linked Gloves", 1, true))
+    -- Only in the mail: said so.
+    searchType("silk")
+    box.scripts.OnEnterPressed(box)
+    assert(wow.printed[#wow.printed]:find("has it in the mail", 1, true), wow.printed[#wow.printed])
+end)
+
+test("the search opens from /afs, /af search, the binding, the menu and the overview; Escape closes it and lets the names go", function()
+    local ns = searchStart()
+    AltsForever_Binding("search")
+    eq(AltsForeverSearchFrame:IsShown(), true)
+    AltsForever_Binding("search")
+    eq(AltsForeverSearchFrame:IsShown(), false, "the binding again closes it")
+    SlashCmdList.ALTSFOREVER("search silk")
+    eq(AltsForeverSearchBox.text, "silk")
+    eq(searchRows(), "Silk Cloth = 2 [DRUID]Tarn 2")
+    AltsForeverSearchBox.scripts.OnEscapePressed(AltsForeverSearchBox)
+    eq(AltsForeverSearchFrame:IsShown(), false)
+    eq(#ns.SearchMatches("linen"), 0, "names let go while closed")
+    ns.ShowOptionsMenu(UIParent)
+    wow.menuItem("Search...").fn()
+    eq(AltsForeverSearchFrame:IsShown(), true)
+    AltsForeverSearchFrame:Hide()
+    SlashCmdList.ALTSFOREVER("")
+    AltsForeverFrame.searchButton.scripts.OnClick(AltsForeverFrame.searchButton)
+    eq(AltsForeverSearchFrame:IsShown(), true)
+    -- In Escape's list, and joined to the controller's navigator, as our other windows.
+    local listed = false
+    for _, name in ipairs(UISpecialFrames) do listed = listed or name == "AltsForeverSearchFrame" end
+    eq(listed, true)
+    eq(type(AltsForeverSearchFrame.SmartNavigationCloseHandler), "function")
+end)
+
+test("a name still loading is asked for, and the search runs again a second later", function()
+    local ns = searchStart()
+    wow.item(7001, "Late Cloth", {})
+    local late = wow.itemNames[7001]
+    wow.itemNames[7001] = nil
+    AltsForeverDB.chars["Tarn Moon"].bags[7001] = 4
+    wow.timers = {}
+    SlashCmdList.ALTSFOREVERSEARCH("late")
+    eq(searchRows(), "")
+    local asked = false
+    for _, id in ipairs(wow.itemLoads or {}) do asked = asked or id == 7001 end
+    eq(asked, true)
+    wow.itemNames[7001] = late
+    for _, fn in ipairs(wow.timers) do fn() end
+    eq(searchRows(), "Late Cloth = 4 [DRUID]Tarn 4")
+end)

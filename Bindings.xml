@@ -5,4 +5,7 @@
 	<Binding name="ALTSFOREVER_BAGS" category="ADDONS">
 		AltsForever_Binding("bags")
 	</Binding>
+	<Binding name="ALTSFOREVER_SEARCH" category="ADDONS">
+		AltsForever_Binding("search")
+	</Binding>
 </Bindings>

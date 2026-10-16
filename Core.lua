@@ -478,6 +478,11 @@ function commands.find(arg)
     ns.FindItems(arg)
 end
 
+-- /af search [text] (or /afs): the search window (Search.lua).
+function commands.search(arg)
+    ns.ToggleSearch(arg)
+end
+
 -- /af bags [name], /af bank [name]: a character's bags or bank, slot by slot.
 local function ShowBags(arg, which)
     local key = arg == "" and ns.charKey or FindChar(arg)
@@ -498,6 +503,7 @@ end
 
 function commands.help()
     Print(L["by Kadmai. /af opens the overview. Also: /af rep | mail | list | delete Name | skillups | sendmail | minimap | stats | mem"])
+    Print(L["/af search (or /afs), with or without a name, finds an item on any of your characters, or who can craft it."])
     Print(L["/af find <text> searches every character's items by name."])
     Print(L["/af counts turns the item counts in tooltips on or off (if another addon, such as Baganator, already shows them)."])
     Print(L["/af bags or /af bank, with a name for another character, shows their bags or bank slot by slot."])
@@ -518,6 +524,9 @@ function ns.RunCommand(name, arg)
 end
 
 commands[""] = function() ns.ToggleOverview() end
+
+SLASH_ALTSFOREVERSEARCH1 = "/afs"
+SlashCmdList.ALTSFOREVERSEARCH = function(msg) ns.ToggleSearch(msg) end
 
 SLASH_ALTSFOREVER1, SLASH_ALTSFOREVER2 = "/af", "/altsforever"
 SlashCmdList.ALTSFOREVER = function(msg)

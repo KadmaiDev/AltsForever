@@ -455,6 +455,7 @@ function ns.ShowOptionsMenu(owner, fromOverview)
             root:CreateButton(L["Open overview"], function() ns.ToggleOverview(true) end)
         end
         root:CreateButton(L["Bags and bank"], function() ns.ShowBags(ns.charKey, "bags") end)
+        root:CreateButton(L["Search..."], function() ns.ToggleSearch() end)
         -- Only what's switched back and forth while playing; the set-once settings are on
         -- the Options page (the owner's call, 2026-10-16: the menu had grown to 15 entries).
         -- Without a page (its registration failed), the menu has them all instead.

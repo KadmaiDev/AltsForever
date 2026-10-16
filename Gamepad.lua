@@ -81,12 +81,19 @@ function ns.PageButton(parent, up, onClick)
 end
 
 -- Key bindings (Bindings.xml): put on a controller button, or reach them with a macro of
--- /af or /af bags on a gamepad action bar.
+-- /af, /af bags or /afs on a gamepad action bar.
 BINDING_HEADER_ALTSFOREVER = "Alts Forever"
 BINDING_NAME_ALTSFOREVER_OVERVIEW = L["Open overview"]
 BINDING_NAME_ALTSFOREVER_BAGS = L["Bags and bank"]
+BINDING_NAME_ALTSFOREVER_SEARCH = L["Search your characters"]
 function AltsForever_Binding(which)
-    if which == "bags" then ns.ShowBags(ns.charKey, "bags") else ns.ToggleOverview() end
+    if which == "bags" then
+        ns.ShowBags(ns.charKey, "bags")
+    elseif which == "search" then
+        ns.ToggleSearch()
+    else
+        ns.ToggleOverview()
+    end
 end
 
 function ns.StartGamepad()

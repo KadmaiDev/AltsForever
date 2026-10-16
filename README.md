@@ -22,6 +22,8 @@ Type `/af` to open the **overview**: every character with level and XP, rested X
 
 ![The bags window, By bag: a section per bag with used and total slots, and the character dropdown open](media/bags-bank.png)
 
+**Search:** `/afs` (or `/af search`, the magnifier in the overview, Search... in the options menu, or a key you bind under Key Bindings > AddOns) opens a search box for every item your characters have **or can craft**. Each result shows how many you have, who has them and who can make it. Use the arrow keys and press Enter to open that character's bags or bank with the item lit up (yours first, else whoever has the most); Shift+Enter links it in chat. Start with `@owned` or `@craft` to see only one side, e.g. `@craft sword`. Characters on other rulesets and factions are left out unless you show them in tooltips.
+
 **Mail expiry:** a few seconds after you log in, Alts Forever warns in chat if any character has mail with items or gold expiring within 3 days, and says whether it'll be returned to the sender or deleted. The overview's Mail column shows how long each character has; `/af mail` lists them all.
 
 Hovering a recipe (pattern, schematic, formula...) lists your characters who have that profession: **Known**, **Can learn**, **Needs 120 (107)** (required skill, their skill), or **Not scanned**. Open each profession window once on each character so Alts Forever knows which recipes they've learned.
@@ -100,6 +102,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af rep` | Open or close the Reputation panel |
 | `/af icons` | Choose the icons item tooltips use for bags, bank, mail and worn items |
 | `/af bags [name]`, `/af bank [name]` | Show your bags or bank slot by slot, or another character's, e.g. `/af bank Tarnia` |
+| `/afs [text]` or `/af search [text]` | Search every item your characters have or can craft; Enter opens their bags with it lit up |
 | `/af find <text>` | Find an item on any character by (part of) its name, e.g. `/af find linen` |
 | `/af mail` | List every character's soonest mail expiry |
 | `/af list` | List stored characters |

@@ -43,6 +43,7 @@ Bags.lua
 Icons.lua
 Upgrades.lua
 Flyout.lua
+Search.lua
 Crates.lua
 Tooltip.lua
 Options.lua
