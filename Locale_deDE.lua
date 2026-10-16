@@ -231,3 +231,8 @@ L["Item tooltips list how many of the item each of your characters has, and wher
 L["Your characters can craft"] = "Deine Charaktere können herstellen"
 L["Crafted by %s (%s)"] = "Hergestellt von %s (%s)"
 L["Click: show them"] = "Klicken: alle anzeigen"
+L["Craftable upgrades on the character sheet on."] = "Herstellbare Verbesserungen im Charakterfenster an."
+L["Craftable upgrades on the character sheet off."] = "Herstellbare Verbesserungen im Charakterfenster aus."
+L["/af anvils shows or hides the anvils on your character sheet that mark upgrades you or your alts can craft."] = "/af anvils zeigt oder verbirgt die Ambosse im Charakterfenster, die Verbesserungen markieren, die du oder deine Twinks herstellen könnt."
+L["Show craftable upgrades on the character sheet"] = "Herstellbare Verbesserungen im Charakterfenster zeigen"
+L["An anvil beside a slot on your character sheet means you or an alt can craft an upgrade for it that you can wear now and that binds when equipped. Hover or click it to see which. Same as /af anvils."] = "Ein Amboss neben einem Platz im Charakterfenster bedeutet, dass du oder ein Twink dafür eine Verbesserung herstellen kann, die du jetzt tragen kannst und die beim Anlegen gebunden wird. Fahre mit der Maus darüber oder klicke darauf, um zu sehen, welche. Wie /af anvils."

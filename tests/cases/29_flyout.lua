@@ -101,7 +101,15 @@ test("the character sheet puts an anvil beside slots with a craftable upgrade yo
     hands.scripts.OnClick(hands)
     PaperDollFrame:Hide()
     eq(panel:IsShown(), false, "closes with the character sheet")
-    -- Upgrades off: the anvils go.
+    -- Their own setting: /af anvils, the menu. Show upgrades (the tooltips) doesn't touch them.
     ns.SetUpgrades(false)
-    eq(hands:IsShown(), false, "upgrades off")
+    eq(hands:IsShown(), true, "tooltips' upgrades off: the anvils stay")
+    ns.SetUpgrades(true)
+    SlashCmdList.ALTSFOREVER("anvils")
+    eq(AltsForeverDB.anvilsOff, true)
+    eq(hands:IsShown(), false, "anvils off")
+    ns.ShowOptionsMenu(UIParent)
+    wow.menuItem("Show craftable upgrades on the character sheet").setSelected()
+    eq(AltsForeverDB.anvilsOff, nil)
+    eq(hands:IsShown(), true, "back on")
 end)

@@ -231,3 +231,8 @@ L["Item tooltips list how many of the item each of your characters has, and wher
 L["Your characters can craft"] = "你的角色可以製造"
 L["Crafted by %s (%s)"] = "製造者:%s(%s)"
 L["Click: show them"] = "點擊：全部顯示"
+L["Craftable upgrades on the character sheet on."] = "角色面板上的可製造提升已開啟。"
+L["Craftable upgrades on the character sheet off."] = "角色面板上的可製造提升已關閉。"
+L["/af anvils shows or hides the anvils on your character sheet that mark upgrades you or your alts can craft."] = "/af anvils 顯示或隱藏角色面板上的鐵砧,它們標出你或你的分身可以製造的裝備提升。"
+L["Show craftable upgrades on the character sheet"] = "在角色面板上顯示可製造的提升"
+L["An anvil beside a slot on your character sheet means you or an alt can craft an upgrade for it that you can wear now and that binds when equipped. Hover or click it to see which. Same as /af anvils."] = "角色面板上某個欄位旁的鐵砧表示你或某個分身可以為它製造一件提升:你現在就能穿戴,且裝備後綁定。滑鼠懸停或點擊即可查看。等同於 /af anvils。"

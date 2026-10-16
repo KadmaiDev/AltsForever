@@ -58,6 +58,8 @@ local function SkillupsSelected() return ns.SkillupsOn() end
 local function ToggleSkillups() ns.SetSkillups(not ns.SkillupsOn()) end
 local function UpgradesSelected() return ns.UpgradesOn() end
 local function ToggleUpgrades() ns.SetUpgrades(not ns.UpgradesOn()) end
+local function AnvilsSelected() return ns.AnvilsOn() end
+local function ToggleAnvils() ns.SetAnvils(not ns.AnvilsOn()) end
 local function SendToAltSelected() return ns.SendToAltOn() end
 local function ToggleSendToAlt() ns.SetSendToAlt(not ns.SendToAltOn()) end
 local function StatsSelected() return ns.StatsOn() end
@@ -107,6 +109,8 @@ local SETTINGS = {
         L["Show which characters can still skill up: in Can craft, on materials (Skill-ups) and in the overview. Same as /af skillups."] },
     { L["Show upgrades"], UpgradesSelected, function(on) ns.SetUpgrades(on) end,
         L["Item tooltips name which of your characters an item would be an upgrade for, judged by their talents. Right-click a character in the overview to change their role. Same as /af upgrades."] },
+    { L["Show craftable upgrades on the character sheet"], AnvilsSelected, function(on) ns.SetAnvils(on) end,
+        L["An anvil beside a slot on your character sheet means you or an alt can craft an upgrade for it that you can wear now and that binds when equipped. Hover or click it to see which. Same as /af anvils."] },
     { L["Send mail to alts"], SendToAltSelected, function(on) ns.SetSendToAlt(on) end,
         L["An arrow next to the To box at the mailbox to pick one of your characters. Same as /af sendmail."] },
     { L["Show session stats"], StatsSelected, function(on) ns.SetStats(on) end,
@@ -268,6 +272,7 @@ function ns.ShowOptionsMenu(owner, fromOverview)
         root:CreateCheckbox(L["Show item counts"], CountsSelected, ToggleCounts)
         root:CreateCheckbox(L["Show skill-up details"], SkillupsSelected, ToggleSkillups)
         root:CreateCheckbox(L["Show upgrades"], UpgradesSelected, ToggleUpgrades)
+        root:CreateCheckbox(L["Show craftable upgrades on the character sheet"], AnvilsSelected, ToggleAnvils)
         root:CreateCheckbox(L["Send mail to alts"], SendToAltSelected, ToggleSendToAlt)
         root:CreateCheckbox(L["Show session stats"], StatsSelected, ToggleStats)
         root:CreateCheckbox(L["Legacy reminders"], LegacySelected, ToggleLegacy)

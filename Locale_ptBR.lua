@@ -231,3 +231,8 @@ L["Item tooltips list how many of the item each of your characters has, and wher
 L["Your characters can craft"] = "Seus personagens podem fabricar"
 L["Crafted by %s (%s)"] = "Fabricado por %s (%s)"
 L["Click: show them"] = "Clique: mostrar todos"
+L["Craftable upgrades on the character sheet on."] = "Melhorias fabricáveis na ficha do personagem ativadas."
+L["Craftable upgrades on the character sheet off."] = "Melhorias fabricáveis na ficha do personagem desativadas."
+L["/af anvils shows or hides the anvils on your character sheet that mark upgrades you or your alts can craft."] = "/af anvils mostra ou oculta as bigornas na ficha do personagem que marcam melhorias que você ou seus alts podem fabricar."
+L["Show craftable upgrades on the character sheet"] = "Mostrar melhorias fabricáveis na ficha do personagem"
+L["An anvil beside a slot on your character sheet means you or an alt can craft an upgrade for it that you can wear now and that binds when equipped. Hover or click it to see which. Same as /af anvils."] = "Uma bigorna ao lado de um espaço na ficha do personagem indica que você ou um alt podem fabricar uma melhoria para ele que você já pode usar e que se vincula ao equipar. Passe o mouse ou clique para ver qual. Igual a /af anvils."

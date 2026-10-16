@@ -390,6 +390,11 @@ function commands.rulesets()
         or L["Characters on other rulesets or factions are hidden in tooltips."])
 end
 
+function commands.anvils()
+    ns.SetAnvils(not ns.AnvilsOn())
+    Print(ns.AnvilsOn() and L["Craftable upgrades on the character sheet on."] or L["Craftable upgrades on the character sheet off."])
+end
+
 function commands.upgrades()
     ns.SetUpgrades(not ns.UpgradesOn())
     Print(ns.UpgradesOn() and L["Upgrades in item tooltips on."] or L["Upgrades in item tooltips off."])
@@ -481,6 +486,7 @@ function commands.help()
     Print(L["/af bags or /af bank, with a name for another character, shows their bags or bank slot by slot."])
     Print(L["/af icons picks the icons item tooltips use for bags, bank, mail and worn items."])
     Print(L["/af upgrades turns upgrade hints in item tooltips on or off. /af role Name role sets what a character's upgrades are judged by (melee, ranged, caster, healer, tank, feral or auto)."])
+    Print(L["/af anvils shows or hides the anvils on your character sheet that mark upgrades you or your alts can craft."])
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
     Print(L["/af rulesets shows or hides your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; they can't trade with this one."])
     Print(L["Or use the minimap button (right-click for options)."])

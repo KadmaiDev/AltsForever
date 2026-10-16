@@ -207,9 +207,13 @@ end
 ---------------------------------------------------------------------------
 -- Working out which slots get one
 ---------------------------------------------------------------------------
+-- The anvils have their own setting ("Show craftable upgrades on the character sheet",
+-- /af anvils; owner, 2026-10-16), apart from Show upgrades (the tooltips).
+function ns.AnvilsOn() return not ns.db.anvilsOff end
+
 local function RefreshDoll()
     if not (ns.char and PaperDollFrame and PaperDollFrame:IsVisible()) then return end
-    local on = ns.UpgradesOn()
+    local on = ns.AnvilsOn()
     local key = ns.UpgradesVersion() .. ":" .. (ns.craftVersion or 0) .. ":" .. (ns.char.level or 0) .. ":" .. tostring(on)
     if key == dollKey then return end
     local pending = false
@@ -258,6 +262,11 @@ local function RefreshDoll()
     end
 end
 ns.CharacterSheetChanged = RefreshDoll
+
+function ns.SetAnvils(on)
+    ns.db.anvilsOff = not on or nil
+    RefreshDoll()
+end
 
 function ns.StartFlyout()
     if not PaperDollFrame then return end
