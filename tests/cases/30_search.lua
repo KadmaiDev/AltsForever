@@ -55,7 +55,7 @@ test("search finds items your characters have or can craft: best matches first, 
     eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn 20, [MAGE]Aldric 5\nBolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
     searchType("cloth bolt")
     eq(searchRows(), "Bolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
-    -- @owned, @mine and @craft narrow it (any start of the word). With @craft, who can make
+    -- @owned and @craft narrow it (any start of the word). With @craft, who can make
     -- it comes first.
     searchType("@craft l")
     eq(searchRows(), "Linked Gloves = can craft: [PALADIN]Smith (Blacksmithing) · none owned\nBolt of Linen Cloth (3) = can craft: [PALADIN]Smith (Tailoring) · [DRUID]Tarn 3",
@@ -63,17 +63,16 @@ test("search finds items your characters have or can craft: best matches first, 
     searchType("@own linen")
     eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn 20, [MAGE]Aldric 5\nBolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)",
         "any of your characters")
-    -- @mine: only what the character you're on has; they come first, and the number is theirs.
+    -- An @ word it doesn't know (@mine was dropped) is left out of the search.
     searchType("@mine linen")
-    eq(searchRows(), "Linen Cloth (5) = [MAGE]Aldric 5, [DRUID]Tarn 20")
-    searchType("@m silk")
-    eq(searchRows(), "", "Tarn's, not yours")
-    -- Nothing typed yet: what it does and the three words; nothing found: it says so.
+    eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn 20, [MAGE]Aldric 5\nBolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
+    -- Nothing typed yet: what it does and the two words; nothing found: it says so.
     searchType("")
     eq(searchRows(), "")
     eq(AltsForeverSearchFrame.hint:IsShown(), true)
     local hint = AltsForeverSearchFrame.hint.text
-    assert(hint:find("@owned", 1, true) and hint:find("@mine", 1, true) and hint:find("@craft", 1, true), hint)
+    assert(hint:find("@owned", 1, true) and hint:find("@craft", 1, true), hint)
+    assert(not hint:find("@mine", 1, true), hint)
     searchType("@craft")
     eq(AltsForeverSearchFrame.hint:IsShown(), true, "a word but nothing to look for yet")
     searchType("zzz")
@@ -328,9 +327,12 @@ test("with the bags window open the search works on it: that character only, bes
         .. "Wool Cloth (4) = [DRUID]Tarn 4\n"
         .. "Bolt of Linen Cloth (3) = [DRUID]Tarn 3\n"
         .. "Silk Cloth (2) = [DRUID]Tarn 2")
-    -- The selected one lit as you go, on Tarn, switching to the bank for the wool.
+    -- The selected one lit as you go, on Tarn, switching to the bank for the wool. The window
+    -- is already as tall as Tarn's bank needs before it goes there: it won't jump.
     eq(ns.BagsHighlight(), 2589)
+    local first = bags:GetHeight()
     box.scripts.OnArrowPressed(box, "DOWN")
+    eq(bags:GetHeight(), first, "as tall as the bank from the start")
     eq(ns.BagsHighlight(), 2592)
     eq(select(2, ns.BagsState()), "bank")
     assert(bags.who.text:find("Tarn Moon", 1, true), "never another character")

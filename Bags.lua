@@ -320,17 +320,17 @@ local function ContentHeight(c, which, split)
     return y
 end
 
--- While an item is lit: the tallest slot area of everyone who has it. The window keeps that
--- height as you step through them, so the arrows stay under the mouse (owner, 2026-10-16:
--- the window resizing made them hard to click).
-local litHeight
--- With the search docked beside it: the tallest of the bags and bank shown since, never less,
--- so the window doesn't jump as the search lights one item after another (owner, 2026-10-16).
-local held
+-- One height while you look around: while an item is lit or the search is docked beside
+-- the window, it's the tallest of everywhere you might go next (each bags or bank with the
+-- lit item; with the search, the shown character's bags and bank), and never less than
+-- before, so nothing under the mouse moves (owner, 2026-10-16: the resizing made the arrows
+-- hard to click, and the window jumped as the search lit one item after another). It fits
+-- its contents again once neither.
+local steady, searchDocked
 
 Place = function()
     -- While the player drags the grip, the window keeps the height they're dragging to.
-    local want = max(contentHeight, litHeight or 0, held or 0)
+    local want = max(contentHeight, steady or 0)
     local visible = sizing and max(frame:GetHeight() - TOP - BOTTOM, MIN_VIEW) or max(min(want, MaxView()), MIN_VIEW)
     scroll = max(0, min(scroll, contentHeight - visible))
     frame.content:ClearAllPoints()
@@ -350,16 +350,19 @@ function Fill()
         frame:SetWidth(WidthFor(cols))
     end
     local split = ns.db.bagsSplit and true or false
-    litHeight = nil
-    if lit then
-        local tallest = 0
-        for _, s in ipairs(Stops()) do
-            local sc = ns.db.chars[s.key]
-            if sc then tallest = max(tallest, ContentHeight(sc, s.view, split)) end
+    if lit or searchDocked then
+        local h = steady or 0
+        if lit then
+            for _, s in ipairs(Stops()) do
+                local sc = ns.db.chars[s.key]
+                if sc then h = max(h, ContentHeight(sc, s.view, split)) end
+            end
         end
-        litHeight = tallest
+        if searchDocked then h = max(h, ContentHeight(c, "bags", split), ContentHeight(c, "bank", split)) end
+        steady = h
+    else
+        steady = nil
     end
-    if held then held = max(held, ContentHeight(c, "bags", split), ContentHeight(c, "bank", split)) end
     local how = ns.BagsContents(c, view, split)
     frame.who:SetText(ns.ColoredName(shownKey, c))
     for _, v in ipairs({ "bags", "bank" }) do
@@ -670,7 +673,7 @@ local function CreateWindow()
     f:HookScript("OnShow", function() if sounds.IG_BACKPACK_OPEN then PlaySound(sounds.IG_BACKPACK_OPEN) end end)
     f:HookScript("OnHide", function()
         lit = nil
-        if held then held = 0 end
+        steady = nil
         if sounds.IG_BACKPACK_CLOSE then PlaySound(sounds.IG_BACKPACK_CLOSE) end
     end)
     ns.GamepadWindow(f)
@@ -727,8 +730,9 @@ function ns.BagsWindow() return frame end
 
 -- The search docked beside the window (true) or gone (false): one height while it's there.
 function ns.BagsHold(on)
-    if (held ~= nil) == (on and true or false) then return end
-    held = on and 0 or nil
+    on = on and true or false
+    if searchDocked == on then return end
+    searchDocked = on
     if frame and frame:IsShown() then Fill() end
 end
 

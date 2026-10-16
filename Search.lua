@@ -153,11 +153,11 @@ local function Better(a, b)
     return a.low < b.low
 end
 
--- "@owned linen", "@mine linen", "@craft sword": a word after @ narrows it to what any of
--- your characters has, what the one you're on has, or what one can make (@mine: the owner,
--- 2026-10-16, read @owned as "mine"). Any start of the word will do; the same words in every
+-- "@owned linen", "@craft sword": a word after @ narrows it to what the characters searched
+-- have, or what they can make (an @mine for the one you're on was dropped, 2026-10-16: the
+-- character menu does that). Any start of the word will do; the same words in every
 -- language, as the hint says.
-local FILTERS = { "owned", "mine", "craft" }
+local FILTERS = { "owned", "craft" }
 local filter -- the one in use, for the rows
 
 local function Filter(word)
@@ -186,20 +186,10 @@ function ns.SearchMatches(text)
             e.rank = rank
             e.holders, e.total = Holders(e.id)
             e.crafters = Crafters(e.id)
-            -- How many the character you're on has; with @mine they come first, and the
-            -- row's number is theirs.
-            e.mine = 0
-            for i, h in ipairs(e.holders) do
-                if h.key == ns.charKey then
-                    e.mine = h.n
-                    if filter == "mine" then table.insert(e.holders, 1, table.remove(e.holders, i)) end
-                    break
-                end
-            end
-            e.count = filter == "mine" and e.mine or e.total
+            e.count = e.total
             -- Only what the ticked characters have or can make.
             if (e.total > 0 or #e.crafters > 0) and (filter ~= "owned" or e.total > 0)
-                and (filter ~= "mine" or e.mine > 0) and (filter ~= "craft" or #e.crafters > 0) then
+                and (filter ~= "craft" or #e.crafters > 0) then
                 matches[#matches + 1] = e
             end
         end
@@ -552,7 +542,7 @@ local function CreateWindow()
     f:EnableMouseWheel(true)
     f:SetScript("OnMouseWheel", function(_, delta) Scroll(-delta) end)
 
-    -- Before anything's typed: what it searches, and the three words that narrow it.
+    -- Before anything's typed: what it searches, and the two words that narrow it.
     local function Word(word, what) return "|cffffd100" .. word .. "|r  " .. what end
     f.hint = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     f.hint:SetPoint("TOPLEFT", f, "TOPLEFT", 24, -76)
@@ -562,7 +552,6 @@ local function CreateWindow()
     f.hint:SetText(L["Type part of an item's name to find everything your characters have or can craft."] .. "\n\n"
         .. L["Start with one of these to narrow it:"] .. "\n"
         .. Word("@owned", L["any of your characters has it"]) .. "\n"
-        .. Word("@mine", L["the character you're on has it"]) .. "\n"
         .. Word("@craft", L["one of your characters can make it"]) .. "\n\n"
         .. GREY .. L["For example: %s"]:format("@craft linen") .. "|r")
     ns.SkinText(f.hint)
