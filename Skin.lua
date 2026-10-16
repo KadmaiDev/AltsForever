@@ -73,11 +73,12 @@ local function ElvWindow(f)
 end
 
 -- A whole window: themed backdrop and border, its close button and inset, and the text
--- it already has. Rows and cells made later call ns.SkinText themselves.
-function ns.SkinWindow(f)
+-- it already has. Rows and cells made later call ns.SkinText themselves. `opts` goes to
+-- EllesmereUI's Shell (e.g. noBorder).
+function ns.SkinWindow(f, opts)
     if not f then return end
     if skin then
-        skin.Shell(f)
+        skin.Shell(f, opts)
         if f.CloseButton then skin.CloseButton(f.CloseButton) end
         if f.Inset then skin.Inset(f.Inset) end
         -- Icon buttons (the overview's reputation and options buttons): EllesmereUI's flat
@@ -187,31 +188,42 @@ function ns.SlotEdge(b, r, g, bl, a)
     return true
 end
 
--- The bags window's background, with EllesmereUI's bags in use: theirs, not the standard
--- window shell, which is about half as bright (measured on the owner's screenshots,
--- 2026-10-16: the two windows looked different side by side). Their bags draw EllesmereUI's
--- panel texture with 25% black over it. The file isn't part of the API: if it ever goes, the
--- texture draws nothing and the shell shows through.
+-- The bags window, with EllesmereUI's bags in use, framed as theirs (owner, 2026-10-16: the
+-- two windows looked different side by side). EllesmereUI's window shell draws its panel
+-- texture with 62% black over it (sublevels -8, -7), a half-black title strip (-5) and a
+-- shadowed frame (a stretched map-border atlas); their bags draw the same texture with only
+-- 25% black and a 1 px dark grey line. So: the shell without its frame (noBorder, part of
+-- the API), the texture at their brightness between the shell's backdrop and its title strip
+-- (one texture, tinted 0.75 = 25% black), and the line. The file isn't part of the API: if
+-- it ever goes, the texture draws nothing and the shell's own backdrop shows through.
 local BAGS_BG = "Interface\\AddOns\\EllesmereUI\\media\\modern_blizz.png"
-local TITLE_STRIP = 24 -- the window template's title bar
+local LINE = 0.1 -- their bags' border colour
+
+local function EuiBags() return skin and _G.EUI_MainBagFrame and true or false end
+
+function ns.BagsShellOpts()
+    return EuiBags() and { noBorder = true } or nil
+end
 
 function ns.SkinBagsWindow(f)
-    if not (skin and _G.EUI_MainBagFrame) or f.euiBg then return end
-    local bg = f:CreateTexture(nil, "BACKGROUND", nil, 6)
-    bg:SetPoint("TOPLEFT", 1, -1)
-    bg:SetPoint("BOTTOMRIGHT", -1, 1)
+    if not EuiBags() or f.euiBg then return end
+    local bg = f:CreateTexture(nil, "BACKGROUND", nil, -6)
+    bg:SetAllPoints()
     bg:SetTexture(BAGS_BG)
-    local shade = f:CreateTexture(nil, "BACKGROUND", nil, 7)
-    shade:SetAllPoints(bg)
-    shade:SetColorTexture(0, 0, 0, 0.25)
-    -- A dark strip behind the title, as their header has (half black; owner, 2026-10-16:
-    -- the texture over the whole window had covered the shell's title bar).
-    local strip = f:CreateTexture(nil, "BORDER", nil, -8)
-    strip:SetPoint("TOPLEFT", bg, "TOPLEFT")
-    strip:SetPoint("TOPRIGHT", bg, "TOPRIGHT")
-    strip:SetHeight(TITLE_STRIP)
-    strip:SetColorTexture(0, 0, 0, 0.5)
-    f.euiBg, f.euiStrip = bg, strip
+    bg:SetVertexColor(0.75, 0.75, 0.75)
+    local pp = EllesmereUI and EllesmereUI.PP
+    local px = type(pp) == "table" and type(pp.mult) == "number" and pp.mult > 0 and pp.mult or 1
+    local edges = {}
+    for i = 1, 4 do
+        local t = f:CreateTexture(nil, "OVERLAY", nil, 7)
+        t:SetColorTexture(LINE, LINE, LINE, 1)
+        edges[i] = t
+    end
+    edges[1]:SetPoint("TOPLEFT"); edges[1]:SetPoint("TOPRIGHT"); edges[1]:SetHeight(px)
+    edges[2]:SetPoint("BOTTOMLEFT"); edges[2]:SetPoint("BOTTOMRIGHT"); edges[2]:SetHeight(px)
+    edges[3]:SetPoint("TOPLEFT"); edges[3]:SetPoint("BOTTOMLEFT"); edges[3]:SetWidth(px)
+    edges[4]:SetPoint("TOPRIGHT"); edges[4]:SetPoint("BOTTOMRIGHT"); edges[4]:SetWidth(px)
+    f.euiBg, f.euiLine = bg, edges
 end
 
 -- A section heading in the bags window: EllesmereUI's are light grey, not gold.

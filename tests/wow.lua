@@ -607,8 +607,8 @@ function M.load(files)
         EllesmereUI = { RegisterSkin = function(name, fn) M.skinName, M.skinCallback = name, fn end }
         M.skinFacade = {}
         for _, fname in ipairs({ "Shell", "CloseButton", "Inset", "Font", "Button", "Panel", "SquareIcon" }) do
-            M.skinFacade[fname] = function(obj)
-                M.skinned[#M.skinned + 1] = { fname, obj }
+            M.skinFacade[fname] = function(obj, opts)
+                M.skinned[#M.skinned + 1] = { fname, obj, opts }
             end
         end
         M.skinFacade.OnLooksChanged = function(fn) M.looksChanged = fn end

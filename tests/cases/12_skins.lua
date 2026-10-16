@@ -61,6 +61,9 @@ test("with EllesmereUI, the bags window's slots look like its bags: square icons
     eq(empty.icon.texture, nil, "not at full strength in the icon")
     eq(table.concat(empty.edges[1].tint, ","), "0,0,0")
     eq(AltsForeverBagsFrame.euiBg, nil, "EllesmereUI's bags not in use: the standard window")
+    for _, call in ipairs(wow.skinned) do
+        if call[1] == "Shell" and call[2] == AltsForeverBagsFrame then eq(call[3], nil, "with its frame") end
+    end
 end)
 
 test("with EllesmereUI's bags in use, the bags window has their background", function()
@@ -73,9 +76,14 @@ test("with EllesmereUI's bags in use, the bags window has their background", fun
     local bg = AltsForeverBagsFrame.euiBg
     assert(bg, "drawn")
     eq(bg.texture, "Interface\\AddOns\\EllesmereUI\\media\\modern_blizz.png")
-    local strip = AltsForeverBagsFrame.euiStrip
-    assert(strip, "a dark strip behind the title, as their header has")
-    eq(strip.point[2], bg)
+    eq(table.concat(bg.tint, ","), "0.75,0.75,0.75", "their bags' 25% black")
+    -- The shell without its shadowed frame (its title strip stays), and a thin line instead.
+    local opts
+    for _, call in ipairs(wow.skinned) do
+        if call[1] == "Shell" and call[2] == AltsForeverBagsFrame then opts = call[3] end
+    end
+    eq(opts and opts.noBorder, true)
+    eq(#AltsForeverBagsFrame.euiLine, 4)
     EUI_MainBagFrame = nil
 end)
 
