@@ -139,9 +139,12 @@ local function Better(a, b)
     return a.low < b.low
 end
 
--- "@owned linen", "@craft sword": a word after @ narrows to one side; any start of the
--- word will do. The same words in every language, as the hint says.
-local FILTERS = { "owned", "craft" }
+-- "@owned linen", "@mine linen", "@craft sword": a word after @ narrows it to what any of
+-- your characters has, what the one you're on has, or what one can make (@mine: the owner,
+-- 2026-10-16, read @owned as "mine"). Any start of the word will do; the same words in every
+-- language, as the hint says.
+local FILTERS = { "owned", "mine", "craft" }
+local filter -- the one in use, for the rows
 
 local function Filter(word)
     if word == "" then return nil end
@@ -154,7 +157,7 @@ function ns.SearchMatches(text)
     wipe(matches)
     selected, offset = 1, 0
     text = (text or ""):lower():match("^%s*(.-)%s*$")
-    local filter
+    filter = nil
     local word, rest = text:match("^@(%S*)%s*(.*)$")
     if word then
         filter = Filter(word)
@@ -169,7 +172,19 @@ function ns.SearchMatches(text)
             e.rank = rank
             e.holders, e.total = Holders(e.id)
             e.crafters = Crafters(e.id)
-            if (filter ~= "owned" or e.total > 0) and (filter ~= "craft" or #e.crafters > 0) then
+            -- How many the character you're on has; with @mine they come first, and the
+            -- row's number is theirs.
+            e.mine = 0
+            for i, h in ipairs(e.holders) do
+                if h.key == ns.charKey then
+                    e.mine = h.n
+                    if filter == "mine" then table.insert(e.holders, 1, table.remove(e.holders, i)) end
+                    break
+                end
+            end
+            e.count = filter == "mine" and e.mine or e.total
+            if (filter ~= "owned" or e.total > 0) and (filter ~= "mine" or e.mine > 0)
+                and (filter ~= "craft" or #e.crafters > 0) then
                 matches[#matches + 1] = e
             end
         end
@@ -184,6 +199,19 @@ end
 -- around her name).
 function ns.SearchDetail(e)
     local parts = {}
+    local crafting -- with @craft, who can make it comes first, so it's never cut off
+    if #e.crafters > 0 then
+        local who = {}
+        for i, cr in ipairs(e.crafters) do
+            if i > SHOWN_HOLDERS then
+                who[#who + 1] = L["+%d more"]:format(#e.crafters - SHOWN_HOLDERS)
+                break
+            end
+            who[i] = ns.ListShortName(cr.key, cr.c) .. GREY .. " (" .. cr.prof .. ")|r"
+        end
+        crafting = GREY .. L["can craft:"] .. "|r " .. table.concat(who, ", ")
+    end
+    if crafting and filter == "craft" then parts[1] = crafting end
     if e.total > 0 then
         local who = {}
         for i = 1, min(#e.holders, SHOWN_HOLDERS) do
@@ -195,17 +223,7 @@ function ns.SearchDetail(e)
     else
         parts[#parts + 1] = GREY .. L["none owned"] .. "|r"
     end
-    if #e.crafters > 0 then
-        local who = {}
-        for i, cr in ipairs(e.crafters) do
-            if i > SHOWN_HOLDERS then
-                who[#who + 1] = L["+%d more"]:format(#e.crafters - SHOWN_HOLDERS)
-                break
-            end
-            who[i] = ns.ListShortName(cr.key, cr.c) .. GREY .. " (" .. cr.prof .. ")|r"
-        end
-        parts[#parts + 1] = GREY .. L["can craft:"] .. "|r " .. table.concat(who, ", ")
-    end
+    if crafting and filter ~= "craft" then parts[#parts + 1] = crafting end
     return table.concat(parts, GREY .. SEP .. "|r")
 end
 
@@ -365,7 +383,7 @@ Render = function()
             row.icon:SetTexture(C_Item.GetItemIconByID(e.id) or 134400)
             row.name:SetText(names[e.id] or "")
             row.name:SetTextColor(QualityColor(e.id))
-            row.total:SetText(e.total > 0 and e.total or "")
+            row.total:SetText(e.count > 0 and e.count or "")
             row.detail:SetText(ns.SearchDetail(e))
             row.lit:SetShown(offset + i == selected)
             row:Show()
@@ -377,8 +395,10 @@ Render = function()
     frame.down:SetEnabled(offset + ROWS < n)
     local text = box:GetText() or ""
     local typed = text:match("^%s*@?%S*%s*(.-)%s*$")
-    if text:match("^%s*$") or (text:match("^%s*@") and typed == "") then
-        frame.status:SetText(GREY .. L["Type part of an item's name: everything your characters have or can craft. Start with @owned or @craft to narrow it."] .. "|r")
+    local empty = text:match("^%s*$") or (text:match("^%s*@") and typed == "")
+    frame.hint:SetShown(empty and true or false)
+    if empty then
+        frame.status:SetText("")
     elseif n == 0 then
         frame.status:SetText(GREY .. L["Nothing matching '%s'."]:format(text) .. "|r")
     else
@@ -446,6 +466,21 @@ local function CreateWindow()
     f.down:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -64 - ROWS * ROW + 20)
     f:EnableMouseWheel(true)
     f:SetScript("OnMouseWheel", function(_, delta) Scroll(-delta) end)
+
+    -- Before anything's typed: what it searches, and the three words that narrow it.
+    local function Word(word, what) return "|cffffd100" .. word .. "|r  " .. what end
+    f.hint = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    f.hint:SetPoint("TOPLEFT", f, "TOPLEFT", 24, -76)
+    f.hint:SetPoint("RIGHT", f, "RIGHT", -36, 0)
+    f.hint:SetJustifyH("LEFT")
+    f.hint:SetSpacing(4)
+    f.hint:SetText(L["Type part of an item's name to find everything your characters have or can craft."] .. "\n\n"
+        .. L["Start with one of these to narrow it:"] .. "\n"
+        .. Word("@owned", L["any of your characters has it"]) .. "\n"
+        .. Word("@mine", L["the character you're on has it"]) .. "\n"
+        .. Word("@craft", L["one of your characters can make it"]) .. "\n\n"
+        .. GREY .. L["For example: %s"]:format("@craft linen") .. "|r")
+    ns.SkinText(f.hint)
 
     f.status = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.status:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 12)

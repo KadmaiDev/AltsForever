@@ -55,17 +55,29 @@ test("search finds items your characters have or can craft: best matches first, 
     eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn 20, [MAGE]Aldric 5\nBolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
     searchType("cloth bolt")
     eq(searchRows(), "Bolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
-    -- @owned and @craft narrow it (any start of the word).
+    -- @owned, @mine and @craft narrow it (any start of the word). With @craft, who can make
+    -- it comes first.
     searchType("@craft l")
-    eq(searchRows(), "Linked Gloves = none owned · can craft: [PALADIN]Smith (Blacksmithing)\nBolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)",
+    eq(searchRows(), "Linked Gloves = can craft: [PALADIN]Smith (Blacksmithing) · none owned\nBolt of Linen Cloth (3) = can craft: [PALADIN]Smith (Tailoring) · [DRUID]Tarn 3",
         "starts with it, then a later word")
     searchType("@own linen")
-    eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn 20, [MAGE]Aldric 5\nBolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
-    -- Nothing typed yet, or nothing found: it says so.
+    eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn 20, [MAGE]Aldric 5\nBolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)",
+        "any of your characters")
+    -- @mine: only what the character you're on has; they come first, and the number is theirs.
+    searchType("@mine linen")
+    eq(searchRows(), "Linen Cloth (5) = [MAGE]Aldric 5, [DRUID]Tarn 20")
+    searchType("@m silk")
+    eq(searchRows(), "", "Tarn's, not yours")
+    -- Nothing typed yet: what it does and the three words; nothing found: it says so.
     searchType("")
     eq(searchRows(), "")
-    assert(AltsForeverSearchFrame.status.text:find("@owned or @craft", 1, true))
+    eq(AltsForeverSearchFrame.hint:IsShown(), true)
+    local hint = AltsForeverSearchFrame.hint.text
+    assert(hint:find("@owned", 1, true) and hint:find("@mine", 1, true) and hint:find("@craft", 1, true), hint)
+    searchType("@craft")
+    eq(AltsForeverSearchFrame.hint:IsShown(), true, "a word but nothing to look for yet")
     searchType("zzz")
+    eq(AltsForeverSearchFrame.hint:IsShown(), false)
     assert(AltsForeverSearchFrame.status.text:find("Nothing matching 'zzz'", 1, true))
     -- With other rulesets shown, as in tooltips.
     SlashCmdList.ALTSFOREVER("rulesets")
