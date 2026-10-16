@@ -29,9 +29,9 @@ local selected, offset = 1, 0
 local retried
 -- With the bags window open, the search works on it (owner, 2026-10-16): only the character
 -- it shows (scopeKey; "All characters" widens it), docked beside it, and the selected item
--- lit there as you go (previewed). Closed, the bags go back to what was last picked, or as
--- they were (savedLit, savedView). The last search is kept for the next opening (this
--- session only).
+-- lit there as you go (previewed; with nothing selected, back to the last pick: savedLit,
+-- savedView). Closing the search clears what's lit. The last search is kept for the next
+-- opening (this session only).
 local scopeKey, savedLit, savedView, previewed, docked
 local lastText = ""
 local ApplyScope, Dock
@@ -464,7 +464,7 @@ Render = function()
     elseif n == 0 then
         frame.status:SetText(GREY .. L["Nothing matching '%s'."]:format(text) .. "|r")
     elseif ns.BagsShownKey() then
-        frame.status:SetText(GREY .. L["Enter: keep it lit · Escape: put the bags back as they were"] .. "|r")
+        frame.status:SetText(GREY .. L["Enter: keep it lit · Escape: close and show every slot"] .. "|r")
     else
         frame.status:SetText(GREY .. L["Enter: open their bags · Right-click: choose whose · Shift+Enter: link in chat"] .. "|r")
     end
@@ -620,8 +620,9 @@ local function CreateWindow()
     end)
     f:SetScript("OnHide", function()
         lastText = box:GetText() or ""
-        -- The bags window back to what was last picked, or as it was before.
-        if previewed ~= savedLit then ns.BagsRestore(savedLit, savedView) end
+        -- Closing the search ends it in the bags window too: nothing lit, every slot back
+        -- (owner, 2026-10-16), on the bags or bank of the last pick (not one only hovered).
+        if ns.BagsHighlight() then ns.BagsRestore(nil, savedView) end
         previewed = nil
         ns.BagsHold(false)
         box:ClearFocus()

@@ -295,7 +295,7 @@ test("after the arrow keys scroll the list, the mouse selects the item it's on, 
     eq(GameTooltip:GetOwner(), rows[2])
 end)
 
-test("with the bags window open the search works on it: that character only, beside it, lit as you go; Escape puts it back", function()
+test("with the bags window open the search works on it: that character only, beside it, lit as you go; closing it clears what's lit", function()
     local ns = searchStart()
     wow.item(2592, "Wool Cloth", {})
     AltsForeverDB.chars["Tarn Moon"].bank = { [2592] = 4 }
@@ -340,11 +340,12 @@ test("with the bags window open the search works on it: that character only, bes
     box.scripts.OnEnterPressed(box)
     eq(f:IsShown(), true, "still open for the next one")
     eq(ns.BagsHighlight(), 2589, "kept")
-    -- Looking at another, then closing: back to the one picked.
+    -- Looking at another (in the bank), then closing: nothing lit, back in the bags of the pick.
     box.scripts.OnArrowPressed(box, "DOWN")
     eq(ns.BagsHighlight(), 2592)
     box.scripts.OnEscapePressed(box)
-    eq(ns.BagsHighlight(), 2589, "the pick stays lit")
+    eq(ns.BagsHighlight(), nil, "closing the search clears it")
+    eq(bags:IsShown(), true, "the bags window stays")
     eq(select(2, ns.BagsState()), "bags")
     assert(bags.who.text:find("Tarn Moon", 1, true))
     -- All characters: Aldric's linen too; an item Tarn hasn't got is lit all the same, not here.
@@ -352,11 +353,13 @@ test("with the bags window open the search works on it: that character only, bes
     f.widen.scripts.OnClick(f.widen)
     eq(f.title.text, "Search your characters")
     eq(f.widen:IsShown(), false)
+    searchType("linen")
+    box.scripts.OnEnterPressed(box)
     searchType("silk")
     eq(ns.BagsHighlight(), 4306, "Tarn's silk is in the mail: lit anyway")
     eq(bags.stop.text, "not here")
     assert(bags.who.text:find("Tarn Moon", 1, true), "still Tarn")
-    -- Nothing matching: the bags as they were.
+    -- Nothing matching: back to the one picked.
     searchType("zzz")
     eq(ns.BagsHighlight(), 2589)
     -- @craft is about everyone: it widens by itself.
