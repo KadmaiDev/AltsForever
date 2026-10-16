@@ -193,6 +193,7 @@ end
 -- panel texture with 25% black over it. The file isn't part of the API: if it ever goes, the
 -- texture draws nothing and the shell shows through.
 local BAGS_BG = "Interface\\AddOns\\EllesmereUI\\media\\modern_blizz.png"
+local TITLE_STRIP = 24 -- the window template's title bar
 
 function ns.SkinBagsWindow(f)
     if not (skin and _G.EUI_MainBagFrame) or f.euiBg then return end
@@ -203,7 +204,14 @@ function ns.SkinBagsWindow(f)
     local shade = f:CreateTexture(nil, "BACKGROUND", nil, 7)
     shade:SetAllPoints(bg)
     shade:SetColorTexture(0, 0, 0, 0.25)
-    f.euiBg = bg
+    -- A dark strip behind the title, as their header has (half black; owner, 2026-10-16:
+    -- the texture over the whole window had covered the shell's title bar).
+    local strip = f:CreateTexture(nil, "BORDER", nil, -8)
+    strip:SetPoint("TOPLEFT", bg, "TOPLEFT")
+    strip:SetPoint("TOPRIGHT", bg, "TOPRIGHT")
+    strip:SetHeight(TITLE_STRIP)
+    strip:SetColorTexture(0, 0, 0, 0.5)
+    f.euiBg, f.euiStrip = bg, strip
 end
 
 -- A section heading in the bags window: EllesmereUI's are light grey, not gold.

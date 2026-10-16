@@ -73,6 +73,9 @@ test("with EllesmereUI's bags in use, the bags window has their background", fun
     local bg = AltsForeverBagsFrame.euiBg
     assert(bg, "drawn")
     eq(bg.texture, "Interface\\AddOns\\EllesmereUI\\media\\modern_blizz.png")
+    local strip = AltsForeverBagsFrame.euiStrip
+    assert(strip, "a dark strip behind the title, as their header has")
+    eq(strip.point[2], bg)
     EUI_MainBagFrame = nil
 end)
 
