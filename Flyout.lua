@@ -1,11 +1,11 @@
--- Alts Forever: upgrades your characters can craft, on the character sheet.
---  * Under the game's equipment flyout (hold Alt over a slot): the flyout lists what's in
---    your bags; below it, a row of what you or your alts can craft that would be an
---    upgrade in that slot (Upgrades.lua picks them). A frame of our own anchored to the
---    flyout: nothing is added to Blizzard's flyout, whose buttons equip items.
---  * On the slots themselves: a small anvil where one can be crafted that you can wear now
---    and that binds when equipped (so whoever makes it can mail it), and hovering the slot
---    lists the best few (owner, 2026-10-16).
+-- Alts Forever: upgrades your characters can craft, on the character sheet. A small anvil
+-- button sits just outside a slot (left of the left column, right of the right column,
+-- below the weapons; the inner sides can hold a UI addon's stat text) when you or one of
+-- your characters who can mail you can craft an upgrade for it that you can wear now and
+-- that binds when equipped (owner, 2026-10-16). Hover it for the best few; click it for
+-- all of them as item buttons beside it. Upgrades.lua picks them (ns.CraftableUpgrades).
+-- (Before, the list sat under the game's Alt-hover equipment flyout; the owner preferred
+-- a button to click.)
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
@@ -13,18 +13,37 @@ local L = ns.L
 local floor, min, max = math.floor, math.min, math.max
 local issecretvalue = issecretvalue or function() return false end
 
-local MAX = 10     -- items shown
-local PER_ROW = 5  -- as many as a row of the game's flyout
+local MAX = 10     -- items in the panel
+local PER_ROW = 5
 local SIZE, GAP, PAD, TITLE = 37, 4, 6, 18
 local BORDER = "Interface\\Common\\WhiteIconFrame"
+local ANVIL = "Interface\\Minimap\\Tracking\\Repair"
+local GLYPH = 18
+local SHOWN_IN_TOOLTIP = 3
 
-local strip
+-- The character sheet's slot buttons, by the side of the sheet they're on.
+local SIDES = {
+    left = { "Head", "Neck", "Shoulder", "Back", "Chest", "Wrist" },
+    right = { "Hands", "Waist", "Legs", "Feet", "Finger0", "Finger1", "Trinket0", "Trinket1" },
+    bottom = { "MainHand", "SecondaryHand", "Ranged" },
+}
+
+local glyphs = {}  -- slot button -> our anvil button
+local bySlot = {}  -- slot -> wearable, bind-on-equip craftable upgrades, best first
+local all = {}
+local dollKey, dollRetry = nil, false
+local panel
 local buttons = {}
-local list = {}
-local shownKey -- what the strip shows now (slot and everything the list depends on)
-local retrying = false
 
-local function Enter(b)
+local function GainText(e)
+    if e.gain ~= math.huge then return "+" .. floor(e.gain + 0.5) .. "%" end
+    return e.empty and L["empty slot"] or L["big upgrade"]
+end
+
+---------------------------------------------------------------------------
+-- The panel of item buttons
+---------------------------------------------------------------------------
+local function ItemEnter(b)
     local e = b.entry
     if not e then return end
     GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
@@ -34,15 +53,15 @@ local function Enter(b)
     GameTooltip:Show()
 end
 
-local function Click(b)
+local function ItemClick(b)
     -- Shift-click links the item in chat, like the game's own buttons.
     if b.entry and IsModifiedClick() then HandleModifiedItemClick(b.entry.link) end
 end
 
-local function Button(i)
+local function ItemButton(i)
     local b = buttons[i]
     if b then return b end
-    b = CreateFrame("Button", nil, strip)
+    b = CreateFrame("Button", nil, panel)
     b:SetSize(SIZE, SIZE)
     b.icon = b:CreateTexture(nil, "ARTWORK")
     b.icon:SetAllPoints()
@@ -54,64 +73,51 @@ local function Button(i)
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.15)
-    b:SetScript("OnEnter", Enter)
+    b:SetScript("OnEnter", ItemEnter)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    b:SetScript("OnClick", Click)
+    b:SetScript("OnClick", ItemClick)
     ns.SkinSlot(b)
     buttons[i] = b
     return b
 end
 
-local function Build()
-    strip = CreateFrame("Frame", "AltsForeverCraftFlyout", UIParent)
-    strip:SetFrameStrata(EquipmentFlyoutFrame:GetFrameStrata() or "HIGH")
-    strip:SetFrameLevel((EquipmentFlyoutFrame:GetFrameLevel() or 0) + 5)
-    local bg = strip:CreateTexture(nil, "BACKGROUND")
+local function BuildPanel()
+    panel = CreateFrame("Frame", "AltsForeverCraftPanel", UIParent)
+    panel:SetFrameStrata("DIALOG")
+    panel:SetClampedToScreen(true)
+    local bg = panel:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
-    bg:SetColorTexture(0, 0, 0, 0.8)
-    strip.title = strip:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    strip.title:SetPoint("TOPLEFT", PAD, -PAD + 1)
-    strip.title:SetText(L["Your characters can craft"])
-    ns.SkinText(strip.title)
-    strip:Hide()
+    bg:SetColorTexture(0, 0, 0, 0.85)
+    panel.title = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    panel.title:SetPoint("TOPLEFT", PAD, -PAD + 1)
+    panel.title:SetText(L["Your characters can craft"])
+    ns.SkinText(panel.title)
+    panel:Hide()
 end
 
-local function Hide()
-    shownKey = nil
-    if strip then strip:Hide() end
-end
-
-local function Fill(slot)
-    if not ns.UpgradesOn() then return Hide() end
-    -- The flyout can be shown again and again while it's open: work the list out only
-    -- when the slot, your gear, recipes or level changed.
-    local key = slot .. ":" .. ns.UpgradesVersion() .. ":" .. (ns.craftVersion or 0) .. ":" .. (ns.char.level or 0)
-    if key == shownKey and strip and strip:IsShown() then return end
-    local pending
-    list, pending = ns.CraftableUpgrades(slot, list)
-    shownKey = not pending and key or nil
-    if pending and not retrying and C_Timer and C_Timer.After then
-        -- Item data on its way: once more in a second.
-        retrying = true
-        C_Timer.After(1, function()
-            retrying = false
-            if EquipmentFlyoutFrame:IsShown() and strip and strip.slot == slot then Fill(slot) end
-        end)
+local function HidePanel()
+    if panel then
+        panel:Hide()
+        panel.glyph = nil
     end
-    local n = min(#list, MAX)
-    if n == 0 then return Hide() end
-    if not strip then Build() end
-    strip.slot = slot
+end
+
+-- Shows the panel beside a glyph, outwards from the sheet; false if there's nothing.
+local function ShowPanel(glyph)
+    local list = bySlot[glyph.slot]
+    local n = list and min(#list, MAX) or 0
+    if n == 0 then return HidePanel() end
+    if not panel then BuildPanel() end
+    panel.glyph = glyph
     for i = 1, n do
-        local e, b = list[i], Button(i)
+        local e, b = list[i], ItemButton(i)
         b.entry = e
         b.icon:SetTexture(C_Item.GetItemIconByID(e.id))
-        b.icon:SetDesaturated(e.at ~= nil) -- not until a level or few from now
         local q = C_Item.GetItemQualityByID(e.id)
         local color = q and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q]
         if color then b.border:SetVertexColor(color.r, color.g, color.b) end
         b.border:SetShown(color ~= nil)
-        b.gain:SetText(e.gain ~= math.huge and "+" .. floor(e.gain + 0.5) .. "%" or "")
+        b.gain:SetText(e.gain ~= math.huge and GainText(e) or "")
         b:ClearAllPoints()
         local col, row = (i - 1) % PER_ROW, floor((i - 1) / PER_ROW)
         b:SetPoint("TOPLEFT", PAD + col * (SIZE + GAP), -(PAD + TITLE + row * (SIZE + GAP)))
@@ -122,44 +128,74 @@ local function Fill(slot)
         buttons[i]:Hide()
     end
     local cols, rows = min(n, PER_ROW), floor((n - 1) / PER_ROW) + 1
-    local titleWidth = strip.title:GetStringWidth()
+    local titleWidth = panel.title:GetStringWidth()
     if type(titleWidth) ~= "number" or issecretvalue(titleWidth) then titleWidth = 0 end
-    strip:SetSize(max(PAD * 2 + cols * (SIZE + GAP) - GAP, titleWidth + PAD * 2),
+    panel:SetSize(max(PAD * 2 + cols * (SIZE + GAP) - GAP, titleWidth + PAD * 2),
         PAD * 2 + TITLE + rows * (SIZE + GAP) - GAP)
-    strip:ClearAllPoints()
-    strip:SetPoint("TOPLEFT", EquipmentFlyoutFrame.buttonFrame or EquipmentFlyoutFrame, "BOTTOMLEFT", 0, -2)
-    strip:Show()
-end
-
--- The flyout opened (or was refreshed) for a slot button: its ID is the inventory slot.
-local function OnFlyout(itemButton)
-    local slot = type(itemButton) == "table" and itemButton.GetID and itemButton:GetID()
-    if issecretvalue(slot) then return end
-    if type(slot) ~= "number" or slot < 1 or slot > 19 or not ns.char then return Hide() end
-    Fill(slot)
+    panel:ClearAllPoints()
+    if glyph.side == "left" then
+        panel:SetPoint("TOPRIGHT", glyph, "TOPLEFT", -2, 0)
+    elseif glyph.side == "right" then
+        panel:SetPoint("TOPLEFT", glyph, "TOPRIGHT", 2, 0)
+    else
+        panel:SetPoint("TOP", glyph, "BOTTOM", 0, -2)
+    end
+    panel:Show()
 end
 
 ---------------------------------------------------------------------------
--- The slots on the character sheet
+-- The anvil buttons
 ---------------------------------------------------------------------------
-local SLOT_NAMES = { "Head", "Neck", "Shoulder", "Back", "Chest", "Wrist", "Hands", "Waist", "Legs", "Feet",
-    "Finger0", "Finger1", "Trinket0", "Trinket1", "MainHand", "SecondaryHand", "Ranged" }
-local MARK = "Interface\\Minimap\\Tracking\\Repair" -- the anvil
-local SHOWN_IN_TOOLTIP = 3
-local marks = {}  -- our anvil texture per slot button
-local bySlot = {} -- slot -> wearable, bind-on-equip craftable upgrades, best first
-local all = {}
-local dollKey, dollRetry = nil, false
-
-local function Mark(b)
-    local m = b:CreateTexture(nil, "OVERLAY", nil, 7)
-    m:SetSize(16, 16)
-    m:SetPoint("TOPRIGHT", b, "TOPRIGHT", 3, 3)
-    m:SetTexture(MARK)
-    marks[b] = m
-    return m
+local function GlyphEnter(g)
+    local list = bySlot[g.slot]
+    if not list then return end
+    GameTooltip:SetOwner(g, g.side == "left" and "ANCHOR_LEFT" or "ANCHOR_RIGHT")
+    GameTooltip:AddLine(L["Your characters can craft"], 1, 0.82, 0)
+    for i = 1, min(#list, SHOWN_IN_TOOLTIP) do
+        local e = list[i]
+        GameTooltip:AddDoubleLine(e.link, "|cff20ff20" .. GainText(e) .. "|r · " .. ns.ListName(e.key, ns.db.chars[e.key]), 1, 1, 1, 1, 1, 1)
+    end
+    GameTooltip:AddLine(L["Click: show them"], 1, 1, 1)
+    GameTooltip:Show()
 end
 
+local function GlyphClick(g)
+    GameTooltip:Hide()
+    if panel and panel:IsShown() and panel.glyph == g then return HidePanel() end
+    ShowPanel(g)
+end
+
+local function Glyph(b, side)
+    local g = glyphs[b]
+    if g then return g end
+    g = CreateFrame("Button", nil, b)
+    g:SetSize(GLYPH, GLYPH)
+    g:SetFrameLevel((b:GetFrameLevel() or 1) + 5)
+    if side == "left" then
+        g:SetPoint("RIGHT", b, "LEFT", -2, 0)
+    elseif side == "right" then
+        g:SetPoint("LEFT", b, "RIGHT", 2, 0)
+    else
+        g:SetPoint("TOP", b, "BOTTOM", 0, -2)
+    end
+    g.icon = g:CreateTexture(nil, "ARTWORK")
+    g.icon:SetAllPoints()
+    g.icon:SetTexture(ANVIL)
+    local hl = g:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetTexture(ANVIL)
+    hl:SetBlendMode("ADD")
+    g.side = side
+    g:SetScript("OnEnter", GlyphEnter)
+    g:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    g:SetScript("OnClick", GlyphClick)
+    glyphs[b] = g
+    return g
+end
+
+---------------------------------------------------------------------------
+-- Working out which slots get one
+---------------------------------------------------------------------------
 local function RefreshDoll()
     if not (ns.char and PaperDollFrame and PaperDollFrame:IsVisible()) then return end
     local on = ns.UpgradesOn()
@@ -181,16 +217,27 @@ local function RefreshDoll()
         end
     end
     dollKey = not pending and key or nil
-    for _, name in ipairs(SLOT_NAMES) do
-        local b = _G["Character" .. name .. "Slot"]
-        local slot = b and b.GetID and b:GetID()
-        if type(slot) == "number" then
-            local has = bySlot[slot] ~= nil
-            local m = marks[b] or (has and Mark(b))
-            if m then m:SetShown(has) end
+    for side, names in pairs(SIDES) do
+        for _, name in ipairs(names) do
+            local b = _G["Character" .. name .. "Slot"]
+            local slot = b and b.GetID and b:GetID()
+            if type(slot) == "number" and not issecretvalue(slot) then
+                local has = bySlot[slot] ~= nil
+                local g = glyphs[b] or (has and Glyph(b, side))
+                if g then
+                    g.slot = slot
+                    g:SetShown(has)
+                end
+            end
         end
     end
+    -- The panel follows: its slot's list changed, or there's none now.
+    if panel and panel:IsShown() then
+        local g = panel.glyph
+        if g and g:IsShown() then ShowPanel(g) else HidePanel() end
+    end
     if pending and not dollRetry and C_Timer and C_Timer.After then
+        -- Item data on its way: once more in a second.
         dollRetry = true
         C_Timer.After(1, function()
             dollRetry = false
@@ -200,32 +247,11 @@ local function RefreshDoll()
 end
 ns.CharacterSheetChanged = RefreshDoll
 
--- Hovering a marked slot: the best few under the game's own tooltip.
-local function SlotEnter(b)
-    local slot = b:GetID()
-    local list = type(slot) == "number" and bySlot[slot]
-    if not list or not ns.UpgradesOn() or GameTooltip:GetOwner() ~= b then return end
-    GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(L["Your characters can craft"], 1, 0.82, 0)
-    for i = 1, min(#list, SHOWN_IN_TOOLTIP) do
-        local e = list[i]
-        local gain = e.gain ~= math.huge and "+" .. floor(e.gain + 0.5) .. "%" or (e.empty and L["empty slot"] or L["big upgrade"])
-        GameTooltip:AddDoubleLine(e.link, "|cff20ff20" .. gain .. "|r · " .. ns.ListName(e.key, ns.db.chars[e.key]), 1, 1, 1, 1, 1, 1)
-    end
-    GameTooltip:Show()
+function ns.StartFlyout()
+    if not PaperDollFrame then return end
+    PaperDollFrame:HookScript("OnShow", RefreshDoll)
+    PaperDollFrame:HookScript("OnHide", HidePanel)
 end
 
-function ns.StartFlyout()
-    if type(EquipmentFlyout_Show) == "function" and EquipmentFlyoutFrame then
-        hooksecurefunc("EquipmentFlyout_Show", OnFlyout)
-        EquipmentFlyoutFrame:HookScript("OnHide", Hide)
-    end
-    if PaperDollFrame then
-        PaperDollFrame:HookScript("OnShow", RefreshDoll)
-        -- The slots' own OnEnter scripts were set before we loaded, so hook each button.
-        for _, name in ipairs(SLOT_NAMES) do
-            local b = _G["Character" .. name .. "Slot"]
-            if b and b.HookScript then b:HookScript("OnEnter", SlotEnter) end
-        end
-    end
-end
+-- For tests: the anvil button beside a slot button, if it has one.
+function ns.CraftGlyph(b) return glyphs[b] end

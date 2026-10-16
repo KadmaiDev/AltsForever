@@ -1,7 +1,6 @@
 ## Alts Forever (next)
 
-- **Craftable upgrades on the character sheet:** hold Alt over a gear slot and, under the game's list of items in your bags, Alts Forever shows what you or your alts can craft that would be an upgrade for that slot, best first. Armour is only the heaviest type you wear (no leather for a warrior), items that bind on pickup only if you can craft them yourself, and only from characters who can mail you. Hover one to see who crafts it.
-- **Anvils on the character sheet:** a slot gets a small anvil when you or an alt can craft an upgrade for it that you can wear now and that binds when equipped. Hover the slot to see the best few and who makes them.
+- **Craftable upgrades on the character sheet:** a small anvil appears beside a gear slot when you or one of your alts can craft an upgrade for it that you can wear now and that binds when equipped. Armour is only the heaviest type you wear (no leather for a warrior), and only characters who can mail you count. Hover the anvil to see the best few and who makes them; click it to see them all (shift-click one to link it).
 
 ## Alts Forever 0.13.0
 
