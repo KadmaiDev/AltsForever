@@ -101,6 +101,7 @@ test("the character sheet puts an anvil beside slots with a craftable upgrade yo
     hands.scripts.OnClick(hands)
     PaperDollFrame:Hide()
     eq(panel:IsShown(), false, "closes with the character sheet")
+    PaperDollFrame:Show()
     -- Their own setting: /af anvils, the menu. Show upgrades (the tooltips) doesn't touch them.
     ns.SetUpgrades(false)
     eq(hands:IsShown(), true, "tooltips' upgrades off: the anvils stay")
@@ -112,4 +113,34 @@ test("the character sheet puts an anvil beside slots with a craftable upgrade yo
     wow.menuItem("Show craftable upgrades on the character sheet").setSelected()
     eq(AltsForeverDB.anvilsOff, nil)
     eq(hands:IsShown(), true, "back on")
+end)
+
+test("with the Gamepad UI on, the character sheet's anvils and their panel are built while it's closed; the panel takes focus", function()
+    local ns = flyStart()
+    PaperDollFrame:Hide()
+    wow.gamepadUI = true
+    wow.fire("INPUT_DEVICE_INTERFACE_TRANSITION", 1, 0)
+    local hands = ns.CraftGlyph(CharacterHandsSlot)
+    assert(hands, "made")
+    eq(ns.CraftGlyph(CharacterHeadSlot):IsShown(), false)
+    local panel = AltsForeverCraftPanel
+    local made = 0
+    for _, child in ipairs({ panel:GetChildren() }) do
+        if child.icon then made = made + 1 end
+    end
+    eq(made, 10, "every item button")
+    -- Opening the sheet makes nothing new, and shows the anvils that have upgrades.
+    local frames = #wow.frames
+    PaperDollFrame:Show()
+    eq(#wow.frames, frames, "nothing created with the sheet open")
+    eq(hands:IsShown(), true)
+    eq(ns.CraftGlyph(CharacterHeadSlot):IsShown(), false, "the helm: not wearable yet")
+    -- A on the anvil: the panel opens and reports to the focus manager; B closes it.
+    wow.focus = {}
+    hands.scripts.OnClick(hands)
+    eq(focusCalls(), "shown AltsForeverCraftPanel")
+    eq(panel:SmartNavigationCloseHandler(), true)
+    eq(panel:IsShown(), false)
+    eq(focusCalls(), "hidden AltsForeverCraftPanel")
+    wow.gamepadUI = false
 end)

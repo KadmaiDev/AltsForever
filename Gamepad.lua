@@ -90,11 +90,15 @@ function AltsForever_Binding(which)
 end
 
 function ns.StartGamepad()
-    -- With the Gamepad UI on, the Options page is built now, while the Options window is
-    -- closed: Blizzard's navigator rebuilds an open window whenever a frame is created in
-    -- it, from the creating addon's code, which can leave its bindings tainted.
+    -- With the Gamepad UI on, the Options page and the character sheet's anvils are built
+    -- now, while those windows are closed: Blizzard's navigator rebuilds an open window
+    -- whenever a frame is created in it, from the creating addon's code, which can leave its
+    -- bindings tainted.
     local function Prepare()
-        if ns.GamepadUI() and not InCombatLockdown() then ns.PrebuildOptions() end
+        if ns.GamepadUI() and not InCombatLockdown() then
+            ns.PrebuildOptions()
+            ns.PrebuildAnvils()
+        end
     end
     ns.On("INPUT_DEVICE_INTERFACE_TRANSITION", Prepare)
     Prepare()

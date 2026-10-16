@@ -280,7 +280,16 @@ local function BuildCanvas(f)
     slider:SetOrientation("HORIZONTAL")
     slider:SetSize(200, 16)
     slider:SetHitRectInsets(0, 0, -4, -4)
-    slider:SetPoint("TOPLEFT", sizeLabel, "BOTTOMLEFT", 0, -10)
+    -- - and + either side, a step each: a controller's D-pad can't drag a slider.
+    local smaller = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    smaller:SetSize(24, 22)
+    smaller:SetPoint("TOPLEFT", sizeLabel, "BOTTOMLEFT", 0, -8)
+    smaller:SetText("-")
+    slider:SetPoint("LEFT", smaller, "RIGHT", 8, 0)
+    local bigger = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    bigger:SetSize(24, 22)
+    bigger:SetPoint("LEFT", slider, "RIGHT", 8, 0)
+    bigger:SetText("+")
     local track = slider:CreateTexture(nil, "BACKGROUND")
     track:SetPoint("LEFT")
     track:SetPoint("RIGHT")
@@ -294,21 +303,31 @@ local function BuildCanvas(f)
     slider:SetValueStep(5)
     slider:SetObeyStepOnDrag(true)
     local scaleText = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    scaleText:SetPoint("LEFT", slider, "RIGHT", 10, 0)
+    scaleText:SetPoint("LEFT", bigger, "RIGHT", 10, 0)
     slider:SetScript("OnValueChanged", function(_, value)
         if f.filling then return end
         scaleText:SetText(ns.ScaleText(ns.SetWindowScale(value / 100)))
         f.followEui:SetChecked(false)
     end)
-    slider:SetScript("OnEnter", function(self)
+    local function SizeTooltip(self)
         Tooltip(self, L["Window size"], L["Makes Alts Forever's windows (overview, bags, reputation, gear, icons, craftable upgrades) bigger or smaller, on top of the game's UI scale. Tooltips follow the game's. Same as /af scale."])
-    end)
-    slider:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+    for _, b in ipairs({ slider, smaller, bigger }) do
+        b:SetScript("OnEnter", SizeTooltip)
+        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+    for b, step in pairs({ [smaller] = -0.05, [bigger] = 0.05 }) do
+        b:SetScript("OnClick", function()
+            ns.SetWindowScale(ns.WindowScale() + step)
+            RefreshCanvas(f)
+        end)
+        ns.SkinButton(b)
+    end
     -- With EllesmereUI: follow its Window Scale (the default) or not. Moving the slider
     -- chooses our own size, which unticks it.
     local follow = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
     follow:SetSize(26, 26)
-    follow:SetPoint("TOPLEFT", slider, "BOTTOMLEFT", -2, -8)
+    follow:SetPoint("TOPLEFT", smaller, "BOTTOMLEFT", -2, -8)
     local followLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     followLabel:SetPoint("LEFT", follow, "RIGHT", 4, 0)
     followLabel:SetText(L["Same as EllesmereUI's Window Scale"])
@@ -324,9 +343,9 @@ local function BuildCanvas(f)
     ns.SkinText(followLabel)
     ns.SkinText(sizeLabel)
     ns.SkinText(scaleText)
-    f.slider, f.scaleText, f.followEui = slider, scaleText, follow
+    f.slider, f.scaleText, f.followEui, f.smaller, f.bigger = slider, scaleText, follow, smaller, bigger
     -- The icons below sit under the tick box only when it's there.
-    above = ns.HasEllesmereScale() and follow or slider
+    above = ns.HasEllesmereScale() and follow or smaller
     -- Tooltip icons: each place's current icon (or word) and a Change... button.
     local heading = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     heading:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 2, -18)

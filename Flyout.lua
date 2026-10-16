@@ -91,7 +91,12 @@ local function BuildPanel()
     panel.title:SetPoint("TOPLEFT", PAD, -PAD + 1)
     panel.title:SetText(L["Your characters can craft"])
     ns.SkinText(panel.title)
+    -- Every item button now: one made while the panel is open would have the controller's
+    -- navigator rebuild it from our code.
+    for i = 1, MAX do ItemButton(i):Hide() end
     panel:Hide()
+    -- With a controller, A on an anvil opens it with focus inside, and B closes it.
+    ns.GamepadWindow(panel)
     ns.ScaleWindow(panel)
 end
 
@@ -267,6 +272,20 @@ ns.CharacterSheetChanged = RefreshDoll
 function ns.SetAnvils(on)
     ns.db.anvilsOff = not on or nil
     RefreshDoll()
+end
+
+-- With the Gamepad UI on (Gamepad.lua): every anvil and the panel made while the character
+-- sheet is closed. Blizzard's navigator rebuilds an open window whenever a frame is created
+-- in it, from the creating addon's code, which can taint its bindings (as with the Options page).
+function ns.PrebuildAnvils()
+    if not PaperDollFrame or PaperDollFrame:IsVisible() then return end
+    for side, names in pairs(SIDES) do
+        for _, name in ipairs(names) do
+            local b = _G["Character" .. name .. "Slot"]
+            if b and not glyphs[b] then Glyph(b, side):Hide() end
+        end
+    end
+    if not panel then BuildPanel() end
 end
 
 function ns.StartFlyout()

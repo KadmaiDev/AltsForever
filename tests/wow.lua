@@ -289,6 +289,12 @@ function M.load(files)
     function frameMethods:GetAlpha() return self.alpha or 1 end
     function frameMethods:SetVertexColor(r, g, b) self.tint = { r, g, b } end
     function frameMethods:IsShown() return self.shown end
+    function frameMethods:IsVisible()
+        if not self.shown then return false end
+        local p = self.parent
+        if p and p.IsVisible and p ~= UIParent then return p:IsVisible() end
+        return true
+    end
     function frameMethods:GetFrameLevel() return self.level or 1 end
     function frameMethods:SetFrameLevel(level) self.level = level end
     function frameMethods:SetText(text) self.text = text end
