@@ -193,6 +193,16 @@ test("a name still loading is asked for, and the search runs again a second late
 end)
 
 -- The rows of the last menu, by text.
+-- Opens the search's character menu and clicks the entry whose text contains `text`.
+function searchTick(text)
+    local f = AltsForeverSearchFrame
+    f.chars.scripts.OnClick(f.chars)
+    for _, item in ipairs(wow.menu.items) do
+        if item.kind == "checkbox" and tostring(item.text):find(text, 1, true) then return item.setSelected() end
+    end
+    error("no tick box " .. text)
+end
+
 function menuTexts()
     local out = {}
     for _, item in ipairs(wow.menu.items) do out[#out + 1] = tostring(item.text) end
@@ -310,13 +320,14 @@ test("with the bags window open the search works on it: that character only, bes
     local f, box = AltsForeverSearchFrame, AltsForeverSearchBox
     eq(f:IsShown(), true)
     assert(f.title.text:find("Tarn Moon", 1, true), f.title.text)
-    eq(f.widen:IsShown(), true)
+    eq(f.chars.text, "[DRUID]Tarn Moon", "the character menu says whose")
     eq(f.point[2], bags, "docked beside the bags window")
-    -- Only Tarn's bags and bank (not the silk in the mail, not Aldric's), Tarn's numbers.
+    -- Only what Tarn has (or can make), Tarn's numbers: not Aldric's, not Smith's crafts.
     searchType("cloth")
-    eq(searchRows(), "Linen Cloth (20) = [DRUID]Tarn 20, [MAGE]Aldric 5\n"
+    eq(searchRows(), "Linen Cloth (20) = [DRUID]Tarn 20\n"
         .. "Wool Cloth (4) = [DRUID]Tarn 4\n"
-        .. "Bolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
+        .. "Bolt of Linen Cloth (3) = [DRUID]Tarn 3\n"
+        .. "Silk Cloth (2) = [DRUID]Tarn 2")
     -- The selected one lit as you go, on Tarn, switching to the bank for the wool.
     eq(ns.BagsHighlight(), 2589)
     box.scripts.OnArrowPressed(box, "DOWN")
@@ -350,9 +361,9 @@ test("with the bags window open the search works on it: that character only, bes
     assert(bags.who.text:find("Tarn Moon", 1, true))
     -- All characters: Aldric's linen too; an item Tarn hasn't got is lit all the same, not here.
     bags.searchButton.scripts.OnClick(bags.searchButton)
-    f.widen.scripts.OnClick(f.widen)
+    searchTick("All characters")
     eq(f.title.text, "Search your characters")
-    eq(f.widen:IsShown(), false)
+    eq(f.chars.text, "All characters", "still there to narrow it again")
     searchType("linen")
     box.scripts.OnEnterPressed(box)
     searchType("silk")
@@ -362,12 +373,14 @@ test("with the bags window open the search works on it: that character only, bes
     -- Nothing matching: back to the one picked.
     searchType("zzz")
     eq(ns.BagsHighlight(), 2589)
-    -- @craft is about everyone: it widens by itself.
+    -- @craft: what the ticked characters can make. Tarn makes no gloves; ticking Smith too does.
     f:Hide()
     bags.searchButton.scripts.OnClick(bags.searchButton)
     assert(f.title.text:find("Tarn Moon", 1, true))
     searchType("@craft gloves")
-    eq(f.title.text, "Search your characters")
+    eq(searchRows(), "")
+    searchTick("Smith")
+    eq(f.chars.text, "2 characters")
     eq(searchRows(), "Linked Gloves = can craft: [PALADIN]Smith (Blacksmithing) · none owned")
     -- Bags window closed: opens in the middle again, for everyone.
     f:Hide()
@@ -384,7 +397,7 @@ test("a worn item opens their gear on the far side of the search from the bags w
     local bags = AltsForeverBagsFrame
     bags.searchButton.scripts.OnClick(bags.searchButton)
     local f, box = AltsForeverSearchFrame, AltsForeverSearchBox
-    f.widen.scripts.OnClick(f.widen)
+    searchTick("All characters")
     local screen = UIParent.width
     UIParent.width = 2560
     -- The search right of the bags window: the gear goes right of the search.
@@ -416,4 +429,34 @@ test("a worn item opens their gear on the far side of the search from the bags w
     bags:Hide()
     bags.GetLeft, f.GetLeft, f.GetRight = nil, nil, nil
     UIParent.width = screen
+end)
+
+test("the character menu: all, or any you tick; one ticked names them, several count them", function()
+    local ns = searchStart()
+    SlashCmdList.ALTSFOREVERSEARCH("linen")
+    local f = AltsForeverSearchFrame
+    eq(f.chars.text, "All characters")
+    f.chars.scripts.OnClick(f.chars)
+    -- Only characters tooltips show (Far Away is on another ruleset).
+    eq(menuTexts(), "All characters | nil | Realm | [MAGE]Aldric | [PALADIN]Smith | [DRUID]Tarn Moon")
+    eq(wow.menu.items[1].isSelected(), true)
+    -- Ticking one while all are searched: just them.
+    searchTick("Aldric")
+    eq(f.chars.text, "[MAGE]Aldric")
+    assert(f.title.text:find("Aldric", 1, true))
+    eq(searchRows(), "Linen Cloth (5) = [MAGE]Aldric 5")
+    f.chars.scripts.OnClick(f.chars)
+    eq(wow.menu.items[1].isSelected(), false)
+    eq(wow.menu.items[4].isSelected(), true)
+    searchTick("Tarn")
+    eq(f.chars.text, "2 characters")
+    eq(f.title.text, "Search your characters")
+    eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn 20, [MAGE]Aldric 5\n"
+        .. "Bolt of Linen Cloth (3) = [DRUID]Tarn 3")
+    -- Unticking both: all of them again.
+    searchTick("Aldric")
+    searchTick("Tarn")
+    eq(f.chars.text, "All characters")
+    assert(searchRows():find("can craft: [PALADIN]Smith", 1, true), "Smith's crafts back")
+    f:Hide()
 end)

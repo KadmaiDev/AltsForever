@@ -27,14 +27,20 @@ local pool, names     -- every item's lower-case name, and its name, while the w
 local matches = {}
 local selected, offset = 1, 0
 local retried
--- With the bags window open, the search works on it (owner, 2026-10-16): only the character
--- it shows (scopeKey; "All characters" widens it), docked beside it, and the selected item
--- lit there as you go (previewed; with nothing selected, back to the last pick: savedLit,
--- savedView). Closing the search clears what's lit. The last search is kept for the next
--- opening (this session only).
-local scopeKey, savedLit, savedView, previewed, docked
+-- Whose items: `only` = the characters ticked in the menu beside the box (a set of keys), or
+-- nil for all of them (owner, 2026-10-16: always there, several at once). With the bags
+-- window open, the search starts on the character it shows, docked beside it, and the
+-- selected item lit there as you go (previewed; with nothing selected, back to the last
+-- pick: savedLit, savedView). Closing the search clears what's lit. The last search is kept
+-- for the next opening (this session only).
+local only, savedLit, savedView, previewed, docked
 local lastText = ""
-local ApplyScope, Dock
+local ApplyScope, Dock, PickCharacters, Update
+
+-- A character the search counts: shown in tooltips, and ticked (or all are).
+local function Counted(key, c)
+    return not ns.Hidden(c) and (not only or only[key]) and true or false
+end
 
 local function ItemName(id)
     local name = C_Item.GetItemNameByID(id)
@@ -90,7 +96,7 @@ end
 local function Holders(id)
     local list, total = {}, 0
     for key, c in pairs(ns.db.chars) do
-        if not ns.Hidden(c) then
+        if Counted(key, c) then
             local n = 0
             for i = 1, #LOCS do
                 local t = c[LOCS[i]]
@@ -110,7 +116,7 @@ end
 local function Crafters(id)
     local list = {}
     for key, c in pairs(ns.db.chars) do
-        local crafts = not ns.Hidden(c) and c.crafts
+        local crafts = Counted(key, c) and c.crafts
         if crafts then
             for prof, items in pairs(crafts) do
                 if items[id] and ns.CraftProf(crafts, prof, id) == prof then
@@ -171,12 +177,6 @@ function ns.SearchMatches(text)
         filter = Filter(word)
         text = rest
     end
-    -- What can be made isn't in one character's bags: @craft searches everyone.
-    if filter == "craft" and scopeKey then
-        scopeKey = nil
-        if ApplyScope then ApplyScope() end
-    end
-    local scoped = scopeKey and ns.db.chars[scopeKey]
     if text == "" or not pool then return matches end
     local words = {}
     for w in text:gmatch("%S+") do words[#words + 1] = w end
@@ -197,20 +197,9 @@ function ns.SearchMatches(text)
                 end
             end
             e.count = filter == "mine" and e.mine or e.total
-            -- One character's bags and bank: theirs only, them first, the number theirs.
-            local here = 0
-            if scoped then
-                here = (scoped.bags and scoped.bags[e.id] or 0) + (scoped.bank and scoped.bank[e.id] or 0)
-                e.count = here
-                for i, h in ipairs(e.holders) do
-                    if h.key == scopeKey then
-                        table.insert(e.holders, 1, table.remove(e.holders, i))
-                        break
-                    end
-                end
-            end
-            if (filter ~= "owned" or e.total > 0) and (filter ~= "mine" or e.mine > 0)
-                and (filter ~= "craft" or #e.crafters > 0) and (not scoped or here > 0) then
+            -- Only what the ticked characters have or can make.
+            if (e.total > 0 or #e.crafters > 0) and (filter ~= "owned" or e.total > 0)
+                and (filter ~= "mine" or e.mine > 0) and (filter ~= "craft" or #e.crafters > 0) then
                 matches[#matches + 1] = e
             end
         end
@@ -479,7 +468,7 @@ Render = function()
     end
 end
 
-local function Update()
+Update = function()
     ns.SearchMatches(box:GetText())
     Render()
 end
@@ -528,7 +517,7 @@ local function CreateWindow()
     box = b
     b:SetHeight(24)
     b:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -32)
-    b:SetPoint("TOPRIGHT", f, "TOPRIGHT", -16, -32)
+    b:SetPoint("TOPRIGHT", f, "TOPRIGHT", -156, -32)
     b:SetAutoFocus(false)
     b:SetFontObject("GameFontHighlight")
     b:SetScript("OnTextChanged", Update)
@@ -540,26 +529,19 @@ local function CreateWindow()
     b:SetScript("OnTabPressed", function() Move(IsShiftKeyDown and IsShiftKeyDown() and -1 or 1) end)
     ns.SkinEditBox(b)
 
-    -- Searching one character's bags: back to all your characters.
-    local widen = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    widen:SetSize(112, 22)
-    widen:SetPoint("TOPRIGHT", f, "TOPRIGHT", -16, -33)
-    widen:SetText(L["All characters"])
-    widen:SetScript("OnClick", function()
-        scopeKey = nil
-        ApplyScope()
-        Update()
-        box:SetFocus()
-    end)
-    widen:SetScript("OnEnter", function(self)
+    -- Whose items: all your characters, or the ones ticked.
+    local chars = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    chars:SetSize(132, 22)
+    chars:SetPoint("TOPRIGHT", f, "TOPRIGHT", -16, -33)
+    chars:SetScript("OnClick", function(self) PickCharacters(self) end)
+    chars:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(L["Search all your characters instead."])
+        GameTooltip:AddLine(L["Whose items to search: all your characters, or the ones you tick."], 1, 1, 1, true)
         GameTooltip:Show()
     end)
-    widen:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    ns.SkinButton(widen)
-    widen:Hide()
-    f.widen = widen
+    chars:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ns.SkinButton(chars)
+    f.chars = chars
 
     for i = 1, ROWS do Row(i) end
     -- Paging arrows (a controller can't turn the mouse wheel), and the wheel.
@@ -638,19 +620,62 @@ local function CreateWindow()
     ns.ScaleWindow(f)
 end
 
--- One character's bags (the bags window is open on them), or all your characters.
+-- The title and the menu button say whose items: one character, several, or all.
 ApplyScope = function()
-    local c = scopeKey and ns.db.chars[scopeKey]
-    if c then
-        frame.title:SetText(L["Search %s"]:format(ns.ColoredName(scopeKey, c)))
-        box:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -136, -32)
-        frame.widen:Show()
-    else
-        scopeKey = nil
-        frame.title:SetText(L["Search your characters"])
-        box:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -16, -32)
-        frame.widen:Hide()
+    local n, one = 0, nil
+    for key in pairs(only or {}) do
+        if ns.db.chars[key] then
+            n, one = n + 1, key
+        else
+            only[key] = nil
+        end
     end
+    if n == 0 then only = nil end
+    if n == 1 then
+        local c = ns.db.chars[one]
+        frame.title:SetText(L["Search %s"]:format(ns.ColoredName(one, c)))
+        frame.chars:SetText(ns.ColoredName(one, c))
+    else
+        frame.title:SetText(L["Search your characters"])
+        frame.chars:SetText(n == 0 and L["All characters"] or L["%d characters"]:format(n))
+    end
+end
+
+local function Changed()
+    ApplyScope()
+    Update()
+end
+
+-- The menu: All characters, then a tick box per character (in the overview's order, headed
+-- by ruleset and faction as there). Ticking one while all are searched starts with just them.
+PickCharacters = function(owner)
+    MenuUtil.CreateContextMenu(owner, function(_, root)
+        root:CreateCheckbox(L["All characters"], function() return only == nil end, function()
+            only = nil
+            Changed()
+        end)
+        root:CreateDivider()
+        local chars = ns.db.chars
+        local byRealm, byFaction = ns.GroupParts()
+        local group
+        for _, key in ipairs(ns.OverviewOrder()) do
+            local c = chars[key]
+            if c and not ns.Hidden(c) then
+                if ns.overviewSplit and ns.GroupKey(c, byRealm, byFaction) ~= group then
+                    if group then root:CreateDivider() end
+                    group = ns.GroupKey(c, byRealm, byFaction)
+                    root:CreateTitle(ns.GroupLabel(c, byRealm, byFaction))
+                end
+                root:CreateCheckbox(ns.ListName(key, c), function() return only ~= nil and only[key] == true end,
+                    function()
+                        only = only or {}
+                        only[key] = not only[key] or nil
+                        if next(only) == nil then only = nil end
+                        Changed()
+                    end)
+            end
+        end
+    end)
 end
 
 -- Beside the bags window when it's open (right of it if there's room, else left), so
@@ -682,7 +707,9 @@ function ns.ToggleSearch(text)
     text = text and text:match("^%s*(.-)%s*$") or ""
     if frame:IsShown() and text == "" then return frame:Hide() end
     if not frame:IsShown() then
-        scopeKey = ns.BagsShownKey()
+        -- The bags window open: the character it shows; otherwise all of them.
+        local shown = ns.BagsShownKey()
+        only = shown and { [shown] = true } or nil
         savedLit, savedView = ns.BagsState()
         previewed = savedLit
         ApplyScope()
