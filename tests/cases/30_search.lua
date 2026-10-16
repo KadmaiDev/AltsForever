@@ -241,3 +241,24 @@ test("the highlight stays as you switch; the arrows step through everyone who ha
     assert(f.who.text:find("Tarn Moon", 1, true))
     eq(ns.BagsHighlight(), 2589)
 end)
+
+test("stepping through who has it keeps the bags window one height, so the arrows stay put", function()
+    local ns = searchStart()
+    -- Tarn's bags hold 30 different things (three rows), Aldric's bank one.
+    local bags = AltsForeverDB.chars["Tarn Moon"].bags
+    for id = 8001, 8030 do
+        wow.item(id, "Thing " .. id, {})
+        bags[id] = 1
+    end
+    ns.ShowBags("Aldric", "bank", 2589)
+    local f = AltsForeverBagsFrame
+    local height = f:GetHeight()
+    f.next.scripts.OnClick(f.next)
+    assert(f.who.text:find("Tarn Moon", 1, true))
+    eq(f:GetHeight(), height, "Tarn's three rows: same height")
+    f.next.scripts.OnClick(f.next)
+    eq(f:GetHeight(), height, "back on Aldric's one slot: same height")
+    -- Cleared: sized to what it shows again.
+    f.clear.scripts.OnClick(f.clear)
+    assert(f:GetHeight() < height, "shrinks to Aldric's bank")
+end)

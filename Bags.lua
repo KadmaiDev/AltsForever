@@ -308,9 +308,27 @@ local function MaxView()
     return max(h > 0 and floor(h * 0.7) - TOP - BOTTOM or 560, MIN_VIEW)
 end
 
+-- The slot area's height for a character's bags or bank (fills the shared lists, so only
+-- before Fill reads them).
+local function ContentHeight(c, which, split)
+    ns.BagsContents(c, which, split)
+    local y = 0
+    for n = 1, nSections do
+        local s = sections[n]
+        y = y + HEADER + ceil((s.to - s.from + 1) / cols) * (SIZE + GAP) + SECTION_GAP
+    end
+    return y
+end
+
+-- While an item is lit: the tallest slot area of everyone who has it. The window keeps that
+-- height as you step through them, so the arrows stay under the mouse (owner, 2026-10-16:
+-- the window resizing made them hard to click).
+local litHeight
+
 Place = function()
     -- While the player drags the grip, the window keeps the height they're dragging to.
-    local visible = sizing and max(frame:GetHeight() - TOP - BOTTOM, MIN_VIEW) or max(min(contentHeight, MaxView()), MIN_VIEW)
+    local want = max(contentHeight, litHeight or 0)
+    local visible = sizing and max(frame:GetHeight() - TOP - BOTTOM, MIN_VIEW) or max(min(want, MaxView()), MIN_VIEW)
     scroll = max(0, min(scroll, contentHeight - visible))
     frame.content:ClearAllPoints()
     frame.content:SetPoint("TOPLEFT", frame.holder, "TOPLEFT", 0, scroll)
@@ -329,6 +347,15 @@ function Fill()
         frame:SetWidth(WidthFor(cols))
     end
     local split = ns.db.bagsSplit and true or false
+    litHeight = nil
+    if lit then
+        local tallest = 0
+        for _, s in ipairs(Stops()) do
+            local sc = ns.db.chars[s.key]
+            if sc then tallest = max(tallest, ContentHeight(sc, s.view, split)) end
+        end
+        litHeight = tallest
+    end
     local how = ns.BagsContents(c, view, split)
     frame.who:SetText(ns.ColoredName(shownKey, c))
     for _, v in ipairs({ "bags", "bank" }) do
