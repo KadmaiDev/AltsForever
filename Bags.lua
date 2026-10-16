@@ -14,6 +14,7 @@ local GetItemIconByID = C_Item.GetItemIconByID
 local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
 
 local GREY = "|cff9d9d9d"
+local issecretvalue = issecretvalue or function() return false end
 local SIZE, GAP, PAD = 36, 3, 12
 -- Columns: set by the window's width (resize grip), remembered in db.bagsCols.
 local DEFAULT_COLS, MIN_COLS, MAX_COLS = 14, 10, 30
@@ -324,6 +325,15 @@ function Fill()
     else
         frame.info:SetText("")
     end
+    local name = lit and C_Item.GetItemNameByID(lit)
+    if lit then
+        if type(name) ~= "string" or issecretvalue(name) then name = "?" end
+        frame.clear.text:SetText(L["Showing: %s"]:format(name))
+        local w = frame.clear.text:GetStringWidth()
+        if type(w) == "number" and not issecretvalue(w) then frame.clear:SetWidth(w + 20) end
+    end
+    frame.clear:SetShown(lit ~= nil)
+    frame.info:SetShown(not lit)
     frame.seen:SetText(how and (GREY .. Seen(c, time()) .. "|r") or "")
     frame.money:SetText(c.money and GetCoinTextureString(c.money) or "")
 end
@@ -446,6 +456,47 @@ local function CreateWindow()
     f.money:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 14, 11)
     f.seen:SetPoint("RIGHT", f.money, "LEFT", -20, 0)
     for _, fs in ipairs({ f.empty, f.info, f.seen, f.money }) do ns.SkinText(fs) end
+
+    -- While the search has lit an item up: which one, in place of the free slots, and a
+    -- click back to every slot (owner, 2026-10-16: there was no way to clear it).
+    local clear = CreateFrame("Button", nil, f)
+    clear:SetSize(200, 16)
+    clear:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD + 2, 10)
+    clear.text = clear:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    clear.text:SetPoint("LEFT")
+    clear.x = clear:CreateTexture(nil, "ARTWORK")
+    clear.x:SetSize(14, 14)
+    clear.x:SetPoint("LEFT", clear.text, "RIGHT", 4, 0)
+    clear.x:SetTexture("Interface\\Buttons\\UI-StopButton")
+    clear:SetScript("OnClick", function()
+        lit = nil
+        Fill()
+    end)
+    clear:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["Click to show every slot again."])
+        GameTooltip:Show()
+    end)
+    clear:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ns.SkinText(clear.text)
+    clear:Hide()
+    f.clear = clear
+
+    -- Search button in the title bar, left of the close button (as the overview's).
+    local search = CreateFrame("Button", nil, f)
+    search:SetSize(16, 16)
+    search:SetPoint("TOPRIGHT", f, "TOPRIGHT", -28, -4)
+    search:SetNormalTexture("Interface\\Icons\\INV_Misc_Spyglass_02")
+    search:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    search:SetScript("OnClick", function() ns.ToggleSearch() end)
+    search:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["Search your characters"])
+        GameTooltip:AddLine(L["Find an item on any character, or who can craft it. Same as /afs."], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    search:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    f.searchButton = search
 
     -- Resize grip: width sets the columns (snapped to whole slots when let go), height
     -- how tall the window gets before it scrolls. Both are remembered.

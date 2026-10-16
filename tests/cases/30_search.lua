@@ -93,6 +93,24 @@ test("Enter opens the bags of whoever has it, lit up (you first); arrows move; S
     end
     eq(alpha[2996], 1, "lit")
     eq(alpha[2589], 0.25, "the rest dimmed")
+    -- Bottom left says what's lit, in place of the free slots; clicking it shows every slot again.
+    local clear = AltsForeverBagsFrame.clear
+    eq(clear:IsShown(), true)
+    eq(clear.text.text, "Showing: Bolt of Linen Cloth")
+    eq(AltsForeverBagsFrame.info:IsShown(), false)
+    clear.scripts.OnClick(clear)
+    eq(ns.BagsHighlight(), nil)
+    eq(clear:IsShown(), false)
+    eq(AltsForeverBagsFrame.info:IsShown(), true)
+    for _, slot in ipairs({ AltsForeverBagsFrame.content:GetChildren() }) do
+        if slot.id and slot:IsShown() then eq(slot.icon:GetAlpha(), 1, "every slot back") end
+    end
+    -- The bags window's own search button.
+    local search = AltsForeverBagsFrame.searchButton
+    search.scripts.OnClick(search)
+    eq(AltsForeverSearchFrame:IsShown(), true)
+    AltsForeverSearchFrame:Hide()
+    ns.ShowBags("Tarn Moon", "bags", 2996)
     AltsForeverBagsFrame:Hide()
     eq(ns.BagsHighlight(), nil, "closed: gone")
     -- Shift+Enter: linked (chat closed: one opens with it).

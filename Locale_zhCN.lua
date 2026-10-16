@@ -250,3 +250,5 @@ L["Enter: open their bags · Shift+Enter: link in chat"] = "回车:打开其背�
 L["/af search (or /afs), with or without a name, finds an item on any of your characters, or who can craft it."] = "/af search(或 /afs),可带名称,查找你任一角色身上的物品,或谁能制造它。"
 L["Search..."] = "搜索..."
 L["Find an item on any character, or who can craft it. Same as /afs."] = "查找任一角色身上的物品,或谁能制造它。等同于 /afs。"
+L["Showing: %s"] = "显示:%s"
+L["Click to show every slot again."] = "点击以重新显示所有格子。"

@@ -250,3 +250,5 @@ L["Enter: open their bags · Shift+Enter: link in chat"] = "Intro: abrir sus bol
 L["/af search (or /afs), with or without a name, finds an item on any of your characters, or who can craft it."] = "/af search (o /afs), con o sin nombre, encuentra un objeto en cualquiera de tus personajes, o quién puede fabricarlo."
 L["Search..."] = "Buscar..."
 L["Find an item on any character, or who can craft it. Same as /afs."] = "Encuentra un objeto en cualquier personaje, o quién puede fabricarlo. Igual que /afs."
+L["Showing: %s"] = "Mostrando: %s"
+L["Click to show every slot again."] = "Haz clic para volver a ver todas las casillas."
