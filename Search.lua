@@ -179,7 +179,9 @@ function ns.SearchMatches(text)
     return matches
 end
 
--- The row's second line: how many and who has them, then who can make it.
+-- The row's second line: who has how many, then who can make it. The total sits apart,
+-- at the end of the name's line (owner, 2026-10-16: "1 Sabine 1" read as two numbers
+-- around her name).
 function ns.SearchDetail(e)
     local parts = {}
     if e.total > 0 then
@@ -189,7 +191,7 @@ function ns.SearchDetail(e)
             who[i] = ns.ListShortName(h.key, h.c) .. " " .. h.n
         end
         if #e.holders > SHOWN_HOLDERS then who[#who + 1] = L["+%d more"]:format(#e.holders - SHOWN_HOLDERS) end
-        parts[#parts + 1] = "|cffffffff" .. e.total .. "|r " .. table.concat(who, ", ")
+        parts[#parts + 1] = table.concat(who, ", ")
     else
         parts[#parts + 1] = GREY .. L["none owned"] .. "|r"
     end
@@ -279,8 +281,13 @@ local function Row(i)
     row.icon:SetPoint("LEFT", 4, 0)
     row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    -- How many in all, at the right of the name's line.
+    row.total = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    row.total:SetPoint("TOPRIGHT", row, "TOPRIGHT", -6, -3)
+    row.total:SetJustifyH("RIGHT")
+    ns.SkinText(row.total)
     row.name:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, -1)
-    row.name:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+    row.name:SetPoint("RIGHT", row.total, "LEFT", -8, 0)
     row.name:SetJustifyH("LEFT")
     row.name:SetWordWrap(false)
     row.detail = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -318,6 +325,7 @@ Render = function()
             row.icon:SetTexture(C_Item.GetItemIconByID(e.id) or 134400)
             row.name:SetText(names[e.id] or "")
             row.name:SetTextColor(QualityColor(e.id))
+            row.total:SetText(e.total > 0 and e.total or "")
             row.detail:SetText(ns.SearchDetail(e))
             row.lit:SetShown(offset + i == selected)
             row:Show()
