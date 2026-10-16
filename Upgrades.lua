@@ -362,6 +362,9 @@ local function Compare(c, info, link)
         end
     end
     local mainLoc = WornLoc(gear[16])
+    -- Weapons only against the kind wielded now (owner, 2026-10-16): with a sword and shield
+    -- (or two one-handers) the one-handers show, not two-handers against both together.
+    if loc == "INVTYPE_2HWEAPON" and mainLoc and mainLoc ~= "INVTYPE_2HWEAPON" then return nil end
     local best, empty, bestSlot
     for _, slot in ipairs(slots) do
         local ok = true

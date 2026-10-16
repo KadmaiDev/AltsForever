@@ -117,7 +117,7 @@ test("already wearing one, or nothing gained: no row; any real gain, however sma
     eq(upHover(5032, worse), "", "worse")
 end)
 
-test("a two-hander is compared with main and off hand together; a one-hander never with a two-hander", function()
+test("weapons are compared only with the kind wielded now: one-handers with one-handers, two-handers with two-handers", function()
     local items = upItems()
     local staff = upItem(5040, "Long Staff", { class = 2, sub = 10, loc = "INVTYPE_2HWEAPON",
         stats = { ITEM_MOD_AGILITY_SHORT = 10 } })
@@ -125,11 +125,21 @@ test("a two-hander is compared with main and off hand together; a one-hander nev
         stats = { ITEM_MOD_AGILITY_SHORT = 3 } })
     local dagger = upItem(5042, "Dagger", { class = 2, sub = 15, loc = "INVTYPE_WEAPON",
         stats = { ITEM_MOD_AGILITY_SHORT = 5 } })
+    local shield = upItem(5043, "Buckler", { sub = 6, loc = "INVTYPE_SHIELD", bind = 1,
+        stats = { ITEM_MOD_STAMINA_SHORT = 1 } })
+    local bigStaff = upItem(5044, "Great Staff", { class = 2, sub = 10, loc = "INVTYPE_2HWEAPON",
+        stats = { ITEM_MOD_AGILITY_SHORT = 14 } })
     upStart({ ["Tarn Moon"] = upHunter(items, { gear = { [16] = sword, [17] = sword } }) })
-    eq(upHover(5040, staff), "[HUNTER]Tarn Moon = Two-Hand · ^^^", "10 agi against 3 + 3")
     eq(upHover(5042, dagger), "[HUNTER]Tarn Moon = One-Hand · ^^^", "a dual wielder: either hand")
+    eq(upHover(5040, staff), "", "not against two one-handers")
+    upStart({ ["Vesp Ash"] = alt("Vesp Ash", "WARRIOR", { level = 25, gear = { [16] = sword, [17] = shield } }) })
+    eq(upHover(5042, dagger), "[WARRIOR]Vesp Ash = One-Hand · ^^^", "sword and shield: the main hand")
+    eq(upHover(5040, staff), "", "sword and shield: no two-handers")
     upStart({ ["Tarn Moon"] = upHunter(items, { gear = { [16] = staff } }) })
     eq(upHover(5042, dagger), "", "against a two-hander")
+    eq(upHover(5044, bigStaff), "[HUNTER]Tarn Moon = Two-Hand · ^^^", "a two-hander against a two-hander")
+    upStart({ ["Tarn Moon"] = upHunter(items, { gear = {} }) })
+    eq(upHover(5040, staff), "[HUNTER]Tarn Moon = Two-Hand · ^^^ · empty slot", "empty hands: anything")
 end)
 
 test("bind on pickup and soulbound items show only you", function()
