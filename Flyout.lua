@@ -68,7 +68,7 @@ local function ItemButton(i)
     b.border:SetTexture(BORDER)
     b.tier = b:CreateTexture(nil, "OVERLAY", nil, 2)
     b.tier:SetSize(20, 20)
-    b.tier:SetPoint("BOTTOMRIGHT", 3, -2)
+    b.tier:SetPoint("BOTTOMRIGHT", 0, -2) -- the picture's own margin: about the same gap right and below
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.15)
