@@ -176,3 +176,56 @@ test("a name still loading is asked for, and the search runs again a second late
     for _, fn in ipairs(wow.timers) do fn() end
     eq(searchRows(), "Late Cloth (4) = [DRUID]Tarn 4")
 end)
+
+-- The rows of the last menu, by text.
+function menuTexts()
+    local out = {}
+    for _, item in ipairs(wow.menu.items) do out[#out + 1] = tostring(item.text) end
+    return table.concat(out, " | ")
+end
+
+test("the highlight stays as you switch; the arrows step through everyone who has it; the menus show who", function()
+    local ns = searchStart()
+    SlashCmdList.ALTSFOREVERSEARCH("linen")
+    AltsForeverSearchBox.scripts.OnEnterPressed(AltsForeverSearchBox)
+    local f = AltsForeverBagsFrame
+    -- Opened on Aldric's bank (you); Tarn has the most, so Tarn's bags come first.
+    eq(f.stop.text, "2 of 2")
+    eq(f.prev:IsShown(), true)
+    f.next.scripts.OnClick(f.next)
+    assert(f.who.text:find("Tarn Moon", 1, true), f.who.text)
+    eq(f.stop.text, "1 of 2")
+    eq(ns.BagsHighlight(), 2589, "still lit")
+    -- Switching view keeps it lit, and says when it isn't there.
+    f.bank.scripts.OnClick(f.bank)
+    eq(ns.BagsHighlight(), 2589)
+    eq(f.stop.text, "not here")
+    f.next.scripts.OnClick(f.next)
+    eq(f.stop.text, "1 of 2", "back to the first who has it")
+    -- The character dropdown: how many each has.
+    f.who.scripts.OnClick(f.who)
+    local texts = plain(menuTexts())
+    assert(texts:find("Tarn Moon (20)", 1, true) and texts:find("Aldric (5)", 1, true), texts)
+    assert(not texts:find("Smith (", 1, true), "nothing for Smith")
+    for _, item in ipairs(wow.menu.items) do
+        if tostring(item.text):find("Aldric", 1, true) then item.setSelected(item.data) end
+    end
+    eq(ns.BagsHighlight(), 2589, "picking a character keeps it lit")
+    f:Hide()
+    -- Right-click a search result: everyone who has it, and where; picking one opens it.
+    SlashCmdList.ALTSFOREVERSEARCH("silk")
+    local row
+    for _, r in ipairs({ AltsForeverSearchFrame:GetChildren() }) do
+        if r.entry and r:IsShown() then row = row or r end
+    end
+    row.scripts.OnClick(row, "RightButton")
+    eq(menuTexts(), "Silk Cloth | [DRUID]Tarn Moon: 2 in the mail | Link in chat")
+    eq(wow.menu.items[2].enabled, false, "mail can't be opened")
+    searchType("linen")
+    row.scripts.OnClick(row, "RightButton")
+    eq(menuTexts(), "Linen Cloth | [DRUID]Tarn Moon: 20 in bags | [MAGE]Aldric: 5 in the bank | Link in chat")
+    wow.menu.items[2].fn()
+    eq(AltsForeverSearchFrame:IsShown(), false)
+    assert(f.who.text:find("Tarn Moon", 1, true))
+    eq(ns.BagsHighlight(), 2589)
+end)

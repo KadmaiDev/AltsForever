@@ -30,7 +30,7 @@ local shownKey, view = nil, "bags"
 local sizing = false
 local scroll, contentHeight = 0, 0
 -- An item the search (Search.lua) opened this window for: its slots lit, the rest dimmed,
--- until you pick another character or view, or close the window.
+-- on every character and view you switch to, until you clear it or close the window.
 local lit
 local loadRetry = false
 
@@ -229,6 +229,64 @@ local function ShowSlot(b, id, count)
     end
 end
 
+-- Where the lit item is: each character's bags and bank holding it, the character with most
+-- first. What the arrows beside "Showing: ..." step through.
+local stops = {}
+
+local function ByMost(a, b)
+    if a.n ~= b.n then return a.n > b.n end
+    return a.key < b.key
+end
+
+local function Stops()
+    wipe(stops)
+    if not lit then return stops end
+    local list = {}
+    for key, c in pairs(ns.db.chars) do
+        if not ns.Hidden(c) then
+            local inBags, inBank = c.bags and c.bags[lit] or 0, c.bank and c.bank[lit] or 0
+            if inBags + inBank > 0 then list[#list + 1] = { key = key, n = inBags + inBank, bags = inBags, bank = inBank } end
+        end
+    end
+    sort(list, ByMost)
+    for _, h in ipairs(list) do
+        if h.bags > 0 then stops[#stops + 1] = { key = h.key, view = "bags" } end
+        if h.bank > 0 then stops[#stops + 1] = { key = h.key, view = "bank" } end
+    end
+    return stops
+end
+
+-- Which stop is showing (0 if this character or view hasn't got it).
+local function StopIndex()
+    for i, s in ipairs(stops) do
+        if s.key == shownKey and s.view == view then return i end
+    end
+    return 0
+end
+
+local function ScrollToLit()
+    for i = 1, shown do
+        if ids[i] == lit and slots[i] and slots[i].top then
+            scroll = max(0, slots[i].top - HEADER)
+            Place()
+            return
+        end
+    end
+end
+
+-- The next (1) or previous (-1) character's bags or bank with the lit item.
+local function Step(dir)
+    Stops()
+    local n = #stops
+    if n == 0 then return end
+    local i = StopIndex()
+    if i == 0 then i = dir > 0 and 1 or n else i = (i - 1 + dir) % n + 1 end
+    shownKey, view, scroll = stops[i].key, stops[i].view, 0
+    Fill()
+    ScrollToLit()
+end
+ns.BagsStep = Step
+
 local function Seen(c, now)
     if view == "bank" then
         return c.bankAt and L["Bank last visited: %s"]:format(ns.FormatAgo(now - c.bankAt)) or ""
@@ -334,6 +392,14 @@ function Fill()
     end
     frame.clear:SetShown(lit ~= nil)
     frame.info:SetShown(not lit)
+    local n = #Stops()
+    local i = StopIndex()
+    frame.stop:SetText(lit and (i > 0 and L["%d of %d"]:format(i, n) or L["not here"]) or "")
+    -- Arrows when there's somewhere else to go.
+    local arrows = lit ~= nil and (n > 1 or (n == 1 and i == 0))
+    frame.prev:SetShown(arrows)
+    frame.next:SetShown(arrows)
+    frame.stop:SetShown(lit ~= nil)
     frame.seen:SetText(how and (GREY .. Seen(c, time()) .. "|r") or "")
     frame.money:SetText(c.money and GetCoinTextureString(c.money) or "")
 end
@@ -352,10 +418,12 @@ local function PickCharacter(owner)
                 group = ns.GroupKey(c, byRealm, byFaction)
                 root:CreateTitle(ns.GroupLabel(c, byRealm, byFaction))
             end
-            root:CreateRadio(ns.ColoredName(key, c),
+            -- With an item lit: how many each character has of it (bags and bank).
+            local n = lit and ((c.bags and c.bags[lit] or 0) + (c.bank and c.bank[lit] or 0)) or 0
+            root:CreateRadio(ns.ColoredName(key, c) .. (n > 0 and " |cffffffff(" .. n .. ")|r" or ""),
                 function(k) return k == shownKey end,
                 function(k)
-                    shownKey, scroll, lit = k, 0, nil
+                    shownKey, scroll = k, 0
                     Fill()
                 end, key)
         end
@@ -368,7 +436,7 @@ local function ViewButton(name, text, x)
     b:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -30)
     b:SetText(text)
     b:SetScript("OnClick", function()
-        view, scroll, lit = name, 0, nil
+        view, scroll = name, 0
         Fill()
     end)
     ns.SkinButton(b)
@@ -481,6 +549,31 @@ local function CreateWindow()
     ns.SkinText(clear.text)
     clear:Hide()
     f.clear = clear
+    -- Previous and next character with it, and where this one is in the list.
+    local function Arrow(dir, art, tip)
+        local b = CreateFrame("Button", nil, f)
+        b:SetSize(20, 20)
+        b:SetNormalTexture("Interface\\Buttons\\UI-SpellbookIcon-" .. art .. "-Up")
+        b:SetPushedTexture("Interface\\Buttons\\UI-SpellbookIcon-" .. art .. "-Down")
+        b:SetDisabledTexture("Interface\\Buttons\\UI-SpellbookIcon-" .. art .. "-Disabled")
+        b:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+        b:SetScript("OnClick", function() Step(dir) end)
+        b:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(tip)
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        b:Hide()
+        return b
+    end
+    f.prev = Arrow(-1, "PrevPage", L["Previous character with it"])
+    f.prev:SetPoint("LEFT", clear, "RIGHT", 4, 0)
+    f.stop = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.stop:SetPoint("LEFT", f.prev, "RIGHT", 2, 0)
+    ns.SkinText(f.stop)
+    f.next = Arrow(1, "NextPage", L["Next character with it"])
+    f.next:SetPoint("LEFT", f.stop, "RIGHT", 2, 0)
 
     -- Search button in the title bar, left of the close button (as the overview's).
     local search = CreateFrame("Button", nil, f)
@@ -562,15 +655,7 @@ function ns.ShowBags(key, which, highlight)
     if shownKey ~= key or view ~= which then scroll = 0 end
     shownKey, view, lit = key, which, highlight
     Fill()
-    if highlight then
-        for i = 1, shown do
-            if ids[i] == highlight and slots[i] and slots[i].top then
-                scroll = max(0, slots[i].top - HEADER)
-                Place()
-                break
-            end
-        end
-    end
+    if highlight then ScrollToLit() end
     frame:Show()
 end
 

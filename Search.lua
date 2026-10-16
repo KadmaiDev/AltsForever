@@ -261,7 +261,47 @@ local function RowEnter(row)
     GameTooltip:Show()
 end
 
-local function RowClick(row)
+-- Right-click: every character who has it and where, to open exactly that one.
+local function HolderMenu(row)
+    local e = row.entry
+    if not (e and MenuUtil and MenuUtil.CreateContextMenu) then return end
+    local id, name = e.id, names[e.id] or ""
+    MenuUtil.CreateContextMenu(row, function(_, root)
+        root:CreateTitle(name)
+        for _, h in ipairs(e.holders) do
+            local key, c = h.key, h.c
+            local who = ns.ListName(key, c)
+            local inBags, inBank = c.bags and c.bags[id] or 0, c.bank and c.bank[id] or 0
+            local inMail, worn = c.mail and c.mail[id] or 0, c.equip and c.equip[id] or 0
+            if inBags > 0 then
+                root:CreateButton(L["%s: %d in bags"]:format(who, inBags), function()
+                    frame:Hide()
+                    ns.ShowBags(key, "bags", id)
+                end)
+            end
+            if inBank > 0 then
+                root:CreateButton(L["%s: %d in the bank"]:format(who, inBank), function()
+                    frame:Hide()
+                    ns.ShowBags(key, "bank", id)
+                end)
+            end
+            if worn > 0 then
+                root:CreateButton(L["%s: wearing it"]:format(who), function()
+                    frame:Hide()
+                    ns.ShowGear(key)
+                end)
+            end
+            if inMail > 0 then
+                -- The bags window doesn't show mail: said, not opened.
+                root:CreateButton(L["%s: %d in the mail"]:format(who, inMail)):SetEnabled(false)
+            end
+        end
+        root:CreateButton(L["Link in chat"], function() Link(e) end)
+    end)
+end
+
+local function RowClick(row, button)
+    if button == "RightButton" then return HolderMenu(row) end
     Pick(row.entry, IsModifiedClick and IsModifiedClick())
 end
 
@@ -298,7 +338,7 @@ local function Row(i)
     ns.SkinText(row.name)
     ns.SkinText(row.detail)
     row.index = i
-    row:RegisterForClicks("LeftButtonUp")
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     row:SetScript("OnEnter", RowEnter)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row:SetScript("OnClick", RowClick)
@@ -342,7 +382,7 @@ Render = function()
     elseif n == 0 then
         frame.status:SetText(GREY .. L["Nothing matching '%s'."]:format(text) .. "|r")
     else
-        frame.status:SetText(GREY .. L["Enter: open their bags · Shift+Enter: link in chat"] .. "|r")
+        frame.status:SetText(GREY .. L["Enter: open their bags · Right-click: choose whose · Shift+Enter: link in chat"] .. "|r")
     end
 end
 
