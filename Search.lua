@@ -268,15 +268,29 @@ end
 ---------------------------------------------------------------------------
 local Render
 
-local function RowEnter(row)
-    selected = row.index
-    Render()
+-- The item's own tooltip, with everything Alts Forever adds to it: who has it where,
+-- Can craft, upgrades.
+local function RowTip(row)
     if not row.entry then return end
-    -- The item's own tooltip, with everything Alts Forever adds to it: who has it where,
-    -- Can craft, upgrades.
     GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
     GameTooltip:SetItemByID(row.entry.id)
     GameTooltip:Show()
+end
+
+-- The mouse on a row selects what it shows: its place in the list, not on screen (the
+-- list may have scrolled with the arrow keys; the owner saw the wrong one selected).
+local function RowEnter(row)
+    selected = offset + row.index
+    Render()
+    RowTip(row)
+end
+
+-- A tooltip open on one of the rows follows the selection when the keys move it.
+local function FollowTip()
+    local owner = GameTooltip:IsShown() and GameTooltip:GetOwner()
+    if not (owner and owner.index and rows[owner.index] == owner) then return end
+    local row = rows[selected - offset]
+    if row and row.entry then RowTip(row) else GameTooltip:Hide() end
 end
 
 -- Right-click: every character who has it and where, to open exactly that one.
@@ -415,11 +429,20 @@ local function Move(by)
     if #matches == 0 then return end
     selected = (selected - 1 + by) % #matches + 1
     Render()
+    FollowTip()
 end
 
 local function Scroll(by)
     offset = max(0, min(offset + by, #matches - ROWS))
     selected = max(offset + 1, min(selected, offset + ROWS))
+    -- Scrolled under the mouse (the wheel): the row it's on now shows another item, so that
+    -- one is selected and its tooltip shown.
+    local owner = GameTooltip:IsShown() and GameTooltip:GetOwner()
+    if owner and owner.index and rows[owner.index] == owner and matches[offset + owner.index] then
+        selected = offset + owner.index
+        Render()
+        return RowTip(owner)
+    end
     Render()
 end
 

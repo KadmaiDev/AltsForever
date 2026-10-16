@@ -262,3 +262,32 @@ test("stepping through who has it keeps the bags window one height, so the arrow
     f.clear.scripts.OnClick(f.clear)
     assert(f:GetHeight() < height, "shrinks to Aldric's bank")
 end)
+
+test("after the arrow keys scroll the list, the mouse selects the item it's on, and the tooltip follows the keys", function()
+    local ns = searchStart()
+    for id = 8101, 8112 do
+        wow.item(id, "Rag " .. id, {})
+        AltsForeverDB.chars["Tarn Moon"].bags[id] = 1
+    end
+    SlashCmdList.ALTSFOREVERSEARCH("rag")
+    local box = AltsForeverSearchBox
+    for _ = 1, 10 do box.scripts.OnArrowPressed(box, "DOWN") end
+    -- The 11th of 12 is selected, so the list has scrolled: the first row shows the 4th.
+    local rows = {}
+    for _, r in ipairs({ AltsForeverSearchFrame:GetChildren() }) do
+        if r.index then rows[r.index] = r end
+    end
+    eq(rows[1].entry.id, 8104)
+    rows[1].scripts.OnEnter(rows[1])
+    eq(rows[1].lit:IsShown(), true, "the row under the mouse is the one selected")
+    eq(GameTooltip.itemID, 8104)
+    box.scripts.OnEnterPressed(box)
+    eq(ns.BagsHighlight(), 8104, "and Enter opens that one")
+    -- With a row's tooltip open, the keys take it along.
+    SlashCmdList.ALTSFOREVERSEARCH("rag")
+    rows[1].scripts.OnEnter(rows[1])
+    eq(GameTooltip.itemID, 8101)
+    box.scripts.OnArrowPressed(box, "DOWN")
+    eq(GameTooltip.itemID, 8102, "the tooltip follows the selection")
+    eq(GameTooltip:GetOwner(), rows[2])
+end)
