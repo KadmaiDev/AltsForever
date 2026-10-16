@@ -134,37 +134,30 @@ function ns.SkinCheck(c)
     end
 end
 
--- An item slot in the gear panel (ElvUI only: EllesmereUI's API has no item button style).
-function ns.SkinSlot(b)
-    if not skin and Elv() then pcall(ElvIconButton, b, b.icon) end
-end
-
--- A slot in the bags window. With EllesmereUI, the look of its bags beside it (owner,
--- 2026-10-16: the two windows looked different): the icon squared by its API, a 1 px edge we
--- colour by quality (ns.SlotEdge), an outlined count, and an empty slot as its bags draw
--- theirs: the empty-slot art, squared and faded (its bags use a darkened copy of it at 35%;
--- that file isn't part of the API, so ours is Blizzard's own; a flat square looked worse,
--- owner 2026-10-16). ElvUI: its icon button, as elsewhere.
+-- An item slot (the gear panel's, the craft panel's, the bags window's). With EllesmereUI,
+-- the look of its bags and character sheet (owner, 2026-10-16: our windows looked different
+-- beside them): the icon squared by its API, a 1 px edge we colour by quality, an outlined
+-- count, and an empty slot as theirs: its art squared and faded. The bags' empty art is
+-- Blizzard's empty bag slot tinted to their darker copy (that file isn't part of the API;
+-- a flat square looked worse); a gear slot's own art shows as their character sheet's does.
+-- Fill them with ns.SlotQuality / ns.SlotEmpty. ElvUI: its icon button, as elsewhere.
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 local EMPTY_ART = "Interface\\PaperDoll\\UI-Backpack-EmptySlot"
 local COUNT_SIZE = 11 -- EllesmereUI's bags' default count size
+local GREY_EDGE = 0.25 -- an item whose quality isn't known yet
 
 local function EuiSlot(b)
     if skin.SquareIcon then skin.SquareIcon(b.icon) end
-    b.border:SetTexture(nil)
-    b.border:Hide()
-    b.empty = b:CreateTexture(nil, "BACKGROUND", nil, 1)
-    b.empty:SetAllPoints()
-    b.empty:SetTexture(EMPTY_ART)
-    b.empty:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    -- Theirs is a dark copy (brightness 12 of 255 on average, 48 at most): at 35% it mostly
-    -- darkens the square, with only a hint of the bag. Blizzard's is several times brighter,
-    -- so it's tinted down to match (the bags stood out, owner 2026-10-16).
-    b.empty:SetVertexColor(0.27, 0.27, 0.27)
-    b.emptyAlpha = 0.35
-    b.empty:Hide()
-    -- Its bags' edges are one screen pixel; they take it from their pixel helper (not part
-    -- of the API: read only, else 1).
+    if b.border then
+        b.border:SetTexture(nil)
+        b.border:Hide()
+    end
+    b.emptyTex = b:CreateTexture(nil, "BACKGROUND", nil, 1)
+    b.emptyTex:SetAllPoints()
+    b.emptyTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    b.emptyTex:Hide()
+    -- Its edges are one screen pixel; it takes that from its pixel helper (not part of the
+    -- API: read only, else 1).
     local pp = EllesmereUI and EllesmereUI.PP
     local px = type(pp) == "table" and type(pp.mult) == "number" and pp.mult > 0 and pp.mult or 1
     local edges = {}
@@ -178,12 +171,19 @@ local function EuiSlot(b)
     edges[3]:SetPoint("TOPLEFT"); edges[3]:SetPoint("BOTTOMLEFT"); edges[3]:SetWidth(px)
     edges[4]:SetPoint("TOPRIGHT"); edges[4]:SetPoint("BOTTOMRIGHT"); edges[4]:SetWidth(px)
     b.edges = edges
-    skin.Font(b.count)
-    local path = b.count:GetFont()
-    if type(path) == "string" then b.count:SetFont(path, COUNT_SIZE, "OUTLINE") end
+    if b.count then
+        skin.Font(b.count)
+        local path = b.count:GetFont()
+        if type(path) == "string" then b.count:SetFont(path, COUNT_SIZE, "OUTLINE") end
+    end
 end
 
-function ns.SkinBagSlot(b)
+-- An icon button that isn't an item slot (the shortcut on ElvUI's bags): ElvUI's look only.
+function ns.SkinSlot(b)
+    if not skin and Elv() then pcall(ElvIconButton, b, b.icon) end
+end
+
+function ns.SkinItemSlot(b)
     if skin then
         pcall(EuiSlot, b)
     elseif Elv() then
@@ -191,11 +191,40 @@ function ns.SkinBagSlot(b)
     end
 end
 
--- Colours a bags-window slot's edge in EllesmereUI's look; false if it hasn't got that look.
-function ns.SlotEdge(b, r, g, bl, a)
+local function Edge(b, r, g, bl, a)
     local edges = b.edges
-    if not edges then return false end
     for i = 1, 4 do edges[i]:SetVertexColor(r, g, bl, a) end
+end
+
+-- An item in a slot with EllesmereUI's look: the edge in its quality colour (every quality,
+-- as its bags; grey until known). The caller sets the icon. False without that look.
+function ns.SlotQuality(b, quality, dim)
+    if not b.edges then return false end
+    b.emptyTex:Hide()
+    local qc = quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality]
+    Edge(b, qc and qc.r or GREY_EDGE, qc and qc.g or GREY_EDGE, qc and qc.b or GREY_EDGE, dim or 1)
+    return true
+end
+
+-- An empty slot with EllesmereUI's look: `art` (a gear slot's) faded as on its character
+-- sheet, or the bag slot's darkened as in its bags (its copy is brightness 12 of 255 on
+-- average, 48 at most, at 35%; Blizzard's is several times brighter, so tinted 0.27), with a
+-- dark edge. False without that look.
+function ns.SlotEmpty(b, art, dim)
+    if not b.edges then return false end
+    dim = dim or 1
+    local t = b.emptyTex
+    b.icon:SetTexture(nil)
+    t:SetTexture(art or EMPTY_ART)
+    if art then
+        t:SetVertexColor(1, 1, 1)
+        t:SetAlpha(0.6 * dim)
+    else
+        t:SetVertexColor(0.27, 0.27, 0.27)
+        t:SetAlpha(0.35 * dim)
+    end
+    t:Show()
+    Edge(b, 0, 0, 0, 0.3 * dim)
     return true
 end
 

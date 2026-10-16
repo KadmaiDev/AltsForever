@@ -112,7 +112,7 @@ local function CreateSlot(slot, x, y, nameSide)
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.15)
-    ns.SkinSlot(b)
+    ns.SkinItemSlot(b)
     if nameSide then
         b.name = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         ns.SkinText(b.name)
@@ -127,7 +127,7 @@ local function CreateSlot(slot, x, y, nameSide)
         end
     end
     local ok, _, emptyTexture = pcall(GetInventorySlotInfo, SLOT_NAMES[slot])
-    b.empty = ok and emptyTexture or nil
+    b.emptyArt = ok and emptyTexture or nil
     b.slot = slot
     b:SetScript("OnEnter", Hover)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -180,8 +180,14 @@ local function Fill()
     for slot, b in pairs(buttons) do
         local link = gear and gear[slot]
         b.link = link
-        local icon = link and select(5, GetItemInfoInstant(link))
-        b.icon:SetTexture(icon or b.empty)
+        local id, _, _, _, icon = nil, nil, nil, nil, nil
+        if link then id, _, _, _, icon = GetItemInfoInstant(link) end
+        if icon then
+            b.icon:SetTexture(icon)
+            ns.SlotQuality(b, id and C_Item.GetItemQualityByID and C_Item.GetItemQualityByID(id))
+        elseif not ns.SlotEmpty(b, b.emptyArt) then
+            b.icon:SetTexture(b.emptyArt)
+        end
         local pct = c.duraSlots and c.duraSlots[slot]
         -- Nearly broken items are tinted red, as on the game's own panel.
         if pct and pct < LOW_DURABILITY then b.icon:SetVertexColor(1, 0.3, 0.3) else b.icon:SetVertexColor(1, 1, 1) end

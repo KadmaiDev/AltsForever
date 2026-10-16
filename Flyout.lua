@@ -75,7 +75,7 @@ local function ItemButton(i)
     b:SetScript("OnEnter", ItemEnter)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
     b:SetScript("OnClick", ItemClick)
-    ns.SkinSlot(b)
+    ns.SkinItemSlot(b)
     buttons[i] = b
     return b
 end
@@ -119,9 +119,11 @@ local function ShowPanel(glyph)
         b.entry = e
         b.icon:SetTexture(C_Item.GetItemIconByID(e.id))
         local q = C_Item.GetItemQualityByID(e.id)
-        local color = q and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q]
-        if color then b.border:SetVertexColor(color.r, color.g, color.b) end
-        b.border:SetShown(color ~= nil)
+        if not ns.SlotQuality(b, q) then
+            local color = q and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q]
+            if color then b.border:SetVertexColor(color.r, color.g, color.b) end
+            b.border:SetShown(color ~= nil)
+        end
         b.tier:SetTexture(ns.GainTexture(e.gain))
         b:ClearAllPoints()
         local col, row = (i - 1) % PER_ROW, floor((i - 1) / PER_ROW)

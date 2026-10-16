@@ -166,7 +166,7 @@ local function Slot(i)
     b:SetScript("OnEnter", SlotEnter)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
     b:SetScript("OnClick", SlotClick)
-    ns.SkinBagSlot(b)
+    ns.SkinItemSlot(b)
     slots[i] = b
     return b
 end
@@ -214,24 +214,14 @@ local function ShowSlot(b, id, count)
     if not id then
         b.count:SetText("")
         b.border:Hide()
-        -- EllesmereUI's look: the empty-slot art faded, with a dark edge.
-        if b.empty then
-            b.icon:SetTexture(nil)
-            b.empty:SetAlpha(b.emptyAlpha * dim)
-            b.empty:Show()
-            ns.SlotEdge(b, 0, 0, 0, 0.3 * dim)
-        else
-            b.icon:SetTexture(EMPTY_SLOT)
-        end
+        if not ns.SlotEmpty(b, nil, dim) then b.icon:SetTexture(EMPTY_SLOT) end
         return
     end
-    if b.empty then b.empty:Hide() end
     b.icon:SetTexture(GetItemIconByID(id) or 134400)
     b.count:SetText(count > 1 and count or "")
     local q = Quality(id)
-    -- EllesmereUI's look: every quality has its colour on the edge, grey until it's known.
+    if ns.SlotQuality(b, q, dim) then return end
     local qc = q and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q]
-    if ns.SlotEdge(b, qc and qc.r or 0.25, qc and qc.g or 0.25, qc and qc.b or 0.25, dim) then return end
     local color = q and q >= 2 and qc
     if color then
         b.border:SetVertexColor(color.r, color.g, color.b)
@@ -432,6 +422,9 @@ function Fill()
     local name = lit and C_Item.GetItemNameByID(lit)
     if lit then
         if type(name) ~= "string" or issecretvalue(name) then name = "?" end
+        -- White like the rest of the footer, the item in its quality colour.
+        local qc = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[Quality(lit) or 1]
+        if qc and type(qc.hex) == "string" then name = qc.hex .. name .. "|r" end
         frame.clear.text:SetText(L["Showing: %s"]:format(name))
         local w = frame.clear.text:GetStringWidth()
         if type(w) == "number" and not issecretvalue(w) then frame.clear:SetWidth(w + 20) end
@@ -576,7 +569,7 @@ local function CreateWindow()
     local clear = CreateFrame("Button", nil, f)
     clear:SetSize(200, 16)
     clear:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD + 2, 10)
-    clear.text = clear:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    clear.text = clear:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     clear.text:SetPoint("LEFT")
     clear.x = clear:CreateTexture(nil, "ARTWORK")
     clear.x:SetSize(14, 14)

@@ -53,11 +53,11 @@ test("with EllesmereUI, the bags window's slots look like its bags: square icons
     eq(rare.border:IsShown(), false, "not Blizzard's round frame")
     eq(table.concat(rare.edges[1].tint, ","), "0,0.44,0.87", "edge in the item's quality colour")
     eq(table.concat(unknown.edges[1].tint, ","), "0.25,0.25,0.25", "grey while its quality isn't known")
-    eq(rare.empty:IsShown(), false)
-    eq(empty.empty:IsShown(), true, "an empty slot: the empty-slot art, faded")
-    eq(empty.empty.texture, "Interface\\PaperDoll\\UI-Backpack-EmptySlot")
-    eq(empty.empty:GetAlpha(), 0.35)
-    eq(table.concat(empty.empty.tint, ","), "0.27,0.27,0.27", "tinted down to EllesmereUI's dark copy")
+    eq(rare.emptyTex:IsShown(), false)
+    eq(empty.emptyTex:IsShown(), true, "an empty slot: the empty-slot art, faded")
+    eq(empty.emptyTex.texture, "Interface\\PaperDoll\\UI-Backpack-EmptySlot")
+    eq(empty.emptyTex:GetAlpha(), 0.35)
+    eq(table.concat(empty.emptyTex.tint, ","), "0.27,0.27,0.27", "tinted down to EllesmereUI's dark copy")
     eq(empty.icon.texture, nil, "not at full strength in the icon")
     eq(table.concat(empty.edges[1].tint, ","), "0,0,0")
     eq(AltsForeverBagsFrame.euiBg, nil, "EllesmereUI's bags not in use: the standard window")
@@ -120,6 +120,26 @@ test("with EllesmereUI, window titles sit in the middle of its title strip and t
     end
     eq(opts and opts.padInput, true, "the search box's text has room before the border")
     AltsForeverSearchFrame:Hide()
+end)
+
+test("with EllesmereUI, the gear panel's slots get the same look as its bags: quality edge, faded slot art", function()
+    wow.withEllesmere = true
+    local ns = wow.load(FILES)
+    wow.itemQuality[3000] = 2
+    wow.login({ v = 2, chars = {
+        ["Brakka"] = alt("Brakka", "HUNTER", { level = 20, gear = { [1] = itemLink(3000, "Hunting Cap") } }),
+    } })
+    wow.skinCallback(wow.skinFacade)
+    ns.ShowGear("Brakka")
+    local slots = gearPanelSlots()
+    assert(skinnedWith("SquareIcon", slots[1].icon))
+    eq(slots[1].icon.texture, "icon:3000")
+    eq(table.concat(slots[1].edges[1].tint, ","), "0.1,1,0.1", "edge in the item's quality colour")
+    eq(slots[1].emptyTex:IsShown(), false)
+    eq(slots[5].icon.texture, nil)
+    eq(slots[5].emptyTex.texture, "empty:ChestSlot", "an empty slot: its own art, faded")
+    eq(slots[5].emptyTex:GetAlpha(), 0.6)
+    eq(table.concat(slots[5].edges[1].tint, ","), "0,0,0")
 end)
 
 test("a window opened before EllesmereUI's callback is skinned when it arrives", function()

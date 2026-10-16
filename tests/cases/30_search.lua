@@ -113,6 +113,11 @@ test("Enter opens the bags of whoever has it, lit up (you first); arrows move; S
     local clear = AltsForeverBagsFrame.clear
     eq(clear:IsShown(), true)
     eq(clear.text.text, "Showing: Bolt of Linen Cloth")
+    -- The item in its quality colour (the game's colours carry a hex code).
+    ITEM_QUALITY_COLORS[1] = { r = 1, g = 1, b = 1, hex = "|cffffffff" }
+    ns.ShowBags("Tarn Moon", "bags", 2996)
+    eq(clear.text.text, "Showing: |cffffffffBolt of Linen Cloth|r")
+    ITEM_QUALITY_COLORS[1] = nil
     eq(AltsForeverBagsFrame.info:IsShown(), false)
     clear.scripts.OnClick(clear)
     eq(ns.BagsHighlight(), nil)
