@@ -373,7 +373,7 @@ local function BuildCanvas(f)
     -- chooses our own size, which unticks it. Hidden without EllesmereUI.
     local follow = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
     follow:SetSize(26, 26)
-    follow:SetPoint("TOPLEFT", smaller, "BOTTOMLEFT", -2, -6)
+    follow:SetPoint("TOPLEFT", smaller, "BOTTOMLEFT", -4, -6) -- in line with the tick boxes above
     local followLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     followLabel:SetPoint("LEFT", follow, "RIGHT", 4, 0)
     followLabel:SetText(L["Same as EllesmereUI's Window Scale"])
