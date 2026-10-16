@@ -13,9 +13,10 @@ SS = 8             # supersampling for smooth edges
 S = SIZE * SS
 GREEN = (72, 235, 72, 255)
 OUTLINE = (0, 0, 0, 220)
-WIDTH = 0.12 * S   # stroke
-BORDER = 0.07 * S  # dark edge around it, so it shows on any background
-RISE = 0.22 * S    # how tall one chevron is
+WIDTH = 0.13 * S   # stroke
+HALF = 0.25 * S    # half a chevron's width: narrow, so the peak is steep (owner, 2026-10-16)
+BORDER = 0.05 * S  # dark edge around it, so it shows on any background
+RISE = 0.25 * S    # how tall one chevron is
 STEP = 0.25 * S    # from one chevron to the next
 
 
@@ -27,7 +28,7 @@ def chevrons(n):
     shapes = []
     for i in range(n):
         y = top + i * STEP
-        shapes.append([(0.16 * S, y + RISE), (0.5 * S, y), (0.84 * S, y + RISE)])
+        shapes.append([(0.5 * S - HALF, y + RISE), (0.5 * S, y), (0.5 * S + HALF, y + RISE)])
     for pts in shapes:
         d.line(pts, fill=OUTLINE, width=int(WIDTH + 2 * BORDER), joint="curve")
     for pts in shapes:
