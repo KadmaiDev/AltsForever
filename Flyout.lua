@@ -170,10 +170,12 @@ local function Glyph(b, side)
     g = CreateFrame("Button", nil, b)
     g:SetSize(GLYPH, GLYPH)
     g:SetFrameLevel((b:GetFrameLevel() or 1) + 5)
+    -- Beside a side column the anvil sits at the slot's top, with its chevrons under it:
+    -- there's only an anvil's width between the left column and the window's edge.
     if side == "left" then
-        g:SetPoint("RIGHT", b, "LEFT", -2, 0)
+        g:SetPoint("TOPRIGHT", b, "TOPLEFT", -2, 1)
     elseif side == "right" then
-        g:SetPoint("LEFT", b, "RIGHT", 2, 0)
+        g:SetPoint("TOPLEFT", b, "TOPRIGHT", 2, 1)
     else
         g:SetPoint("TOP", b, "BOTTOM", 0, -2)
     end
@@ -183,11 +185,12 @@ local function Glyph(b, side)
     -- The best upgrade's chevrons on the anvil's corner, so each slot can be judged at a glance.
     g.tier = g:CreateTexture(nil, "OVERLAY")
     g.tier:SetSize(18, 18)
-    -- On the outer side, away from the item icon (it overlapped the left column's icons).
-    if side == "left" then
-        g.tier:SetPoint("RIGHT", g, "LEFT", 3, -2)
-    else
+    -- Under the anvil beside the side columns (on its corner they covered the item icon;
+    -- beside it, they went past the window's edge); beside it under the weapons.
+    if side == "bottom" then
         g.tier:SetPoint("LEFT", g, "RIGHT", -3, -2)
+    else
+        g.tier:SetPoint("TOP", g, "BOTTOM", 0, 3)
     end
     local hl = g:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()

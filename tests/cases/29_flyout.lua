@@ -64,8 +64,8 @@ test("the character sheet puts an anvil beside slots with a craftable upgrade yo
     eq(hands and hands:IsShown(), true, "the mail gloves Smith makes")
     eq(back and back:IsShown(), true, "the cape: cloth for everyone")
     eq(head, nil, "the helm needs level 28: not wearable yet")
-    eq(hands.point[1], "LEFT", "outside the right-hand column")
-    eq(back.point[1], "RIGHT", "outside the left-hand column")
+    eq(hands.point[1], "TOPLEFT", "outside the right-hand column")
+    eq(back.point[1], "TOPRIGHT", "outside the left-hand column")
     -- The best upgrade's chevrons on the anvil: nothing worn in the hands, so major.
     eq(hands.tier.texture, "Interface\\AddOns\\AltsForever\\media\\up3.tga")
     -- Shipped with the addon, and drawn.
