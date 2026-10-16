@@ -140,6 +140,7 @@ function ns.UpgradesChanged()
 end
 
 function ns.UpgradesOn() return not ns.db.upgradesOff end
+function ns.UpgradesVersion() return version end
 
 function ns.SetUpgrades(on)
     ns.db.upgradesOff = not on or nil
@@ -508,6 +509,90 @@ local function OnSpell(tt, data)
     local id, _, _, _, _, class = GetItemInfoInstant(link)
     if not id or not (class == WEAPON_CLASS or class == ARMOR_CLASS) then return end
     AddRows(tt, id, link, data, "trainer")
+end
+
+---------------------------------------------------------------------------
+-- Craftable upgrades (the equipment flyout, Flyout.lua)
+---------------------------------------------------------------------------
+-- Items any of your characters can craft (their learned recipes, c.crafts) that would be
+-- an upgrade for you in one inventory slot. Armour other than cloaks only of the heaviest
+-- type you wear now (no leather for a warrior: the owner's rule, 2026-10-16); an item that
+-- binds on pickup only if you craft it yourself, as it can't be mailed. Only characters
+-- you can mail make things for you (another ruleset or faction can't).
+local ARMOR_TYPES = { 1, 2, 3, 4 } -- cloth, leather, mail, plate
+
+local function Heaviest(cls, level)
+    local best
+    for _, sub in ipairs(ARMOR_TYPES) do
+        local from = cls.armor[sub]
+        if from and from <= level then best = sub end
+    end
+    return best
+end
+
+local function InSlot(loc, slot)
+    for _, s in ipairs(SLOTS[loc] or {}) do
+        if s == slot then return true end
+    end
+    return false
+end
+
+local function Better(a, b)
+    if a.gain ~= b.gain then return a.gain > b.gain end
+    return a.id < b.id
+end
+
+-- Fills `out` with { id, link, gain, empty, at, key (who crafts it), prof }, best gain
+-- first, and returns it and whether some item data is still loading (ask again shortly).
+-- Runs when the flyout opens, never per frame.
+function ns.CraftableUpgrades(slot, out)
+    out = out or {}
+    wipe(out)
+    local me, myKey = ns.char, ns.charKey
+    local cls = me and CLASSES[me.class]
+    if not (cls and me.level and me.gear) then return out, false end
+    local heaviest = Heaviest(cls, me.level)
+    local keys = {}
+    for key, c in pairs(ns.db.chars) do
+        if key == myKey or (c.crafts and not ns.Elsewhere(c)) then keys[#keys + 1] = key end
+    end
+    table.sort(keys, function(a, b)
+        if (a == myKey) ~= (b == myKey) then return a == myKey end -- your own recipes first
+        return a < b
+    end)
+    local done, pending = {}, false
+    for _, key in ipairs(keys) do
+        for prof, items in pairs(ns.db.chars[key].crafts or {}) do
+            for id in pairs(items) do
+                local _, _, _, loc, _, class, sub = GetItemInfoInstant(id)
+                local armour = class == ARMOR_CLASS and sub and sub >= 1 and sub <= 4 and loc ~= "INVTYPE_CLOAK"
+                if not done[id] and (class == ARMOR_CLASS or class == WEAPON_CLASS) and InSlot(loc, slot)
+                    and not (armour and sub ~= heaviest) then
+                    local _, link = GetItemInfo(id)
+                    if not link then
+                        Request(id)
+                        pending = true
+                    else
+                        local data = C_TooltipInfo and C_TooltipInfo.GetHyperlink and C_TooltipInfo.GetHyperlink(link)
+                        local info = Describe(link, data, false)
+                        if info == nil then
+                            pending = true
+                        elseif info and (info.bind == BIND_ON_EQUIP or key == myKey) then
+                            done[id] = true
+                            local gain, empty, at = Compare(me, info, link)
+                            if gain == false then
+                                pending = true
+                            elseif gain then
+                                out[#out + 1] = { id = id, link = link, gain = gain, empty = empty, at = at, key = key, prof = prof }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    table.sort(out, Better)
+    return out, pending
 end
 
 ---------------------------------------------------------------------------

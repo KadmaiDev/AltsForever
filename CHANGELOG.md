@@ -1,3 +1,7 @@
+## Alts Forever (next)
+
+- **Craftable upgrades on the character sheet:** hold Alt over a gear slot and, under the game's list of items in your bags, Alts Forever shows what you or your alts can craft that would be an upgrade for that slot, best first. Armour is only the heaviest type you wear (no leather for a warrior), items that bind on pickup only if you can craft them yourself, and only from characters who can mail you. Hover one to see who crafts it.
+
 ## Alts Forever 0.13.0
 
 - **Show item counts** (options, or `/af counts`): turn off the item counts in tooltips if another addon, such as Baganator or Bagnon, already shows them, so you don't see two lists. Can craft, skill-ups, upgrades and Waylaid Crates stay.

@@ -42,6 +42,7 @@ Gear.lua
 Bags.lua
 Icons.lua
 Upgrades.lua
+Flyout.lua
 Crates.lua
 Tooltip.lua
 Options.lua

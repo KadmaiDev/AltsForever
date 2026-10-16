@@ -425,6 +425,9 @@ function M.load(files)
             if M.uncached[id] then return nil end
             local it = M.items[id] or {}
             local link = M.itemLinks and M.itemLinks[id] or (type(item) == "string" and item or nil)
+            if not link and M.items[id] and M.itemNames[id] then -- by ID: the game gives the link too
+                link = "|cff1eff00|Hitem:" .. id .. "::::::::|h[" .. M.itemNames[id] .. "]|h|r"
+            end
             return M.itemNames[id], link, nil, nil, it.level, nil, nil, nil, it.loc, nil, nil, M.itemClass[id], it.sub, it.bind
         end,
         RequestLoadItemDataByID = function(id)

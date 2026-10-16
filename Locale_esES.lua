@@ -229,3 +229,5 @@ L["Item counts in tooltips off."] = "Cantidades de objetos en las descripciones 
 L["/af counts turns the item counts in tooltips on or off (if another addon, such as Baganator, already shows them)."] = "/af counts activa o desactiva las cantidades de objetos en las descripciones (si otro addon, como Baganator, ya las muestra)."
 L["Show item counts"] = "Mostrar cantidades de objetos"
 L["Item tooltips list how many of the item each of your characters has, and where. Turn this off if another addon, such as Baganator, already shows them; Can craft, skill-ups, upgrades and crates stay. Same as /af counts."] = "Las descripciones de objetos muestran cuántos tiene cada uno de tus personajes y dónde. Desactívalo si otro addon, como Baganator, ya las muestra; Puede fabricar, subidas de habilidad, mejoras y cajas se mantienen. Igual que /af counts."
+L["Your characters can craft"] = "Tus personajes pueden fabricar"
+L["Crafted by %s (%s)"] = "Fabricado por %s (%s)"
