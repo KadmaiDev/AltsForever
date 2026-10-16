@@ -111,13 +111,14 @@ test("window size: /af scale, the menu and the Options slider scale every window
     eq(AltsForeverDB.scale, 3)
     SlashCmdList.ALTSFOREVER("scale big")
     eq(AltsForeverDB.scale, 3)
-    -- The menu's sizes; 100% is stored as nothing.
+    -- The menu's sizes (no EllesmereUI: nothing to follow).
     ns.ShowOptionsMenu(UIParent)
     local texts = {}
     for _, item in ipairs(wow.menuItem("Window size").items) do texts[#texts + 1] = item.text end
     eq(table.concat(texts, " "), "75% 90% 100% 110% 125% 150% 175% 200% 250%")
     wow.menuItem("Window size").items[3].setSelected()
-    eq(AltsForeverDB.scale, nil)
+    eq(AltsForeverDB.scale, 1)
+    eq(wow.menuItem("Window size").items[3].isSelected(), true)
     eq(f:GetScale(), 1)
     eq(AltsForeverBagsFrame:GetScale(), 1)
     -- The Options page: a slider in %, showing the size.
@@ -129,4 +130,58 @@ test("window size: /af scale, the menu and the Options slider scale every window
     eq(AltsForeverDB.scale, 1.25)
     eq(f:GetScale(), 1.25)
     eq(page.scaleText.text, "125%")
+end)
+
+test("window size follows EllesmereUI's Window Scale until you choose your own", function()
+    local ns = wow.load(FILES)
+    wow.login({ v = 2, chars = { ["Tarn Moon"] = alt("Tarn Moon", "DRUID", {}) } })
+    -- EllesmereUI's slider: its saved value, and the function it calls (made with its panel).
+    EllesmereUI = {}
+    EllesmereUIDB = { panelScale = 1.5 }
+    ns.ToggleOverview(true)
+    local f = AltsForeverFrame
+    eq(f:GetScale(), 1.5, "the default follows it")
+    eq(ns.FollowsEllesmere(), true)
+    -- Changed while our window was closed: it catches up when it opens.
+    ns.ToggleOverview()
+    EllesmereUIDB.panelScale = 1.25
+    ns.ToggleOverview(true)
+    eq(f:GetScale(), 1.25)
+    -- Changed with ours open: live, once its panel has made SetPanelScale.
+    function EllesmereUI:SetPanelScale(v) EllesmereUIDB.panelScale = v end
+    ns.ToggleOverview()
+    ns.ToggleOverview(true)
+    EllesmereUI:SetPanelScale(1.75)
+    eq(f:GetScale(), 1.75, "follows its slider")
+    -- The menu: Same as EllesmereUI first, ticked.
+    ns.ShowOptionsMenu(UIParent)
+    local size = wow.menuItem("Window size")
+    eq(size.items[1].text, "Same as EllesmereUI (175%)")
+    eq(size.items[1].isSelected(), true)
+    -- Our own size wins, even when EllesmereUI's changes.
+    SlashCmdList.ALTSFOREVER("scale 120")
+    eq(f:GetScale(), 1.2)
+    eq(size.items[1].isSelected(), false)
+    EllesmereUI:SetPanelScale(2)
+    eq(f:GetScale(), 1.2, "ours stays")
+    -- The Options page: the tick box shows which, and ticking it follows again.
+    local page = ns.OptionsPanel()
+    page:Show()
+    eq(page.followEui:IsShown(), true)
+    eq(page.followEui:GetChecked(), false)
+    eq(page.slider:GetValue(), 120)
+    page.followEui:SetChecked(true)
+    page.followEui.scripts.OnClick(page.followEui)
+    eq(AltsForeverDB.scale, nil)
+    eq(f:GetScale(), 2)
+    eq(page.slider:GetValue(), 200)
+    -- Moving the slider unticks it.
+    page.slider:SetValue(150)
+    eq(page.followEui:GetChecked(), false)
+    eq(AltsForeverDB.scale, 1.5)
+    -- /af scale eui: following again.
+    SlashCmdList.ALTSFOREVER("scale eui")
+    eq(AltsForeverDB.scale, nil)
+    assert(wow.printed[#wow.printed]:find("200%, the same as EllesmereUI", 1, true), wow.printed[#wow.printed])
+    EllesmereUI, EllesmereUIDB = nil, nil
 end)

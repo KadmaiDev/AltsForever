@@ -19,11 +19,29 @@ end
 
 -- Window size (a player's request, 2026-10-16: they play at UI scale 0.53): our own
 -- windows scaled together, on top of the game's UI scale. Tooltips follow the game's.
+-- With EllesmereUI and no size of our own chosen (db.scale nil), they follow its Window
+-- Scale (the owner's wish, same day): EllesmereUIDB.panelScale, read only, not part of its
+-- official API. Its options panel is pinned to screen pixels times that; with its
+-- pixel-perfect UI scale (0.53 is 1440p's) UIParent is too, so the two match exactly.
 ns.SCALES = { 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5 }
 local MIN_SCALE, MAX_SCALE = 0.5, 3
 local windows = {}
 
-function ns.WindowScale() return ns.db.scale or 1 end
+local function Clamp(scale)
+    return math.max(MIN_SCALE, math.min(MAX_SCALE, math.floor(scale * 100 + 0.5) / 100))
+end
+
+-- EllesmereUI's Window Scale, or nil without EllesmereUI (1 if it hasn't set one).
+local function EllesmereScale()
+    if type(EllesmereUI) ~= "table" then return nil end
+    local v = type(EllesmereUIDB) == "table" and EllesmereUIDB.panelScale
+    if type(v) == "number" and v == v and v > 0 then return Clamp(v) end
+    return 1
+end
+
+function ns.HasEllesmereScale() return EllesmereScale() ~= nil end
+function ns.FollowsEllesmere() return ns.db.scale == nil and EllesmereScale() ~= nil end
+function ns.WindowScale() return ns.db.scale or EllesmereScale() or 1 end
 
 -- Positions are in a window's own scaled units: one placed against the screen keeps its
 -- centre where it was. One anchored to another of ours (gear, reputation) follows that.
@@ -39,19 +57,47 @@ local function Rescale(f, scale)
     end
 end
 
--- Each window, once, when it's created.
+local function ApplyScale()
+    local scale = ns.WindowScale()
+    for _, f in ipairs(windows) do Rescale(f, scale) end
+    if ns.BagsWindowChanged then ns.BagsWindowChanged() end -- its default height is a share of the screen
+end
+
+-- EllesmereUI's slider calls SetPanelScale (its panel creates it when first opened): once
+-- it exists, our open windows follow its slider live. Hooked once, guarded.
+local hookedEllesmere
+local function HookEllesmere()
+    if hookedEllesmere or type(EllesmereUI) ~= "table" or type(EllesmereUI.SetPanelScale) ~= "function" then return end
+    hookedEllesmere = true
+    pcall(hooksecurefunc, EllesmereUI, "SetPanelScale", function()
+        if ns.FollowsEllesmere() then ApplyScale() end
+    end)
+end
+
+-- Each window, once, when it's created. Checked again each time it opens: EllesmereUI's
+-- Window Scale may have changed while it was closed.
 function ns.ScaleWindow(f)
     windows[#windows + 1] = f
     f:SetScale(ns.WindowScale())
+    f:HookScript("OnShow", function(self)
+        HookEllesmere()
+        local scale = ns.WindowScale()
+        if self:GetScale() ~= scale then Rescale(self, scale) end
+    end)
 end
 
--- Sets the size (1 = 100%), kept between 50% and 300%; returns what it was set to.
+-- Sets our own size (1 = 100%), kept between 50% and 300%; returns what it was set to.
 function ns.SetWindowScale(scale)
-    scale = math.max(MIN_SCALE, math.min(MAX_SCALE, math.floor(scale * 100 + 0.5) / 100))
-    ns.db.scale = scale ~= 1 and scale or nil
-    for _, f in ipairs(windows) do Rescale(f, scale) end
-    if ns.BagsWindowChanged then ns.BagsWindowChanged() end -- its default height is a share of the screen
+    scale = Clamp(scale)
+    ns.db.scale = scale
+    ApplyScale()
     return scale
+end
+
+-- Back to the default: EllesmereUI's Window Scale if it's installed, else 100%.
+function ns.FollowEllesmere()
+    ns.db.scale = nil
+    ApplyScale()
 end
 
 function ns.ScaleText(scale) return ("%d%%"):format(math.floor((scale or ns.WindowScale()) * 100 + 0.5)) end
@@ -169,6 +215,8 @@ local function RefreshCanvas(f)
         f.slider:SetValue(ns.WindowScale() * 100)
         f.filling = nil
         f.scaleText:SetText(ns.ScaleText())
+        f.followEui:SetShown(ns.HasEllesmereScale())
+        f.followEui:SetChecked(ns.FollowsEllesmere())
     end
     for place, label in pairs(f.icons or {}) do
         label:SetText(ns.PlaceName(place) .. ":  " .. ns.PlaceMarkup(place) .. " 23")
@@ -250,15 +298,35 @@ local function BuildCanvas(f)
     slider:SetScript("OnValueChanged", function(_, value)
         if f.filling then return end
         scaleText:SetText(ns.ScaleText(ns.SetWindowScale(value / 100)))
+        f.followEui:SetChecked(false)
     end)
     slider:SetScript("OnEnter", function(self)
         Tooltip(self, L["Window size"], L["Makes Alts Forever's windows (overview, bags, reputation, gear, icons, craftable upgrades) bigger or smaller, on top of the game's UI scale. Tooltips follow the game's. Same as /af scale."])
     end)
     slider:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    -- With EllesmereUI: follow its Window Scale (the default) or not. Moving the slider
+    -- chooses our own size, which unticks it.
+    local follow = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+    follow:SetSize(26, 26)
+    follow:SetPoint("TOPLEFT", slider, "BOTTOMLEFT", -2, -8)
+    local followLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    followLabel:SetPoint("LEFT", follow, "RIGHT", 4, 0)
+    followLabel:SetText(L["Same as EllesmereUI's Window Scale"])
+    follow:SetScript("OnClick", function(self)
+        if self:GetChecked() then ns.FollowEllesmere() else ns.SetWindowScale(ns.WindowScale()) end
+        RefreshCanvas(f)
+    end)
+    follow:SetScript("OnEnter", function(self)
+        Tooltip(self, L["Same as EllesmereUI's Window Scale"], L["Your Alts Forever windows take the Window Scale set in EllesmereUI's options. Move the slider to choose a size of your own instead. Same as /af scale eui."])
+    end)
+    follow:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ns.SkinCheck(follow)
+    ns.SkinText(followLabel)
     ns.SkinText(sizeLabel)
     ns.SkinText(scaleText)
-    f.slider, f.scaleText = slider, scaleText
-    above = slider
+    f.slider, f.scaleText, f.followEui = slider, scaleText, follow
+    -- The icons below sit under the tick box only when it's there.
+    above = ns.HasEllesmereScale() and follow or slider
     -- Tooltip icons: each place's current icon (or word) and a Change... button.
     local heading = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     heading:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 2, -18)
@@ -360,8 +428,13 @@ function ns.ShowOptionsMenu(owner, fromOverview)
         root:CreateCheckbox(L["Show other rulesets and factions"], RulesetsSelected, ToggleRulesets)
         root:CreateCheckbox(L["Show minimap button"], MinimapSelected, ToggleMinimap)
         local size = root:CreateButton(L["Window size"])
+        if ns.HasEllesmereScale() then
+            size:CreateRadio(L["Same as EllesmereUI (%s)"]:format(ns.ScaleText(EllesmereScale())),
+                ns.FollowsEllesmere, ns.FollowEllesmere)
+        end
         for _, s in ipairs(ns.SCALES) do
-            size:CreateRadio(ns.ScaleText(s), function() return ns.WindowScale() == s end, function() ns.SetWindowScale(s) end)
+            size:CreateRadio(ns.ScaleText(s), function() return ns.db.scale == s or (ns.db.scale == nil and not ns.HasEllesmereScale() and s == 1) end,
+                function() ns.SetWindowScale(s) end)
         end
         root:CreateButton(L["Memory use"], function() ns.RunCommand("mem") end)
         -- Wrapped: a menu button's return value is read as a MenuResponse, and

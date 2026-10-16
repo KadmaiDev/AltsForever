@@ -396,10 +396,20 @@ function commands.anvils()
 end
 
 -- /af scale 150: our windows' size in % (Options.lua); on its own, says what it is.
+-- /af scale eui: back to following EllesmereUI's Window Scale.
 function commands.scale(arg)
-    local n = tonumber((arg or ""):match("^%s*(%d+%.?%d*)%%?%s*$"))
-    if n and n > 0 then ns.SetWindowScale(n / 100) end
-    Print(L["Window size: %s. /af scale and a size from 50 to 300 changes it."]:format(ns.ScaleText()))
+    arg = (arg or ""):lower()
+    local n = tonumber(arg:match("^%s*(%d+%.?%d*)%%?%s*$"))
+    if n and n > 0 then
+        ns.SetWindowScale(n / 100)
+    elseif arg:match("^%s*eui%s*$") or arg:match("^%s*ellesmere") then
+        ns.FollowEllesmere()
+    end
+    if ns.FollowsEllesmere() then
+        Print(L["Window size: %s, the same as EllesmereUI's Window Scale. /af scale and a size from 50 to 300 sets your own."]:format(ns.ScaleText()))
+    else
+        Print(L["Window size: %s. /af scale and a size from 50 to 300 changes it."]:format(ns.ScaleText()))
+    end
 end
 
 function commands.upgrades()
@@ -495,6 +505,7 @@ function commands.help()
     Print(L["/af upgrades turns upgrade hints in item tooltips on or off. /af role Name role sets what a character's upgrades are judged by (melee, ranged, caster, healer, tank, feral or auto)."])
     Print(L["/af anvils shows or hides the anvils on your character sheet that mark upgrades you or your alts can craft."])
     Print(L["/af scale 150 makes Alts Forever's windows one and a half times their size (any size from 50 to 300), on top of the game's UI scale."])
+    if ns.HasEllesmereScale() then Print(L["/af scale eui makes them follow EllesmereUI's Window Scale again (the default)."]) end
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
     Print(L["/af rulesets shows or hides your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; they can't trade with this one."])
     Print(L["Or use the minimap button (right-click for options)."])

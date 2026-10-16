@@ -2,7 +2,7 @@
 
 - **Upgrades shown as chevrons:** instead of a percentage, an upgrade now shows one green chevron for minor, two stacked for decent and three for major. It's judged against everything the character wears, not just the item it replaces, so +1 Agility over a cloak with only armour no longer shows as +583%.
 - **Craftable upgrades on the character sheet:** a small anvil appears beside a gear slot when you or one of your alts can craft an upgrade for it that you can wear now and that binds when equipped. Armour is only the heaviest type you wear (no leather for a warrior), and only characters who can mail you count. The anvil carries the best one's chevrons, so you can judge each slot at a glance. Hover it to see the best few and who makes them; click it to see them all (shift-click one to link it). Turn them off with **Show craftable upgrades on the character sheet** in the options, or `/af anvils`.
-- **Window size** (options, or `/af scale 150`): make Alts Forever's windows bigger or smaller, from 50% to 300%, on top of the game's UI scale. Handy if you play at a small UI scale. Thanks to the player who asked for this!
+- **Window size** (options, or `/af scale 150`): make Alts Forever's windows bigger or smaller, from 50% to 300%, on top of the game's UI scale. Handy if you play at a small UI scale. With EllesmereUI, the windows follow its Window Scale until you choose a size of your own. Thanks to the player who asked for this!
 - **Weapons compared like for like:** a weapon is only judged against the kind you wield now. With a sword and shield (or two one-handers) you see one-handed upgrades, not two-handers weighed against both; with a two-hander, only two-handers.
 
 ## Alts Forever 0.13.0
