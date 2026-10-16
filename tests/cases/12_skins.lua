@@ -57,6 +57,7 @@ test("with EllesmereUI, the bags window's slots look like its bags: square icons
     eq(empty.empty:IsShown(), true, "an empty slot: the empty-slot art, faded")
     eq(empty.empty.texture, "Interface\\PaperDoll\\UI-Backpack-EmptySlot")
     eq(empty.empty:GetAlpha(), 0.35)
+    eq(table.concat(empty.empty.tint, ","), "0.27,0.27,0.27", "tinted down to EllesmereUI's dark copy")
     eq(empty.icon.texture, nil, "not at full strength in the icon")
     eq(table.concat(empty.edges[1].tint, ","), "0,0,0")
 end)

@@ -145,6 +145,10 @@ local function EuiSlot(b)
     b.empty:SetAllPoints()
     b.empty:SetTexture(EMPTY_ART)
     b.empty:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    -- Theirs is a dark copy (brightness 12 of 255 on average, 48 at most): at 35% it mostly
+    -- darkens the square, with only a hint of the bag. Blizzard's is several times brighter,
+    -- so it's tinted down to match (the bags stood out, owner 2026-10-16).
+    b.empty:SetVertexColor(0.27, 0.27, 0.27)
     b.emptyAlpha = 0.35
     b.empty:Hide()
     -- Its bags' edges are one screen pixel; they take it from their pixel helper (not part
