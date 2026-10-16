@@ -27,6 +27,13 @@ local pool, names     -- every item's lower-case name, and its name, while the w
 local matches = {}
 local selected, offset = 1, 0
 local retried
+-- With the bags window open, the search works on it (owner, 2026-10-16): only the character
+-- it shows (scopeKey; "All characters" widens it), docked beside it, and the selected item
+-- lit there as you go (previewed). Closed without picking, the bags go back as they were
+-- (savedLit, savedView). The last search is kept for the next opening (this session only).
+local scopeKey, savedLit, savedView, previewed, picked, docked
+local lastText = ""
+local ApplyScope
 
 local function ItemName(id)
     local name = C_Item.GetItemNameByID(id)
@@ -163,6 +170,12 @@ function ns.SearchMatches(text)
         filter = Filter(word)
         text = rest
     end
+    -- What can be made isn't in one character's bags: @craft searches everyone.
+    if filter == "craft" and scopeKey then
+        scopeKey = nil
+        if ApplyScope then ApplyScope() end
+    end
+    local scoped = scopeKey and ns.db.chars[scopeKey]
     if text == "" or not pool then return matches end
     local words = {}
     for w in text:gmatch("%S+") do words[#words + 1] = w end
@@ -183,8 +196,20 @@ function ns.SearchMatches(text)
                 end
             end
             e.count = filter == "mine" and e.mine or e.total
+            -- One character's bags and bank: theirs only, them first, the number theirs.
+            local here = 0
+            if scoped then
+                here = (scoped.bags and scoped.bags[e.id] or 0) + (scoped.bank and scoped.bank[e.id] or 0)
+                e.count = here
+                for i, h in ipairs(e.holders) do
+                    if h.key == scopeKey then
+                        table.insert(e.holders, 1, table.remove(e.holders, i))
+                        break
+                    end
+                end
+            end
             if (filter ~= "owned" or e.total > 0) and (filter ~= "mine" or e.mine > 0)
-                and (filter ~= "craft" or #e.crafters > 0) then
+                and (filter ~= "craft" or #e.crafters > 0) and (not scoped or here > 0) then
                 matches[#matches + 1] = e
             end
         end
@@ -239,9 +264,18 @@ end
 
 -- Enter or a click: the bags or bank of whoever has it (you first, else the most), with it
 -- lit up; worn, their gear; only in the mail, said so. Nobody has it: link it.
+-- Closing after a pick: what's lit in the bags window stays (Escape or the close button put
+-- it back instead).
+local function Leave()
+    picked = true
+    frame:Hide()
+end
+
 local function Pick(e, link)
     if not e then return end
     if link then return Link(e) end
+    -- The bags window open on someone who has it: lit up there, where you're looking.
+    if ns.BagsShownKey() and ns.BagsPreview(e.id) then return Leave() end
     local h = e.holders[1]
     for _, x in ipairs(e.holders) do
         if x.key == ns.charKey then
@@ -251,7 +285,7 @@ local function Pick(e, link)
     end
     if not h then return Link(e) end
     local c = h.c
-    frame:Hide()
+    Leave()
     if c.bags and c.bags[e.id] then
         ns.ShowBags(h.key, "bags", e.id)
     elseif c.bank and c.bank[e.id] then
@@ -307,19 +341,19 @@ local function HolderMenu(row)
             local inMail, worn = c.mail and c.mail[id] or 0, c.equip and c.equip[id] or 0
             if inBags > 0 then
                 root:CreateButton(L["%s: %d in bags"]:format(who, inBags), function()
-                    frame:Hide()
+                    Leave()
                     ns.ShowBags(key, "bags", id)
                 end)
             end
             if inBank > 0 then
                 root:CreateButton(L["%s: %d in the bank"]:format(who, inBank), function()
-                    frame:Hide()
+                    Leave()
                     ns.ShowBags(key, "bank", id)
                 end)
             end
             if worn > 0 then
                 root:CreateButton(L["%s: wearing it"]:format(who), function()
-                    frame:Hide()
+                    Leave()
                     ns.ShowGear(key)
                 end)
             end
@@ -415,8 +449,19 @@ Render = function()
         frame.status:SetText("")
     elseif n == 0 then
         frame.status:SetText(GREY .. L["Nothing matching '%s'."]:format(text) .. "|r")
+    elseif ns.BagsShownKey() then
+        frame.status:SetText(GREY .. L["Enter: keep it lit · Escape: put the bags back as they were"] .. "|r")
     else
         frame.status:SetText(GREY .. L["Enter: open their bags · Right-click: choose whose · Shift+Enter: link in chat"] .. "|r")
+    end
+    -- The selected item lit in the open bags window, in place, if the character it shows has
+    -- it; if not, the bags as they were.
+    if ns.BagsShownKey() and frame:IsShown() then
+        local id = matches[selected] and matches[selected].id
+        if id ~= previewed then
+            previewed = id
+            if not (id and ns.BagsPreview(id)) then ns.BagsRestore(savedLit, savedView) end
+        end
     end
 end
 
@@ -481,6 +526,27 @@ local function CreateWindow()
     b:SetScript("OnTabPressed", function() Move(IsShiftKeyDown and IsShiftKeyDown() and -1 or 1) end)
     ns.SkinEditBox(b)
 
+    -- Searching one character's bags: back to all your characters.
+    local widen = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    widen:SetSize(112, 22)
+    widen:SetPoint("TOPRIGHT", f, "TOPRIGHT", -16, -33)
+    widen:SetText(L["All characters"])
+    widen:SetScript("OnClick", function()
+        scopeKey = nil
+        ApplyScope()
+        Update()
+        box:SetFocus()
+    end)
+    widen:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["Search all your characters instead."])
+        GameTooltip:Show()
+    end)
+    widen:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ns.SkinButton(widen)
+    widen:Hide()
+    f.widen = widen
+
     for i = 1, ROWS do Row(i) end
     -- Paging arrows (a controller can't turn the mouse wheel), and the wheel.
     f.up = ns.PageButton(f, true, function() Scroll(-ROWS) end)
@@ -527,13 +593,22 @@ local function CreateWindow()
         end
         Update()
         -- A frame later: focused at once, the key that opened it (a binding) would be typed in.
-        if C_Timer and C_Timer.After then
-            C_Timer.After(0, function() if frame:IsShown() then box:SetFocus() end end)
-        else
+        -- The last search is selected, so typing replaces it.
+        local function Focus()
             box:SetFocus()
+            box:HighlightText()
+        end
+        if C_Timer and C_Timer.After then
+            C_Timer.After(0, function() if frame:IsShown() then Focus() end end)
+        else
+            Focus()
         end
     end)
     f:SetScript("OnHide", function()
+        lastText = box:GetText() or ""
+        -- Closed without picking: the bags window as it was before.
+        if not picked and previewed ~= nil then ns.BagsRestore(savedLit, savedView) end
+        previewed, picked = nil, false
         box:ClearFocus()
         pool, names = nil, nil
         wipe(matches)
@@ -547,11 +622,56 @@ local function CreateWindow()
     ns.ScaleWindow(f)
 end
 
--- Opens the search (with some text to start from), or closes it if open and none is given.
+-- One character's bags (the bags window is open on them), or all your characters.
+ApplyScope = function()
+    local c = scopeKey and ns.db.chars[scopeKey]
+    if c then
+        frame.title:SetText(L["Search %s"]:format(ns.ColoredName(scopeKey, c)))
+        box:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -136, -32)
+        frame.widen:Show()
+    else
+        scopeKey = nil
+        frame.title:SetText(L["Search your characters"])
+        box:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -16, -32)
+        frame.widen:Hide()
+    end
+end
+
+-- Beside the bags window when it's open (right of it if there's room, else left), so
+-- neither covers the other; otherwise where it always opens.
+local function Dock()
+    local bags = ns.BagsWindow()
+    if bags and bags:IsShown() then
+        frame:ClearAllPoints()
+        local right = bags:GetRight()
+        if type(right) == "number" and not issecretvalue(right)
+            and right + 4 + WIDTH > UIParent:GetWidth() / ns.WindowScale() then
+            frame:SetPoint("TOPRIGHT", bags, "TOPLEFT", -4, 0)
+        else
+            frame:SetPoint("TOPLEFT", bags, "TOPRIGHT", 4, 0)
+        end
+        docked = true
+    elseif docked then
+        frame:ClearAllPoints()
+        frame:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
+        docked = false
+    end
+end
+
+-- Opens the search (with some text to start from; else the last search), or closes it if
+-- open and none is given.
 function ns.ToggleSearch(text)
     if not frame then CreateWindow() end
     text = text and text:match("^%s*(.-)%s*$") or ""
     if frame:IsShown() and text == "" then return frame:Hide() end
+    if not frame:IsShown() then
+        scopeKey = ns.BagsShownKey()
+        savedLit, savedView = ns.BagsState()
+        previewed, picked = nil, false
+        ApplyScope()
+        Dock()
+        if text == "" then text = lastText end
+    end
     box:SetText(text)
     if frame:IsShown() then Update() else frame:Show() end
 end

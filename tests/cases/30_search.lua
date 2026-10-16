@@ -96,7 +96,8 @@ test("Enter opens the bags of whoever has it, lit up (you first); arrows move; S
     eq(AltsForeverBagsFrame:IsShown(), true)
     eq(ns.BagsHighlight(), 2589)
     eq(AltsForeverBagsFrame.who.text:find("Aldric", 1, true) ~= nil, true)
-    -- Another character's bags: switching view clears the highlight.
+    -- With the bags window closed, the search is everyone's again: the bolt is in Tarn's bags.
+    AltsForeverBagsFrame:Hide()
     SlashCmdList.ALTSFOREVERSEARCH("linen")
     box.scripts.OnArrowPressed(box, "DOWN")
     box.scripts.OnEnterPressed(box)
@@ -290,4 +291,62 @@ test("after the arrow keys scroll the list, the mouse selects the item it's on, 
     box.scripts.OnArrowPressed(box, "DOWN")
     eq(GameTooltip.itemID, 8102, "the tooltip follows the selection")
     eq(GameTooltip:GetOwner(), rows[2])
+end)
+
+test("with the bags window open the search works on it: that character only, beside it, lit as you go; Escape puts it back", function()
+    local ns = searchStart()
+    wow.item(2592, "Wool Cloth", {})
+    AltsForeverDB.chars["Tarn Moon"].bank = { [2592] = 4 }
+    ns.ShowBags("Tarn Moon", "bags")
+    local bags = AltsForeverBagsFrame
+    bags.searchButton.scripts.OnClick(bags.searchButton)
+    local f, box = AltsForeverSearchFrame, AltsForeverSearchBox
+    eq(f:IsShown(), true)
+    assert(f.title.text:find("Tarn Moon", 1, true), f.title.text)
+    eq(f.widen:IsShown(), true)
+    eq(f.point[2], bags, "docked beside the bags window")
+    -- Only Tarn's bags and bank (not the silk in the mail, not Aldric's), Tarn's numbers.
+    searchType("cloth")
+    eq(searchRows(), "Linen Cloth (20) = [DRUID]Tarn 20, [MAGE]Aldric 5\n"
+        .. "Wool Cloth (4) = [DRUID]Tarn 4\n"
+        .. "Bolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
+    -- The selected one lit as you go, on Tarn, switching to the bank for the wool.
+    eq(ns.BagsHighlight(), 2589)
+    box.scripts.OnArrowPressed(box, "DOWN")
+    eq(ns.BagsHighlight(), 2592)
+    eq(select(2, ns.BagsState()), "bank")
+    assert(bags.who.text:find("Tarn Moon", 1, true), "never another character")
+    assert(f.status.text:find("Escape", 1, true), "says what Enter and Escape do here")
+    -- Escape: the bags as they were.
+    box.scripts.OnEscapePressed(box)
+    eq(f:IsShown(), false)
+    eq(ns.BagsHighlight(), nil)
+    eq(select(2, ns.BagsState()), "bags")
+    -- Opened again: the last search, selected so typing replaces it. Enter keeps it lit.
+    bags.searchButton.scripts.OnClick(bags.searchButton)
+    eq(box.text, "cloth")
+    box.scripts.OnEnterPressed(box)
+    eq(f:IsShown(), false)
+    eq(ns.BagsHighlight(), 2589, "kept")
+    assert(bags.who.text:find("Tarn Moon", 1, true))
+    -- All characters: Aldric's linen too; an item Tarn hasn't got leaves the bags as they were.
+    bags.searchButton.scripts.OnClick(bags.searchButton)
+    f.widen.scripts.OnClick(f.widen)
+    eq(f.title.text, "Search your characters")
+    eq(f.widen:IsShown(), false)
+    searchType("silk")
+    eq(ns.BagsHighlight(), 2589, "Tarn's bags hold no silk: left as they were")
+    -- @craft is about everyone: it widens by itself.
+    f:Hide()
+    bags.searchButton.scripts.OnClick(bags.searchButton)
+    assert(f.title.text:find("Tarn Moon", 1, true))
+    searchType("@craft gloves")
+    eq(f.title.text, "Search your characters")
+    eq(searchRows(), "Linked Gloves = can craft: [PALADIN]Smith (Blacksmithing) · none owned")
+    -- Bags window closed: opens in the middle again, for everyone.
+    f:Hide()
+    bags:Hide()
+    SlashCmdList.ALTSFOREVERSEARCH("")
+    eq(f.point[2], UIParent)
+    eq(f.title.text, "Search your characters")
 end)

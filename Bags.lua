@@ -688,6 +688,35 @@ end
 
 function ns.BagsHighlight() return lit end
 
+-- For the search (Search.lua), while this window is open: whose bags it shows, and what's
+-- lit and in which view, to put back if the search is closed without picking.
+function ns.BagsShownKey() return frame and frame:IsShown() and shownKey or nil end
+function ns.BagsState() return lit, view end
+
+-- Lights an item up on the character shown, in place: their bags or bank, wherever it is
+-- (switching between the two, never to another character). False, and nothing changed,
+-- if they haven't got it.
+function ns.BagsPreview(id)
+    local c = frame and frame:IsShown() and ns.db.chars[shownKey]
+    if not c then return false end
+    local other = view == "bags" and "bank" or "bags"
+    local here, there = c[view] and c[view][id], c[other] and c[other][id]
+    if not (here or there) then return false end
+    if lit == id and here then return true end
+    if not here then view = other end
+    lit, scroll = id, 0
+    Fill()
+    ScrollToLit()
+    return true
+end
+
+function ns.BagsRestore(oldLit, oldView)
+    if not (frame and frame:IsShown()) then return end
+    lit, view, scroll = oldLit, oldView or view, 0
+    Fill()
+    if lit then ScrollToLit() end
+end
+
 function ns.BagsWindow() return frame end
 
 -- The scanner calls this after each bags or bank scan; money changes too.
