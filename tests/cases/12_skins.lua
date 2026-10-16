@@ -34,7 +34,7 @@ test("with EllesmereUI, every window takes its look when first created", functio
     assert(skinnedWith("Shell", AltsForeverRepFrame), "reputation panel")
 end)
 
-test("with EllesmereUI, the bags window's slots look like its bags: square icons, a quality edge, faint empty squares", function()
+test("with EllesmereUI, the bags window's slots look like its bags: square icons, a quality edge, faded empty slots", function()
     wow.withEllesmere = true
     local ns = wow.load(FILES)
     wow.setBag(0, 4, { [1] = { 100, 20 }, [3] = { 200, 1 } })
@@ -54,8 +54,10 @@ test("with EllesmereUI, the bags window's slots look like its bags: square icons
     eq(table.concat(rare.edges[1].tint, ","), "0,0.44,0.87", "edge in the item's quality colour")
     eq(table.concat(unknown.edges[1].tint, ","), "0.25,0.25,0.25", "grey while its quality isn't known")
     eq(rare.empty:IsShown(), false)
-    eq(empty.empty:IsShown(), true, "an empty slot is a faint square")
-    eq(empty.icon.texture, nil, "without Blizzard's empty-slot art")
+    eq(empty.empty:IsShown(), true, "an empty slot: the empty-slot art, faded")
+    eq(empty.empty.texture, "Interface\\PaperDoll\\UI-Backpack-EmptySlot")
+    eq(empty.empty:GetAlpha(), 0.35)
+    eq(empty.icon.texture, nil, "not at full strength in the icon")
     eq(table.concat(empty.edges[1].tint, ","), "0,0,0")
 end)
 

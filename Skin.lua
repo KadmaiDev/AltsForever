@@ -129,10 +129,12 @@ end
 
 -- A slot in the bags window. With EllesmereUI, the look of its bags beside it (owner,
 -- 2026-10-16: the two windows looked different): the icon squared by its API, a 1 px edge we
--- colour by quality (ns.SlotEdge), an outlined count, and an empty slot drawn as a faint
--- square, as its bags draw theirs (its bag addon's own textures aren't part of the API, so
--- the square is ours). ElvUI: its icon button, as elsewhere.
+-- colour by quality (ns.SlotEdge), an outlined count, and an empty slot as its bags draw
+-- theirs: the empty-slot art, squared and faded (its bags use a darkened copy of it at 35%;
+-- that file isn't part of the API, so ours is Blizzard's own; a flat square looked worse,
+-- owner 2026-10-16). ElvUI: its icon button, as elsewhere.
 local WHITE = "Interface\\Buttons\\WHITE8X8"
+local EMPTY_ART = "Interface\\PaperDoll\\UI-Backpack-EmptySlot"
 local COUNT_SIZE = 11 -- EllesmereUI's bags' default count size
 
 local function EuiSlot(b)
@@ -141,7 +143,9 @@ local function EuiSlot(b)
     b.border:Hide()
     b.empty = b:CreateTexture(nil, "BACKGROUND", nil, 1)
     b.empty:SetAllPoints()
-    b.empty:SetColorTexture(1, 1, 1, 0.06)
+    b.empty:SetTexture(EMPTY_ART)
+    b.empty:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    b.emptyAlpha = 0.35
     b.empty:Hide()
     -- Its bags' edges are one screen pixel; they take it from their pixel helper (not part
     -- of the API: read only, else 1).

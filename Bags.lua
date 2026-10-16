@@ -214,9 +214,10 @@ local function ShowSlot(b, id, count)
     if not id then
         b.count:SetText("")
         b.border:Hide()
-        -- EllesmereUI's look: a faint square with a dark edge.
+        -- EllesmereUI's look: the empty-slot art faded, with a dark edge.
         if b.empty then
             b.icon:SetTexture(nil)
+            b.empty:SetAlpha(b.emptyAlpha * dim)
             b.empty:Show()
             ns.SlotEdge(b, 0, 0, 0, 0.3 * dim)
         else
