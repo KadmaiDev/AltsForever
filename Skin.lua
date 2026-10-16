@@ -72,6 +72,8 @@ local function ElvWindow(f)
     SkinRegions(f, ElvFont)
 end
 
+local TITLE_Y = -14
+
 -- A whole window: themed backdrop and border, its close button and inset, and the text
 -- it already has. Rows and cells made later call ns.SkinText themselves. `opts` goes to
 -- EllesmereUI's Shell (e.g. noBorder).
@@ -81,6 +83,13 @@ function ns.SkinWindow(f, opts)
         skin.Shell(f, opts)
         if f.CloseButton then skin.CloseButton(f.CloseButton) end
         if f.Inset then skin.Inset(f.Inset) end
+        -- The title's letters in the middle of the shell's 25-unit title strip: the font
+        -- string's box allows for descenders, so centring the box left them ~3 px high
+        -- (measured on the owner's screenshot, 2026-10-16).
+        if f.TitleText then
+            f.TitleText:ClearAllPoints()
+            f.TitleText:SetPoint("CENTER", f, "TOP", 0, TITLE_Y)
+        end
         -- Icon buttons (the overview's reputation and options buttons): EllesmereUI's flat
         -- square icons with its thin border.
         for _, b in ipairs({ f.cog, f.repButton }) do
@@ -103,11 +112,13 @@ function ns.SkinButton(b)
     end
 end
 
--- A text box: EllesmereUI's, or ElvUI's.
+-- A text box: EllesmereUI's, or ElvUI's. With EllesmereUI the text gets room before the
+-- border (`padInput`, its API's own option: the owner found "linen" pressed against the
+-- edge, 2026-10-16); it needs the box anchored first.
 function ns.SkinEditBox(e)
     if not e then return end
     if skin then
-        if skin.EditBox then pcall(skin.EditBox, e) end
+        if skin.EditBox then pcall(skin.EditBox, e, { padInput = true }) end
     elseif Elv() then
         pcall(elvS.HandleEditBox, elvS, e)
     end

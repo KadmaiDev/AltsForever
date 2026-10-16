@@ -101,6 +101,27 @@ test("without EllesmereUI the bags window keeps Blizzard's slot art", function()
     end
 end)
 
+test("with EllesmereUI, window titles sit in the middle of its title strip and text boxes get room before the edge", function()
+    wow.withEllesmere = true
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    wow.skinCallback(wow.skinFacade)
+    local f = CreateFrame("Frame", nil, UIParent)
+    f.TitleText = f:CreateFontString()
+    ns.SkinWindow(f)
+    eq(f.TitleText.point[1], "CENTER")
+    eq(f.TitleText.point[2], f)
+    eq(f.TitleText.point[3], "TOP")
+    eq(f.TitleText.point[5], -14)
+    SlashCmdList.ALTSFOREVERSEARCH("")
+    local opts
+    for _, call in ipairs(wow.skinned) do
+        if call[1] == "EditBox" and call[2] == AltsForeverSearchBox then opts = call[3] end
+    end
+    eq(opts and opts.padInput, true, "the search box's text has room before the border")
+    AltsForeverSearchFrame:Hide()
+end)
+
 test("a window opened before EllesmereUI's callback is skinned when it arrives", function()
     wow.withEllesmere = true
     wow.load(FILES)
