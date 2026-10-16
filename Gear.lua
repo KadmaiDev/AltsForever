@@ -190,14 +190,27 @@ local function Fill()
     panel.footer:SetText(gear and (L["Lowest durability: %s"]:format(ns.DurabilityText(c.dura))) or "")
 end
 
+local function Num(x) return type(x) == "number" and not issecretvalue(x) and x end
+
 -- Opens the gear panel for a character, beside the overview if it's open; clicking
--- the same character again closes it.
-function ns.ShowGear(key)
+-- the same character again closes it. With `beside` (the search), next to that window on
+-- `side` ("LEFT" or "RIGHT"), or the other side if there's no room on the screen.
+function ns.ShowGear(key, beside, side)
     if not panel then CreatePanel() end
-    if panel:IsShown() and shownKey == key then return panel:Hide() end
+    if panel:IsShown() and shownKey == key and not beside then return panel:Hide() end
     shownKey = key
     panel:ClearAllPoints()
-    if AltsForeverFrame and AltsForeverFrame:IsShown() then
+    if beside then
+        local width, screen = panel:GetWidth(), UIParent:GetWidth() / ns.WindowScale()
+        local left, right = Num(beside:GetLeft()), Num(beside:GetRight())
+        if side == "RIGHT" and right and width and right + 4 + width > screen then side = "LEFT" end
+        if side == "LEFT" and left and width and left - 4 - width < 0 then side = "RIGHT" end
+        if side == "LEFT" then
+            panel:SetPoint("TOPRIGHT", beside, "TOPLEFT", -4, 0)
+        else
+            panel:SetPoint("TOPLEFT", beside, "TOPRIGHT", 4, 0)
+        end
+    elseif AltsForeverFrame and AltsForeverFrame:IsShown() then
         panel:SetPoint("TOPLEFT", AltsForeverFrame, "TOPRIGHT", 4, 0)
     else
         panel:SetPoint("CENTER")

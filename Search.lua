@@ -280,10 +280,19 @@ local function Open(key, view, id)
     Kept()
 end
 
--- Their gear is another window: the search makes way for it.
+local function Num(x) return type(x) == "number" and not issecretvalue(x) and x end
+
+-- Their gear: the panel opens on the far side of the search from the bags window, and the
+-- search stays open (owner, 2026-10-16).
 local function Gear(key)
-    frame:Hide()
-    ns.ShowGear(key)
+    local side = "RIGHT"
+    local bags = ns.BagsWindow()
+    if docked and bags and bags:IsShown() then
+        local left, bagsLeft = Num(frame:GetLeft()), Num(bags:GetLeft())
+        if left and bagsLeft and left < bagsLeft then side = "LEFT" end
+    end
+    ns.ShowGear(key, frame, side)
+    box:SetFocus()
 end
 
 local function Pick(e, link)

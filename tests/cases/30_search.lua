@@ -373,3 +373,44 @@ test("with the bags window open the search works on it: that character only, bes
     eq(f.point[2], UIParent)
     eq(f.title.text, "Search your characters")
 end)
+
+test("a worn item opens their gear on the far side of the search from the bags window, and the search stays open", function()
+    local ns = searchStart()
+    AltsForeverDB.chars["Smith"].equip = { [6001] = 1 }
+    ns.ShowBags("Tarn Moon", "bags")
+    local bags = AltsForeverBagsFrame
+    bags.searchButton.scripts.OnClick(bags.searchButton)
+    local f, box = AltsForeverSearchFrame, AltsForeverSearchBox
+    f.widen.scripts.OnClick(f.widen)
+    local screen = UIParent.width
+    UIParent.width = 2560
+    -- The search right of the bags window: the gear goes right of the search.
+    bags.GetLeft = function() return 100 end
+    f.GetLeft, f.GetRight = function() return 800 end, function() return 1280 end
+    searchType("linked")
+    box.scripts.OnEnterPressed(box)
+    local gear = AltsForeverGearFrame
+    eq(gear:IsShown(), true)
+    eq(f:IsShown(), true, "the search stays open")
+    eq(gear.point[1], "TOPLEFT")
+    eq(gear.point[2], f)
+    eq(gear.point[3], "TOPRIGHT")
+    box.scripts.OnEnterPressed(box)
+    eq(gear:IsShown(), true, "picking it again doesn't close it")
+    -- The search left of the bags window: the gear goes left of it.
+    bags.GetLeft = function() return 1300 end
+    box.scripts.OnEnterPressed(box)
+    eq(gear.point[1], "TOPRIGHT")
+    eq(gear.point[3], "TOPLEFT")
+    -- No room right of the search on the screen: left of it.
+    bags.GetLeft = function() return 100 end
+    UIParent.width = 1400
+    gear.width = 440
+    box.scripts.OnEnterPressed(box)
+    eq(gear.point[1], "TOPRIGHT")
+    gear:Hide()
+    f:Hide()
+    bags:Hide()
+    bags.GetLeft, f.GetLeft, f.GetRight = nil, nil, nil
+    UIParent.width = screen
+end)
