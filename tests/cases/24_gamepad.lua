@@ -26,6 +26,20 @@ test("with the Gamepad UI on, our windows report to Blizzard's focus manager, an
     eq(focusCalls(), "hidden AltsForeverBagsFrame")
 end)
 
+test("with the Gamepad UI on, the search reports to the focus manager, B closes it, and it pages without a wheel", function()
+    local ns = wow.load(FILES)
+    wow.login({ v = 2, chars = { ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { level = 20, bags = {} }) } })
+    wow.gamepadUI = true
+    wow.focus = {}
+    ns.ToggleSearch()
+    local f = AltsForeverSearchFrame
+    eq(focusCalls(), "shown AltsForeverSearchFrame")
+    assert(f.up and f.down, "page buttons for a controller")
+    eq(f:SmartNavigationCloseHandler(), true, "handled")
+    eq(f:IsShown(), false)
+    eq(focusCalls(), "hidden AltsForeverSearchFrame")
+end)
+
 test("mouse and keyboard players: nothing reports to the focus manager", function()
     local ns = wow.load(FILES)
     wow.login(nil)
