@@ -494,13 +494,18 @@ function commands.rep()
     ns.ToggleReputation()
 end
 
+-- /af export: every character as text to copy (Export.lua).
+function commands.export()
+    ns.ToggleExport()
+end
+
 function commands.mem()
     UpdateAddOnMemoryUsage()
     Print(L["Memory: %.1f KB"]:format(GetAddOnMemoryUsage(ADDON)))
 end
 
 function commands.help()
-    Print(L["by Kadmai. /af opens the overview. Also: /af rep | mail | list | delete Name | skillups | sendmail | minimap | stats | mem"])
+    Print(L["by Kadmai. /af opens the overview. Also: /af rep | export | mail | list | delete Name | skillups | sendmail | minimap | stats | mem"])
     Print(L["/af search (or /afs), with or without a name, finds an item on any of your characters, or who can craft it."])
     Print(L["/af counts turns the item counts in tooltips on or off (if another addon, such as Baganator, already shows them)."])
     Print(L["/af bags or /af bank, with a name for another character, shows their bags or bank slot by slot."])
