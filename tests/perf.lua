@@ -5,7 +5,12 @@
 package.path = "tests/?.lua;" .. package.path
 local wow = require("wow")
 local SAVED = arg[1] or "tests/fixtures/AltsForever.lua"
-local FILES = { "Locales.lua", "Locale_deDE.lua", "Locale_esES.lua", "Locale_frFR.lua", "Locale_ptBR.lua", "Locale_zhCN.lua", "Locale_zhTW.lua", "Core.lua", "Scanner.lua", "Mail.lua", "Money.lua", "Professions.lua", "Character.lua", "Talents.lua", "Columns.lua", "Overview.lua", "Bars.lua", "Gear.lua", "Bags.lua", "Icons.lua", "Upgrades.lua", "Tooltip.lua", "Options.lua", "Reputation.lua", "Skin.lua", "Gamepad.lua" }
+-- The files the game loads, in its order, from the .toc (a list kept here fell behind).
+local FILES = {}
+for line in io.lines("AltsForever.toc") do
+    local file = line:match("^([%w_]+%.lua)%s*$")
+    if file then FILES[#FILES + 1] = file end
+end
 
 local function out(fmt, ...) io.write(fmt:format(...), "\n") end
 local function settle()

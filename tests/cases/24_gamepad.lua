@@ -40,6 +40,19 @@ test("with the Gamepad UI on, the search reports to the focus manager, B closes 
     eq(focusCalls(), "hidden AltsForeverSearchFrame")
 end)
 
+test("with the Gamepad UI on, the export reports to the focus manager and B closes it", function()
+    local ns = wow.load(FILES)
+    wow.login({ v = 2, chars = { ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { level = 20, bags = {} }) } })
+    wow.gamepadUI = true
+    wow.focus = {}
+    ns.ToggleExport()
+    local f = AltsForeverExportFrame
+    eq(focusCalls(), "shown AltsForeverExportFrame")
+    eq(f:SmartNavigationCloseHandler(), true, "handled")
+    eq(f:IsShown(), false)
+    eq(focusCalls(), "hidden AltsForeverExportFrame")
+end)
+
 test("mouse and keyboard players: nothing reports to the focus manager", function()
     local ns = wow.load(FILES)
     wow.login(nil)
