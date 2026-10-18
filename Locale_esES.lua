@@ -297,3 +297,4 @@ L["Spreadsheet (Excel, Google Sheets)"] = "Hoja de cálculo (Excel, Google Sheet
 L["Text (notes, chat, documents)"] = "Texto (notas, chat, documentos)"
 L["Markdown table (Notion, Obsidian)"] = "Tabla Markdown (Notion, Obsidian)"
 L["Columns for a spreadsheet, readable lines for notes or chat, or a Markdown table for Notion or Obsidian."] = "Columnas para una hoja de cálculo, líneas legibles para notas o chat, o una tabla Markdown para Notion u Obsidian."
+L["Online"] = "En línea"

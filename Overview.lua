@@ -128,7 +128,7 @@ function ns.PlayedText(c, now)
 end
 
 function ns.SeenText(key, c, now)
-    if key == ns.charKey then return "|cff20ff20Online|r" end
+    if key == ns.charKey then return "|cff20ff20" .. L["Online"] .. "|r" end
     local t = c.updated or c.seen
     return t and ns.FormatAgo(now - t) or (GREY .. "?|r")
 end

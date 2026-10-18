@@ -69,6 +69,16 @@ test("on a German client the addon speaks German", function()
     assert(text:find("Ausgeruht", 1, true), text)
 end)
 
+test("on a Spanish client your own row says you're online in Spanish", function()
+    wow.locale = "esES"
+    wow.load(FILES)
+    wow.locale = nil
+    wow.now = NOW
+    wow.login(overviewAlts())
+    SlashCmdList.ALTSFOREVER("")
+    eq(cell(overviewRows()[1], 14), "|cff20ff20En línea|r")
+end)
+
 test("on an English client nothing is translated", function()
     wow.load(FILES)
     wow.login(nil)
