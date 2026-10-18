@@ -18,7 +18,7 @@ Type `/af` to open the **overview**: every character with level and XP, rested X
 
 ![The overview window, grouped by ruleset and faction, with a character's details and gear panel](media/alt-overview.png)
 
-**Export:** the note button in the overview's title bar (or `/af export`) shows the overview as plain text, selected and ready to copy with Ctrl+C into your notes or a planning page. Tick **For spreadsheets** for a header row and columns that paste straight into Google Sheets or Excel.
+**Export:** the note button in the overview's title bar (or `/af export`) shows the overview as text, selected and ready to copy with Ctrl+C. Choose the format: **Spreadsheet** pastes into Excel or Google Sheets as columns, **Text** gives readable lines for notes or chat, and **Markdown table** becomes a table in Notion, Obsidian and the like.
 
 **Bags and bank:** your own bags and bank (an entry in the bag's portrait menu, or a small Alts Forever button in the header of Blizzard's bank and of ElvUI's and EllesmereUI's bags and bank), the bag button in the overview's title bar (or `/af bags`, `/af bank`, or right-click a character) opens a window showing any character's bags or bank slot by slot, as you last saw them: each stack with its count, empty slots, how many slots are free, and a coloured border for uncommon and better items. Everything shows in one grid, or tick **By bag** for a section per bag or bank tab, e.g. "Red Linen Bag (7 / 8)". The character's gold is at the bottom. Drag the bottom-right corner to resize: the width sets the slots per row (10 to 30), the height how tall it gets before scrolling, and both are remembered. Pick the character from the dropdown and switch between Bags and Bank. Hover an item for its tooltip, shift-click to link it. A character's slots are recorded the next time you log in on them (bags) or visit their bank; until then the window shows one slot per item with its total.
 
@@ -104,7 +104,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 |---|---|
 | `/af` | Open or close the overview window |
 | `/af rep` | Open or close the Reputation panel |
-| `/af export` | Show every character as text to copy into notes or a spreadsheet |
+| `/af export` | Show every character as text to copy: for a spreadsheet, notes or a Markdown table |
 | `/af icons` | Choose the icons item tooltips use for bags, bank, mail and worn items |
 | `/af bags [name]`, `/af bank [name]` | Show your bags or bank slot by slot, or another character's, e.g. `/af bank Tarnia` |
 | `/afs [text]`, `/af search [text]` or `/af find [text]` | Search every item your characters have or can craft; Enter opens their bags with it lit up |

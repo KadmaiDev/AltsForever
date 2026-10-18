@@ -1,6 +1,6 @@
 ## Unreleased
 
-- **Export your characters** (the note button in the overview's title bar, or `/af export`): every character's level, XP, rested, Well Rested, Legacy points, gold, professions, mail expiry, zone, time played and when you last played them, as plain text ready to copy with Ctrl+C into your notes or planning page, grouped by ruleset and faction like the overview. Tick **For spreadsheets** for a header row and columns that paste straight into Google Sheets or Excel. (A player's request.)
+- **Export your characters** (the note button in the overview's title bar, or `/af export`): every character's level, XP, rested, Well Rested, Legacy points, gold, professions, mail expiry, zone, time played and when you last played them, ready to copy with Ctrl+C, grouped by ruleset and faction like the overview. Pick the format: **Spreadsheet** (columns that paste straight into Excel or Google Sheets, with gold, percentages and dates as numbers), **Text** (readable lines for notes or chat) or **Markdown table** (for Notion, Obsidian and the like). (A player's request.)
 
 ## Alts Forever 0.15.0
 

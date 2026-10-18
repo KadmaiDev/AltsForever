@@ -1,9 +1,12 @@
--- Alts Forever export: the overview's characters as plain text to copy (a player's request,
+-- Alts Forever export: the overview's characters as text to copy (a player's request,
 -- 2026-10-17, for their own planning page outside the game). An addon can't write a file or
--- the clipboard, so the text sits selected in a box for Ctrl+C. Readable lines by default;
--- with "For spreadsheets" ticked (db.exportTabs) a header row and tab-separated columns,
--- which paste into Google Sheets or Excel as columns. The text is made when the window
--- opens and let go when it closes.
+-- the clipboard, so the text sits selected in a box for Ctrl+C. Three formats, picked from a
+-- dropdown and remembered (db.exportFormat, nil = spreadsheet, the owner's default):
+--  * "tabs": a header row and tab-separated columns, which paste into Google Sheets or
+--    Excel as columns;
+--  * "text": readable lines for notes or chat;
+--  * "markdown": a table that Notion, Obsidian and the like turn into a real one.
+-- The text is made when the window opens and let go when it closes.
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
@@ -15,7 +18,17 @@ local WIDTH, HEIGHT = 680, 440
 local SEP = " · "
 local TAB = "\t"
 
-local frame, box, scroll, check
+-- In the dropdown's order. CSV was considered and left out (owner, 2026-10-18): pasted, Excel
+-- splits only on tabs, and a comma decimal mark would need every value quoted.
+local FORMATS = { "tabs", "text", "markdown" }
+local NAMES = { tabs = L["Spreadsheet"], text = L["Text"], markdown = L["Markdown table"] }
+local CHOICES = {
+    tabs = L["Spreadsheet (Excel, Google Sheets)"],
+    text = L["Text (notes, chat, documents)"],
+    markdown = L["Markdown table (Notion, Obsidian)"],
+}
+
+local frame, box, scroll
 local text -- what the box holds while open: typing in it puts this back
 
 -- Colour codes and icons out: the text leaves the game.
@@ -33,6 +46,11 @@ function ns.PlainMoney(copper)
     if s > 0 then parts[#parts + 1] = s .. (SILVER_AMOUNT_SYMBOL or "s") end
     if c > 0 or #parts == 0 then parts[#parts + 1] = c .. (COPPER_AMOUNT_SYMBOL or "c") end
     return concat(parts, " ")
+end
+
+function ns.ExportFormat()
+    local f = ns.db.exportFormat
+    return NAMES[f] and f or "tabs"
 end
 
 local function ClassName(c)
@@ -54,50 +72,83 @@ local function Profs(c)
     return n1, s1, n2, s2
 end
 
--- One readable line: only what's known, with words saying what each number is.
-local function Line(key, c, now)
-    local out = { key }
-    local class = ClassName(c)
-    if class then out[#out + 1] = class end
-    if c.level then
-        local _, pct = ns.LevelParts(c)
-        pct = Plain(pct)
-        out[#out + 1] = L["Level %d"]:format(c.level) .. (pct ~= "" and (" (" .. pct .. ")") or "")
-    end
-    local rested = Rested(c, now)
-    if rested then out[#out + 1] = L["Rested %s"]:format(rested) end
-    if c.wellRested then out[#out + 1] = L["Well Rested %s"]:format(c.wellRested .. "/5") end
-    if ns.LegacyUnspent(c) then
-        out[#out + 1] = L["Legacy %s"]:format(Plain((ns.LegacyCells(c))))
-    end
-    if c.money then out[#out + 1] = ns.PlainMoney(c.money) end
+local function When(t) return t and date("%Y-%m-%d %H:%M", t) or nil end
+
+-- What the readable formats show of a character, as text; nil where it isn't known.
+local function Readable(key, c, now)
+    local _, pct = ns.LevelParts(c)
+    pct = Plain(pct)
+    local r = {
+        class = ClassName(c),
+        xp = pct ~= "" and pct or nil,
+        rested = Rested(c, now),
+        wellRested = c.wellRested and (c.wellRested .. "/5"),
+        legacy = ns.LegacyUnspent(c) and Plain((ns.LegacyCells(c))),
+        gold = c.money and ns.PlainMoney(c.money),
+        zone = c.zone,
+    }
     local n1, s1, n2, s2 = Profs(c)
     if n1 then
         local p = n1 ~= "" and (n1 .. " " .. s1) or ""
         if n2 ~= "" then p = (p ~= "" and (p .. ", ") or "") .. n2 .. " " .. s2 end
-        if p ~= "" then out[#out + 1] = p end
+        if p ~= "" then r.profs = p end
     end
-    if c.mail and c.mailExpires then
-        local left = c.mailExpires - now
-        out[#out + 1] = left > 0 and L["Mail expires in %s"]:format(ns.ExpiryText(left)) or L["Mail has expired"]
-    end
-    if c.zone then out[#out + 1] = c.zone end
+    if c.mail and c.mailExpires then r.mailLeft = c.mailExpires - now end
     local played = ns.PlayedNow(c, now)
-    if played then out[#out + 1] = L["Played %s"]:format(ns.FormatPlayed(played)) end
+    if played then r.played = ns.FormatPlayed(played) end
     if key == ns.charKey then
-        out[#out + 1] = L["Playing now"]
+        r.seen = L["Playing now"]
     elseif c.updated or c.seen then
-        out[#out + 1] = L["Last seen %s"]:format(ns.FormatAgo(now - (c.updated or c.seen)))
+        r.ago = ns.FormatAgo(now - (c.updated or c.seen))
     end
+    return r
+end
+
+-- One readable line: only what's known, with words saying what each number is.
+local function Line(key, c, now)
+    local r = Readable(key, c, now)
+    local out = { key }
+    local function Add(v) if v then out[#out + 1] = v end end
+    Add(r.class)
+    if c.level then Add(L["Level %d"]:format(c.level) .. (r.xp and (" (" .. r.xp .. ")") or "")) end
+    Add(r.rested and L["Rested %s"]:format(r.rested))
+    Add(r.wellRested and L["Well Rested %s"]:format(r.wellRested))
+    Add(r.legacy and L["Legacy %s"]:format(r.legacy))
+    Add(r.gold)
+    Add(r.profs)
+    if r.mailLeft then
+        Add(r.mailLeft > 0 and L["Mail expires in %s"]:format(ns.ExpiryText(r.mailLeft)) or L["Mail has expired"])
+    end
+    Add(r.zone)
+    Add(r.played and L["Played %s"]:format(r.played))
+    Add(r.seen or (r.ago and L["Last seen %s"]:format(r.ago)))
     return concat(out, SEP)
+end
+
+-- A Markdown table: the header, then the line under it (numbers right-aligned).
+local function MarkdownHeader()
+    return "| " .. concat({ L["Character"], L["Class"], L["Level"], L["XP"], L["Rested"], L["Well Rested"],
+        L["Legacy"], L["Gold"], L["Professions"], L["Mail expires"], L["Zone"], L["Played"], L["Last seen"] }, " | ")
+        .. " |", "|---|---|--:|--:|--:|:-:|:-:|--:|---|---|---|--:|---|"
+end
+
+local function MarkdownRow(key, c, now)
+    local r = Readable(key, c, now)
+    local mail = r.mailLeft and ns.ExpiryText(r.mailLeft)
+    local cells = { key, r.class, c.level, r.xp, r.rested, r.wellRested, r.legacy, r.gold, r.profs, mail,
+        r.zone, r.played, r.seen or r.ago }
+    local out = {}
+    for i = 1, 13 do
+        -- A | in a cell would end it.
+        out[i] = cells[i] == nil and "" or (tostring(cells[i]):gsub("[\r\n]", " "):gsub("|", "\\|"))
+    end
+    return "| " .. concat(out, " | ") .. " |"
 end
 
 local function Cell(v)
     if v == nil then return "" end
     return (tostring(v):gsub("[\t\r\n]", " "))
 end
-
-local function When(t) return t and date("%Y-%m-%d %H:%M", t) or nil end
 
 -- Gold as a number to the silver ("312.10"), with the decimal mark of the game's language,
 -- which is likely the spreadsheet's too ("312,10" in German).
@@ -134,21 +185,30 @@ local function Row(key, c, now, group)
     return concat(out, TAB)
 end
 
--- Every character, in the overview's order and groups (rulesets and factions).
-function ns.ExportText(tabs)
+-- Every character, in the overview's order and groups (rulesets and factions), in one of
+-- the FORMATS (default: the saved choice).
+function ns.ExportText(format)
+    format = format or ns.ExportFormat()
     local now = time()
     local chars = ns.db.chars
     local keys = ns.OverviewOrder()
     local byRealm, byFaction = ns.GroupParts()
     local split = byRealm or byFaction
     local lines = {}
-    if tabs then
+    if format == "tabs" then
         lines[1] = Header(split)
         for _, key in ipairs(keys) do
             local c = chars[key]
             lines[#lines + 1] = Row(key, c, now, split and ns.GroupLabel(c, byRealm, byFaction))
         end
         return concat(lines, "\n")
+    end
+    local md = format == "markdown"
+    local function Table()
+        if not md then return end
+        local head, under = MarkdownHeader()
+        lines[#lines + 1] = head
+        lines[#lines + 1] = under
     end
     lines[1] = "Alts Forever" .. SEP .. When(now)
     -- Each group headed by its name and gold: gold can't move between them.
@@ -165,27 +225,48 @@ function ns.ExportText(tabs)
         if split and ns.GroupKey(c, byRealm, byFaction) ~= group then
             group = ns.GroupKey(c, byRealm, byFaction)
             lines[#lines + 1] = ""
-            lines[#lines + 1] = ns.GroupLabel(c, byRealm, byFaction) .. " (" .. ns.PlainMoney(gold[group]) .. ")"
+            lines[#lines + 1] = (md and "### " or "") .. ns.GroupLabel(c, byRealm, byFaction)
+                .. " (" .. ns.PlainMoney(gold[group]) .. ")"
+            if md then lines[#lines + 1] = "" end
+            Table()
         elseif #lines == 1 then
             lines[#lines + 1] = ""
+            Table()
         end
-        lines[#lines + 1] = Line(key, c, now)
+        lines[#lines + 1] = md and MarkdownRow(key, c, now) or Line(key, c, now)
         total = total + (c.money or 0)
         local p = ns.PlayedNow(c, now)
         if p then played, anyPlayed = played + p, true end
     end
     lines[#lines + 1] = ""
     if not split then lines[#lines + 1] = L["Total gold: %s"]:format(ns.PlainMoney(total)) end
-    if anyPlayed then lines[#lines + 1] = L["Total played: %s"]:format(ns.FormatPlayed(played)) end
+    -- Two lines in Markdown are one paragraph unless a blank line parts them.
+    if anyPlayed then
+        if md and not split then lines[#lines + 1] = "" end
+        lines[#lines + 1] = L["Total played: %s"]:format(ns.FormatPlayed(played))
+    end
     return concat(lines, "\n")
 end
 
 local function Fill()
-    text = ns.ExportText(ns.db.exportTabs)
+    frame.format:SetText(NAMES[ns.ExportFormat()])
+    text = ns.ExportText()
     box:SetText(text)
     box:SetFocus()
     box:HighlightText()
     if scroll.SetVerticalScroll then scroll:SetVerticalScroll(0) end
+end
+
+local function PickFormat(owner)
+    MenuUtil.CreateContextMenu(owner, function(_, root)
+        for _, f in ipairs(FORMATS) do
+            root:CreateRadio(CHOICES[f], function(v) return v == ns.ExportFormat() end, function(v)
+                -- nil for the default, so saves stay small.
+                ns.db.exportFormat = v ~= "tabs" and v or nil
+                Fill()
+            end, f)
+        end
+    end)
 end
 
 local function CreateWindow()
@@ -210,26 +291,23 @@ local function CreateWindow()
     f.hint:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -38)
     f.hint:SetText(L["Press Ctrl+C to copy, then paste it wherever you like."])
 
-    -- Readable lines, or columns for a spreadsheet: remembered for next time.
-    local okCheck, c = pcall(CreateFrame, "CheckButton", nil, f, "UICheckButtonTemplate")
-    if not okCheck then c = CreateFrame("CheckButton", nil, f) end
-    check = c
-    f.check = c
-    c:SetSize(24, 24)
-    c.label = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    c.label:SetPoint("TOPRIGHT", f, "TOPRIGHT", -18, -38)
-    c.label:SetText(L["For spreadsheets"])
-    c:SetPoint("RIGHT", c.label, "LEFT", -2, 0)
-    c:SetScript("OnClick", function(self)
-        ns.db.exportTabs = self:GetChecked() and true or nil
-        Fill()
-    end)
-    c:SetScript("OnEnter", function(self)
+    -- The format dropdown, top right; remembered for next time.
+    local fmt = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    fmt:SetSize(150, 22)
+    fmt:SetPoint("TOPRIGHT", f, "TOPRIGHT", -16, -33)
+    fmt:SetScript("OnClick", PickFormat)
+    fmt:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(L["Columns separated by tabs: they paste into Google Sheets or Excel as columns."], 1, 1, 1, true)
+        GameTooltip:AddLine(L["Format"])
+        GameTooltip:AddLine(L["Columns for a spreadsheet, readable lines for notes or chat, or a Markdown table for Notion or Obsidian."], 1, 1, 1, true)
         GameTooltip:Show()
     end)
-    c:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    fmt:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ns.SkinButton(fmt)
+    f.format = fmt
+    f.formatLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    f.formatLabel:SetPoint("RIGHT", fmt, "LEFT", -6, 0)
+    f.formatLabel:SetText(L["Format"])
 
     local okScroll, s = pcall(CreateFrame, "ScrollFrame", "AltsForeverExportScroll", f, "UIPanelScrollFrameTemplate")
     if not okScroll then s = CreateFrame("ScrollFrame", "AltsForeverExportScroll", f) end
@@ -258,10 +336,8 @@ local function CreateWindow()
     s:SetScript("OnMouseDown", function() b:SetFocus() end)
 
     ns.SkinWindow(f)
-    ns.SkinCheck(c)
     f:SetScript("OnShow", function(self)
         self:Raise()
-        check:SetChecked(ns.db.exportTabs == true)
         Fill()
     end)
     f:SetScript("OnHide", function()
