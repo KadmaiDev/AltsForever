@@ -121,3 +121,71 @@ test("/af export and the overview's button open the export with the text selecte
     SlashCmdList.ALTSFOREVER("export")
     eq(f:IsShown(), false, "/af export again closes it")
 end)
+
+-- Item names in the saved file (/af names): only for reading the file outside the game.
+test("item names: off by default; when on, every item's name and quality is saved at logout", function()
+    local ns = exportStart()
+    wow.itemNames[2589], wow.itemQuality[2589] = "Linen Cloth", 1
+    wow.itemNames[2318], wow.itemQuality[2318] = "Light Leather", 1
+    wow.itemNames[4306], wow.itemQuality[4306] = "Silk Cloth", 0
+    wow.itemNames[9999], wow.itemQuality[9999] = "Mail Thing", 2
+    wow.itemNames[7777], wow.itemQuality[7777] = "Not Loaded Yet", 3
+    wow.uncached[7777] = true
+    local tarn = AltsForeverDB.chars["Tarn Moon"]
+    tarn.bags = { [2589] = 20, [7777] = 1 }
+    tarn.bank = { [2318] = 5 }
+    tarn.mail = { [9999] = 1 }
+    ns.char.bags[4306] = 3
+    wow.fire("PLAYER_LOGOUT")
+    eq(AltsForeverDB.itemNames, nil, "off: nothing saved")
+    eq(AltsForeverDB.itemQuality, nil)
+    eq(pageBox("Save item names for use outside the game").isSelected(), false)
+
+    wow.itemLoads = nil
+    pageBox("Save item names for use outside the game").setSelected()
+    eq(AltsForeverDB.itemNamesOn, true)
+    eq(table.concat(wow.itemLoads or {}, ","), "7777", "items the game hasn't loaded are asked for")
+    wow.fire("PLAYER_LOGOUT")
+    local names, quality = AltsForeverDB.itemNames, AltsForeverDB.itemQuality
+    eq(names[2589], "Linen Cloth"); eq(quality[2589], 1)
+    eq(names[2318], "Light Leather", "bank"); eq(names[9999], "Mail Thing", "mail")
+    eq(names[4306], "Silk Cloth"); eq(quality[4306], 0, "poor quality is kept")
+    eq(names[7777], "Not Loaded Yet", "the game knows it by logout")
+
+    -- Gone from everyone: dropped. Kept names aren't looked up again.
+    tarn.bank[2318] = nil
+    wow.itemNames[2589] = nil
+    wow.fire("PLAYER_LOGOUT")
+    eq(names[2318], nil); eq(quality[2318], nil)
+    eq(names[2589], "Linen Cloth")
+
+    -- Next login: still on, and anything still missing is asked for 10 s in.
+    wow.itemLoads = nil
+    tarn.bags[1234] = 1
+    wow.uncached[1234] = true
+    runTimers()
+    eq(table.concat(wow.itemLoads or {}, ","), "1234")
+
+    -- Off again: the names leave the saved file.
+    SlashCmdList.ALTSFOREVER("names")
+    eq(AltsForeverDB.itemNamesOn, nil)
+    eq(AltsForeverDB.itemNames, nil); eq(AltsForeverDB.itemQuality, nil)
+    assert(wow.printed[#wow.printed]:find("no longer saved", 1, true))
+    SlashCmdList.ALTSFOREVER("names")
+    eq(AltsForeverDB.itemNamesOn, true)
+    assert(wow.printed[#wow.printed]:find("only for reading the file outside the game", 1, true))
+end)
+
+test("item names: a secret or missing name isn't saved", function()
+    local ns = exportStart()
+    AltsForeverDB.itemNamesOn = true
+    ns.char.bags[2589] = 1
+    ns.char.bags[3000] = 1
+    wow.itemNames[2589] = "Linen Cloth"
+    wow.itemNames[3000] = wow.SECRET
+    wow.itemQuality[2589] = wow.SECRET
+    ns.SaveItemNames()
+    eq(AltsForeverDB.itemNames[2589], "Linen Cloth")
+    eq(AltsForeverDB.itemNames[3000], nil)
+    eq(AltsForeverDB.itemQuality[2589], nil)
+end)

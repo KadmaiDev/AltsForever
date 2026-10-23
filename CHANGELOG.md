@@ -1,3 +1,7 @@
+## Alts Forever 0.17.0 (not yet released)
+
+- **Item names for use outside the game** (off by default; options, or `/af names`): for players who read Alts Forever's saved file with their own tools. Bags, bank and mail store only item IDs and counts there; with this on, the name and quality of every item your characters have are saved too when you log out. It adds nothing in the game and uses a little more memory, so leave it off unless you read the file. Thanks to the player who asked for this!
+
 ## Alts Forever 0.16.0
 
 - **Export your characters** (the note button in the overview's title bar, or `/af export`): every character's level, XP, rested, Well Rested, Legacy points, gold, professions, mail expiry, zone, time played and when you last played them, ready to copy with Ctrl+C, grouped by ruleset and faction like the overview. Pick the format: **Spreadsheet** (columns that paste straight into Excel or Google Sheets, with gold, percentages and dates as numbers), **Text** (readable lines for notes or chat) or **Markdown table** (for Notion, Obsidian and the like). (A player's request.)

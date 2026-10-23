@@ -11,7 +11,8 @@ local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
 
-local floor, ipairs, tostring, type = math.floor, ipairs, tostring, type
+local floor, ipairs, pairs, tostring, type = math.floor, ipairs, pairs, tostring, type
+local C_Item = C_Item
 local concat = table.concat
 
 local WIDTH, HEIGHT = 680, 440
@@ -357,4 +358,88 @@ function ns.ToggleExport()
     if not frame then CreateWindow() end
     if frame:IsShown() then return frame:Hide() end
     frame:Show()
+end
+
+---------------------------------------------------------------------------
+-- Item names in the saved file (a player's request, 2026-10-23, for their own planning page:
+-- bags, bank and mail keep only item ID -> count, so outside the game most items can't be
+-- told apart). Off by default ("Save item names for use outside the game", /af names): it
+-- adds nothing in the game and costs memory (~60-80 KB for the owner's 534 items), so it's
+-- only for players who read the file (owner, 2026-10-23). When on: db.itemNames =
+-- { [itemID] = name } and db.itemQuality = { [itemID] = quality }, once per item any
+-- character has (bags, bank, mail, worn), in the game's language. Filled at logout (and
+-- /reload), where it costs nothing in play; items the game hasn't loaded this session are
+-- requested 10 s after login, so they're known by then. Turning it off drops both tables.
+local PLACES = { "bags", "bank", "mail", "equip" }
+local NONE = {} -- a place not scanned yet
+local issecretvalue = issecretvalue or function() return false end
+
+local function Owned(chars, id)
+    for _, c in pairs(chars) do
+        for _, place in ipairs(PLACES) do
+            local items = c[place]
+            if items and items[id] then return true end
+        end
+    end
+    return false
+end
+
+function ns.ItemNamesOn() return ns.db.itemNamesOn == true end
+
+function ns.SetItemNames(on)
+    local db = ns.db
+    db.itemNamesOn = on or nil
+    if on then
+        ns.RequestItemNames()
+    else
+        db.itemNames, db.itemQuality = nil, nil
+    end
+end
+
+-- Asks the game for every item a character has whose name isn't saved and isn't loaded.
+function ns.RequestItemNames()
+    local db = ns.db
+    if not (db.itemNamesOn and C_Item.RequestLoadItemDataByID and C_Item.IsItemDataCachedByID) then return end
+    local names = db.itemNames
+    for _, c in pairs(db.chars) do
+        for _, place in ipairs(PLACES) do
+            for id in pairs(c[place] or NONE) do
+                if not (names and names[id]) and not C_Item.IsItemDataCachedByID(id) then
+                    C_Item.RequestLoadItemDataByID(id)
+                end
+            end
+        end
+    end
+end
+
+-- Saves the name and quality of every item a character has that the game knows by now,
+-- and drops the items nobody has any more.
+function ns.SaveItemNames()
+    local db = ns.db
+    local names, quality = db.itemNames or {}, db.itemQuality or {}
+    db.itemNames, db.itemQuality = names, quality
+    for id in pairs(names) do
+        if not Owned(db.chars, id) then names[id], quality[id] = nil, nil end
+    end
+    for _, c in pairs(db.chars) do
+        for _, place in ipairs(PLACES) do
+            for id in pairs(c[place] or NONE) do
+                if not names[id] then
+                    local name = C_Item.GetItemNameByID(id)
+                    if not issecretvalue(name) and type(name) == "string" and name ~= "" then names[id] = name end
+                end
+                if names[id] and not quality[id] then
+                    local q = C_Item.GetItemQualityByID(id)
+                    if not issecretvalue(q) and type(q) == "number" then quality[id] = q end
+                end
+            end
+        end
+    end
+end
+
+function ns.StartItemNames()
+    if C_Timer and C_Timer.After then C_Timer.After(10, ns.RequestItemNames) end
+    ns.On("PLAYER_LOGOUT", function()
+        if ns.db.itemNamesOn then ns.SaveItemNames() end
+    end)
 end

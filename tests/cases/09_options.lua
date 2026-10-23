@@ -52,7 +52,7 @@ test("options menu: only what's switched while playing, then Settings...; withou
     eq(box.kind, "checkbox"); eq(box.isSelected(), true)
     box.setSelected()
     eq(AltsForeverDB.skillupsOff, true); eq(box.isSelected(), false)
-    eq(#wow.menu.items, 4 + 9, "the title, Open overview, Bags and bank, Search..., the nine settings")
+    eq(#wow.menu.items, 4 + 10, "the title, Open overview, Bags and bank, Search..., the ten settings")
 end)
 
 test("right-click a character in the overview to forget them, after confirming", function()

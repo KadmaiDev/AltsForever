@@ -145,6 +145,7 @@ local function StatsSelected() return ns.StatsOn() end
 local function LegacySelected() return ns.LegacyRemindersOn() end
 local function RulesetsSelected() return ns.OtherRulesetsOn() end
 local function ToggleRulesets() ns.SetOtherRulesets(not ns.OtherRulesetsOn()) end
+local function ItemNamesSelected() return ns.ItemNamesOn() end
 local function MinimapSelected() return ns.MinimapButtonOn() end
 
 ---------------------------------------------------------------------------
@@ -196,6 +197,8 @@ local SETTINGS = {
         L["Says in chat when the character you log in on has Legacy points to spend, and when you earn one. Same as /af legacy on or off."], section = "extras" },
     { L["Show other rulesets and factions"], RulesetsSelected, function(on) ns.SetOtherRulesets(on) end,
         L["Tooltips also list your characters on other rulesets (Normal, PvP...) and the other faction, under their own heading. They can't trade or mail with this one, so they're hidden by default; the overview always shows everyone. Same as /af rulesets."], section = "tooltips" },
+    { L["Save item names for use outside the game"], ItemNamesSelected, function(on) ns.SetItemNames(on) end,
+        L["Off by default. Only for reading Alts Forever's saved file (AltsForever.lua in your WTF folder) with other programs: it saves the name and quality of every item your characters have when you log out. It adds nothing in the game and uses a little more memory, so leave it off unless you need it. Same as /af names."], section = "extras" },
     { L["Show minimap button"], MinimapSelected, function(on) ns.SetMinimapButton(on) end,
         L["Same as /af minimap. Alts Forever is also in the minimap's addon menu."], section = "display" },
 }

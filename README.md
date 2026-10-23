@@ -18,7 +18,7 @@ Type `/af` to open the **overview**: every character with level and XP, rested X
 
 ![The overview window, grouped by ruleset and faction, with a character's details and gear panel](media/alt-overview.png)
 
-**Export:** the note button in the overview's title bar (or `/af export`) shows the overview as text, selected and ready to copy with Ctrl+C. Choose the format: **Spreadsheet** pastes into Excel or Google Sheets as columns, **Text** gives readable lines for notes or chat, and **Markdown table** becomes a table in Notion, Obsidian and the like.
+**Export:** the note button in the overview's title bar (or `/af export`) shows the overview as text, selected and ready to copy with Ctrl+C. Choose the format: **Spreadsheet** pastes into Excel or Google Sheets as columns, **Text** gives readable lines for notes or chat, and **Markdown table** becomes a table in Notion, Obsidian and the like. Reading Alts Forever's saved file (`AltsForever.lua` in your WTF folder) with your own tools instead? Bags, bank and mail store only item IDs and counts there; turn on **Save item names for use outside the game** in the options (or `/af names`) and the name and quality of every item your characters have are saved too when you log out. It adds nothing in the game and uses a little more memory, so it's off by default.
 
 **Bags and bank:** your own bags and bank (an entry in the bag's portrait menu, or a small Alts Forever button in the header of Blizzard's bank and of ElvUI's and EllesmereUI's bags and bank), the bag button in the overview's title bar (or `/af bags`, `/af bank`, or right-click a character) opens a window showing any character's bags or bank slot by slot, as you last saw them: each stack with its count, empty slots, how many slots are free, and a coloured border for uncommon and better items. Everything shows in one grid, or tick **By bag** for a section per bag or bank tab, e.g. "Red Linen Bag (7 / 8)". The character's gold is at the bottom. Drag the bottom-right corner to resize: the width sets the slots per row (10 to 30), the height how tall it gets before scrolling, and both are remembered. Pick the character from the dropdown and switch between Bags and Bank. Hover an item for its tooltip, shift-click to link it. A character's slots are recorded the next time you log in on them (bags) or visit their bank; until then the window shows one slot per item with its total.
 
@@ -113,6 +113,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af skillups` | Turn the skill-up details in tooltips on or off |
 | `/af upgrades` | Turn upgrades in item tooltips on or off |
 | `/af anvils` | Show or hide the anvils on your character sheet that mark craftable upgrades |
+| `/af names` | Save item names and qualities in the saved file when you log out, only for reading it outside the game (off by default) |
 | `/af counts` | Turn the item counts in tooltips on or off, e.g. if Baganator or Bagnon already shows them (Can craft, skill-ups, upgrades and crates stay) |
 | `/af rulesets` | Show or hide your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; hidden by default |
 | `/af legacy` | List each character's Legacy points to spend and Well Rested rank; `/af legacy on` or `off` turns the chat reminders on or off |
