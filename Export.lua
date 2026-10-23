@@ -363,7 +363,7 @@ end
 ---------------------------------------------------------------------------
 -- Item names in the saved file (a player's request, 2026-10-23, for their own planning page:
 -- bags, bank and mail keep only item ID -> count, so outside the game most items can't be
--- told apart). Off by default ("Save item names for use outside the game", /af names): it
+-- told apart). Off by default ("Save item names for use outside the game", /af itemnames): it
 -- adds nothing in the game and costs memory (~60-80 KB for the owner's 534 items), so it's
 -- only for players who read the file (owner, 2026-10-23). When on: db.itemNames =
 -- { [itemID] = name } and db.itemQuality = { [itemID] = quality }, once per item any

@@ -122,7 +122,7 @@ test("/af export and the overview's button open the export with the text selecte
     eq(f:IsShown(), false, "/af export again closes it")
 end)
 
--- Item names in the saved file (/af names): only for reading the file outside the game.
+-- Item names in the saved file (/af itemnames): only for reading the file outside the game.
 test("item names: off by default; when on, every item's name and quality is saved at logout", function()
     local ns = exportStart()
     wow.itemNames[2589], wow.itemQuality[2589] = "Linen Cloth", 1
@@ -167,11 +167,11 @@ test("item names: off by default; when on, every item's name and quality is save
     eq(table.concat(wow.itemLoads or {}, ","), "1234")
 
     -- Off again: the names leave the saved file.
-    SlashCmdList.ALTSFOREVER("names")
+    SlashCmdList.ALTSFOREVER("itemnames")
     eq(AltsForeverDB.itemNamesOn, nil)
     eq(AltsForeverDB.itemNames, nil); eq(AltsForeverDB.itemQuality, nil)
     assert(wow.printed[#wow.printed]:find("no longer saved", 1, true))
-    SlashCmdList.ALTSFOREVER("names")
+    SlashCmdList.ALTSFOREVER("itemnames")
     eq(AltsForeverDB.itemNamesOn, true)
     assert(wow.printed[#wow.printed]:find("only for reading the file outside the game", 1, true))
 end)

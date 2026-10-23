@@ -507,8 +507,8 @@ function commands.rulesets()
         or L["Characters on other rulesets or factions are hidden in tooltips."])
 end
 
--- /af names: item names and qualities in the saved file, for reading it outside the game.
-function commands.names()
+-- /af itemnames: item names and qualities in the saved file, for reading it outside the game.
+function commands.itemnames()
     ns.SetItemNames(not ns.ItemNamesOn())
     Print(ns.ItemNamesOn() and L["Item names will be saved in Alts Forever's saved file when you log out. They're only for reading the file outside the game: Alts Forever doesn't need them."]
         or L["Item names are no longer saved."])
@@ -635,7 +635,7 @@ function commands.help()
     Print(L["/af bags or /af bank, with a name for another character, shows their bags or bank slot by slot."])
     Print(L["/af icons picks the icons item tooltips use for bags, bank, mail and worn items."])
     Print(L["/af upgrades turns upgrade hints in item tooltips on or off. /af role Name role sets what a character's upgrades are judged by (melee, ranged, caster, healer, tank, feral or auto)."])
-    Print(L["/af names turns saving item names in Alts Forever's saved file on or off (only for reading it outside the game)."])
+    Print(L["/af itemnames turns saving item names in Alts Forever's saved file on or off (only for reading it outside the game)."])
     Print(L["/af anvils shows or hides the anvils on your character sheet that mark upgrades you or your alts can craft."])
     Print(L["/af scale 150 makes Alts Forever's windows one and a half times their size (any size from 50 to 300), on top of the game's UI scale."])
     if ns.HasEllesmereScale() then Print(L["/af scale eui makes them follow EllesmereUI's Window Scale again (the default)."]) end
