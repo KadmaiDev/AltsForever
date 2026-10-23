@@ -249,6 +249,27 @@ function ns.GroupLabel(c, byRealm, byFaction)
     return ruleset or faction or ""
 end
 
+---------------------------------------------------------------------------
+-- The beta. Its realms are "ClassicBetaPvE", "ClassicBetaPvE2", "ClassicBetaPvP"..., and its
+-- characters don't carry over to the live game (owner, 2026-10-23: aiming 1.0.0 at launch).
+-- A saved file from the beta still lists them, so the first login on a live realm offers to
+-- forget them (Options.lua, ns.CheckBeta); nothing goes without the player's say-so.
+---------------------------------------------------------------------------
+function ns.BetaRealm(realm)
+    return type(realm) == "string" and realm:lower():find("^classicbeta") ~= nil
+end
+
+-- Logged in on a live realm as a character whose saved entry is from the beta: the same name,
+-- but a new character, so it starts fresh. The beta one is kept aside as "Name (beta)" with
+-- the other beta characters, until the player forgets them.
+function ns.SetAsideBeta(chars, name, realm)
+    local old = chars[name]
+    if not realm or ns.BetaRealm(realm) or type(old) ~= "table" or not ns.BetaRealm(old.realm) then return end
+    local aside = name .. " (beta)"
+    old.name = aside
+    chars[aside], chars[name] = old, nil
+end
+
 -- Bank and mail stay nil until first seen, so "never scanned" differs from "empty".
 -- Characters are keyed by full name ("First Last"), which is unique in a region.
 function ns.InitChar(db, name, class, faction, realm)
@@ -287,6 +308,7 @@ ns.On("PLAYER_LOGIN", function()
     local _, class = UnitClass("player")
     local name = ns.PlayerName()
     ns.AdoptFirstName(ns.db.chars, name, class)
+    ns.SetAsideBeta(ns.db.chars, name, ns.PlayerRealm())
     local newChar = ns.db.chars[name] == nil
     ns.charKey, ns.char = ns.InitChar(ns.db, name, class, UnitFactionGroup("player"), ns.PlayerRealm())
     ns.StartScanner()
@@ -308,6 +330,7 @@ ns.On("PLAYER_LOGIN", function()
     ns.StartGamepad()
     ns.StartItemNames()
     ns.Welcome(newChar)
+    ns.CheckBeta()
 end)
 
 -- A few seconds after login (after the game's own login messages): on a fresh install,
@@ -368,6 +391,13 @@ function commands.delete(arg)
     if key == ns.charKey then return Print(L["You can't delete the character you're logged in on."]) end
     ns.ForgetCharacter(key)
     Print(L["Deleted %s."]:format(key))
+end
+
+-- /af forgetbeta: forgets the characters from the beta (only from a live realm).
+function commands.forgetbeta()
+    if ns.BetaRealm(ns.char.realm) then return Print(L["You're on the beta, so there's nothing to forget yet."]) end
+    local n = ns.ForgetBeta()
+    Print(n > 0 and L["Forgot your characters from the beta (%d)."]:format(n) or L["No characters from the beta to forget."])
 end
 
 function commands.mail()
@@ -524,6 +554,7 @@ function commands.help()
     Print(L["/af scale 150 makes Alts Forever's windows one and a half times their size (any size from 50 to 300), on top of the game's UI scale."])
     if ns.HasEllesmereScale() then Print(L["/af scale eui makes them follow EllesmereUI's Window Scale again (the default)."]) end
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
+    Print(L["/af forgetbeta forgets your characters from the beta, which aren't in the live game."])
     Print(L["/af rulesets shows or hides your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; they can't trade with this one."])
     Print(L["Or use the minimap button (right-click for options)."])
 end

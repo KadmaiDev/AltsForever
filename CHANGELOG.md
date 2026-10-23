@@ -1,6 +1,7 @@
 ## Alts Forever 0.17.0 (not yet released)
 
 - **Item names for use outside the game** (off by default; options, or `/af names`): for players who read Alts Forever's saved file with their own tools. Bags, bank and mail store only item IDs and counts there; with this on, the name and quality of every item your characters have are saved too when you log out. It adds nothing in the game and uses a little more memory, so leave it off unless you read the file. Thanks to the player who asked for this!
+- **Ready for the live game:** the first time you log in on a live realm, Alts Forever offers to forget your characters from the beta, who don't carry over (your settings are kept). Choose Keep and you can do it later with `/af forgetbeta`. A new character with the same name as one of your beta characters starts fresh instead of inheriting the beta one's bags, bank and gold.
 
 ## Alts Forever 0.16.0
 

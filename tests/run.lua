@@ -90,6 +90,7 @@ CASES = {
     "29_flyout.lua",
     "30_search.lua",
     "31_export.lua",
+    "32_launch.lua",
 }
 do
     local where = {}

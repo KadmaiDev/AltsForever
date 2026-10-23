@@ -134,6 +134,91 @@ local function ForgetDialog()
 end
 
 ---------------------------------------------------------------------------
+-- The beta's characters (Core.lua, ns.BetaRealm). Those not logged in since realms were
+-- recorded (0.12.0) count too, once the file shows it's from the beta: they were on it.
+---------------------------------------------------------------------------
+function ns.BetaChars()
+    local chars, beta, unknown, any = ns.db.chars, {}, {}, false
+    for key, c in pairs(chars) do
+        if key ~= ns.charKey then
+            if ns.BetaRealm(c.realm) then
+                beta[#beta + 1], any = key, true
+            elseif c.realm == nil then
+                unknown[#unknown + 1] = key
+            end
+        end
+    end
+    if any then
+        for _, key in ipairs(unknown) do beta[#beta + 1] = key end
+    end
+    table.sort(beta)
+    return beta
+end
+
+-- Forgets them and their gold history; your settings stay. Returns how many.
+function ns.ForgetBeta()
+    local db, keys = ns.db, ns.BetaChars()
+    for _, key in ipairs(keys) do db.chars[key] = nil end
+    for group in pairs(db.goldDaysBy or {}) do
+        if ns.BetaRealm(group:match("^(.-)|")) then db.goldDaysBy[group] = nil end
+    end
+    -- The main history was a beta group's: this character's group takes its place (the
+    -- same table Money.lua is recording into).
+    if ns.BetaRealm(db.goldGroup and db.goldGroup:match("^(.-)|")) then
+        local group = (ns.char.realm or "") .. "|" .. (ns.char.faction or "")
+        db.goldDays = db.goldDaysBy and db.goldDaysBy[group] or {}
+        db.goldGroup = group
+        if db.goldDaysBy then db.goldDaysBy[group] = nil end
+    end
+    if db.goldDaysBy and next(db.goldDaysBy) == nil then db.goldDaysBy = nil end
+    db.collapsedGroups = nil -- their keys named the beta's groups
+    if #keys > 0 then
+        ns.PruneRecipeInfo()
+        ns.InvalidateCache()
+        if ns.RefreshOverview then ns.RefreshOverview() end
+    end
+    return #keys
+end
+
+local function BetaDialog()
+    if StaticPopupDialogs.ALTSFOREVER_BETA then return end
+    StaticPopupDialogs.ALTSFOREVER_BETA = {
+        text = L["Welcome to the live game! Alts Forever still has your characters from the beta (%s), which aren't here. Forget them? Your settings are kept.\n\nYou can also do it later with /af forgetbeta."],
+        button1 = L["Forget them"],
+        button2 = L["Keep them"],
+        OnAccept = function()
+            ns.db.betaAsked = true
+            ns.Print(L["Forgot your characters from the beta (%d)."]:format(ns.ForgetBeta()))
+        end,
+        OnCancel = function()
+            ns.db.betaAsked = true
+            ns.Print(L["Kept your characters from the beta. /af forgetbeta forgets them whenever you like."])
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+    }
+end
+
+-- At login: on a live realm with beta characters saved, asks once (a few seconds in, after
+-- the game's own messages).
+function ns.CheckBeta()
+    local db = ns.db
+    if db.betaAsked or not ns.char.realm or ns.BetaRealm(ns.char.realm) then return end
+    local function Ask()
+        local n = #ns.BetaChars()
+        if n == 0 then
+            db.betaAsked = true
+            return
+        end
+        BetaDialog()
+        StaticPopup_Show("ALTSFOREVER_BETA", tostring(n))
+    end
+    if C_Timer and C_Timer.After then C_Timer.After(8, Ask) else Ask() end
+end
+
+---------------------------------------------------------------------------
 -- Menus
 ---------------------------------------------------------------------------
 local function CountsSelected() return ns.CountsOn() end
