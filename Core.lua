@@ -143,7 +143,8 @@ local CHAR_FIELDS = {
 }
 local DB_FIELDS = {
     icons = "table", goldDays = "table", goldDaysBy = "table", factions = "table",
-    recipeInfo = "table", collapsedGroups = "table", session = "table",
+    recipeInfo = "table", collapsedGroups = "table", session = "table", itemNames = "table",
+    itemQuality = "table",
     legacyPool = "number", scale = "number", minimapAngle = "number", bagsCols = "number",
     bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
 }

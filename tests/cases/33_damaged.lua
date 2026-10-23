@@ -4,6 +4,7 @@
 function damagedSave()
     return { v = 2, icons = "junk", goldDays = 5, goldDaysBy = { x = 3 }, factions = "x",
         recipeInfo = { Tailoring = "x", [5] = {} }, collapsedGroups = 7, legacyPool = "16",
+        itemNamesOn = true, itemNames = "x", itemQuality = 3,
         chars = {
             ["Junk"] = "not a character",
             [42] = { name = "Numbered" },
