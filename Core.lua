@@ -126,11 +126,96 @@ local function FoldFirstNames(chars)
     end
 end
 
+-- Repairs a damaged save in place (hand-edited, or from an older or another copy): a value of
+-- the wrong type is dropped, which reads as "not known yet" and is recorded again in play,
+-- and everything valid is kept (never reset saved data: owner, 2026-09-25). Once, at load;
+-- one type check per stored value.
+local CHAR_FIELDS = {
+    name = "string", class = "string", faction = "string", realm = "string", zone = "string",
+    hearth = "string", prof1 = "string", prof2 = "string", role = "string",
+    money = "number", level = "number", xp = "number", xpMax = "number", rested = "number",
+    seen = "number", updated = "number", ilvl = "number", dura = "number", played = "number",
+    playedAt = "number", mailExpires = "number", spec = "number", wellRested = "number",
+    legacySpent = "number", bankAt = "number",
+    bags = "table", bank = "table", mail = "table", equip = "table", gear = "table",
+    layout = "table", profs = "table", profMax = "table", recipes = "table", crafts = "table",
+    reps = "table", duraSlots = "table",
+}
+local DB_FIELDS = {
+    icons = "table", goldDays = "table", goldDaysBy = "table", factions = "table",
+    recipeInfo = "table", collapsedGroups = "table", session = "table",
+    legacyPool = "number", scale = "number", minimapAngle = "number", bagsCols = "number",
+    bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
+}
+
+-- Keeps only entries whose key and value are of these types (value nil = any).
+local function KeepOnly(t, keyType, valueType)
+    for k, v in pairs(t) do
+        if type(k) ~= keyType or (valueType and type(v) ~= valueType) then t[k] = nil end
+    end
+end
+
+local function RepairChar(c)
+    for field, kind in pairs(CHAR_FIELDS) do
+        if c[field] ~= nil and type(c[field]) ~= kind then c[field] = nil end
+    end
+    for _, place in ipairs({ "bags", "bank", "mail", "equip" }) do
+        if c[place] then KeepOnly(c[place], "number", "number") end
+    end
+    if c.gear then KeepOnly(c.gear, "number", "string") end
+    if c.duraSlots then KeepOnly(c.duraSlots, "number", "number") end
+    if c.reps then KeepOnly(c.reps, "number", "number") end
+    if c.profs then KeepOnly(c.profs, "string", "number") end
+    if c.profMax then KeepOnly(c.profMax, "string", "number") end
+    if c.recipes then KeepOnly(c.recipes, "string", "table") end
+    if c.crafts then KeepOnly(c.crafts, "string", "table") end
+    if c.layout then
+        KeepOnly(c.layout, "number", "table")
+        for _, slots in pairs(c.layout) do
+            for i, v in pairs(slots) do
+                if type(i) ~= "number" then slots[i] = nil elseif type(v) ~= "number" then slots[i] = 0 end
+            end
+        end
+    end
+end
+
+local function Repair(saved)
+    for field, kind in pairs(DB_FIELDS) do
+        if saved[field] ~= nil and type(saved[field]) ~= kind then saved[field] = nil end
+    end
+    if saved.goldDays then KeepOnly(saved.goldDays, "number", "number") end
+    if saved.goldDaysBy then
+        KeepOnly(saved.goldDaysBy, "string", "table")
+        for _, days in pairs(saved.goldDaysBy) do KeepOnly(days, "number", "number") end
+    end
+    if saved.recipeInfo then
+        KeepOnly(saved.recipeInfo, "string", "table")
+        for _, recipes in pairs(saved.recipeInfo) do KeepOnly(recipes, "string", "string") end
+    end
+    local chars = saved.chars
+    -- A character under a key that isn't a name moves to its own name if that's free.
+    local moved = {}
+    for key, c in pairs(chars) do
+        if type(key) ~= "string" or type(c) ~= "table" then
+            chars[key] = nil
+            if type(c) == "table" and type(c.name) == "string" then moved[#moved + 1] = c end
+        end
+    end
+    for _, c in ipairs(moved) do
+        if chars[c.name] == nil then chars[c.name] = c end
+    end
+    for key, c in pairs(chars) do
+        RepairChar(c)
+        if not c.name then c.name = key end
+    end
+end
+
 function ns.InitDB(saved)
     if type(saved) == "table" then Upgrade(saved) end
     if type(saved) ~= "table" or saved.v ~= DB_VERSION or type(saved.chars) ~= "table" then
         saved = { v = DB_VERSION, chars = {} }
     end
+    Repair(saved)
     FoldFirstNames(saved.chars)
     return saved
 end
