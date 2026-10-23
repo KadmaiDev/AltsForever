@@ -94,7 +94,7 @@ Characters you haven't logged in on since updating count as being on yours until
 
 ## From the beta to the live game
 
-Your beta characters don't carry over to the live game. The first time you log in on a live realm, Alts Forever asks whether to forget them (your settings are kept); choose Keep and you can do it later with `/af forgetbeta`. A new character with the same name as one of your beta characters starts fresh, so they don't inherit the beta one's bags, bank and gold.
+Your beta characters don't carry over to the live game, so the first time you log in on a live realm, Alts Forever forgets them, with their gold history and Legacy points, and says so in chat. Your settings are kept. A new character with the same name as one of your beta characters starts fresh, so they don't inherit the beta one's bags, bank and gold.
 
 ## Settings
 
@@ -117,7 +117,6 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af skillups` | Turn the skill-up details in tooltips on or off |
 | `/af upgrades` | Turn upgrades in item tooltips on or off |
 | `/af anvils` | Show or hide the anvils on your character sheet that mark craftable upgrades |
-| `/af forgetbeta` | Forget your characters from the beta (on a live realm) |
 | `/af itemnames` | Save item names and qualities in the saved file when you log out, only for reading it outside the game (off by default) |
 | `/af counts` | Turn the item counts in tooltips on or off, e.g. if Baganator or Bagnon already shows them (Can craft, skill-ups, upgrades and crates stay) |
 | `/af rulesets` | Show or hide your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; hidden by default |

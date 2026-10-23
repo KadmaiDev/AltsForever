@@ -337,42 +337,44 @@ end
 
 ---------------------------------------------------------------------------
 -- The beta. Its realms are "ClassicBetaPvE", "ClassicBetaPvE2", "ClassicBetaPvP"..., and its
--- characters don't carry over to the live game (owner, 2026-10-23: aiming 1.0.0 at launch).
--- A saved file from the beta still lists them, so the first login on a live realm offers to
--- forget them (Options.lua, ns.CheckBeta); nothing goes without the player's say-so.
+-- characters don't carry over to the live game. A saved file from the beta still lists them
+-- (the same file, or a WTF folder copied over), so the first login on a live realm forgets
+-- them; nobody would want to keep them (owner, 2026-10-23).
 ---------------------------------------------------------------------------
 function ns.BetaRealm(realm)
     return type(realm) == "string" and realm:lower():find("^classicbeta") ~= nil
 end
 
--- Logged in on a live realm as a character whose saved entry is from the beta: the same name,
--- but a new character, so it starts fresh. The beta one is kept aside as "Name (beta)" with
--- the other beta characters, until the player forgets them.
-function ns.SetAsideBeta(chars, name, realm)
-    local old = chars[name]
-    if not realm or ns.BetaRealm(realm) or type(old) ~= "table" or not ns.BetaRealm(old.realm) then return end
-    local aside = name .. " (beta)"
-    old.name = aside
-    chars[aside], chars[name] = old, nil
-end
-
--- The beta's Legacy points don't carry over either, but the saved pool never shrinks
--- (Talents.lua), so every live character would be told it has the beta's points to spend.
--- On a live realm, while the beta's characters are still to be asked about, it's read afresh.
-function ns.LeaveBetaLegacy(db, realm)
-    if db.betaAsked or not realm or ns.BetaRealm(realm) then return end
-    for _, c in pairs(db.chars) do
+-- On a live realm: forgets every character from the beta, before this one is set up (a
+-- namesake from the beta is a different character, so you start fresh), with the beta's gold
+-- history and Legacy points (the saved pool never shrinks, so every live character would be
+-- told it had the beta's points to spend). Characters not logged in since realms were recorded
+-- (0.12.0) go too once the file shows it's from the beta: they were on it. Settings stay.
+-- Returns how many went; after the first live login there are none, so it's one pass at login.
+function ns.LeaveBeta(db, realm)
+    if not realm or ns.BetaRealm(realm) then return 0 end
+    local chars, unknown, gone = db.chars, {}, 0
+    for key, c in pairs(chars) do
         if ns.BetaRealm(c.realm) then
-            db.legacyPool, db.wellRested = nil, nil
-            return
+            chars[key], gone = nil, gone + 1
+        elseif c.realm == nil then
+            unknown[#unknown + 1] = key
         end
     end
-end
-
--- Mail left on the beta can't be collected on a live realm: no warnings for it there.
-function ns.BetaMailMoot(c)
-    local realm = ns.PlayerRealm()
-    return realm ~= nil and not ns.BetaRealm(realm) and ns.BetaRealm(c.realm)
+    if gone == 0 then return 0 end
+    for _, key in ipairs(unknown) do chars[key] = nil end
+    for group in pairs(db.goldDaysBy or {}) do
+        local r = group:match("^(.-)|")
+        if r == "" or ns.BetaRealm(r) then db.goldDaysBy[group] = nil end
+    end
+    if db.goldDaysBy and next(db.goldDaysBy) == nil then db.goldDaysBy = nil end
+    -- The main history was the beta's (or from before groups): Money.lua starts it afresh.
+    local main = db.goldGroup and db.goldGroup:match("^(.-)|")
+    if main == nil or main == "" or ns.BetaRealm(main) then db.goldDays, db.goldGroup = nil, nil end
+    db.collapsedGroups = nil -- their keys named the beta's groups
+    db.legacyPool, db.wellRested = nil, nil
+    ns.PruneRecipeInfo()
+    return gone + #unknown
 end
 
 -- Bank and mail stay nil until first seen, so "never scanned" differs from "empty".
@@ -413,8 +415,7 @@ ns.On("PLAYER_LOGIN", function()
     local _, class = UnitClass("player")
     local name = ns.PlayerName()
     ns.AdoptFirstName(ns.db.chars, name, class)
-    ns.SetAsideBeta(ns.db.chars, name, ns.PlayerRealm())
-    ns.LeaveBetaLegacy(ns.db, ns.PlayerRealm())
+    local betaGone = ns.LeaveBeta(ns.db, ns.PlayerRealm())
     local newChar = ns.db.chars[name] == nil
     ns.charKey, ns.char = ns.InitChar(ns.db, name, class, UnitFactionGroup("player"), ns.PlayerRealm())
     ns.StartScanner()
@@ -435,14 +436,14 @@ ns.On("PLAYER_LOGIN", function()
     ns.StartBroker()
     ns.StartGamepad()
     ns.StartItemNames()
-    ns.Welcome(newChar)
-    ns.CheckBeta()
+    ns.Welcome(newChar, betaGone)
 end)
 
 -- A few seconds after login (after the game's own login messages): on a fresh install,
 -- how to use Alts Forever, once; on a character seen for the first time, that it's now
--- tracked. Existing players never see the welcome (db.welcomed is set quietly).
-function ns.Welcome(newChar)
+-- tracked; on the first live login, that the beta's characters were forgotten. Existing
+-- players never see the welcome (db.welcomed is set quietly).
+function ns.Welcome(newChar, betaGone)
     local db = ns.db
     local lines
     if not db.welcomed and ns.freshInstall then
@@ -455,6 +456,10 @@ function ns.Welcome(newChar)
         lines = { L["Now tracking %s. Open the bank and mailbox once on this character so they're included too."]:format(ns.charKey) }
     end
     db.welcomed = true
+    if betaGone and betaGone > 0 then
+        lines = lines or {}
+        table.insert(lines, 1, L["Welcome to the live game! Alts Forever has forgotten your characters from the beta (%d), which don't carry over. Your settings are kept."]:format(betaGone))
+    end
     if not lines then return end
     local function Show()
         for i = 1, #lines do ns.Print(lines[i]) end
@@ -497,13 +502,6 @@ function commands.delete(arg)
     if key == ns.charKey then return Print(L["You can't delete the character you're logged in on."]) end
     ns.ForgetCharacter(key)
     Print(L["Deleted %s."]:format(key))
-end
-
--- /af forgetbeta: forgets the characters from the beta (only from a live realm).
-function commands.forgetbeta()
-    if ns.BetaRealm(ns.char.realm) then return Print(L["You're on the beta, so there's nothing to forget yet."]) end
-    local n = ns.ForgetBeta()
-    Print(n > 0 and L["Forgot your characters from the beta (%d)."]:format(n) or L["No characters from the beta to forget."])
 end
 
 function commands.mail()
@@ -660,7 +658,6 @@ function commands.help()
     Print(L["/af scale 150 makes Alts Forever's windows one and a half times their size (any size from 50 to 300), on top of the game's UI scale."])
     if ns.HasEllesmereScale() then Print(L["/af scale eui makes them follow EllesmereUI's Window Scale again (the default)."]) end
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
-    Print(L["/af forgetbeta forgets your characters from the beta, which aren't in the live game."])
     Print(L["/af rulesets shows or hides your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; they can't trade with this one."])
     Print(L["Or use the minimap button (right-click for options)."])
 end
