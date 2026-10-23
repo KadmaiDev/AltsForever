@@ -11,7 +11,7 @@ local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
 
-local floor, ipairs, pairs, tostring, type = math.floor, ipairs, pairs, tostring, type
+local floor, ipairs, next, pairs, tostring, type = math.floor, ipairs, next, pairs, tostring, type
 local C_Item = C_Item
 local concat = table.concat
 
@@ -367,11 +367,15 @@ end
 -- adds nothing in the game and costs memory (~60-80 KB for the owner's 534 items), so it's
 -- only for players who read the file (owner, 2026-10-23). When on: db.itemNames =
 -- { [itemID] = name } and db.itemQuality = { [itemID] = quality }, once per item any
--- character has (bags, bank, mail, worn), in the game's language. Filled at logout (and
--- /reload), where it costs nothing in play; items the game hasn't loaded this session are
--- requested 10 s after login, so they're known by then. Turning it off drops both tables.
+-- character has (bags, bank, mail, worn), in the game's language. Filled 10 s after login
+-- (items the game hasn't loaded are asked for and saved as they arrive) and at logout (and
+-- /reload) for items got since; nothing runs in play otherwise. Turning it off drops both tables.
 local PLACES = { "bags", "bank", "mail", "equip" }
 local NONE = {} -- a place not scanned yet
+-- Item IDs asked for and not named yet; nil when none. Each name is saved as soon as it
+-- arrives: by logout the game no longer gave some of them (checked in game 2026-10-23: Sabine's
+-- mail items were loaded and named during play, yet missing from two saves running).
+local pending, listening
 local issecretvalue = issecretvalue or function() return false end
 
 local function Owned(chars, id)
@@ -392,19 +396,48 @@ function ns.SetItemNames(on)
     if on then
         ns.RequestItemNames()
     else
-        db.itemNames, db.itemQuality = nil, nil
+        db.itemNames, db.itemQuality, pending = nil, nil, nil
     end
 end
 
--- Asks the game for every item a character has whose name isn't saved and isn't loaded.
+-- Saves one item's name and quality if the game gives them. True when it has a name.
+local function Fill(names, quality, id)
+    if not names[id] then
+        local name = C_Item.GetItemNameByID(id)
+        if issecretvalue(name) or type(name) ~= "string" or name == "" then return false end
+        names[id] = name
+    end
+    if not quality[id] then
+        local q = C_Item.GetItemQualityByID(id)
+        if not issecretvalue(q) and type(q) == "number" then quality[id] = q end
+    end
+    return true
+end
+
+local function Arrived(id, ok)
+    if not (pending and pending[id]) then return end
+    pending[id] = nil
+    local db = ns.db
+    if ok and db.itemNamesOn and db.itemNames and db.itemQuality then Fill(db.itemNames, db.itemQuality, id) end
+    if next(pending) == nil then pending = nil end
+end
+
+-- Saves the names the game already knows of every item a character has, and asks for the rest.
 function ns.RequestItemNames()
     local db = ns.db
     if not (db.itemNamesOn and C_Item.RequestLoadItemDataByID and C_Item.IsItemDataCachedByID) then return end
-    local names = db.itemNames
+    local names, quality = db.itemNames or {}, db.itemQuality or {}
+    db.itemNames, db.itemQuality = names, quality
     for _, c in pairs(db.chars) do
         for _, place in ipairs(PLACES) do
             for id in pairs(c[place] or NONE) do
-                if not (names and names[id]) and not C_Item.IsItemDataCachedByID(id) then
+                if not names[id] and not (C_Item.IsItemDataCachedByID(id) and Fill(names, quality, id))
+                    and not (pending and pending[id]) then
+                    -- Upgrades.lua listens too, so ours stays registered; it returns at once
+                    -- when nothing is pending.
+                    if not listening then listening = ns.On("GET_ITEM_INFO_RECEIVED", Arrived) end
+                    pending = pending or {}
+                    pending[id] = true
                     C_Item.RequestLoadItemDataByID(id)
                 end
             end
@@ -423,16 +456,7 @@ function ns.SaveItemNames()
     end
     for _, c in pairs(db.chars) do
         for _, place in ipairs(PLACES) do
-            for id in pairs(c[place] or NONE) do
-                if not names[id] then
-                    local name = C_Item.GetItemNameByID(id)
-                    if not issecretvalue(name) and type(name) == "string" and name ~= "" then names[id] = name end
-                end
-                if names[id] and not quality[id] then
-                    local q = C_Item.GetItemQualityByID(id)
-                    if not issecretvalue(q) and type(q) == "number" then quality[id] = q end
-                end
-            end
+            for id in pairs(c[place] or NONE) do Fill(names, quality, id) end
         end
     end
 end

@@ -189,3 +189,35 @@ test("item names: a secret or missing name isn't saved", function()
     eq(AltsForeverDB.itemNames[3000], nil)
     eq(AltsForeverDB.itemQuality[2589], nil)
 end)
+
+test("item names: saved as soon as they arrive, so a name the game drops by logout is kept", function()
+    local ns = exportStart()
+    wow.itemNames[2589], wow.itemQuality[2589] = "Linen Cloth", 1
+    wow.itemNames[2078], wow.itemQuality[2078] = "Northern Shortsword", 2
+    wow.uncached[2078] = true
+    local tarn = AltsForeverDB.chars["Tarn Moon"]
+    tarn.mail = { [2078] = 1, [2589] = 2 }
+    wow.itemLoads = nil
+    SlashCmdList.ALTSFOREVER("itemnames")
+    eq(AltsForeverDB.itemNames[2589], "Linen Cloth", "a loaded item is saved at once")
+    eq(AltsForeverDB.itemNames[2078], nil, "not loaded yet")
+    eq(table.concat(wow.itemLoads or {}, ","), "2078")
+
+    wow.itemLoads = nil
+    ns.RequestItemNames()
+    eq(wow.itemLoads, nil, "asked for once, not again while it's on its way")
+
+    wow.uncached[2078] = nil
+    wow.fire("GET_ITEM_INFO_RECEIVED", 2078, true)
+    eq(AltsForeverDB.itemNames[2078], "Northern Shortsword", "saved when it arrives")
+    eq(AltsForeverDB.itemQuality[2078], 2)
+
+    wow.itemNames[2078], wow.itemQuality[2078] = nil, nil -- the game no longer gives it at logout
+    wow.fire("PLAYER_LOGOUT")
+    eq(AltsForeverDB.itemNames[2078], "Northern Shortsword", "still saved")
+
+    -- An item someone else loads isn't ours to save; one that fails to load stays unnamed.
+    wow.itemNames[4306] = "Silk Cloth"
+    wow.fire("GET_ITEM_INFO_RECEIVED", 4306, true)
+    eq(AltsForeverDB.itemNames[4306], nil)
+end)
