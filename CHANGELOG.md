@@ -1,7 +1,10 @@
-## Alts Forever 0.17.0 (not yet released)
+## Alts Forever 1.0.0
+
+Ready for the launch of WoW Forever. Thank you to everyone who tried Alts Forever during the beta and sent ideas and reports: many of the features here came from you.
 
 - **Item names for use outside the game** (off by default; options, or `/af itemnames`): for players who read Alts Forever's saved file with their own tools. Bags, bank and mail store only item IDs and counts there; with this on, the name and quality of every item your characters have are saved too when you log out. It adds nothing in the game and uses a little more memory, so leave it off unless you read the file. Thanks to the player who asked for this!
 - **Ready for the live game:** the first time you log in on a live realm, Alts Forever offers to forget your characters from the beta, who don't carry over (your settings are kept). Choose Keep and you can do it later with `/af forgetbeta`. A new character with the same name as one of your beta characters starts fresh instead of inheriting the beta one's bags, bank and gold.
+- **Sturdier saved data:** if Alts Forever's saved file is damaged (edited by hand, or written by another copy of the addon), it's repaired when you log in instead of stopping the addon from loading. Only the damaged values are dropped and recorded again as you play; everything else is kept.
 
 ## Alts Forever 0.16.0
 
