@@ -63,7 +63,9 @@ end
 function ns.MailWarnings(now, within)
     local list = {}
     for key, c in pairs(ns.db.chars) do
-        if c.mailExpires and c.mailExpires - now < within then list[#list + 1] = key end
+        if c.mailExpires and c.mailExpires - now < within and not ns.BetaMailMoot(c) then
+            list[#list + 1] = key
+        end
     end
     local chars = ns.db.chars
     table.sort(list, function(a, b) return chars[a].mailExpires < chars[b].mailExpires end)

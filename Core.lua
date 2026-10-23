@@ -356,6 +356,25 @@ function ns.SetAsideBeta(chars, name, realm)
     chars[aside], chars[name] = old, nil
 end
 
+-- The beta's Legacy points don't carry over either, but the saved pool never shrinks
+-- (Talents.lua), so every live character would be told it has the beta's points to spend.
+-- On a live realm, while the beta's characters are still to be asked about, it's read afresh.
+function ns.LeaveBetaLegacy(db, realm)
+    if db.betaAsked or not realm or ns.BetaRealm(realm) then return end
+    for _, c in pairs(db.chars) do
+        if ns.BetaRealm(c.realm) then
+            db.legacyPool, db.wellRested = nil, nil
+            return
+        end
+    end
+end
+
+-- Mail left on the beta can't be collected on a live realm: no warnings for it there.
+function ns.BetaMailMoot(c)
+    local realm = ns.PlayerRealm()
+    return realm ~= nil and not ns.BetaRealm(realm) and ns.BetaRealm(c.realm)
+end
+
 -- Bank and mail stay nil until first seen, so "never scanned" differs from "empty".
 -- Characters are keyed by full name ("First Last"), which is unique in a region.
 function ns.InitChar(db, name, class, faction, realm)
@@ -395,6 +414,7 @@ ns.On("PLAYER_LOGIN", function()
     local name = ns.PlayerName()
     ns.AdoptFirstName(ns.db.chars, name, class)
     ns.SetAsideBeta(ns.db.chars, name, ns.PlayerRealm())
+    ns.LeaveBetaLegacy(ns.db, ns.PlayerRealm())
     local newChar = ns.db.chars[name] == nil
     ns.charKey, ns.char = ns.InitChar(ns.db, name, class, UnitFactionGroup("player"), ns.PlayerRealm())
     ns.StartScanner()

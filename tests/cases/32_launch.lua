@@ -95,3 +95,43 @@ test("a live save with no beta characters is never asked about; unknown realms a
     eq(AltsForeverDB.betaAsked, true)
     eq(type(AltsForeverDB.chars["Old"]), "table")
 end)
+
+test("first login on a live realm: the beta's Legacy points are read afresh", function()
+    local saved = betaSave()
+    saved.legacyPool, saved.wellRested = 16, 5
+    saved.chars["Tarn Moon"].legacySpent = 3
+    local ns = legacyStart(saved, { 0, 0 }, 0, true)
+    eq(AltsForeverDB.legacyPool, 0, "the live account has earned none yet")
+    eq(AltsForeverDB.wellRested, nil)
+    assert(not legacyPrinted():find("Legacy point", 1, true), "no points to spend\n" .. legacyPrinted())
+    eq(ns.LegacyUnspent(AltsForeverDB.chars["Tarn Moon"]), 0)
+
+    -- Read afresh at each login until the question is answered; then left alone again.
+    StaticPopupDialogs.ALTSFOREVER_BETA.OnCancel()
+    eq(AltsForeverDB.betaAsked, true, "kept them")
+    AltsForeverDB.legacyPool = 4
+    legacyStart(AltsForeverDB, { 0, 0 }, 0)
+    eq(AltsForeverDB.legacyPool, 4)
+
+    -- On the beta itself, nothing changes.
+    local beta = betaSave()
+    beta.legacyPool = 16
+    wow.load(FILES)
+    wow.player.realm = "ClassicBetaPvE2"
+    wow.login(beta)
+    eq(AltsForeverDB.legacyPool, 16)
+end)
+
+test("on a live realm, mail left on the beta raises no warnings", function()
+    local saved = betaSave()
+    saved.chars["Tarn Moon"].mailExpires = NOW - DAY
+    saved.chars["Old"].mailExpires = NOW + HOUR
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.login(saved)
+    local lines = table.concat(ns.MailWarnings(NOW, 3 * DAY), "\n")
+    eq(lines:find("Tarn Moon", 1, true), nil, "a beta character's mail")
+    assert(lines:find("Old", 1, true), "a character of unknown realm still warns")
+    wow.player.realm = "ClassicBetaPvE2"
+    assert(table.concat(ns.MailWarnings(NOW, 3 * DAY), "\n"):find("Tarn Moon", 1, true), "on the beta it warns")
+end)
