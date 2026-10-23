@@ -4,7 +4,7 @@
 
 By **Kadmai**.
 
-A World of Warcraft: Forever addon (interface 16001) that adds a total and a per-character breakdown of an item to its tooltip:
+A World of Warcraft: Forever addon that adds a total and a per-character breakdown of an item to its tooltip:
 
 ![Item tooltip for Linen Cloth: skill-ups across characters, then counts per character](media/item-tracking.png)
 
@@ -67,7 +67,7 @@ Item tooltips (counts, Can craft, skill-ups) work with any input. With Forever's
 - **Long lists** (reputation, the icon picker) have page buttons; in the bags window, moving onto a slot scrolls it into view.
 - Resizing the bags window and moving windows still need a mouse.
 
-Forever's controller support is in alpha and changes with each beta build, so please report anything that doesn't work.
+Controller support is new, in the game and in Alts Forever, and hasn't been tried by many players yet, so please report anything that doesn't work.
 
 ## Languages
 
@@ -92,6 +92,10 @@ Each ruleset (Normal, PvP, Roleplaying, Hardcore) has its own auction house and 
 
 Characters you haven't logged in on since updating count as being on yours until you do.
 
+## From the beta to the live game
+
+Your beta characters don't carry over to the live game. The first time you log in on a live realm, Alts Forever asks whether to forget them (your settings are kept); choose Keep and you can do it later with `/af forgetbeta`. A new character with the same name as one of your beta characters starts fresh, so they don't inherit the beta one's bags, bank and gold.
+
 ## Settings
 
 Options > AddOns > Alts Forever has every setting, with a short explanation of each: what tooltips show and their icons on the left, the extras, minimap button and window size on the right. The minimap button's right-click menu and the cog in the overview keep to what you switch while playing (Open overview, Bags and bank, Show other rulesets and factions) and Settings... for the rest, and every setting has a slash command. **Window size** makes Alts Forever's windows bigger or smaller (50% to 300%), on top of the game's UI scale: handy if you play at a small UI scale. With EllesmereUI, it follows EllesmereUI's Window Scale until you choose a size of your own (`/af scale eui` to follow it again).
@@ -113,6 +117,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af skillups` | Turn the skill-up details in tooltips on or off |
 | `/af upgrades` | Turn upgrades in item tooltips on or off |
 | `/af anvils` | Show or hide the anvils on your character sheet that mark craftable upgrades |
+| `/af forgetbeta` | Forget your characters from the beta (on a live realm) |
 | `/af names` | Save item names and qualities in the saved file when you log out, only for reading it outside the game (off by default) |
 | `/af counts` | Turn the item counts in tooltips on or off, e.g. if Baganator or Bagnon already shows them (Can craft, skill-ups, upgrades and crates stay) |
 | `/af rulesets` | Show or hide your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; hidden by default |

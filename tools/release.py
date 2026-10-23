@@ -5,6 +5,8 @@
                                                     RELEASE_TYPE file, then tag v<version> and make a
                                                     GitHub release with the same zip
     python tools/release.py --github CHANGELOG.md   build, then only the GitHub part
+    python tools/release.py --versions              list CurseForge's WoW Forever game versions
+                                                    (to set GAME_VERSIONS when the client moves on)
 
 Publishing needs everything committed and pushed, so the tag matches the zip.
 
@@ -32,7 +34,8 @@ ALLOWED = (".toc", ".lua")
 
 PROJECT_ID = 1709551
 API = "https://wow.curseforge.com/api"
-GAME_VERSIONS = [17053]  # WoW Forever 1.60.1
+GAME_VERSIONS = [17053]  # WoW Forever 1.60.1; at launch, find the live one with --versions
+FOREVER_TYPE = 88568  # CurseForge's game version type for WoW Forever
 RELEASE_TYPE = "release"  # "release", "beta" or "alpha"
 
 
@@ -118,6 +121,28 @@ def token():
     return key
 
 
+def list_versions():
+    req = urllib.request.Request(API + "/game/versions", headers={"X-Api-Token": token()})
+    try:
+        with urllib.request.urlopen(req) as r:
+            versions = json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        fail("listing versions failed: HTTP %d" % e.code)
+    for v in sorted((v for v in versions if v.get("gameVersionTypeID") == FOREVER_TYPE), key=lambda v: v["id"]):
+        print("%6d  %s%s" % (v["id"], v.get("name"), "   <- in use" if v["id"] in GAME_VERSIONS else ""))
+
+
+def check_changelog(ver, changelog_path):
+    """The changelog's first heading must be this version, so a draft ("not yet released")
+    or a forgotten version bump never goes out."""
+    for line in open(changelog_path, encoding="utf-8"):
+        if line.startswith("## "):
+            if line.strip() != "## Alts Forever " + ver:
+                fail("the changelog's first heading is %r; expected '## Alts Forever %s'" % (line.strip(), ver))
+            return
+    fail("the changelog has no '## Alts Forever %s' heading" % ver)
+
+
 def upload(path, ver, changelog_path):
     changelog = open(changelog_path, encoding="utf-8").read()
     metadata = {
@@ -170,11 +195,16 @@ def github_release(path, ver, changelog_path):
 
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) >= 2 else None
+    if mode == "--versions":
+        list_versions()
+        sys.exit(0)
     if mode in ("--upload", "--github"):
         if len(sys.argv) < 3:
             fail(mode + " needs a changelog file")
         check_pushed()
     path, ver = build()
+    if mode in ("--upload", "--github"):
+        check_changelog(ver, sys.argv[2])
     if mode == "--upload":
         upload(path, ver, sys.argv[2])
     if mode in ("--upload", "--github"):
