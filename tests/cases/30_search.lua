@@ -444,8 +444,9 @@ test("the character menu: all, or any you tick; one ticked names them, several c
     local f = AltsForeverSearchFrame
     eq(f.chars.text, "All characters")
     f.chars.scripts.OnClick(f.chars)
-    -- Only characters tooltips show (Far Away is on another ruleset).
-    eq(menuTexts(), "All characters | nil | Realm | [MAGE]Aldric | [PALADIN]Smith | [DRUID]Tarn Moon")
+    -- Only characters tooltips show (Far Away is on another ruleset); the game says yours
+    -- is Normal.
+    eq(menuTexts(), "All characters | nil | Normal | [MAGE]Aldric | [PALADIN]Smith | [DRUID]Tarn Moon")
     eq(wow.menu.items[1].isSelected(), true)
     -- Ticking one while all are searched: just them.
     searchTick("Aldric")

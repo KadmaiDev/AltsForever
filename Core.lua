@@ -144,7 +144,7 @@ local CHAR_FIELDS = {
 local DB_FIELDS = {
     icons = "table", goldDays = "table", goldDaysBy = "table", factions = "table",
     recipeInfo = "table", collapsedGroups = "table", session = "table", itemNames = "table",
-    itemQuality = "table",
+    itemQuality = "table", rulesets = "table",
     legacyPool = "number", scale = "number", minimapAngle = "number", bagsCols = "number",
     bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
 }
@@ -185,6 +185,7 @@ local function Repair(saved)
         if saved[field] ~= nil and type(saved[field]) ~= kind then saved[field] = nil end
     end
     if saved.goldDays then KeepOnly(saved.goldDays, "number", "number") end
+    if saved.rulesets then KeepOnly(saved.rulesets, "string", "string") end
     if saved.goldDaysBy then
         KeepOnly(saved.goldDaysBy, "string", "table")
         for _, days in pairs(saved.goldDaysBy) do KeepOnly(days, "number", "number") end
@@ -275,9 +276,34 @@ function ns.SetOtherRulesets(on)
     if ns.UpgradesChanged then ns.UpgradesChanged() end
 end
 
--- The ruleset's name from the realm name the client reports, in the player's language;
--- a realm name that doesn't say is shown as it is.
+-- Which ruleset the game says it's running ("pvp", "rp", "hardcore", "normal"), as Nova
+-- Instance Tracker asks it on Forever; nil if it can't be asked. Recorded per realm name at
+-- login (db.rulesets), so live realm names that don't say their ruleset still get one.
+local RULES = { { "HardcoreRuleset", "hardcore" }, { "RPRuleset", "rp" }, { "PvPRuleset", "pvp" } }
+function ns.PlayerRuleset()
+    local rules = Enum and Enum.GameRule
+    local active = C_GameRules and C_GameRules.IsGameRuleActive
+    if not rules or not active then return end
+    local asked
+    for _, rule in ipairs(RULES) do
+        if rules[rule[1]] ~= nil then
+            local ok, on = pcall(active, rules[rule[1]])
+            if ok and not issecretvalue(on) then
+                if on then return rule[2] end
+                asked = true
+            end
+        end
+    end
+    return asked and "normal" or nil
+end
+
+local RULESET_NAMES = { normal = "Normal", pvp = "PvP", rp = "Roleplaying", hardcore = "Hardcore" }
+
+-- The ruleset's name, in the player's language: as the game told us for that realm, else
+-- from the realm name; a realm name that doesn't say is shown as it is.
 local function RulesetBase(realm)
+    local known = ns.db.rulesets and RULESET_NAMES[ns.db.rulesets[realm]]
+    if known then return L[known] end
     local r = realm:lower()
     if r:find("hardcore", 1, true) then return L["Hardcore"] end
     if r:find("pvp%d*$") then return L["PvP"] end
@@ -371,6 +397,9 @@ function ns.LeaveBeta(db, realm)
     -- The main history was the beta's (or from before groups): Money.lua starts it afresh.
     local main = db.goldGroup and db.goldGroup:match("^(.-)|")
     if main == nil or main == "" or ns.BetaRealm(main) then db.goldDays, db.goldGroup = nil, nil end
+    for r in pairs(db.rulesets or {}) do
+        if ns.BetaRealm(r) then db.rulesets[r] = nil end
+    end
     db.collapsedGroups = nil -- their keys named the beta's groups
     db.legacyPool, db.wellRested = nil, nil
     ns.PruneRecipeInfo()
@@ -387,7 +416,14 @@ function ns.InitChar(db, name, class, faction, realm)
         db.chars[key] = c
     end
     c.name, c.class, c.faction = name, class, faction
-    if realm then c.realm = realm end
+    if realm then
+        c.realm = realm
+        local ruleset = ns.PlayerRuleset()
+        if ruleset then
+            db.rulesets = db.rulesets or {}
+            db.rulesets[realm] = ruleset
+        end
+    end
     c.bags = c.bags or {}
     c.equip = c.equip or {}
     return key, c

@@ -1,3 +1,7 @@
+## Alts Forever 1.0.1 (not yet released)
+
+- Rulesets (Normal, PvP, Roleplaying, Hardcore) are now named from what the game says it's running, not only from the realm name, so the overview and tooltips name them correctly on live realms whatever they're called.
+
 ## Alts Forever 1.0.0
 
 Ready for the launch of WoW Forever. Thank you to everyone who tried Alts Forever during the beta and sent ideas and reports: many of the features here came from you.

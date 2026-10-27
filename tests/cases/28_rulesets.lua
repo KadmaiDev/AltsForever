@@ -56,6 +56,51 @@ test("ruleset names: from the realm name, told apart when two share a ruleset", 
     eq(ns.RulesetLabel(PVE), "Normal (ClassicBetaPvE2)")
 end)
 
+test("ruleset names: the game's own answer, recorded per realm, beats the realm name", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.player.realm, wow.player.ruleset = "Forever-3", "PvPRuleset"
+    local saved = rulesetAlts()
+    saved.chars["Tarn Moon"].realm = "Forever-1"
+    wow.login(saved)
+    eq(AltsForeverDB.rulesets["Forever-3"], "pvp")
+    eq(AltsForeverDB.rulesets["Forever-1"], nil, "only realms logged in on")
+    eq(ns.RulesetLabel("Forever-3"), "PvP")
+    eq(ns.RulesetLabel("Forever-1"), "Forever-1", "not asked yet: the realm name as it is")
+    eq(ns.RulesetLabel("SomeRP"), "Roleplaying", "still read from the name")
+    eq(ns.RulesetLabel(PVP), "PvP (ClassicBetaPvP)", "told apart from the game's PvP")
+    -- Logging in on Tarn's realm, a Normal one, whose name says nothing.
+    saved = AltsForeverDB
+    wow.load(FILES)
+    wow.player.name, wow.player.realm, wow.player.ruleset = "Tarn Moon", "Forever-1", nil
+    wow.login(saved)
+    eq(AltsForeverDB.rulesets["Forever-1"], "normal")
+    eq(AltsForeverDB.rulesets["Forever-3"], "pvp", "others kept")
+    -- The game's answer wins over a name that seems to say otherwise.
+    saved = AltsForeverDB
+    wow.load(FILES)
+    wow.player.realm, wow.player.ruleset = "OddPvE", "RPRuleset"
+    wow.login(saved)
+    eq(AltsForeverDB.rulesets["OddPvE"], "rp")
+end)
+
+test("ruleset from the game: a secret or missing answer records nothing", function()
+    wow.load(FILES)
+    wow.player.realm, wow.player.ruleset = "Forever-3", wow.SECRET
+    wow.login(rulesetAlts())
+    eq(AltsForeverDB.rulesets, nil, "secret")
+    wow.load(FILES)
+    C_GameRules = nil
+    wow.player.realm = "Forever-3"
+    wow.login(rulesetAlts())
+    eq(AltsForeverDB.rulesets, nil, "no C_GameRules")
+    wow.load(FILES)
+    Enum.GameRule = { PvPRuleset = 103 }
+    wow.player.realm = "Forever-3"
+    wow.login(rulesetAlts())
+    eq(AltsForeverDB.rulesets["Forever-3"], "normal", "the rules it knows are asked")
+end)
+
 test("item tooltips leave out other rulesets by default; not-yet-sorted characters stay", function()
     rulesetStart()
     local text = rulesetHover(2589)
