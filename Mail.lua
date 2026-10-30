@@ -188,6 +188,7 @@ function ns.StartMail()
         char.mail = char.mail or {}
         char.mailExpires, char.mailDeletes = ns.ScanInbox(char.mail)
         ns.version = ns.version + 1
+        if ns.RefreshOverview then ns.RefreshOverview() end -- its Mail column, if open
     end
 
     -- The inbox can only be read while the mailbox is open.
@@ -233,6 +234,7 @@ function ns.StartMail()
         wipe(pending)
         pendingMoney = 0
         ns.InvalidateCache()
+        if ns.RefreshOverview then ns.RefreshOverview() end
     end)
 
     ns.On("MAIL_FAILED", function()

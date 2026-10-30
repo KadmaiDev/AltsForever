@@ -116,3 +116,26 @@ test("expiry text and the overview's mail column", function()
     eq(ns.MailText({ mail = {} }, NOW), "", "no valuable mail")
     eq(ns.MailText({ mail = {}, mailExpires = NOW + 5 * HOUR }, NOW), "|cffff20205h|r")
 end)
+
+test("the open overview's Mail column follows the inbox and mail sent to an alt", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.login({ v = 2, chars = { ["Alt"] = alt("Alt", "WARRIOR", {}) } })
+    SlashCmdList.ALTSFOREVER("")
+    local function mailOf(key)
+        for _, row in ipairs(overviewRows()) do
+            if row.key == key then return cell(row, 11) end
+        end
+    end
+    eq(mailOf(ns.charKey), G .. "?|r", "mailbox never opened")
+    eq(mailOf("Alt"), G .. "?|r")
+    wow.fire("MAIL_SHOW")
+    wow.inbox = { { { 100, 1 }, days = 2.5 } }
+    wow.fire("MAIL_INBOX_UPDATE")
+    eq(mailOf(ns.charKey), ns.MailText(ns.char, NOW))
+    assert(mailOf(ns.charKey):find("2d", 1, true), mailOf(ns.charKey))
+    wow.outbox = { { 100, 5 } }
+    SendMail("Alt", "", "")
+    wow.fire("MAIL_SEND_SUCCESS")
+    assert(mailOf("Alt"):find("30d", 1, true), mailOf("Alt"))
+end)
