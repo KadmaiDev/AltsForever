@@ -69,7 +69,7 @@ end
 -- cells so the percentages line up.
 function ns.LevelParts(c)
     if not c.level then return GREY .. "?|r", "" end
-    if c.level >= ns.MaxLevel() or not c.xpMax or c.xpMax == 0 then return tostring(c.level), "" end
+    if c.level >= ns.MaxLevel() or not c.xp or not c.xpMax or c.xpMax == 0 then return tostring(c.level), "" end
     -- Multiply first: 5700 / 10000 * 100 is 56.99... in floating point.
     return tostring(c.level), GREY .. floor(c.xp * 100 / c.xpMax) .. "%|r"
 end
@@ -211,7 +211,7 @@ local function RowTooltip(row)
     tt:AddLine(ns.ColoredName(key, c))
     if c.level then
         local line = L["Level %d"]:format(c.level)
-        if c.xpMax and c.xpMax > 0 and c.level < ns.MaxLevel() then
+        if c.xp and c.xpMax and c.xpMax > 0 and c.level < ns.MaxLevel() then
             line = line .. "  " .. GREY .. L["(%d / %d XP)"]:format(c.xp, c.xpMax) .. "|r"
         end
         tt:AddLine(line, 1, 1, 1)

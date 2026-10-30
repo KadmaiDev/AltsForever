@@ -58,7 +58,7 @@ function ns.AddXPLines(tt, fresh)
     for _, key in ipairs(ns.OverviewOrder()) do
         local c = chars[key]
         if key ~= ns.charKey and not ns.Hidden(c) and c.level and c.level < maxLevel then
-            local xp = (c.xpMax and c.xpMax > 0) and (GREY .. floor(c.xp * 100 / c.xpMax) .. "%|r") or ""
+            local xp = (c.xp and c.xpMax and c.xpMax > 0) and (GREY .. floor(c.xp * 100 / c.xpMax) .. "%|r") or ""
             rows[#rows + 1] = { ns.ListName(key, c), tostring(c.level), xp, ns.RestedText(c, now) }
         end
     end

@@ -70,12 +70,17 @@ end)
 local function Upgrade(saved)
     if saved.v ~= 1 or type(saved.chars) ~= "table" then return end
     local chars = {}
+    local function When(c)
+        local t = c.updated or c.seen
+        return type(t) == "number" and t or 0
+    end
     for key, c in pairs(saved.chars) do
-        if type(c) == "table" then
-            local name = c.name or key:match("^(.*)%-[^%-]*$") or key
+        local name = type(c) == "table" and (type(c.name) == "string" and c.name
+            or type(key) == "string" and (key:match("^(.*)%-[^%-]*$") or key))
+        if name then
             c.name, c.realm = name, nil
             local old = chars[name]
-            if not old or (c.updated or c.seen or 0) > (old.updated or old.seen or 0) then chars[name] = c end
+            if not old or When(c) > When(old) then chars[name] = c end
         end
     end
     saved.chars, saved.realmOnly, saved.v = chars, nil, 2
@@ -185,6 +190,13 @@ local function Repair(saved)
     for field, kind in pairs(DB_FIELDS) do
         if saved[field] ~= nil and type(saved[field]) ~= kind then saved[field] = nil end
     end
+    if saved.icons then
+        for place, icon in pairs(saved.icons) do
+            if type(place) ~= "string" or (type(icon) ~= "string" and type(icon) ~= "number") then
+                saved.icons[place] = nil
+            end
+        end
+    end
     if saved.goldDays then KeepOnly(saved.goldDays, "number", "number") end
     if saved.rulesets then KeepOnly(saved.rulesets, "string", "string") end
     if saved.goldDaysBy then
@@ -214,10 +226,12 @@ local function Repair(saved)
 end
 
 function ns.InitDB(saved)
-    if type(saved) == "table" then Upgrade(saved) end
-    if type(saved) ~= "table" or saved.v ~= DB_VERSION or type(saved.chars) ~= "table" then
-        saved = { v = DB_VERSION, chars = {} }
-    end
+    if type(saved) ~= "table" then saved = { v = DB_VERSION, chars = {} } end
+    Upgrade(saved)
+    -- A damaged or unknown version marker, or a damaged character list, costs only what's
+    -- damaged: the rest is repaired below, never thrown away (owner: repair, never reset).
+    saved.v = DB_VERSION
+    if type(saved.chars) ~= "table" then saved.chars = {} end
     Repair(saved)
     FoldFirstNames(saved.chars)
     return saved

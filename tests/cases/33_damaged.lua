@@ -60,3 +60,52 @@ test("a damaged saved file is repaired in place: good characters and values kept
     eq(AltsForeverDB.recipeInfo.Tailoring, nil)
     eq(AltsForeverDB.icons, nil)
 end)
+
+test("a damaged version marker or character list costs only what's damaged", function()
+    wow.load(FILES)
+    wow.login({ v = "2", countsOff = true, chars = { ["Good Alt"] = alt("Good Alt", "ROGUE", { money = 1000 }) } })
+    eq(AltsForeverDB.v, 2)
+    eq(AltsForeverDB.chars["Good Alt"].money, 1000, "characters kept")
+    eq(AltsForeverDB.countsOff, true, "settings kept")
+    wow.load(FILES)
+    wow.login({ v = 2, countsOff = true, chars = "junk" })
+    eq(type(AltsForeverDB.chars), "table")
+    eq(AltsForeverDB.countsOff, true, "settings kept")
+end)
+
+test("a damaged version 1 save loads, keeping its good characters", function()
+    wow.load(FILES)
+    local ok, err = pcall(wow.login, { v = 1, chars = {
+        [42] = { class = "MAGE" },
+        ["Kadra-Realm"] = { class = "MAGE", updated = "x", bags = { [100] = 1 } },
+        ["Kadra-Other"] = { class = "MAGE", updated = 50, bags = { [100] = 2 } },
+        ["Tarn Moon-Realm"] = { class = "DRUID", bags = { [200] = 3 } } } })
+    assert(ok, err)
+    eq(AltsForeverDB.chars["Tarn Moon"].bags[200], 3)
+    eq(AltsForeverDB.chars["Kadra"].bags[100], 2, "the newer one kept")
+end)
+
+test("a damaged icon choice falls back to the default; good ones are kept", function()
+    wow.load(FILES)
+    local ok, err = pcall(wow.login, { v = 2, icons = { bags = true, bank = {}, mail = "words", [5] = "x" }, chars = {} })
+    assert(ok, err)
+    eq(AltsForeverDB.icons.bags, nil); eq(AltsForeverDB.icons.bank, nil)
+    eq(AltsForeverDB.icons.mail, "words")
+    eq(AltsForeverDB.icons[5], nil)
+end)
+
+test("one damaged XP value: level kept, XP unknown, nothing breaks", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.login({ v = 2, chars = { ["Low Alt"] = alt("Low Alt", "ROGUE", { level = 20, xp = "bad", xpMax = 10000 }) } })
+    local c = AltsForeverDB.chars["Low Alt"]
+    eq(c.xp, nil); eq(c.level, 20)
+    eq(ns.LevelText(c), "20")
+    local ok, err = pcall(function()
+        SlashCmdList.ALTSFOREVER("")
+        for _, row in ipairs(overviewRows()) do row.scripts.OnEnter(row) end
+        ns.AddXPLines(GameTooltip, true)
+        ns.ExportText("tabs")
+    end)
+    assert(ok, err)
+end)
