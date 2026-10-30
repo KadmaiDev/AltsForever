@@ -371,3 +371,29 @@ test("gathering professions are recognised in any language (by the game's profes
     assert(text:find("Angeln = 50\n", 1, true) or text:find("Angeln = 50$"), "German Fishing: no note\n" .. text)
     assert(text:find("Bergbau = 150  ", 1, true), "German Mining (not gathering here) keeps its note\n" .. text)
 end)
+
+test("Can craft: a character who dropped the profession isn't offered; recipes are kept", function()
+    local ns = wow.load(FILES)
+    wow.login({ v = 2, chars = {
+        ["Brakka"] = alt("Brakka", "HUNTER", { profs = { Mining = 50 },
+            crafts = { Engineering = { [SQUIRREL_ITEM] = "mechanical squirrel" } } }),
+        ["Far"] = alt("Far", "MAGE", { profs = { Engineering = 40 },
+            crafts = { Engineering = { [SQUIRREL_ITEM] = "mechanical squirrel" } } }),
+        ["Old"] = alt("Old", "MAGE", { crafts = { Engineering = { [SQUIRREL_ITEM] = "mechanical squirrel" } } }),
+    } })
+    eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)), "[MAGE]Far, [MAGE]Old",
+        "Brakka has dropped Engineering; Old's skills were never read, so kept as before")
+    eq(ns.db.chars["Brakka"].crafts.Engineering[SQUIRREL_ITEM], "mechanical squirrel", "nothing deleted")
+end)
+
+test("Can craft: skill-ups come from the profession that holds the recipe, not a stray copy", function()
+    wow.load(FILES)
+    local crafts = { Engineering = { [SQUIRREL_ITEM] = "mechanical squirrel" } }
+    -- 0.2.x filed items under the character's other professions too, as true.
+    for _, p in ipairs({ "Cooking", "First Aid", "Fishing", "Mining", "Skinning" }) do crafts[p] = { [SQUIRREL_ITEM] = true } end
+    wow.login({ v = 2, recipeInfo = { Engineering = { ["mechanical squirrel"] = "100;Mechanical Squirrel;" } }, chars = {
+        ["Brakka"] = alt("Brakka", "HUNTER", { crafts = crafts,
+            profs = { Engineering = 40, Cooking = 1, ["First Aid"] = 1, Fishing = 1, Mining = 1, Skinning = 1 } }),
+    } })
+    eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)), "[HUNTER]Brakka" .. skillupsTo(100))
+end)

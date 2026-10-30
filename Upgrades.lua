@@ -622,7 +622,9 @@ function ns.CraftableUpgrades(slot, out)
         local crafts = ns.db.chars[key].crafts or {}
         for prof, items in pairs(crafts) do
             for id in pairs(items) do
-                if CraftProf(crafts, prof, id) ~= prof then id = nil end -- counted under its own
+                if CraftProf(crafts, prof, id) ~= prof or not ns.HasProf(ns.db.chars[key], prof) then
+                    id = nil -- counted under its own profession; or one they've dropped
+                end
                 if id then
                 local _, _, _, loc, _, class, sub = GetItemInfoInstant(id)
                 local armour = class == ARMOR_CLASS and sub and sub >= 1 and sub <= 4 and loc ~= "INVTYPE_CLOAK"

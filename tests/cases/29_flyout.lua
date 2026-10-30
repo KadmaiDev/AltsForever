@@ -190,3 +190,13 @@ test("forgetting a crafter with the character sheet open: their anvil goes, and 
     local ok, err = pcall(g.scripts.OnEnter, g)
     assert(ok, err)
 end)
+
+test("craftable upgrades leave out a profession the crafter has dropped", function()
+    local ns = flyStart()
+    ns.db.chars["Smith"].profs = { Tailoring = 100 }
+    eq(#ns.CraftableUpgrades(10), 1, "only Aldric's own gauntlets: Smith no longer has Blacksmithing")
+    eq(ns.CraftableUpgrades(10)[1].key, "Aldric")
+    eq(ns.CraftableUpgrades(15)[1].id, 6006, "Smith still tailors")
+    ns.db.chars["Smith"].profs.Blacksmithing = 100
+    eq(#ns.CraftableUpgrades(10), 2, "taken up again")
+end)

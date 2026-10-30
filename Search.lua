@@ -122,7 +122,7 @@ local function Crafters(id)
         local crafts = Counted(key, c) and c.crafts
         if crafts then
             for prof, items in pairs(crafts) do
-                if items[id] and ns.CraftProf(crafts, prof, id) == prof then
+                if items[id] and ns.CraftProf(crafts, prof, id) == prof and ns.HasProf(c, prof) then
                     list[#list + 1] = { key = key, c = c, prof = prof }
                     break
                 end

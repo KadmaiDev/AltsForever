@@ -6,7 +6,7 @@ local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
 
-local pairs, ipairs, wipe, tonumber, type, sort = pairs, ipairs, wipe, tonumber, type, table.sort
+local pairs, ipairs, next, wipe, tonumber, type, sort = pairs, ipairs, next, wipe, tonumber, type, table.sort
 local issecretvalue = issecretvalue or function() return false end
 local GetProfessions, GetProfessionInfo = GetProfessions, GetProfessionInfo
 local GetItemInfoInstant, GetItemNameByID = C_Item.GetItemInfoInstant, C_Item.GetItemNameByID
@@ -265,6 +265,14 @@ function ns.AtRankCap(c, prof)
     return skill and max and skill >= max or false
 end
 
+-- False once a character has dropped the profession (it's gone from their skills): their
+-- recipes are kept, just no longer offered. A character whose skills were never read, or
+-- read as none, counts as having it, as before.
+function ns.HasProf(c, prof)
+    local profs = c.profs
+    return not profs or next(profs) == nil or profs[prof] ~= nil
+end
+
 -- The skill a character would gain from, or nil if nothing can give them a skill-up now.
 local function SkillFor(c, prof)
     local skill = c.profs and c.profs[prof]
@@ -498,15 +506,20 @@ local function FindCrafters(id)
         local c = chars[key]
         if c and c.crafts then
             for prof, items in pairs(c.crafts) do
-                local lname = items[id]
-                if lname then
-                    local text = ns.ListName(key, c)
-                    -- Saves from before 0.3.0 hold true here, so the grey point is unknown.
-                    local grey = skillups and type(lname) == "string" and ns.RecipeGrey(prof, lname)
-                    local skill = grey and SkillFor(c, prof)
-                    if skill and skill < grey then text = text .. LIGHT .. " · " .. L["skill-ups to %s"]:format(grey) .. "|r" end
-                    list = list or {}
-                    list[#list + 1] = "  " .. text
+                if items[id] then
+                    -- 0.2.x filed some items under other professions too (as true): the
+                    -- entry holding the recipe's name is the one it's made with.
+                    prof = ns.CraftProf(c.crafts, prof, id)
+                    local lname = c.crafts[prof][id]
+                    if ns.HasProf(c, prof) then
+                        local text = ns.ListName(key, c)
+                        -- Saves from before 0.3.0 hold true here, so the grey point is unknown.
+                        local grey = skillups and type(lname) == "string" and ns.RecipeGrey(prof, lname)
+                        local skill = grey and SkillFor(c, prof)
+                        if skill and skill < grey then text = text .. LIGHT .. " · " .. L["skill-ups to %s"]:format(grey) .. "|r" end
+                        list = list or {}
+                        list[#list + 1] = "  " .. text
+                    end
                     break -- once per character, even if two professions make it
                 end
             end
