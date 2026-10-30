@@ -2,12 +2,19 @@
 -- other shared helpers; helpers defined here are shared with the other files too.
 ---------------------------------------------------------------------------
 -- EllesmereUIBags: its money display shows its own gold summary unless its gold
--- tracking is off; then ours.
-function ellesmereBags(trackingOff)
+-- tracking is off; then ours. The switch is account-wide in its gold ledger (9.6.6 on);
+-- `old` puts it in the bags profile instead, as older versions did.
+function ellesmereBags(trackingOff, old)
     wow.withEllesmere = true
     wow.load(FILES)
     local profile = {}
-    if trackingOff then profile.enableGoldTracking = false end
+    if old then
+        EllesmereUIDB = nil
+        if trackingOff then profile.enableGoldTracking = false end
+    else
+        EllesmereUIDB = { goldLedger = { chars = {} } }
+        if trackingOff then EllesmereUIDB.goldLedger.tracking = false end
+    end
     EllesmereUI._bagsDB = { profile = profile }
     EUI_Bags = CreateFrame("Frame", "EUI_MainBagFrame")
     local footer = CreateFrame("Frame")
@@ -27,6 +34,7 @@ test("EllesmereUIBags' money shows its own gold summary while its gold tracking 
     local hitbox = ellesmereBags(false)
     hitbox.scripts.OnEnter(hitbox)
     eq(GameTooltip:IsShown() or false, false, "ours stays out of the way")
+    EllesmereUIDB = nil
 end)
 
 test("with EllesmereUIBags' gold tracking off, its money shows our gold across characters", function()
@@ -34,12 +42,12 @@ test("with EllesmereUIBags' gold tracking off, its money shows our gold across c
     hitbox.scripts.OnEnter(hitbox)
     eq(GameTooltip:IsShown(), true); eq(GameTooltip:GetOwner(), hitbox)
     eq(GameTooltip.lines[1][1], "Gold")
-    EllesmereUI._bagsDB.profile.enableGoldTracking = nil -- turned back on: theirs again
+    EllesmereUIDB.goldLedger.tracking = nil -- turned back on: theirs again
     GameTooltip:Hide()
     hitbox.scripts.OnEnter(hitbox)
     eq(GameTooltip:IsShown(), false)
     -- Hooked once, however often the bags open.
-    EllesmereUI._bagsDB.profile.enableGoldTracking = false
+    EllesmereUIDB.goldLedger.tracking = false
     EUI_Bags.scripts.OnShow(EUI_Bags)
     hitbox.scripts.OnEnter(hitbox)
     local golds = 0
@@ -47,6 +55,17 @@ test("with EllesmereUIBags' gold tracking off, its money shows our gold across c
     eq(golds, 1)
     hitbox.scripts.OnLeave(hitbox)
     eq(GameTooltip:IsShown(), false)
+    EllesmereUIDB = nil
+end)
+
+test("an older EllesmereUIBags with gold tracking off in its bags profile shows ours too", function()
+    local hitbox = ellesmereBags(true, true)
+    hitbox.scripts.OnEnter(hitbox)
+    eq(GameTooltip:IsShown(), true)
+    GameTooltip:Hide()
+    EllesmereUI._bagsDB.profile.enableGoldTracking = nil
+    hitbox.scripts.OnEnter(hitbox)
+    eq(GameTooltip:IsShown() or false, false)
 end)
 
 test("ElvUI's bags: hovering the gold shows our gold across characters", function()

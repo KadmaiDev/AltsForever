@@ -196,8 +196,13 @@ end
 -- has an invisible hover area on top showing EllesmereUI's own gold summary. That's the
 -- player's choice, so ours shows there only when they've turned EllesmereUI's gold
 -- tracking off (its summary then shows nothing). The setting is read on every hover, so
--- switching it applies straight away.
+-- switching it applies straight away. EllesmereUI now keeps the switch account-wide in its
+-- gold ledger (`EllesmereUIDB.goldLedger.tracking`, false only when off; seen in 9.6.6 and
+-- 9.7); older versions kept it per bags profile. Neither is its official API: read only.
 local function EllesmereGoldOff()
+    local acct = EllesmereUIDB
+    local ledger = type(acct) == "table" and acct.goldLedger
+    if type(ledger) == "table" then return ledger.tracking == false end
     local db = EllesmereUI and EllesmereUI._bagsDB
     local profile = type(db) == "table" and db.profile
     return type(profile) == "table" and profile.enableGoldTracking == false
