@@ -47,7 +47,7 @@ end
 
 local function ItemName(id)
     local name = C_Item.GetItemNameByID(id)
-    if type(name) == "string" and name ~= "" and not issecretvalue(name) then return name end
+    if not issecretvalue(name) and type(name) == "string" and name ~= "" then return name end
 end
 
 ---------------------------------------------------------------------------

@@ -152,7 +152,7 @@ local function SearchPool()
     if picker.pool then return picker.pool end
     local pool, seen = {}, {}
     local function Add(name, icon)
-        if type(name) == "string" and name ~= "" and icon and not issecretvalue(name) and not issecretvalue(icon) then
+        if not issecretvalue(name) and not issecretvalue(icon) and type(name) == "string" and name ~= "" and icon then
             local key = name:lower()
             if not seen[key] then
                 seen[key] = true

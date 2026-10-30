@@ -103,7 +103,7 @@ local function Index()
                 for id in pairs(t) do
                     if not indexed[id] then
                         local name = GetItemNameByID(id)
-                        if type(name) == "string" and name ~= "" and not issecretvalue(name) then
+                        if not issecretvalue(name) and type(name) == "string" and name ~= "" then
                             indexed[id] = true
                             index[name:lower()] = id
                         else
@@ -146,7 +146,7 @@ end
 
 local function Icon(id)
     local icon = id and C_Item.GetItemIconByID and C_Item.GetItemIconByID(id)
-    if not icon or issecretvalue(icon) then icon = UNKNOWN_ICON end
+    if issecretvalue(icon) or not icon then icon = UNKNOWN_ICON end
     return "|T" .. icon .. CROP
 end
 

@@ -202,7 +202,7 @@ local scores, scoreCount = {}, 0 -- [role][link] = score
 local waiting = false            -- some item data was asked for and hasn't come yet
 
 local function Plain(v)
-    if v ~= nil and not issecretvalue(v) then return v end
+    if not issecretvalue(v) and v ~= nil then return v end
 end
 
 -- Asks the game for an item it hasn't loaded; upgrades are worked out again when it comes.

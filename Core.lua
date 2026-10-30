@@ -241,7 +241,7 @@ end
 -- ("Mira", "Dawnfield"); earlier builds returned "Mira Dawnfield" as the first value.
 function ns.PlayerName()
     local first, surname = UnitName("player")
-    if surname and not issecretvalue(surname) and surname ~= "" then
+    if not issecretvalue(surname) and surname and surname ~= "" then
         return first .. " " .. surname
     end
     return first

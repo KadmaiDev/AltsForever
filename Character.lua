@@ -21,7 +21,7 @@ local AWAY_RATE = 0.25
 local WELL_RESTED_STEP = 0.04
 
 local function Plain(v)
-    if v ~= nil and not issecretvalue(v) then return v end
+    if not issecretvalue(v) and v ~= nil then return v end
 end
 
 function ns.MaxLevel()
@@ -40,9 +40,9 @@ function ns.ScanCharacter(c)
         c.resting = IsResting() and true or nil
     end
     local zone = GetZoneText()
-    if zone and zone ~= "" and not issecretvalue(zone) then c.zone = zone end
+    if not issecretvalue(zone) and zone and zone ~= "" then c.zone = zone end
     local hearth = GetBindLocation()
-    if hearth and hearth ~= "" then c.hearth = hearth end
+    if not issecretvalue(hearth) and hearth and hearth ~= "" then c.hearth = hearth end
     local _, equipped = GetAverageItemLevel()
     if Plain(equipped) and equipped > 0 then c.ilvl = floor(equipped + 0.5) end
     c.updated = time()

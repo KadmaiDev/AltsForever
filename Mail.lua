@@ -109,7 +109,7 @@ function ns.SendToAltEntries()
     wipe(attached)
     for i = 1, MAX_SEND do
         local _, id = GetSendMailItem(i)
-        if id and not issecretvalue(id) then attached[#attached + 1] = id end
+        if not issecretvalue(id) and id then attached[#attached + 1] = id end
     end
     wipe(entries)
     local chars, faction = ns.db.chars, ns.char.faction

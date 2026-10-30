@@ -32,7 +32,7 @@ ns.WELL_RESTED_NODE = 110301
 ns.WELL_RESTED_SPELL = 1225478
 
 local function Plain(v)
-    if v ~= nil and not issecretvalue(v) then return v end
+    if not issecretvalue(v) and v ~= nil then return v end
 end
 
 local function ConfigType(name, fallback)
@@ -159,7 +159,7 @@ end
 -- Well Rested's name in the player's language (the Legacy talent's spell).
 function ns.WellRestedName()
     local name = C_Spell and C_Spell.GetSpellName and C_Spell.GetSpellName(ns.WELL_RESTED_SPELL)
-    if type(name) == "string" and name ~= "" and not issecretvalue(name) then return name end
+    if not issecretvalue(name) and type(name) == "string" and name ~= "" then return name end
     return L["Well Rested"]
 end
 

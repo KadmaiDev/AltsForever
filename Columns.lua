@@ -58,7 +58,7 @@ end
 
 -- A font as read from a font string, if it can be used (not secret).
 function ns.UsableFont(font, size, flags)
-    return font and not issecretvalue(font) and not issecretvalue(size) and not issecretvalue(flags)
+    return not issecretvalue(font) and not issecretvalue(size) and not issecretvalue(flags) and font
 end
 
 local function Width(m, s)

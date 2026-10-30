@@ -41,7 +41,7 @@ end
 function ns.AddRepLines(tt, fresh)
     local d = R and R.GetWatchedFactionData and R.GetWatchedFactionData()
     local id = d and d.factionID
-    if not id or issecretvalue(id) or id == 0 then return false end
+    if issecretvalue(id) or not id or id == 0 then return false end
     local rows = {}
     for _, key in ipairs(ns.OverviewOrder()) do
         local c = ns.db.chars[key]
@@ -61,7 +61,7 @@ function ns.AddRepLines(tt, fresh)
     local title
     if fresh then
         title = ns.db.factions and ns.db.factions[id]
-        if not title and d.name and not issecretvalue(d.name) then title = d.name end
+        if not title and not issecretvalue(d.name) and d.name then title = d.name end
     end
     return ns.AddCharacterRows(tt, rows, {}, title or (fresh and L["Reputation"]))
 end
@@ -77,9 +77,9 @@ local seen = {}
 
 local function Record(c, names, d)
     local standing = d and d.currentStanding
-    if not d or not d.factionID or standing == nil or issecretvalue(standing) then return end
+    if not d or not d.factionID or issecretvalue(standing) or standing == nil then return end
     c.reps[d.factionID] = standing
-    if d.name and not issecretvalue(d.name) then names[d.factionID] = d.name end
+    if not issecretvalue(d.name) and d.name then names[d.factionID] = d.name end
     seen[d.factionID] = true
 end
 

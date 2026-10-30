@@ -190,7 +190,7 @@ local function Gathering()
     local ts = C_TradeSkillUI
     for _, id in ipairs(GATHERING_IDS) do
         local name = ts and ts.GetTradeSkillDisplayName and ts.GetTradeSkillDisplayName(id)
-        if type(name) == "string" and name ~= "" and not issecretvalue(name) then
+        if not issecretvalue(name) and type(name) == "string" and name ~= "" then
             set[name] = true
         else
             complete = false

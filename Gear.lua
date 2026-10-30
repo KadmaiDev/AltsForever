@@ -47,7 +47,7 @@ function ns.ScanGear(c)
 
     for slot in pairs(SLOT_NAMES) do
         local link = GetInventoryItemLink("player", slot)
-        if link and not issecretvalue(link) then
+        if not issecretvalue(link) and link then
             gear[slot] = link
         elseif GetInventoryItemID("player", slot) then
             incomplete = true -- item there, link not ready: keep the old one
@@ -62,7 +62,7 @@ function ns.ScanGear(c)
     local lowest
     for slot in pairs(SLOT_NAMES) do
         local cur, max = GetInventoryItemDurability(slot)
-        if cur and max and max > 0 and not issecretvalue(cur) then
+        if not issecretvalue(cur) and not issecretvalue(max) and cur and max and max > 0 then
             local pct = floor(cur * 100 / max)
             if pct < 100 then low[slot] = pct end
             if not lowest or pct < lowest then lowest = pct end

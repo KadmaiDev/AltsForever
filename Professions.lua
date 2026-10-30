@@ -53,7 +53,7 @@ function ns.ScanSkills(c)
         local name, _, skill, max = GetProfessionInfo(index)
         if name and not issecretvalue(skill) and skill then
             profs[name] = skill
-            if max and not issecretvalue(max) and max > 0 then maxes[name] = max end
+            if not issecretvalue(max) and max and max > 0 then maxes[name] = max end
             return name
         end
     end
@@ -74,7 +74,7 @@ local function OutputItem(recipeID, s)
         local link = TS.GetRecipeItemLink(recipeID)
         id = type(link) == "string" and not issecretvalue(link) and tonumber(link:match("|Hitem:(%d+)"))
     end
-    if id and not issecretvalue(id) and id > 0 then return id end
+    if not issecretvalue(id) and id and id > 0 then return id end
 end
 
 -- A recipe's reagents as ",itemID:qty,itemID:qty" from its schematic. The leading comma
@@ -87,7 +87,7 @@ local function Reagents(s)
         local slot = slots[i]
         local r = slot.reagents and slot.reagents[1]
         local id, qty = r and r.itemID, slot.quantityRequired
-        if id and qty and not issecretvalue(id) and not issecretvalue(qty) then
+        if not issecretvalue(id) and not issecretvalue(qty) and id and qty then
             out = (out or "") .. "," .. id .. ":" .. qty
         end
     end
@@ -364,14 +364,14 @@ local function ParseRecipe(tt, id, data)
     -- crafted item shown inside the tooltip.
     for i = 1, n do
         local text = LineText(tt, data, i)
-        if text and not issecretvalue(text) then
+        if not issecretvalue(text) and text then
             local pr, lv = text:match(REQUIRES)
             if pr then prof, req = pr, tonumber(lv) end
         end
     end
     local name = GetItemNameByID(id) or LineText(tt, data, 1)
     p = false
-    if prof and name and not issecretvalue(name) then
+    if not issecretvalue(name) and prof and name then
         p = { prof = prof, req = req, name = (name:match("^.-:%s*(.+)$") or name):lower() }
     elseif C_Item.IsItemDataCachedByID and not C_Item.IsItemDataCachedByID(id) then
         -- Not loaded yet ("Retrieving item information", as in the auction house): the next
