@@ -125,3 +125,37 @@ test("the crate grid is lined up in columns, alongside the crate's own counts", 
     GameTooltip.hooks.OnShow(GameTooltip) -- shown in its final font: both placed again
     check()
 end)
+
+test("hovering the same crate again places its grid without measuring it again", function()
+    local ns = wow.load(FILES)
+    local rights = columnTooltip()
+    wow.itemNames[9001], wow.itemNames[CRATE] = "Soul Dust", CRATE_TEXT[1]
+    wow.setBag(0, 16, { { CRATE, 1 }, { 9001, 5 } })
+    wow.login({ v = 2, chars = {
+        ["Vespera Ashward"] = alt("Vespera Ashward", "PALADIN", { bags = { [9001] = 12, [CRATE] = 2 } }),
+    } })
+    local measured, real = 0, ns.MeasureColumns
+    ns.MeasureColumns = function(...) measured = measured + 1 return real(...) end
+    local function grid()
+        local lines = wow.hover(GameTooltip, CRATE, CRATE_TEXT)
+        for i, l in ipairs(lines) do
+            if l[1] == "[PALADIN]Vespera" then return cellsOn(rights[i]) end
+        end
+    end
+    local first = grid()
+    local once = measured
+    assert(once > 0 and #first == 4, "measured and placed on the first hover")
+    local again = grid()
+    eq(measured, once, "nothing measured again")
+    eq(#again, 4, "the same grid")
+    for i = 1, 4 do
+        eq(again[i].x, first[i].x) eq(again[i].width, first[i].width) eq(again[i].text, first[i].text)
+    end
+    -- Your bags change: the grid is worked out afresh.
+    wow.setBag(0, 16, { { CRATE, 1 }, { 9001, 7 } })
+    wow.fire("BAG_UPDATE", 0)
+    wow.fire("BAG_UPDATE_DELAYED")
+    local after = grid()
+    assert(measured > once, "measured again after a change")
+    eq(after[4].text, "|cffe0e0e012|r", "Vespera's own count still in its column")
+end)

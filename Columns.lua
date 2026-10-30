@@ -190,16 +190,28 @@ end
 -- Our lines take the font of the tooltip's second line (its body text): a line the
 -- tooltip hasn't needed before gets a new font string, which a UI addon that restyled
 -- the existing ones (EllesmereUI) hasn't reached, so it would show in the game's font.
+local SIDES = { "TextLeft", "TextRight" }
+-- A named block's last layout per tooltip. Its caller (Crates.lua) makes new rows whenever
+-- their data changes, so the same rows in the same font are placed again without being
+-- built and measured again: repeat hovers allocate nothing. (The main block's callers may
+-- refill their rows in place, so they're measured every time, as before.)
+local aligned = setmetatable({}, { __mode = "k" })
+
 local function Align(tt, first, rows, labels, lefts, block)
     local body = ns.LineText(tt, "TextLeft", 2)
     local font, size, flags
     if body and body.GetFont then font, size, flags = body:GetFont() end
     if not ns.UsableFont(font, size, flags) then return false end
     for line = first - 1, first + #rows - 1 do
-        for _, side in ipairs({ "TextLeft", "TextRight" }) do
+        for _, side in ipairs(SIDES) do
             local text = ns.LineText(tt, side, line)
             if text and text.SetFont then text:SetFont(font, size, flags) end
         end
+    end
+    local last = block and aligned[tt] and aligned[tt][block]
+    if last and last.rows == rows and last.labels == labels and last.lefts == lefts
+        and last.font == font and last.size == size and last.flags == flags then
+        return ns.PlaceColumns(tt, first, last.cellRows, last.spec, last.layout, block)
     end
     -- A label becomes its own column just before its value.
     local spec, cellRows = {}, {}
@@ -222,7 +234,13 @@ local function Align(tt, first, rows, labels, lefts, block)
         cellRows[i] = cells
     end
     local layout = ns.MeasureColumns(tt, cellRows, spec, font, size, flags)
-    return layout and ns.PlaceColumns(tt, first, cellRows, spec, layout, block) or false
+    if not layout then return false end
+    if block then
+        aligned[tt] = aligned[tt] or {}
+        aligned[tt][block] = { rows = rows, labels = labels, lefts = lefts, font = font, size = size,
+            flags = flags, cellRows = cellRows, spec = spec, layout = layout }
+    end
+    return ns.PlaceColumns(tt, first, cellRows, spec, layout, block)
 end
 
 ns.AlignColumns = Align
