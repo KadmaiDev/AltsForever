@@ -37,9 +37,12 @@ local only, savedLit, savedView, previewed, docked
 local lastText = ""
 local ApplyScope, Dock, PickCharacters, Update
 
--- A character the search counts: shown in tooltips, and ticked (or all are).
+-- A character the search counts: ticked, or with none ticked, shown in tooltips. A ticked
+-- one counts even on another ruleset or faction: opened from that character's bags window,
+-- the search is on them.
 local function Counted(key, c)
-    return not ns.Hidden(c) and (not only or only[key]) and true or false
+    if only then return only[key] == true end
+    return not ns.Hidden(c)
 end
 
 local function ItemName(id)
@@ -56,8 +59,8 @@ end
 local function Build()
     local seen, loading = {}, false
     pool, names = {}, {}
-    for _, c in pairs(ns.db.chars) do
-        if not ns.Hidden(c) then
+    for key, c in pairs(ns.db.chars) do
+        if Counted(key, c) or not ns.Hidden(c) then
             for i = 1, #LOCS do
                 local t = c[LOCS[i]]
                 if t then for id in pairs(t) do seen[id] = true end end

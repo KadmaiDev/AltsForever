@@ -468,3 +468,18 @@ test("the character menu: all, or any you tick; one ticked names them, several c
     assert(searchRows():find("can craft: [PALADIN]Smith", 1, true), "Smith's crafts back")
     f:Hide()
 end)
+
+test("opened from the bags window of a character on another ruleset, the search finds their items", function()
+    local ns = searchStart()
+    ns.ShowBags("Far Away", "bags")
+    AltsForeverBagsFrame.searchButton.scripts.OnClick(AltsForeverBagsFrame.searchButton)
+    searchType("gloves")
+    assert(searchRows():find("Far Gloves", 1, true), searchRows())
+    searchType("linen")
+    assert(searchRows():find("99", 1, true), searchRows())
+    -- Searching everyone again: they're hidden from tooltips, so out of it as before.
+    AltsForeverSearchFrame:Hide()
+    AltsForeverBagsFrame:Hide()
+    ns.ToggleSearch("gloves")
+    eq(searchRows():find("Far Gloves", 1, true), nil, searchRows())
+end)
