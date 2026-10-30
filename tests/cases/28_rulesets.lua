@@ -372,3 +372,19 @@ test("the gold history from before goes to the group with the most gold, whoever
     eq(AltsForeverDB.goldGroup, PVE .. "|Horde")
     eq(AltsForeverDB.goldDays[yesterday], 5000, "the old days kept")
 end)
+
+test("claiming the history from before, a group keeps its own days too", function()
+    wow.load(FILES)
+    wow.now = NOW
+    local yesterday = math.floor(NOW / 86400) - 1
+    wow.player.name, wow.player.realm, wow.player.class, wow.player.faction = "Rich Main", PVE, "WARRIOR", "Horde"
+    wow.money = 90000
+    wow.login({ v = 2, goldDays = { [yesterday - 1] = 5000, [yesterday] = 6000 },
+        goldDaysBy = { [PVE .. "|Horde"] = { [yesterday] = 9000 }, [PVP .. "|Alliance"] = { [yesterday] = 100 } },
+        chars = { ["Rich Main"] = alt("Rich Main", "WARRIOR", { faction = "Horde", realm = PVE, money = 90000 }) } })
+    eq(AltsForeverDB.goldGroup, PVE .. "|Horde")
+    eq(AltsForeverDB.goldDays[yesterday - 1], 5000, "the old days kept")
+    eq(AltsForeverDB.goldDays[yesterday], 9000, "its own reading wins")
+    eq(AltsForeverDB.goldDaysBy[PVE .. "|Horde"], nil, "no longer kept apart")
+    eq(AltsForeverDB.goldDaysBy[PVP .. "|Alliance"][yesterday], 100, "other groups untouched")
+end)

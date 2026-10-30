@@ -122,6 +122,17 @@ test("time played keeps counting while online and is saved at logout", function(
     eq(ns.PlayedNow({ played = 100, playedAt = NOW }, NOW + DAY), 100, "logged-out characters don't count up")
 end)
 
+test("time played: the days logged out don't count while the game's answer is on its way", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    local me = alt("Aldric", "MAGE", { played = 10 * HOUR, playedAt = NOW - 3 * DAY })
+    wow.login({ v = 2, chars = { ["Aldric"] = me } })
+    eq(ns.PlayedNow(ns.char, NOW), 10 * HOUR)
+    wow.now = NOW + 2
+    wow.fire("PLAYER_LOGOUT") -- a /reload before the answer
+    eq(ns.char.played, 10 * HOUR + 2)
+end)
+
 test("secret time played is never stored", function()
     local ns = wow.load(FILES)
     wow.login(nil)

@@ -4,7 +4,7 @@ local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
 
-local pairs, ipairs, select, sort, type, wipe, GetMoney = pairs, ipairs, select, table.sort, type, wipe, GetMoney
+local next, pairs, ipairs, select, sort, type, wipe, GetMoney = next, pairs, ipairs, select, table.sort, type, wipe, GetMoney
 local floor, time, date = math.floor, time, date
 local issecretvalue = issecretvalue or function() return false end
 local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
@@ -285,6 +285,14 @@ function ns.StartMoney()
     else
         db.goldGroup = group
         days = db.goldDays
+        -- This group's own history, kept apart until it claimed the main one, joins it (its
+        -- own readings win: they're this group's alone).
+        local own = db.goldDaysBy and db.goldDaysBy[group]
+        if own then
+            for day, total in pairs(own) do days[day] = total end
+            db.goldDaysBy[group] = nil
+            if next(db.goldDaysBy) == nil then db.goldDaysBy = nil end
+        end
     end
 
     local function Update()

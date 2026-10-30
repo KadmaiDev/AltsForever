@@ -101,6 +101,9 @@ local function UnmuteChat()
 end
 
 local function StartPlayed(char)
+    -- What's saved is the total as of the last logout: this session counts from now, not from
+    -- then (the time logged out isn't played), until the game's own answer comes.
+    if char.played then char.playedAt = time() end
     ns.On("TIME_PLAYED_MSG", function(total)
         ns.RecordPlayed(char, total, time())
         -- Listen again a moment later, once every window has had its turn at the event.
