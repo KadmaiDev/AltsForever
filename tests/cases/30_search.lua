@@ -484,15 +484,6 @@ test("opened from the bags window of a character on another ruleset, the search 
     eq(searchRows():find("Far Gloves", 1, true), nil, searchRows())
 end)
 
-test("search doesn't name a crafter who has dropped the profession", function()
-    local ns = searchStart()
-    ns.db.chars["Smith"].profs = { Tailoring = 100 }
-    SlashCmdList.ALTSFOREVERSEARCH("glo")
-    eq(searchRows(), "", "Smith no longer has Blacksmithing, and nobody owns them")
-    searchType("bolt")
-    eq(searchRows(), "Bolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
-end)
-
 test("names slower than a second are still waited for, a few times, then no more", function()
     searchStart()
     wow.item(7001, "Late Cloth", {})

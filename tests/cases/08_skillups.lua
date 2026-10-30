@@ -372,20 +372,6 @@ test("gathering professions are recognised in any language (by the game's profes
     assert(text:find("Bergbau = 150  ", 1, true), "German Mining (not gathering here) keeps its note\n" .. text)
 end)
 
-test("Can craft: a character who dropped the profession isn't offered; recipes are kept", function()
-    local ns = wow.load(FILES)
-    wow.login({ v = 2, chars = {
-        ["Brakka"] = alt("Brakka", "HUNTER", { profs = { Mining = 50 },
-            crafts = { Engineering = { [SQUIRREL_ITEM] = "mechanical squirrel" } } }),
-        ["Far"] = alt("Far", "MAGE", { profs = { Engineering = 40 },
-            crafts = { Engineering = { [SQUIRREL_ITEM] = "mechanical squirrel" } } }),
-        ["Old"] = alt("Old", "MAGE", { crafts = { Engineering = { [SQUIRREL_ITEM] = "mechanical squirrel" } } }),
-    } })
-    eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)), "[MAGE]Far, [MAGE]Old",
-        "Brakka has dropped Engineering; Old's skills were never read, so kept as before")
-    eq(ns.db.chars["Brakka"].crafts.Engineering[SQUIRREL_ITEM], "mechanical squirrel", "nothing deleted")
-end)
-
 test("Can craft: skill-ups come from the profession that holds the recipe, not a stray copy", function()
     wow.load(FILES)
     local crafts = { Engineering = { [SQUIRREL_ITEM] = "mechanical squirrel" } }
@@ -396,4 +382,51 @@ test("Can craft: skill-ups come from the profession that holds the recipe, not a
             profs = { Engineering = 40, Cooking = 1, ["First Aid"] = 1, Fishing = 1, Mining = 1, Skinning = 1 } }),
     } })
     eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)), "[HUNTER]Brakka" .. skillupsTo(100))
+end)
+
+test("abandoning a profession while playing forgets its recipes; relearned, it reads Not scanned", function()
+    local ns = wow.load(FILES)
+    wow.profs = { { "Engineering", 55 }, { "Mining", 50 } }
+    local text = wow.recipeItem(SQUIRREL, "Schematic: Mechanical Squirrel", "Engineering", 1)
+    wow.login(nil)
+    greyWindow({ squirrel = true })
+    wow.fire("TRADE_SKILL_CLOSE")
+    ns.char.crafts.Mining = { [2840] = "smelt copper" }
+    eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)), "[MAGE]Aldric" .. skillupsTo(100))
+    eq(wow.hover(GameTooltip, SQUIRREL, text)[3][2], "|cff20ff20Known|r")
+    -- A skill-up, or an unreadable entry: nothing forgotten.
+    wow.profs = { { "Engineering", 56 }, { "Mining", 50 } }
+    wow.fire("SKILL_LINES_CHANGED")
+    wow.profs = { { "Mining", 50 }, { [2] = 56 } }
+    wow.fire("SKILL_LINES_CHANGED")
+    eq(ns.char.crafts.Engineering[SQUIRREL_ITEM], "mechanical squirrel", "kept while a profession couldn't be read")
+    -- Abandoned.
+    wow.profs = { { "Mining", 50 } }
+    wow.fire("SKILL_LINES_CHANGED")
+    eq(ns.char.recipes.Engineering, nil); eq(ns.char.crafts.Engineering, nil)
+    eq(AltsForeverDB.recipeInfo.Engineering["mechanical squirrel"], nil, "nobody else knows it")
+    eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)), nil)
+    eq(ns.char.crafts.Mining[2840], "smelt copper", "the others are kept")
+    -- Learned again: the old recipes don't come back until the window is opened.
+    wow.profs = { { "Mining", 50 }, { "Engineering", 1 } }
+    wow.fire("SKILL_LINES_CHANGED")
+    eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)), nil)
+    eq(wow.hover(GameTooltip, SQUIRREL, text)[3][2], "|cff9d9d9dNot scanned|r")
+    -- The last profession dropped.
+    wow.profs = { { "Engineering", 1 } }
+    wow.fire("SKILL_LINES_CHANGED")
+    wow.profs = {}
+    wow.fire("SKILL_LINES_CHANGED")
+    eq(next(ns.char.profs), nil)
+    eq(ns.char.crafts.Mining, nil)
+end)
+
+test("a login that reads no professions keeps the ones known", function()
+    local ns = wow.load(FILES)
+    wow.profs = {}
+    wow.login({ v = 2, chars = { ["Aldric"] = alt("Aldric", "MAGE", { profs = { Engineering = 55 }, profMax = { Engineering = 75 },
+        crafts = { Engineering = { [SQUIRREL_ITEM] = "mechanical squirrel" } } }) } })
+    eq(ns.char.profs.Engineering, 55)
+    eq(ns.char.crafts.Engineering[SQUIRREL_ITEM], "mechanical squirrel")
+    eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)), "[MAGE]Aldric")
 end)

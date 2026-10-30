@@ -43,23 +43,50 @@ end
 -- c.profs = { [professionName] = skillLevel }, c.profMax = { [professionName] = the
 -- current rank's maximum (75, 150, 225 or 300) }; c.prof1/c.prof2 name the two main
 -- professions (GetProfessions lists those first, then the secondary ones).
-function ns.ScanSkills(c)
+-- `live`: a skill change while playing (SKILL_LINES_CHANGED). A profession gone then was
+-- abandoned, and the game took its recipes with it, so they're forgotten here too:
+-- relearned, it reads "Not scanned" until its window is opened. A read that may be
+-- incomplete changes nothing: one with a profession that couldn't be read, or, at login,
+-- one that finds none while some were known. Returns true if a profession was dropped.
+local read, readMax = {}, {} -- reused
+function ns.ScanSkills(c, live)
+    local a, b, c3, d, e, f = GetProfessions()
     local profs, maxes = c.profs or {}, c.profMax or {}
     c.profs, c.profMax = profs, maxes
-    wipe(profs)
-    wipe(maxes)
+    if not live and not (a or b or c3 or d or e or f) and next(profs) then return false end
+    wipe(read)
+    wipe(readMax)
+    local unread = false
     local function Add(index)
         if not index then return end
         local name, _, skill, max = GetProfessionInfo(index)
-        if name and not issecretvalue(skill) and skill then
-            profs[name] = skill
-            if not issecretvalue(max) and max and max > 0 then maxes[name] = max end
+        if not issecretvalue(name) and not issecretvalue(skill) and name and skill then
+            read[name] = skill
+            if not issecretvalue(max) and max and max > 0 then readMax[name] = max end
             return name
         end
+        unread = true
     end
-    local a, b, c3, d, e, f = GetProfessions()
-    c.prof1, c.prof2 = Add(a), Add(b)
+    local prof1, prof2 = Add(a), Add(b)
     Add(c3) Add(d) Add(e) Add(f)
+    if unread and next(profs) then return false end
+    local dropped = false
+    if live then
+        for name in pairs(profs) do
+            if not read[name] then
+                if c.recipes then c.recipes[name] = nil end
+                if c.crafts then c.crafts[name] = nil end
+                dropped = true
+            end
+        end
+    end
+    wipe(profs)
+    wipe(maxes)
+    for name, skill in pairs(read) do profs[name] = skill end
+    for name, max in pairs(readMax) do maxes[name] = max end
+    c.prof1, c.prof2 = prof1, prof2
+    if dropped then ns.PruneRecipeInfo() end
+    return dropped
 end
 
 local function ProfessionName(info)
@@ -265,14 +292,6 @@ function ns.AtRankCap(c, prof)
     return skill and max and skill >= max or false
 end
 
--- False once a character has dropped the profession (it's gone from their skills): their
--- recipes are kept, just no longer offered. A character whose skills were never read, or
--- read as none, counts as having it, as before.
-function ns.HasProf(c, prof)
-    local profs = c.profs
-    return not profs or next(profs) == nil or profs[prof] ~= nil
-end
-
 -- The skill a character would gain from, or nil if nothing can give them a skill-up now.
 local function SkillFor(c, prof)
     local skill = c.profs and c.profs[prof]
@@ -331,7 +350,7 @@ function ns.StartProfessions()
     end
 
     ns.On("SKILL_LINES_CHANGED", function()
-        ns.ScanSkills(char)
+        ns.ScanSkills(char, true)
         ns.craftVersion = ns.craftVersion + 1 -- skill-up lines depend on skill levels
         Changed()
     end)
@@ -508,15 +527,13 @@ local function FindCrafters(id)
                     -- entry holding the recipe's name is the one it's made with.
                     prof = ns.CraftProf(c.crafts, prof, id)
                     local lname = c.crafts[prof][id]
-                    if ns.HasProf(c, prof) then
-                        local text = ns.ListName(key, c)
-                        -- Saves from before 0.3.0 hold true here, so the grey point is unknown.
-                        local grey = skillups and type(lname) == "string" and ns.RecipeGrey(prof, lname)
-                        local skill = grey and SkillFor(c, prof)
-                        if skill and skill < grey then text = text .. LIGHT .. " · " .. L["skill-ups to %s"]:format(grey) .. "|r" end
-                        list = list or {}
-                        list[#list + 1] = "  " .. text
-                    end
+                    local text = ns.ListName(key, c)
+                    -- Saves from before 0.3.0 hold true here, so the grey point is unknown.
+                    local grey = skillups and type(lname) == "string" and ns.RecipeGrey(prof, lname)
+                    local skill = grey and SkillFor(c, prof)
+                    if skill and skill < grey then text = text .. LIGHT .. " · " .. L["skill-ups to %s"]:format(grey) .. "|r" end
+                    list = list or {}
+                    list[#list + 1] = "  " .. text
                     break -- once per character, even if two professions make it
                 end
             end
