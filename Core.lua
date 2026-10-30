@@ -147,6 +147,7 @@ local DB_FIELDS = {
     itemQuality = "table", rulesets = "table",
     legacyPool = "number", scale = "number", minimapAngle = "number", bagsCols = "number",
     bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
+    live = "boolean",
 }
 
 -- Keeps only entries whose key and value are of these types (value nil = any).
@@ -374,21 +375,20 @@ end
 -- On a live realm: forgets every character from the beta, before this one is set up (a
 -- namesake from the beta is a different character, so you start fresh), with the beta's gold
 -- history and Legacy points (the saved pool never shrinks, so every live character would be
--- told it had the beta's points to spend). Characters not logged in since realms were recorded
--- (0.12.0) go too once the file shows it's from the beta: they were on it. Settings stay.
--- Returns how many went; after the first live login there are none, so it's one pass at login.
+-- told it had the beta's points to spend). On the first live login (db.live unset) characters
+-- with no realm go too: realms were recorded only from 0.12.0, and a version 1 save loses them
+-- in Upgrade, so a save from before then has nothing else to tell its beta characters by; every
+-- character in a save from before the live game was on the beta. After that, db.live keeps a
+-- live character whose realm couldn't be read safe. Settings stay. Returns how many went.
 function ns.LeaveBeta(db, realm)
     if not realm or ns.BetaRealm(realm) then return 0 end
-    local chars, unknown, gone = db.chars, {}, 0
+    local first = not db.live
+    db.live = true
+    local chars, gone = db.chars, 0
     for key, c in pairs(chars) do
-        if ns.BetaRealm(c.realm) then
-            chars[key], gone = nil, gone + 1
-        elseif c.realm == nil then
-            unknown[#unknown + 1] = key
-        end
+        if ns.BetaRealm(c.realm) or (first and c.realm == nil) then chars[key], gone = nil, gone + 1 end
     end
     if gone == 0 then return 0 end
-    for _, key in ipairs(unknown) do chars[key] = nil end
     for group in pairs(db.goldDaysBy or {}) do
         local r = group:match("^(.-)|")
         if r == "" or ns.BetaRealm(r) then db.goldDaysBy[group] = nil end
@@ -403,7 +403,7 @@ function ns.LeaveBeta(db, realm)
     db.collapsedGroups = nil -- their keys named the beta's groups
     db.legacyPool, db.wellRested = nil, nil
     ns.PruneRecipeInfo()
-    return gone + #unknown
+    return gone
 end
 
 -- Bank and mail stay nil until first seen, so "never scanned" differs from "empty".

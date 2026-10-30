@@ -739,7 +739,10 @@ function M.item(id, name, opts)
     return "|cff1eff00|Hitem:" .. id .. "::::::::|h[" .. name .. "]|h|r"
 end
 
+-- A save is taken to be from the live game already (db.live, set at the first live login)
+-- unless it says live = false: tests of the move from the beta do.
 function M.login(saved)
+    if type(saved) == "table" and saved.live == nil then saved.live = true end
     AltsForeverDB = saved
     M.fire("ADDON_LOADED", "AltsForever")
     M.fire("PLAYER_LOGIN")

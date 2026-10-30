@@ -5,7 +5,7 @@
 -- Old not logged in since realms were recorded; gold history for two beta groups, Legacy
 -- points and a setting.
 function betaSave()
-    return { v = 2, goldGroup = "ClassicBetaPvE2|Alliance", goldDays = { [100] = 5000 },
+    return { v = 2, live = false, goldGroup = "ClassicBetaPvE2|Alliance", goldDays = { [100] = 5000 },
         goldDaysBy = { ["ClassicBetaPvP|Horde"] = { [100] = 70 } },
         collapsedGroups = { ["ClassicBetaPvP|Horde"] = true },
         legacyPool = 16, wellRested = 5, countsOff = true,
@@ -73,12 +73,12 @@ end)
 
 test("a live save without beta characters, or a fresh install, is left alone", function()
     local ns = wow.load(FILES)
-    wow.login({ v = 2, legacyPool = 4, chars = {
+    wow.login({ v = 2, live = true, legacyPool = 4, chars = {
         ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { realm = "Realm" }),
         ["Old"] = alt("Old", "WARRIOR", {}) } })
     runTimers()
     eq(betaLine(), nil)
-    eq(keys(), "Aldric,Old,Tarn Moon", "a character of unknown realm stays")
+    eq(keys(), "Aldric,Old,Tarn Moon", "after the first live login, a character of unknown realm stays")
     eq(AltsForeverDB.legacyPool, 4)
 
     wow.load(FILES)
@@ -86,4 +86,25 @@ test("a live save without beta characters, or a fresh install, is left alone", f
     runTimers()
     eq(betaLine(), nil)
     assert(table.concat(wow.printed, "\n"):find("Welcome!", 1, true), "just the welcome")
+end)
+
+test("first live login with a save from before realms were recorded (0.11 or older): all of it was the beta", function()
+    local ns = legacyStart({ v = 2, live = false, legacyPool = 16, goldDays = { [100] = 5000 }, chars = {
+        ["Aldric"] = alt("Aldric", "MAGE", { bank = { [2318] = 5 }, legacySpent = 3 }),
+        ["Tarn Moon"] = alt("Tarn Moon", "DRUID", {}) } }, { 0, 0 }, 0, true)
+    eq(keys(), "Aldric")
+    eq(ns.char.bank, nil, "you start fresh")
+    assert(betaLine():find("(2)", 1, true), betaLine())
+    eq(AltsForeverDB.legacyPool, 0)
+    eq(legacyPrinted():find("Legacy point", 1, true), nil, "no reminder of the beta's points")
+    eq(AltsForeverDB.live, true)
+end)
+
+test("first live login with a version 1 save (Name-Realm keys from the beta)", function()
+    local ns = wow.load(FILES)
+    wow.login({ v = 1, live = false, chars = {
+        ["Aldric-ClassicBetaPvE2"] = alt("Aldric", "MAGE", { realm = "ClassicBetaPvE2", bank = { [2318] = 5 } }),
+        ["Tarn Moon-ClassicBetaPvE2"] = alt("Tarn Moon", "DRUID", { realm = "ClassicBetaPvE2" }) } })
+    eq(keys(), "Aldric")
+    eq(ns.char.bank, nil)
 end)
