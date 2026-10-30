@@ -1,6 +1,20 @@
-## Alts Forever 1.0.1 (not yet released)
+## Alts Forever 1.0.1
+
+Fixes found in a full review of the code before the live launch.
 
 - Rulesets (Normal, PvP, Roleplaying, Hardcore) are now named from what the game says it's running, not only from the realm name, so the overview and tooltips name them correctly on live realms whatever they're called.
+- **Moving to the live game:** characters from the beta are recognised in older saves too (from before 0.12, which didn't record realms), and a live character whose realm couldn't be read once is never taken for one of them.
+- **Played time** no longer counts time spent logged out.
+- **Professions:** a profession you drop is no longer offered for crafting or skill-ups, and its recipes are forgotten (learn it again and its recipes read "Not scanned" until you open it). A login where the game hasn't sent your professions yet no longer loses them.
+- **Recipe tooltips:** recipe lines no longer go missing after hovering a recipe before it has loaded.
+- **Upgrades:** the same item with a better random suffix ("of the Monkey") now shows as an upgrade; a second copy of a ring that isn't unique can go on the other finger; an off-hand weapon is never compared with a shield.
+- **Bags window:** a character's bank you haven't visited no longer shows their bags instead; a bag name that loads late fills in.
+- **Search:** opened from another ruleset's bags window, it finds that character's items; item names that load slowly are waited for.
+- **Overview:** the Mail column updates while the overview is open when you read your inbox or mail an alt.
+- **Gold history:** days start at local midnight during daylight saving time too, not an hour off.
+- **Character sheet anvils:** worked out once when a batch of items arrives instead of once per item; forgetting a crafter updates them.
+- **Sturdier saved data:** more kinds of damage are repaired at login instead of causing errors.
+- Hovering the same Waylaid Crate again is quicker.
 
 ## Alts Forever 1.0.0
 
