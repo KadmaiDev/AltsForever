@@ -342,3 +342,28 @@ test("an off-hand weapon is never compared with a shield", function()
     upStart({ ["Vesp Ash"] = alt("Vesp Ash", "WARRIOR", { level = 25, gear = { [16] = sword, [17] = sword } }) })
     eq(upHover(5045, left), "[WARRIOR]Vesp Ash = Off Hand · ^^^", "dual wielding")
 end)
+
+test("the same item with a better random suffix is an upgrade over the one worn; a unique ring only replaces its twin", function()
+    local items = upItems()
+    upItem(5050, "Bandit Gloves", { sub = 2, loc = "INVTYPE_HAND", stats = { ITEM_MOD_AGILITY_SHORT = 2 } })
+    local monkey = "|cff1eff00|Hitem:5050::::::1212::|h[Bandit Gloves of the Monkey]|h|r"
+    local falcon = "|cff1eff00|Hitem:5050::::::1213::|h[Bandit Gloves of the Falcon]|h|r"
+    upStart({ ["Tarn Moon"] = upHunter(items, { gear = { [10] = monkey } }) })
+    wow.itemStats[monkey] = { ITEM_MOD_AGILITY_SHORT = 2 }
+    wow.itemStats[falcon] = { ITEM_MOD_AGILITY_SHORT = 6 }
+    eq(upHover(5050, falcon, { "Bandit Gloves of the Falcon", "Hands" }), "[HUNTER]Tarn Moon = Hands · ^^^", "6 Agility over 2")
+    eq(upHover(5050, monkey, { "Bandit Gloves of the Monkey", "Hands" }), "", "the very one worn: nothing gained")
+    -- A unique ring with a better suffix: in place of the one worn, never on the other finger too.
+    upItem(5051, "Seal", { loc = "INVTYPE_FINGER", stats = { ITEM_MOD_AGILITY_SHORT = 1 } })
+    local owl = "|cff1eff00|Hitem:5051::::::1214::|h[Seal of the Owl]|h|r"
+    local tiger = "|cff1eff00|Hitem:5051::::::1215::|h[Seal of the Tiger]|h|r"
+    local weak = upItem(5052, "Weak Band", { loc = "INVTYPE_FINGER", bind = 1, stats = { ITEM_MOD_AGILITY_SHORT = 2 } })
+    upStart({ ["Tarn Moon"] = upHunter(items, { gear = { [11] = owl, [12] = weak } }) })
+    wow.itemStats[owl] = { ITEM_MOD_AGILITY_SHORT = 5 }
+    wow.itemStats[tiger] = { ITEM_MOD_AGILITY_SHORT = 4 }
+    -- Better than the Weak Band, but worn with the Owl it would be two of a unique ring.
+    eq(upHover(5051, tiger, { "Seal of the Tiger", "Unique", "Finger" }), "", "worse than the Owl it would replace")
+    local better = "|cff1eff00|Hitem:5051::::::1216::|h[Seal of the Monkey]|h|r"
+    wow.itemStats[better] = { ITEM_MOD_AGILITY_SHORT = 8 }
+    eq(upHover(5051, better, { "Seal of the Monkey", "Unique", "Finger" }), "[HUNTER]Tarn Moon = Finger · ^^^", "better than the Owl")
+end)

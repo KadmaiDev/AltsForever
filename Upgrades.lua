@@ -354,11 +354,15 @@ local function Compare(c, info, link)
     if new == nil then return false end
     if new <= 0 then return nil end
     local loc, slots = info.loc, SLOTS[info.loc]
-    -- Already wearing one: a second only fits another slot (a ring, a one-hander for dual
-    -- wielders), and never if it's unique.
-    for _, slot in ipairs(slots) do
-        local worn = gear[slot]
-        if worn and GetItemInfoInstant(worn) == info.id and (info.unique or #slots == 1) then return nil end
+    -- Already wearing one with this item ID (the same, or another random suffix such as "of
+    -- the Owl"): the scores decide whether it's better where it's worn (the same one gains
+    -- nothing). A unique one can't be worn twice, so it's weighed only in that slot.
+    local onlySlot
+    if info.unique then
+        for _, slot in ipairs(slots) do
+            local worn = gear[slot]
+            if worn and GetItemInfoInstant(worn) == info.id then onlySlot = slot end
+        end
     end
     local total = 0
     for slot, worn in pairs(gear) do
@@ -374,10 +378,10 @@ local function Compare(c, info, link)
     if loc == "INVTYPE_2HWEAPON" and mainLoc and mainLoc ~= "INVTYPE_2HWEAPON" then return nil end
     local best, empty, bestSlot
     for _, slot in ipairs(slots) do
-        local ok = true
+        local ok = not onlySlot or slot == onlySlot
         if slot == 17 and (loc == "INVTYPE_WEAPON" or loc == "INVTYPE_WEAPONOFFHAND") then
             -- A weapon in the off hand: only for dual wielders not using a shield.
-            ok = cls.dualWield and level >= cls.dualWield and not OFF_HAND_ITEMS[WornLoc(gear[17])]
+            ok = ok and cls.dualWield and level >= cls.dualWield and not OFF_HAND_ITEMS[WornLoc(gear[17])]
         end
         if (slot == 16 or slot == 17) and loc ~= "INVTYPE_2HWEAPON" and mainLoc == "INVTYPE_2HWEAPON" then
             ok = false -- one hand against a two-hander isn't a fair comparison
