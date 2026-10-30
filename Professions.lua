@@ -378,14 +378,11 @@ local function ParseRecipe(tt, id, data)
         end
     end
     local name = GetItemNameByID(id) or LineText(tt, data, 1)
-    p = false
-    if not issecretvalue(name) and prof and name then
-        p = { prof = prof, req = req, name = (name:match("^.-:%s*(.+)$") or name):lower() }
-    elseif C_Item.IsItemDataCachedByID and not C_Item.IsItemDataCachedByID(id) then
-        -- Not loaded yet ("Retrieving item information", as in the auction house): the next
-        -- hover reads it again rather than remembering it as no recipe.
-        return p
-    end
+    -- Only recipe items come here, so one without its "Requires" line isn't complete yet
+    -- ("Retrieving item information", or lines still arriving, as in the auction house):
+    -- nothing is remembered, and the next hover reads it again.
+    if issecretvalue(name) or not (prof and name) then return false end
+    p = { prof = prof, req = req, name = (name:match("^.-:%s*(.+)$") or name):lower() }
     if parsedCount >= 200 then
         wipe(parsed)
         parsedCount = 0

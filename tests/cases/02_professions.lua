@@ -125,6 +125,17 @@ test("recipe tooltip: a recipe first hovered before it loads gets its lines once
     eq(lines[2] and lines[2][1], "Engineering (120)", "not remembered as no recipe")
 end)
 
+test("recipe tooltip: a loaded recipe whose lines are still arriving is read again once they have", function()
+    wow.load(FILES)
+    wow.profs = { { "Engineering", 107 } }
+    local text = wow.recipeItem(5000, "Schematic: Shadow Goggles", "Engineering", 120, 115)
+    wow.login(nil)
+    -- The item is cached, but only its name line has come so far.
+    eq(#wow.hover(GameTooltip, 5000, { "Schematic: Shadow Goggles" }), 0)
+    local lines = wow.hover(GameTooltip, 5000, text)
+    eq(lines[2] and lines[2][1], "Engineering (120)", "not remembered as no recipe")
+end)
+
 test("recipe tooltip: names match regardless of capitalisation", function()
     wow.load(FILES)
     wow.profs = { { "Engineering", 107 } }
