@@ -492,3 +492,24 @@ test("search doesn't name a crafter who has dropped the profession", function()
     searchType("bolt")
     eq(searchRows(), "Bolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
 end)
+
+test("names slower than a second are still waited for, a few times, then no more", function()
+    searchStart()
+    wow.item(7001, "Late Cloth", {})
+    wow.item(7002, "Gone Cloth", {})
+    local late = wow.itemNames[7001]
+    wow.itemNames[7001], wow.itemNames[7002] = nil, nil
+    AltsForeverDB.chars["Tarn Moon"].bags[7001] = 4
+    AltsForeverDB.chars["Tarn Moon"].bags[7002] = 1 -- never loads
+    wow.timers = {}
+    SlashCmdList.ALTSFOREVERSEARCH("late")
+    runTimers()
+    eq(searchRows(), "", "not yet after a second")
+    wow.itemNames[7001] = late
+    runTimers()
+    eq(searchRows(), "Late Cloth (4) = [DRUID]Tarn 4", "two seconds in")
+    local tries = 0
+    while #wow.timers > 0 and tries < 20 do tries = tries + 1 runTimers() end
+    eq(#wow.timers, 0, "stopped")
+    assert(tries <= 3, tries)
+end)

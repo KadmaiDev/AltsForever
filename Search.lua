@@ -26,7 +26,8 @@ local rows = {}
 local pool, names     -- every item's lower-case name, and its name, while the window is shown
 local matches = {}
 local selected, offset = 1, 0
-local retried
+local opened = 0 -- counts openings, so a wait for names from an earlier one stops
+local NAME_TRIES = 5
 -- Whose items: `only` = the characters ticked in the menu beside the box (a set of keys), or
 -- nil for all of them (owner, 2026-10-16: always there, several at once). With the bags
 -- window open, the search starts on the character it shows, docked beside it, and the
@@ -568,16 +569,19 @@ local function CreateWindow()
     ns.SkinWindow(f)
     f:SetScript("OnShow", function(self)
         self:Raise()
-        retried = false
+        opened = opened + 1
         if Build() and C_Timer and C_Timer.After then
-            -- Some names were still loading: once more in a second, if still open.
-            C_Timer.After(1, function()
-                if frame:IsShown() and not retried then
-                    retried = true
-                    Build()
-                    Update()
-                end
-            end)
+            -- Some names were still loading: again each second while open, a few times
+            -- (one that never loads, such as an item removed from the game, stops it).
+            local this, tries = opened, 0
+            local function Again()
+                if not frame:IsShown() or opened ~= this then return end
+                tries = tries + 1
+                local missing = Build()
+                Update()
+                if missing and tries < NAME_TRIES then C_Timer.After(1, Again) end
+            end
+            C_Timer.After(1, Again)
         end
         Update()
         -- A frame later: focused at once, the key that opened it (a binding) would be typed in.
