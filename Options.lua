@@ -108,6 +108,8 @@ function ns.ForgetCharacter(key)
     ns.db.chars[key] = nil
     ns.PruneRecipeInfo()
     ns.InvalidateCache()
+    -- The character sheet's anvils may list what they could craft.
+    if ns.CharacterSheetChanged then ns.CharacterSheetChanged() end
     return true
 end
 

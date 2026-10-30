@@ -41,13 +41,19 @@ local function GainText(e) return ns.GainLabel(e.gain, e.empty) end
 ---------------------------------------------------------------------------
 -- The panel of item buttons
 ---------------------------------------------------------------------------
+-- The crafter's name as lists show it (a character forgotten since: just the name).
+local function Crafter(e)
+    local c = ns.db.chars[e.key]
+    return c and ns.ListName(e.key, c) or e.key
+end
+
 local function ItemEnter(b)
     local e = b.entry
     if not e then return end
     GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
     GameTooltip:SetHyperlink(e.link)
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(L["Crafted by %s (%s)"]:format(ns.ListName(e.key, ns.db.chars[e.key]), e.prof), 1, 0.82, 0)
+    GameTooltip:AddLine(L["Crafted by %s (%s)"]:format(Crafter(e), e.prof), 1, 0.82, 0)
     GameTooltip:Show()
 end
 
@@ -160,7 +166,7 @@ local function GlyphEnter(g)
     GameTooltip:AddLine(L["Your characters can craft"], 1, 0.82, 0)
     for i = 1, min(#list, SHOWN_IN_TOOLTIP) do
         local e = list[i]
-        GameTooltip:AddDoubleLine(e.link, GainText(e) .. " · " .. ns.ListName(e.key, ns.db.chars[e.key]), 1, 1, 1, 1, 1, 1)
+        GameTooltip:AddDoubleLine(e.link, GainText(e) .. " · " .. Crafter(e), 1, 1, 1, 1, 1, 1)
     end
     GameTooltip:AddLine(L["Click: show them"], 1, 1, 1)
     GameTooltip:Show()
