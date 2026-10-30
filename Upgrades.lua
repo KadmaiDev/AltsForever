@@ -257,6 +257,8 @@ local function Pattern(fmt)
 end
 local REQUIRES = Pattern(ITEM_MIN_SKILL or "Requires %s (%d)")
 local CLASSES_LINE = Pattern(ITEM_CLASSES_ALLOWED or "Classes: %s")
+-- "Unique", "Unique-Equipped", "Unique (2)": all start with the game's word for it.
+local UNIQUE = type(ITEM_UNIQUE) == "string" and ITEM_UNIQUE ~= "" and ITEM_UNIQUE or "Unique"
 
 -- What a hovered item is: equip location, item class and subclass, required level, bind
 -- type, and from its tooltip lines any "Classes:" list and profession requirements. For a
@@ -271,6 +273,8 @@ local function Describe(link, data, recipe)
     end
     local info = { id = id, loc = loc, class = class, sub = sub, level = Plain(minLevel) or 1, bind = Plain(bind) }
     local lines = data and data.lines
+    -- Taken as unique unless its lines say otherwise: then a second one is never suggested.
+    info.unique = type(lines) ~= "table"
     if type(lines) == "table" then
         local requires
         for _, line in ipairs(lines) do
@@ -283,6 +287,7 @@ local function Describe(link, data, recipe)
                 end
                 local classes = text:match(CLASSES_LINE)
                 if classes then info.classes = classes end
+                if text:sub(1, #UNIQUE) == UNIQUE then info.unique = true end
             end
         end
         if requires and recipe then requires[#requires] = nil end
@@ -349,9 +354,11 @@ local function Compare(c, info, link)
     if new == nil then return false end
     if new <= 0 then return nil end
     local loc, slots = info.loc, SLOTS[info.loc]
+    -- Already wearing one: a second only fits another slot (a ring, a one-hander for dual
+    -- wielders), and never if it's unique.
     for _, slot in ipairs(slots) do
         local worn = gear[slot]
-        if worn and GetItemInfoInstant(worn) == info.id then return nil end -- already wearing one
+        if worn and GetItemInfoInstant(worn) == info.id and (info.unique or #slots == 1) then return nil end
     end
     local total = 0
     for slot, worn in pairs(gear) do
@@ -368,8 +375,8 @@ local function Compare(c, info, link)
     local best, empty, bestSlot
     for _, slot in ipairs(slots) do
         local ok = true
-        if slot == 17 and loc == "INVTYPE_WEAPON" then
-            -- A one-hander in the off hand: only for dual wielders not using a shield.
+        if slot == 17 and (loc == "INVTYPE_WEAPON" or loc == "INVTYPE_WEAPONOFFHAND") then
+            -- A weapon in the off hand: only for dual wielders not using a shield.
             ok = cls.dualWield and level >= cls.dualWield and not OFF_HAND_ITEMS[WornLoc(gear[17])]
         end
         if (slot == 16 or slot == 17) and loc ~= "INVTYPE_2HWEAPON" and mainLoc == "INVTYPE_2HWEAPON" then
