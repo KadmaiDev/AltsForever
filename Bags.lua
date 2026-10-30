@@ -90,7 +90,8 @@ function ns.BagsContents(c, which, split)
         end
     end
     if not how then
-        local totals = which == "bank" and c.bank or c.bags
+        local totals = c.bags
+        if which == "bank" then totals = c.bank end -- a bank not seen yet stays unknown
         if totals and next(totals) then
             AddCounts(totals)
             how = "counts"

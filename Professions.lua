@@ -371,8 +371,12 @@ local function ParseRecipe(tt, id, data)
     end
     local name = GetItemNameByID(id) or LineText(tt, data, 1)
     p = false
-    if prof and name then
+    if prof and name and not issecretvalue(name) then
         p = { prof = prof, req = req, name = (name:match("^.-:%s*(.+)$") or name):lower() }
+    elseif C_Item.IsItemDataCachedByID and not C_Item.IsItemDataCachedByID(id) then
+        -- Not loaded yet ("Retrieving item information", as in the auction house): the next
+        -- hover reads it again rather than remembering it as no recipe.
+        return p
     end
     if parsedCount >= 200 then
         wipe(parsed)

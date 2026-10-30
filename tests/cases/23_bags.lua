@@ -138,6 +138,14 @@ test("all in one or by bag (remembered), bank tabs as sections, and money at the
     eq(f.money.text, "")
 end)
 
+test("a bank not seen yet shows nothing, not the bags", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    local c = { bags = { [500] = 40 } }
+    eq(ns.BagsContents(c, "bank"), nil)
+    eq(ns.BagsContents(c, "bags"), "counts")
+end)
+
 test("a tall bank scrolls instead of growing past the screen", function()
     local ns = wow.load(FILES)
     wow.ns = ns

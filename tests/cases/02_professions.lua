@@ -113,6 +113,18 @@ test("recipe tooltip: reads the recipe's own requirement, not the crafted item's
     eq(lines[3][2], "|cffff2020Needs 120 (107)|r")
 end)
 
+test("recipe tooltip: a recipe first hovered before it loads gets its lines once it has", function()
+    wow.load(FILES)
+    wow.profs = { { "Engineering", 107 } }
+    local text = wow.recipeItem(5000, "Schematic: Shadow Goggles", "Engineering", 120, 115)
+    wow.login(nil)
+    wow.uncached[5000] = true
+    eq(#wow.hover(GameTooltip, 5000, { "Retrieving item information" }), 0)
+    wow.uncached[5000] = nil
+    local lines = wow.hover(GameTooltip, 5000, text)
+    eq(lines[2] and lines[2][1], "Engineering (120)", "not remembered as no recipe")
+end)
+
 test("recipe tooltip: names match regardless of capitalisation", function()
     wow.load(FILES)
     wow.profs = { { "Engineering", 107 } }
