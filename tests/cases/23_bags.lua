@@ -345,3 +345,37 @@ test("the bags window plays the game's bag sounds when it opens and closes, and 
     ns.ShowBags(nil, "bank")
     eq(table.concat(wow.sounds, ","), "862,863", "close")
 end)
+
+test("a bag's name that loads late replaces 'Bag n'; an item that never loads stops asking after a few tries", function()
+    local ns = wow.load(FILES)
+    wow.ns = ns
+    wow.setBag(0, 2, { [1] = { 100, 1 } })
+    wow.setBag(1, 2, { [2] = { 101, 1 } })
+    wow.inventory[31] = 4245
+    wow.itemQuality[100], wow.itemQuality[101] = 1, 1
+    wow.login(nil)
+    AltsForeverDB.bagsSplit = true
+    wow.timers = {}
+    ns.ShowBags(nil, "bags")
+    eq(bagsHeadings(), "Backpack|cff9d9d9d  (1 / 2)|r | Bag 1|cff9d9d9d  (1 / 2)|r", "the bag's name isn't loaded")
+    wow.itemNames[4245] = "Red Linen Bag"
+    runTimers()
+    eq(bagsHeadings(), "Backpack|cff9d9d9d  (1 / 2)|r | Red Linen Bag|cff9d9d9d  (1 / 2)|r", "filled in once it loads")
+    eq(#wow.timers, 0, "nothing else to wait for")
+    -- Item 102's quality never comes: a few tries, then no more.
+    wow.setBag(0, 2, { [1] = { 100, 1 }, [2] = { 102, 1 } })
+    bagsChanged(0)
+    local tries = 0
+    for _ = 1, 20 do
+        if #wow.timers == 0 then break end
+        tries = tries + 1
+        runTimers()
+    end
+    eq(#wow.timers, 0, "stopped")
+    assert(tries <= 5, tries)
+    -- Opening it again asks afresh.
+    AltsForeverBagsFrame:Hide()
+    ns.ShowBags(nil, "bags")
+    eq(AltsForeverBagsFrame:IsShown(), true)
+    eq(#wow.timers, 1)
+end)

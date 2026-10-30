@@ -33,6 +33,10 @@ local scroll, contentHeight = 0, 0
 -- on every character and view you switch to, until you clear it or close the window.
 local lit
 local loadRetry = false
+-- Fills in a row from that timer: an item that never loads (one removed from the game)
+-- stops it after a few, rather than refilling every second while the window is open.
+local retries, retrying = 0, false
+local MAX_RETRIES = 5
 
 ---------------------------------------------------------------------------
 -- What to show (no UI, so tests can check it)
@@ -103,6 +107,8 @@ end
 
 function ns.BagsShown() return ids, counts, shown, sections, nSections end
 
+local RetryLater
+
 -- A section's title: the bag's name (or bank tab), or the whole place's.
 local function SectionName(c, bag)
     if not bag then return view == "bank" and L["Bank"] or L["Bags"] end
@@ -113,7 +119,10 @@ local function SectionName(c, bag)
     end
     local item = c.layout[bag][0]
     local name = item and C_Item.GetItemNameByID(item)
-    if not name and item and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(item) end
+    if not name and item and C_Item.RequestLoadItemDataByID then
+        C_Item.RequestLoadItemDataByID(item)
+        if RetryLater then RetryLater() end -- its name, once loaded
+    end
     return name or L["Bag %d"]:format(bag)
 end
 ns.BagsSectionName = SectionName
@@ -189,11 +198,15 @@ end
 
 -- Item quality and names aren't known until the game has loaded the item: ask for it,
 -- and fill again a second later (once per fill, however many items were missing).
-local function RetryLater()
-    if loadRetry or not C_Timer then return end
-    loadRetry = true
+function RetryLater()
+    if loadRetry or not C_Timer or retries >= MAX_RETRIES then return end
+    loadRetry, retries = true, retries + 1
     C_Timer.After(1, function()
-        if frame:IsShown() then Fill() end
+        if frame and frame:IsShown() then
+            retrying = true
+            Fill()
+            retrying = false
+        end
     end)
 end
 
@@ -348,6 +361,7 @@ function Fill()
     local c = shownKey and ns.db.chars[shownKey]
     if not c then return frame:Hide() end
     loadRetry = false
+    if not retrying then retries = 0 end
     if not sizing then
         cols = ns.db.bagsCols or DEFAULT_COLS
         frame:SetWidth(WidthFor(cols))
