@@ -78,7 +78,11 @@ local function Upgrade(saved)
         local name = type(c) == "table" and (type(c.name) == "string" and c.name
             or type(key) == "string" and (key:match("^(.*)%-[^%-]*$") or key))
         if name then
-            c.name, c.realm = name, nil
+            -- A beta realm is kept: it's how ns.LeaveBeta knows the character was the beta's.
+            local realm = type(key) == "string" and key:match("%-([^%-]*)$")
+            if not ns.BetaRealm(c.realm) then c.realm = nil end
+            if c.realm == nil and ns.BetaRealm(realm) then c.realm = realm end
+            c.name = name
             local old = chars[name]
             if not old or When(c) > When(old) then chars[name] = c end
         end

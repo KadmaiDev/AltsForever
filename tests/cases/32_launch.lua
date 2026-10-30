@@ -125,6 +125,27 @@ test("first live login with a version 1 save (Name-Realm keys from the beta)", f
     eq(ns.char.bank, nil)
 end)
 
+test("a version 1 save keeps a beta realm from its keys, so a character with no time recorded still goes", function()
+    wow.betaEnded = true
+    local ns = wow.load(FILES)
+    wow.now = LIVE
+    wow.login({ v = 1, chars = {
+        ["Tarn Moon-ClassicBetaPvE2"] = alt("Tarn Moon", "DRUID", { bank = { [1] = 1 } }),
+        ["Rook Vale-ClassicBetaPvP"] = alt("Rook Vale", "ROGUE", { realm = "SomewhereElse" }),
+        ["Mira Dawn-OldRealm"] = alt("Mira Dawn", "MAGE", {}) } })
+    eq(keys(), "Aldric,Mira Dawn", "beta realms go; a realm that isn't the beta's says nothing either way")
+    eq(AltsForeverDB.chars["Mira Dawn"].realm, nil)
+    wow.now = nil
+
+    -- During the beta the realm stays recorded, and the characters stay.
+    wow.betaEnded = true
+    ns = wow.load(FILES)
+    wow.player.realm = "ClassicBetaPvE2"
+    wow.login({ v = 1, chars = { ["Tarn Moon-ClassicBetaPvE2"] = alt("Tarn Moon", "DRUID", {}) } })
+    eq(keys(), "Aldric,Tarn Moon")
+    eq(AltsForeverDB.chars["Tarn Moon"].realm, "ClassicBetaPvE2")
+end)
+
 test("a live character whose realm couldn't be read at its first login is kept at the next", function()
     -- A copied beta folder, then a live login where the game gave no realm name.
     wow.betaEnded = true
