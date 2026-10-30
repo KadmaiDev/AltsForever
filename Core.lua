@@ -152,7 +152,6 @@ local DB_FIELDS = {
     itemQuality = "table", rulesets = "table",
     legacyPool = "number", scale = "number", minimapAngle = "number", bagsCols = "number",
     bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
-    live = "boolean",
 }
 
 -- Keeps only entries whose key and value are of these types (value nil = any).
@@ -386,21 +385,30 @@ function ns.BetaRealm(realm)
     return type(realm) == "string" and realm:lower():find("^classicbeta") ~= nil
 end
 
+-- A character with no realm (realms were recorded only from 0.12.0, and a version 1 save
+-- loses them in Upgrade) is from the beta if it was last seen before 1.0.0 came out, ahead
+-- of the live game (2026-10-23). One seen since, or with no time recorded, is kept: a live
+-- character whose realm couldn't be read once must never be taken for the beta's.
+ns.BETA_ENDED = 1792713600
+
+local function FromBeta(c)
+    if ns.BetaRealm(c.realm) then return true end
+    if c.realm ~= nil then return false end
+    local seen, updated = c.seen, c.updated
+    local last = type(seen) == "number" and seen or nil
+    if type(updated) == "number" and (not last or updated > last) then last = updated end
+    return last ~= nil and last < ns.BETA_ENDED
+end
+
 -- On a live realm: forgets every character from the beta, before this one is set up (a
 -- namesake from the beta is a different character, so you start fresh), with the beta's gold
 -- history and Legacy points (the saved pool never shrinks, so every live character would be
--- told it had the beta's points to spend). On the first live login (db.live unset) characters
--- with no realm go too: realms were recorded only from 0.12.0, and a version 1 save loses them
--- in Upgrade, so a save from before then has nothing else to tell its beta characters by; every
--- character in a save from before the live game was on the beta. After that, db.live keeps a
--- live character whose realm couldn't be read safe. Settings stay. Returns how many went.
+-- told it had the beta's points to spend). Settings stay. Returns how many went.
 function ns.LeaveBeta(db, realm)
     if not realm or ns.BetaRealm(realm) then return 0 end
-    local first = not db.live
-    db.live = true
     local chars, gone = db.chars, 0
     for key, c in pairs(chars) do
-        if ns.BetaRealm(c.realm) or (first and c.realm == nil) then chars[key], gone = nil, gone + 1 end
+        if FromBeta(c) then chars[key], gone = nil, gone + 1 end
     end
     if gone == 0 then return 0 end
     for group in pairs(db.goldDaysBy or {}) do

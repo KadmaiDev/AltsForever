@@ -652,10 +652,17 @@ function M.load(files)
     ElvUI_ExperienceBarHolder, EllesmereEAB_XPBar = nil, nil
     ElvUI_ReputationBarHolder, EllesmereEAB_RepBar = nil, nil
     EUI_Bags, EUI_BagMoneyFrame, ElvUI_ContainerFrame = nil, nil, nil
+    local betaEnded = M.betaEnded
+    M.betaEnded = nil -- for this load only
     local ns = {}
     for _, file in ipairs(files) do
         assert(loadfile(file))("AltsForever", ns)
     end
+    -- The tests' characters carry times from September 2026, before 1.0.0 came out ahead of
+    -- the live game, on a live realm: to the addon a realm-less one would be from the beta.
+    -- They stand for live characters, so the beta ended at 0 unless a test of the move from
+    -- the beta (tests/cases/32_launch.lua) sets M.betaEnded before loading.
+    if ns.BETA_ENDED and not betaEnded then ns.BETA_ENDED = 0 end
     return ns
 end
 
@@ -739,10 +746,7 @@ function M.item(id, name, opts)
     return "|cff1eff00|Hitem:" .. id .. "::::::::|h[" .. name .. "]|h|r"
 end
 
--- A save is taken to be from the live game already (db.live, set at the first live login)
--- unless it says live = false: tests of the move from the beta do.
 function M.login(saved)
-    if type(saved) == "table" and saved.live == nil then saved.live = true end
     AltsForeverDB = saved
     M.fire("ADDON_LOADED", "AltsForever")
     M.fire("PLAYER_LOGIN")

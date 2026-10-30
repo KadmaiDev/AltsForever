@@ -62,7 +62,6 @@ test("saved data loaded by the game before the addon is picked up at login", fun
     wow.load({ "tests/fixtures/AltsForever.lua", unpack(FILES) })
     wow.player.name, wow.player.realm = "Thessa Oakenbrook", "TestRealm"
     wow.setBag(0, 16, { [1] = { 6948, 1 } })
-    AltsForeverDB.live = true -- a save from the live game (wow.login marks the others)
     wow.fire("ADDON_LOADED", "AltsForever")
     wow.fire("PLAYER_LOGIN")
     local lines = wow.hover(GameTooltip, 6948)
