@@ -144,3 +144,36 @@ test("with the Gamepad UI on, the character sheet's anvils and their panel are b
     eq(focusCalls(), "hidden AltsForeverCraftPanel")
     wow.gamepadUI = false
 end)
+
+test("items arriving while the character sheet is open: its anvils are worked out once per burst", function()
+    local ns = wow.load(FILES)
+    local crafts = {}
+    for i = 1, 30 do
+        local id = 7000 + i
+        wow.item(id, "Gloves " .. i, { sub = 3, loc = "INVTYPE_HAND", stats = { ITEM_MOD_STRENGTH_SHORT = i } })
+        crafts[id] = "gloves " .. i
+        wow.uncached[id] = true
+    end
+    wow.player.class = "WARRIOR"
+    PaperDollFrame = CreateFrame("Frame")
+    local b = CreateFrame("Button", "CharacterHandsSlot")
+    b.GetID = function() return 10 end
+    wow.login({ v = 2, chars = {
+        ["Aldric"] = alt("Aldric", "WARRIOR", { level = 24, gear = {}, realm = "Realm" }),
+        ["Smith"] = alt("Smith", "PALADIN", { realm = "Realm", crafts = { Blacksmithing = crafts } }),
+    } })
+    wow.timers = {}
+    local runs, real = 0, ns.CraftableUpgrades
+    ns.CraftableUpgrades = function(...) runs = runs + 1 return real(...) end
+    PaperDollFrame:Show()
+    PaperDollFrame.scripts.OnShow(PaperDollFrame)
+    eq(runs, 1)
+    for i = 1, 30 do
+        wow.uncached[7000 + i] = nil
+        wow.fire("GET_ITEM_INFO_RECEIVED", 7000 + i, true)
+    end
+    eq(runs, 1, "nothing worked out per item")
+    runTimers()
+    assert(runs <= 3, "once for the burst (plus the sheet's own retry), not 30 times: " .. runs)
+    eq(ns.CraftGlyph(b):IsShown(), true, "the anvil is there once the items have come")
+end)

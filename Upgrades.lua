@@ -663,10 +663,23 @@ end
 -- Item data the game sends back after a request: if we were waiting, work upgrades out
 -- again. A while after login, the gear every character wore last is asked for, so their
 -- scores are ready by the time items are hovered.
+-- The character sheet's anvils are worked out once per burst of arrivals, not once per item:
+-- 60 crafted items still loading meant 60 full passes over every crafter's items.
+local sheetSoon = false
+local function SheetChanged()
+    sheetSoon = false
+    if ns.CharacterSheetChanged then ns.CharacterSheetChanged() end
+end
+
 local function ItemArrived()
     if waiting then
         waiting = false
-        ns.UpgradesChanged()
+        version = version + 1
+        if not (C_Timer and C_Timer.After) then return SheetChanged() end
+        if not sheetSoon then
+            sheetSoon = true
+            C_Timer.After(0.5, SheetChanged)
+        end
     end
 end
 
