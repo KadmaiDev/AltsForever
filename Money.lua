@@ -271,9 +271,12 @@ end
 function ns.StartMoney()
     local char = ns.char
 
-    -- Local time's offset from UTC, so days start at local midnight.
+    -- Local time's offset from UTC, so days start at local midnight. The UTC fields are read
+    -- back as local time with today's daylight saving, or summer days started an hour off.
     local now = time()
-    dayOffset = now - time(date("!*t", now))
+    local utc = date("!*t", now)
+    utc.isdst = date("*t", now).isdst
+    dayOffset = now - time(utc)
     local db = ns.db
     local group = (char.realm or "") .. "|" .. (char.faction or "")
     db.goldDays = db.goldDays or {}

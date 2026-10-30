@@ -124,3 +124,42 @@ test("session stats carry over a /reload, but start again on a real login", func
     seconds, xp, gold = reloaded(true, false, NOW + 1820)
     eq(seconds, 600, "a real login starts again"); eq(xp, 0); eq(gold, "0c")
 end)
+
+test("gold history: days start at local midnight in summer time too", function()
+    -- A zone at UTC+10, UTC+11 in summer (as eastern Australia), with mktime's rules:
+    -- fields read as standard time when isdst is false, as summer time when true or unset.
+    local realDate, realTime = os.date, os.time
+    local function epoch(t) -- the fields as if UTC
+        local y, m = t.year, t.month
+        if m <= 2 then y = y - 1 end
+        local era = math.floor(y / 400)
+        local yoe = y - era * 400
+        local doy = math.floor((153 * ((m + 9) % 12) + 2) / 5) + t.day - 1
+        local doe = yoe * 365 + math.floor(yoe / 4) - math.floor(yoe / 100) + doy
+        return (era * 146097 + doe - 719468) * 86400 + (t.hour or 12) * 3600 + (t.min or 0) * 60 + (t.sec or 0)
+    end
+    local now = math.floor(NOW / 86400) * 86400 + 13.5 * 3600 -- 23:30 standard, 00:30 summer
+    os.date = function(fmt, t)
+        if fmt == "*t" then
+            local l = realDate("!*t", (t or now) + 11 * 3600)
+            l.isdst = true
+            return l
+        end
+        return realDate(fmt, t)
+    end
+    os.time = function(t)
+        if not t then return now end
+        return epoch(t) - (t.isdst == false and 10 or 11) * 3600
+    end
+    local ok, err = pcall(function()
+        local ns = wow.load(FILES)
+        wow.now = now
+        wow.login(nil)
+        local day = math.floor((now + 11 * 3600) / 86400)
+        assert(AltsForeverDB.goldDays[day], "today is the local summer day")
+        eq(AltsForeverDB.goldDays[day - 1], nil)
+    end)
+    os.date, os.time = realDate, realTime
+    wow.now = nil
+    assert(ok, err)
+end)
