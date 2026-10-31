@@ -1,3 +1,9 @@
+## Alts Forever 1.1.0 (not yet released: to be tried in the live game first)
+
+- **Lockouts:** the raids and dungeons each character is saved to, and when each resets. A new Lockouts column in the overview, the list (with bosses killed) when you hover a character, and `/af lockouts`. Read each time you log in on a character and after every boss kill.
+- **Sync with your other game accounts:** `/af sync` and the name of your character on another game account (under the same Battle.net account or not) swaps everything Alts Forever knows between the two, so both see all your characters. Both characters must be online at the same time, on the same ruleset and faction; the other side is asked to accept the first time. Each side sends every character it knows, so syncing one pair brings your characters on every ruleset and faction. A character you forget stays forgotten unless it's played again.
+- **EllesmereUI bags:** with EllesmereUI's gold tracking turned off, hovering its bag gold shows Alts Forever's gold across characters again (EllesmereUI had moved the setting).
+
 ## Alts Forever 1.0.1
 
 Fixes found in a full review of the code before the live launch.

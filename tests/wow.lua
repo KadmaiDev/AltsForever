@@ -22,6 +22,7 @@ local KNOWN_EVENTS = {
     TRADE_SKILL_DATA_SOURCE_CHANGED = true, TRADE_SKILL_CLOSE = true, NEW_RECIPE_LEARNED = true,
     TIME_PLAYED_MSG = true, UNIT_NAME_UPDATE = true, UPDATE_FACTION = true,
     TRAIT_CONFIG_UPDATED = true, TRAIT_TREE_CURRENCY_INFO_UPDATED = true, GET_ITEM_INFO_RECEIVED = true,
+    UPDATE_INSTANCE_INFO = true, ENCOUNTER_END = true, BOSS_KILL = true, CHAT_MSG_ADDON = true,
 }
 
 -- Resets every global and loads the addon files fresh. Returns the addon namespace.
@@ -107,6 +108,8 @@ function M.load(files)
         BagIndex = { Keyring = -2, Backpack = 0, Bag_1 = 1, Bag_2 = 2, Bag_3 = 3, Bag_4 = 4, ReagentBag = 5,
             CharacterBankTab_1 = 6, CharacterBankTab_2 = 7, CharacterBankTab_3 = 8 },
         TooltipDataType = { Item = 0, Spell = 1 },
+        SendAddonMessageResult = { Success = 0, InvalidPrefix = 1, InvalidMessage = 2, AddonMessageThrottle = 3,
+            ChannelThrottle = 8, GeneralError = 9, AddOnMessageLockdown = 11, TargetOffline = 12 },
         ItemClass = { Recipe = 9 },
         TraitConfigType = { Combat = 1, Profession = 2, Generic = 3, CamelotCombat = 4 },
     }
@@ -595,6 +598,30 @@ function M.load(files)
         ExpandAllFactionHeaders = function() M.expanded = true end,
         ExpandFactionHeader = function() M.expanded = true end,
     }
+
+    -- Saved instances, as GetSavedInstanceInfo returns them: { name, reset (seconds left),
+    -- locked, extended, difficultyName, numEncounters, encounterProgress }.
+    M.saves, M.raidInfoRequests = {}, 0
+    RequestRaidInfo = function() M.raidInfoRequests = M.raidInfoRequests + 1 end
+    GetNumSavedInstances = function() return #M.saves end
+    GetSavedInstanceInfo = function(i)
+        local s = M.saves[i]
+        return s[1], 1000 + i, s[2], 9, s[3], s[4], 0, true, 40, s[5], s[6], s[7]
+    end
+    -- Addon messages: every one sent is recorded in M.sent ({ prefix, text, chatType, target });
+    -- the game's answer is the next of M.sendResults, else Success.
+    M.sent, M.sendResults, M.prefixes, M.chatLockdown = {}, {}, {}, nil
+    C_ChatInfo = {
+        RegisterAddonMessagePrefix = function(prefix) M.prefixes[prefix] = true return 0 end,
+        SendAddonMessage = function(prefix, text, chatType, target)
+            assert(#text <= 255, "addon message over 255 bytes")
+            M.sent[#M.sent + 1] = { prefix, text, chatType, target }
+            return table.remove(M.sendResults, 1) or 0
+        end,
+        InChatMessagingLockdown = function() return M.chatLockdown == true end,
+        AreOutgoingAddonChatMessagesRestricted = function() return false end,
+    }
+    ACCEPT, DECLINE = "Accept", "Decline"
 
     -- Confirmation pop-ups: the last one shown.
     M.popup = nil

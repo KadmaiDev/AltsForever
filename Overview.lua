@@ -31,6 +31,8 @@ local COLUMNS = {
     { title = "", width = 104, gap = 16 },
     { title = "", width = 34, right = true },
     { title = L["Mail"], width = 60, gap = 16 },
+    -- Raid and dungeon saves running: how many (the row tooltip lists them).
+    { title = L["Lockouts"], width = 64, center = true },
     { title = L["Zone"], width = 140 },
     { title = L["Played"], width = 70, right = true },
     { title = L["Last seen"], width = 80, right = true },
@@ -266,6 +268,7 @@ local function RowTooltip(row)
             tt:AddDoubleLine(r[1], r[3] ~= "" and (r[2] .. "  " .. r[3]) or r[2], 1, 1, 1, 1, 1, 1)
         end
     end
+    ns.AddLockoutLines(tt, c, now)
     tt:AddLine(" ")
     tt:AddLine(GREY .. (c.bank and L["Bank scanned"] or L["Bank not scanned yet - visit a banker"]) .. "|r")
     if c.dura then tt:AddDoubleLine(L["Lowest durability"], ns.DurabilityText(c.dura), 1, 0.82, 0, 1, 1, 1) end
@@ -451,9 +454,10 @@ local function Refresh()
         cells[9]:SetText(n2)
         cells[10]:SetText(s2)
         cells[11]:SetText(ns.MailText(c, now))
-        cells[12]:SetText(c.zone or (GREY .. "?|r"))
-        cells[13]:SetText(ns.PlayedText(c, now))
-        cells[14]:SetText(ns.SeenText(key, c, now))
+        cells[12]:SetText(ns.LockoutText(c, now))
+        cells[13]:SetText(c.zone or (GREY .. "?|r"))
+        cells[14]:SetText(ns.PlayedText(c, now))
+        cells[15]:SetText(ns.SeenText(key, c, now))
         total = total + (c.money or 0)
         played = played + (ns.PlayedNow(c, now) or 0)
         row:SetShown(not hidden)
@@ -595,6 +599,7 @@ local function CreateWindow()
     ns.SkinWindow(f)
     f:SetScript("OnShow", function(self)
         self:Raise()
+        ns.PruneSaves(time())
         Refresh()
     end)
     f:SetScript("OnHide", function()
