@@ -43,6 +43,34 @@ test("scans record each bag's and bank tab's slots, reusing the same tables", fu
     wow.now = nil
 end)
 
+test("the keyring shows only its keys and never counts as free bag space", function()
+    local ns = wow.load(FILES)
+    wow.ns = ns
+    local ring = Enum.BagIndex.Keyring
+    wow.setBag(0, 4, { [1] = { 100, 20 } })
+    wow.setBag(ring, 32, {})
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("bags")
+    local f = AltsForeverBagsFrame
+    eq(#ns.char.layout[ring], 32, "still recorded slot by slot")
+    eq(bagsGrid(), "100x20 - - -", "an empty keyring takes no room")
+    eq(f.info.text, "3 of 4 slots free")
+    eq(ns.BagsContents(ns.char, "bags", true), "slots")
+    eq(select(5, ns.BagsShown()), 1, "and has no section of its own")
+    -- Keys: shown, in either view, but they aren't bag slots.
+    wow.setBag(ring, 32, { [5] = { 300, 1 }, [9] = { 301, 1 } })
+    bagsChanged(ring)
+    eq(bagsGrid(), "100x20 - - - 300x1 301x1")
+    eq(f.info.text, "3 of 4 slots free")
+    ns.BagsContents(ns.char, "bags", true)
+    eq(bagsGrid(), "100x20 - - - 300x1 301x1")
+    local _, _, _, sections, n = ns.BagsShown()
+    eq(n, 2)
+    eq(sections[2].bag, ring)
+    eq(sections[2].used, 2)
+    f:Hide()
+end)
+
 test("the bags window shows a character's bags slot by slot, with free slots and a quality border", function()
     local ns = wow.load(FILES)
     wow.ns = ns
