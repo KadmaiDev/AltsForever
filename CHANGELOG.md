@@ -1,3 +1,8 @@
+## Alts Forever 1.0.2
+
+- **Bags window:** the keyring no longer counts as free bag space, so the slots free line shows the room you really have. Empty keyring slots are gone from the window, and any keys you carry still show.
+- **Gold tooltip with EllesmereUI's bags:** if you've turned EllesmereUI's gold tracking off, Alts Forever's gold tooltip shows there again. EllesmereUI had moved that setting.
+
 ## Alts Forever 1.0.1
 
 Fixes found in a full review of the code before the live launch.
