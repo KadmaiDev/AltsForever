@@ -2,7 +2,11 @@
 
 - **Lockouts:** the raids and dungeons each character is saved to, and when each resets. A new Lockouts column in the overview, the list (with bosses killed) when you hover a character, and `/af lockouts`. Read each time you log in on a character and after every boss kill.
 - **Sync with your other game accounts:** the new sync button at the top of the overview (or `/af sync`) opens a window: enter the name of your character on another game account (under the same Battle.net account or not), press Sync and a progress bar shows how it's going. It swaps everything Alts Forever knows between the two, so both see all your characters. After that it keeps itself up to date: whenever both accounts are online they swap changes by themselves, when either logs in and then every 10 minutes (untick it in the sync window, or `/af sync auto`). Both characters must be online at the same time, on the same ruleset and faction; the other side is asked to accept the first time. Each side sends every character it knows, so syncing one pair brings your characters on every ruleset and faction. A character you forget stays forgotten unless it's played again.
-- **EllesmereUI bags:** with EllesmereUI's gold tracking turned off, hovering its bag gold shows Alts Forever's gold across characters again (EllesmereUI had moved the setting).
+
+## Alts Forever 1.0.2
+
+- **Bags window:** the keyring no longer counts as free bag space, so the slots free line shows the room you really have. Empty keyring slots are gone from the window, and any keys you carry still show.
+- **Gold tooltip with EllesmereUI's bags:** if you've turned EllesmereUI's gold tracking off, Alts Forever's gold tooltip shows there again. EllesmereUI had moved that setting.
 
 ## Alts Forever 1.0.1
 

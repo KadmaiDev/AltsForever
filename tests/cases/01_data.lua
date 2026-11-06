@@ -81,7 +81,7 @@ test("bag scan sums stacks across bags, keyring and reagent bag", function()
     wow.setBag(0, 16, { [1] = { 100, 20 }, [2] = { 100, 5 }, [3] = { 200, 1 } })
     wow.setBag(1, 10, { [4] = { 100, 10 } })
     wow.setBag(5, 20, { [1] = { 300, 40 } })
-    wow.setBag(-2, 12, { [1] = { 400, 1 } })
+    wow.setBag(Enum.BagIndex.Keyring, 12, { [1] = { 400, 1 } })
     wow.login(nil)
     local bags = ns.char.bags
     eq(bags[100], 35)

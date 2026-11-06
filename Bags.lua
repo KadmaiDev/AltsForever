@@ -45,6 +45,7 @@ local MAX_RETRIES = 5
 -- the sections they're grouped in: { bag = bag index or false, from, to, used }.
 local ids, counts, sections = {}, {}, {}
 local shown, nSections = 0, 0
+local keys = 0 -- of the slots shown, how many are the keyring's
 
 local function NewSection(bag)
     nSections = nSections + 1
@@ -75,20 +76,33 @@ local function AddCounts(totals)
     for i = 1, n do Add(section, byId[i], totals[byId[i]]) end
 end
 
+local function HasItem(values)
+    for i = 1, #values do
+        if values[i] ~= 0 then return true end
+    end
+    return false
+end
+
 -- Fills the slots for a character's bags or bank, one section per bag if split, else one
 -- for all; returns how it was recorded: "slots", "counts" (no layout yet) or nil.
 function ns.BagsContents(c, which, split)
-    shown, nSections = 0, 0
+    shown, nSections, keys = 0, 0, 0
     local layout = c.layout
     local how
     local section
     for _, bag in ipairs(which == "bank" and ns.BANK_TABS or ns.CARRIED_BAGS) do
         local values = layout and layout[bag]
-        if values then
+        -- The keyring holds only keys: its 32 slots aren't room for anything else, so just
+        -- its keys are shown, and a character with none has no keyring here at all.
+        local ring = bag == BagIndex.Keyring
+        if values and (not ring or HasItem(values)) then
             if split or not section then section = NewSection(split and bag or false) end
             for i = 1, #values do
                 local id, count = ns.SlotItem(values[i])
-                Add(section, id, count)
+                if id or not ring then
+                    Add(section, id, count)
+                    if ring then keys = keys + 1 end
+                end
             end
             how = "slots"
         end
@@ -393,7 +407,8 @@ function Fill()
         local h = Header(n)
         local title = SectionName(c, s.bag)
         if how == "slots" then
-            h:SetText(title .. GREY .. "  (" .. s.used .. " / " .. (s.to - s.from + 1) .. ")|r")
+            local size = s.bag == BagIndex.Keyring and "" or (" / " .. (s.to - s.from + 1))
+            h:SetText(title .. GREY .. "  (" .. s.used .. size .. ")|r")
         else
             -- Totals only: say so beside the heading (too long for the bottom row).
             h:SetText(title .. GREY .. "   " .. (view == "bank" and L["Totals only: visit the bank on this character to see its slots."]
@@ -430,7 +445,7 @@ function Fill()
     end
     frame.empty:SetShown(not how)
     if how == "slots" then
-        frame.info:SetText(L["%d of %d slots free"]:format(free, shown))
+        frame.info:SetText(L["%d of %d slots free"]:format(free, shown - keys))
     else
         frame.info:SetText("")
     end
