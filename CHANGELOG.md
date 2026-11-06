@@ -1,3 +1,8 @@
+## Alts Forever 1.1.0
+
+- **Sync with your other game accounts:** see all your characters from every account, under the same Battle.net account or not. Press the new sync button at the top of the overview (or type `/af sync`), enter the name of your character on the other account and press Sync; a progress bar shows how it's going. Both characters must be online at the same time, on the same ruleset and faction, and the other side is asked to accept the first time. Each side sends every character it knows, so one sync brings your characters on every ruleset and faction.
+- **Stays in sync by itself:** once you've synced, your accounts swap changes on their own whenever both are online, when either logs in and then every 10 minutes. Untick it in the sync window, or type `/af sync auto`. A character you forget stays forgotten unless it's played again.
+
 ## Alts Forever 1.0.2
 
 - **Bags window:** the keyring no longer counts as free bag space, so the slots free line shows the room you really have. Empty keyring slots are gone from the window, and any keys you carry still show.

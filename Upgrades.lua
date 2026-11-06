@@ -184,6 +184,7 @@ function ns.SetRole(key, role)
         if not ok then return false end
     end
     c.role = role
+    c.changed = time() -- so a sync with another account picks it up
     ns.UpgradesChanged()
     return true
 end

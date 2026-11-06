@@ -22,6 +22,7 @@ local KNOWN_EVENTS = {
     TRADE_SKILL_DATA_SOURCE_CHANGED = true, TRADE_SKILL_CLOSE = true, NEW_RECIPE_LEARNED = true,
     TIME_PLAYED_MSG = true, UNIT_NAME_UPDATE = true, UPDATE_FACTION = true,
     TRAIT_CONFIG_UPDATED = true, TRAIT_TREE_CURRENCY_INFO_UPDATED = true, GET_ITEM_INFO_RECEIVED = true,
+    CHAT_MSG_ADDON = true,
 }
 
 -- Resets every global and loads the addon files fresh. Returns the addon namespace.
@@ -107,6 +108,8 @@ function M.load(files)
         BagIndex = { Keyring = -1, Backpack = 0, Bag_1 = 1, Bag_2 = 2, Bag_3 = 3, Bag_4 = 4, ReagentBag = 5,
             CharacterBankTab_1 = 6, CharacterBankTab_2 = 7, CharacterBankTab_3 = 8 },
         TooltipDataType = { Item = 0, Spell = 1 },
+        SendAddonMessageResult = { Success = 0, InvalidPrefix = 1, InvalidMessage = 2, AddonMessageThrottle = 3,
+            ChannelThrottle = 8, GeneralError = 9, AddOnMessageLockdown = 11, TargetOffline = 12 },
         ItemClass = { Recipe = 9 },
         TraitConfigType = { Combat = 1, Profession = 2, Generic = 3, CamelotCombat = 4 },
     }
@@ -496,7 +499,29 @@ function M.load(files)
     M.outboxMoney = 0
     GetSendMailMoney = function() return M.outboxMoney end
     M.timers = {}
-    C_Timer = { After = function(_, fn) M.timers[#M.timers + 1] = fn end }
+    M.delays = {} -- [timer function] = seconds, for telling long waits from short ones
+    C_Timer = { After = function(seconds, fn)
+        M.timers[#M.timers + 1] = fn
+        M.delays[fn] = seconds
+    end }
+    -- Chat message filters: M.chatFilter(event, text) says whether a line would be hidden.
+    ERR_CHAT_PLAYER_NOT_FOUND_S = "No player named '%s' is currently playing."
+    M.filters = {}
+    ChatFrame_AddMessageEventFilter = function(event, fn)
+        M.filters[event] = M.filters[event] or {}
+        table.insert(M.filters[event], fn)
+    end
+    ChatFrame_RemoveMessageEventFilter = function(event, fn)
+        for i, f in ipairs(M.filters[event] or {}) do
+            if f == fn then return table.remove(M.filters[event], i) end
+        end
+    end
+    function M.chatFilter(event, text)
+        for _, fn in ipairs(M.filters[event] or {}) do
+            if fn(nil, event, text) then return true end
+        end
+        return false
+    end
     GetMoney = function() return M.money end
     C_CurrencyInfo = {
         GetCoinTextureString = function(copper, height)
@@ -595,6 +620,21 @@ function M.load(files)
         ExpandAllFactionHeaders = function() M.expanded = true end,
         ExpandFactionHeader = function() M.expanded = true end,
     }
+
+    -- Addon messages: every one sent is recorded in M.sent ({ prefix, text, chatType, target });
+    -- the game's answer is the next of M.sendResults, else Success.
+    M.sent, M.sendResults, M.prefixes, M.chatLockdown = {}, {}, {}, nil
+    C_ChatInfo = {
+        RegisterAddonMessagePrefix = function(prefix) M.prefixes[prefix] = true return 0 end,
+        SendAddonMessage = function(prefix, text, chatType, target)
+            assert(#text <= 255, "addon message over 255 bytes")
+            M.sent[#M.sent + 1] = { prefix, text, chatType, target }
+            return table.remove(M.sendResults, 1) or 0
+        end,
+        InChatMessagingLockdown = function() return M.chatLockdown == true end,
+        AreOutgoingAddonChatMessagesRestricted = function() return false end,
+    }
+    ACCEPT, DECLINE = "Accept", "Decline"
 
     -- Confirmation pop-ups: the last one shown.
     M.popup = nil

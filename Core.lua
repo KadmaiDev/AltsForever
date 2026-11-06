@@ -145,7 +145,7 @@ local CHAR_FIELDS = {
     money = "number", level = "number", xp = "number", xpMax = "number", rested = "number",
     seen = "number", updated = "number", ilvl = "number", dura = "number", played = "number",
     playedAt = "number", mailExpires = "number", spec = "number", wellRested = "number",
-    legacySpent = "number", bankAt = "number",
+    legacySpent = "number", bankAt = "number", changed = "number",
     bags = "table", bank = "table", mail = "table", equip = "table", gear = "table",
     layout = "table", profs = "table", profMax = "table", recipes = "table", crafts = "table",
     reps = "table", duraSlots = "table",
@@ -153,7 +153,7 @@ local CHAR_FIELDS = {
 local DB_FIELDS = {
     icons = "table", goldDays = "table", goldDaysBy = "table", factions = "table",
     recipeInfo = "table", collapsedGroups = "table", session = "table", itemNames = "table",
-    itemQuality = "table", rulesets = "table",
+    itemQuality = "table", rulesets = "table", syncWith = "table", forgotten = "table", syncAutoOff = "boolean",
     legacyPool = "number", scale = "number", minimapAngle = "number", bagsCols = "number",
     bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
 }
@@ -202,6 +202,8 @@ local function Repair(saved)
     end
     if saved.goldDays then KeepOnly(saved.goldDays, "number", "number") end
     if saved.rulesets then KeepOnly(saved.rulesets, "string", "string") end
+    if saved.syncWith then KeepOnly(saved.syncWith, "string", "boolean") end
+    if saved.forgotten then KeepOnly(saved.forgotten, "string", "number") end
     if saved.goldDaysBy then
         KeepOnly(saved.goldDaysBy, "string", "table")
         for _, days in pairs(saved.goldDaysBy) do KeepOnly(days, "number", "number") end
@@ -227,6 +229,8 @@ local function Repair(saved)
         if not c.name then c.name = key end
     end
 end
+-- Characters from another account (Sync.lua) get the same checks.
+ns.RepairChar = RepairChar
 
 function ns.InitDB(saved)
     if type(saved) ~= "table" then saved = { v = DB_VERSION, chars = {} } end
@@ -494,6 +498,7 @@ ns.On("PLAYER_LOGIN", function()
     ns.StartUpgrades()
     ns.StartFlyout()
     ns.StartReputation()
+    ns.StartSync()
     ns.StartOptions()
     ns.StartBroker()
     ns.StartGamepad()
@@ -698,6 +703,11 @@ function commands.rep()
     ns.ToggleReputation()
 end
 
+-- /af sync First Last: swaps characters with your character on another game account (Sync.lua).
+function commands.sync(arg)
+    ns.SyncWith(arg)
+end
+
 -- /af export: every character as text to copy (Export.lua).
 function commands.export()
     ns.ToggleExport()
@@ -720,6 +730,8 @@ function commands.help()
     Print(L["/af scale 150 makes Alts Forever's windows one and a half times their size (any size from 50 to 300), on top of the game's UI scale."])
     if ns.HasEllesmereScale() then Print(L["/af scale eui makes them follow EllesmereUI's Window Scale again (the default)."]) end
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
+    Print(L["/af sync and the name of your character on another game account swaps characters with it, so both accounts see all of them. Both need to be online at the same time, on the same ruleset and faction."])
+    Print(L["/af sync auto turns syncing by itself on or off."])
     Print(L["/af rulesets shows or hides your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; they can't trade with this one."])
     Print(L["Or use the minimap button (right-click for options)."])
 end

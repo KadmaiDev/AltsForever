@@ -106,6 +106,11 @@ function ns.ForgetCharacter(key)
     if not ns.db.chars[key] then return false, L["No character named '%s'."]:format(tostring(key)) end
     if key == ns.charKey then return false, L["You can't forget the character you're logged in on."] end
     ns.db.chars[key] = nil
+    -- Remembered, so a sync with another account doesn't bring them back (Sync.lua) unless
+    -- they're played again.
+    ns.db.forgotten = ns.db.forgotten or {}
+    ns.db.forgotten[key] = time()
+    if ns.db.syncWith then ns.db.syncWith[key] = nil end
     ns.PruneRecipeInfo()
     ns.InvalidateCache()
     -- The character sheet's anvils may list what they could craft.
