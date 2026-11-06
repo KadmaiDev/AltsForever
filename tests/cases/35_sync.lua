@@ -603,14 +603,75 @@ test("a ping is ignored from strangers, with it off, and during a swap", functio
     eq(#wow.sent, 0, "already swapping")
 end)
 
-test("in combat a ping waits for the 10 minute check", function()
+test("a ping in combat swaps as soon as the fight ends", function()
     local ns = syncStart()
     ns.db.syncWith = { ["Bob Smith"] = true }
     wow.inCombat = true
     syncFrom(ns, "Bob Smith", { k = "ping" })
     eq(#wow.sent, 0)
     wow.inCombat = nil
+    wow.fire("PLAYER_REGEN_ENABLED")
+    eq(syncSent(ns, "Bob Smith")[1].auto, true)
+
+    -- Once: the next fight ending has nothing to do.
+    autoAnswer(ns, "Bob Smith")
+    wow.sent = {}
+    wow.fire("PLAYER_REGEN_ENABLED")
+    eq(#wow.sent, 0)
+end)
+
+test("a fight ending does nothing with no swap due, or with it turned off since", function()
+    local ns = syncStart()
+    ns.db.syncWith = { ["Bob Smith"] = true }
+    wow.fire("PLAYER_REGEN_ENABLED")
+    eq(#wow.sent, 0)
+
+    wow.inCombat = true
+    syncFrom(ns, "Bob Smith", { k = "ping" })
+    wow.inCombat = nil
+    ns.SetSyncAuto(false)
+    wow.fire("PLAYER_REGEN_ENABLED")
+    eq(#wow.sent, 0)
+end)
+
+test("the 10 minute swap falling in combat runs when the fight ends, and the checks go on", function()
+    local ns = syncStart()
+    ns.db.syncWith = { ["Bob Smith"] = true }
+    syncFrom(ns, "Bob Smith", { k = "ping" })
+    autoAnswer(ns, "Bob Smith")
+    wow.sent = {}
+    wow.inCombat = true
     wow.now = NOW + 600
+    runTimers()
+    eq(#wow.sent, 0, "not in a fight")
+    wow.inCombat = nil
+    wow.fire("PLAYER_REGEN_ENABLED")
+    eq(syncSent(ns, "Bob Smith")[1].auto, true)
+    autoAnswer(ns, "Bob Smith")
+    wow.sent = {}
+    wow.now = NOW + 1200
+    runTimers()
+    eq(syncSent(ns, "Bob Smith")[1].auto, true, "still every 10 minutes")
+end)
+
+test("a swap for another reason moves the next one back, with no whole extra wait", function()
+    -- As seen in game: a check that came 7 minutes after a login's swap skipped, and the next
+    -- swap took 20 minutes.
+    local ns = syncStart()
+    ns.db.syncWith = { ["Bob Smith"] = true }
+    syncFrom(ns, "Bob Smith", { k = "ping" })
+    autoAnswer(ns, "Bob Smith") -- the check is set for 10 minutes from now
+    wow.now = NOW + 180
+    syncFrom(ns, "Bob Smith", { k = "ping" }) -- they logged in again
+    autoAnswer(ns, "Bob Smith")
+
+    wow.sent = {}
+    wow.now = NOW + 600
+    runTimers()
+    eq(#wow.sent, 0, "seven minutes since that swap")
+    eq(#wow.timers, 1)
+    eq(wow.delays[wow.timers[1]], 180, "the three minutes left, not another ten")
+    wow.now = NOW + 780
     runTimers()
     eq(syncSent(ns, "Bob Smith")[1].auto, true)
 end)

@@ -22,7 +22,7 @@ local KNOWN_EVENTS = {
     TRADE_SKILL_DATA_SOURCE_CHANGED = true, TRADE_SKILL_CLOSE = true, NEW_RECIPE_LEARNED = true,
     TIME_PLAYED_MSG = true, UNIT_NAME_UPDATE = true, UPDATE_FACTION = true,
     TRAIT_CONFIG_UPDATED = true, TRAIT_TREE_CURRENCY_INFO_UPDATED = true, GET_ITEM_INFO_RECEIVED = true,
-    CHAT_MSG_ADDON = true,
+    CHAT_MSG_ADDON = true, PLAYER_REGEN_ENABLED = true,
 }
 
 -- Resets every global and loads the addon files fresh. Returns the addon namespace.
