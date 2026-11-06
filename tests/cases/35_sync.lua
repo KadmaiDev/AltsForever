@@ -146,7 +146,7 @@ test("/af sync: hello, then each side asks for what it lacks or has older, and t
     local link = "|cff1eff00|Hitem:2589::::::::|h[Linen Cloth]|h|r"
     syncFrom(ns, "Bob Smith-Realm", { k = "char", key = "Bob Smith",
         c = alt("Bob Smith", "WARRIOR", { updated = NOW, bags = { [2589] = 3 },
-            gear = { [1] = link }, recipes = { Tailoring = { ["bolt of linen cloth"] = true } } }),
+            gear = { [1] = link }, saves = { ["Molten Core"] = NOW + DAY }, recipes = { Tailoring = { ["bolt of linen cloth"] = true } } }),
         ri = { Tailoring = { ["bolt of linen cloth"] = "75;Bolt of Linen Cloth;2996,2589:2" } }, fn = { [72] = "Stormwind" } })
     syncFrom(ns, "Bob Smith-Realm", { k = "char", key = "New Alt", rs = "pvp",
         c = alt("New Alt", "MAGE", { realm = "Other", faction = "Horde", updated = NOW - HOUR }) })
@@ -155,7 +155,7 @@ test("/af sync: hello, then each side asks for what it lacks or has older, and t
     syncFrom(ns, "Bob Smith-Realm", { k = "done", n = 4 })
     assert(syncPrinted():find("Got 2 characters from Bob Smith.", 1, true), syncPrinted())
     local bob = ns.db.chars["Bob Smith"]
-    eq(bob.bags[2589], 3); eq(bob.gear[1], link)
+    eq(bob.bags[2589], 3); eq(bob.gear[1], link); eq(bob.saves["Molten Core"], NOW + DAY)
     eq(ns.db.chars["New Alt"].class, "MAGE")
     eq(ns.char.money, wow.money, "the character you're on is never overwritten")
     eq(ns.db.chars["Tarn Moon"].bags[118], 2, "an older copy is ignored")
