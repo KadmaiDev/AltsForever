@@ -145,7 +145,7 @@ local CHAR_FIELDS = {
     money = "number", level = "number", xp = "number", xpMax = "number", rested = "number",
     seen = "number", updated = "number", ilvl = "number", dura = "number", played = "number",
     playedAt = "number", mailExpires = "number", spec = "number", wellRested = "number",
-    legacySpent = "number", bankAt = "number",
+    legacySpent = "number", bankAt = "number", changed = "number",
     bags = "table", bank = "table", mail = "table", equip = "table", gear = "table",
     layout = "table", profs = "table", profMax = "table", recipes = "table", crafts = "table",
     reps = "table", duraSlots = "table",

@@ -254,9 +254,20 @@ local function Ended(name, why)
     Notify()
 end
 
+-- Drops everything still queued for this name.
+local function Drop(name)
+    local kept = {}
+    for i = head, #queue do
+        if queue[i].name ~= name then kept[#kept + 1] = queue[i] end
+    end
+    queue, head = kept, 1
+end
+
 -- Tells the player how it ended, in chat and in the window; an automatic sync says nothing.
+-- Nothing more goes to them: an answer to it would find no session to land in.
 local function Over(name, why)
     local s = sessions[name]
+    Drop(name)
     if not (s and s.quiet) then ns.Print(why) end
     Ended(name, why)
 end
@@ -265,14 +276,26 @@ local function Fresh(s)
     return s and time() - s.at < QUIET
 end
 
--- Drops everything still queued for this name and says why.
+-- Gives up on this name, saying why if a swap was running.
 local function Stop(name, why)
-    local kept = {}
-    for i = head, #queue do
-        if queue[i].name ~= name then kept[#kept + 1] = queue[i] end
+    if sessions[name] then
+        Over(name, L["Sync with %s stopped: %s."]:format(name, why))
+    else
+        Drop(name)
     end
-    queue, head = kept, 1
-    if sessions[name] then Over(name, L["Sync with %s stopped: %s."]:format(name, why)) end
+end
+
+-- Ends a swap that has gone quiet. They may still be there, so the 10 minute check tries again.
+local function Stalled(name, s)
+    s.keep = true
+    Stop(name, L["nothing heard for two minutes"])
+end
+
+-- Runs for as long as a swap does, so one that stalls can't block the next, window open or not.
+local function Watch(name, s)
+    if sessions[name] ~= s then return end
+    if not Fresh(s) then return Stalled(name, s) end
+    After(QUIET, function() Watch(name, s) end)
 end
 
 function Pump()
@@ -373,11 +396,14 @@ end
 ---------------------------------------------------------------------------
 -- Characters
 ---------------------------------------------------------------------------
+-- `changed` is for changes made while the character is offline, such as mail sent to them:
+-- `updated` can't say so, as the rested XP estimate counts from it.
 local function Stamp(c)
     if c == ns.char then return time() end
-    local seen, updated = c.seen, c.updated
+    local seen, updated, changed = c.seen, c.updated, c.changed
     local t = type(seen) == "number" and seen or 0
     if type(updated) == "number" and updated > t then t = updated end
+    if type(changed) == "number" and changed > t then t = changed end
     return t
 end
 
@@ -537,6 +563,7 @@ local function NewSession(name, s)
     s.name, s.got, s.at = name, 0, time()
     sessions[name] = s
     if not (s.quiet and s.ours) then current = s end
+    After(QUIET, function() Watch(name, s) end)
     return s
 end
 
@@ -590,7 +617,6 @@ local function Begin(name, target, quiet)
         ns.Print(L["Asking %s to swap characters..."]:format(name))
         Notify()
     end
-    Send(name, target, Hello(nil, quiet))
     local function Check()
         if sessions[name] ~= s or s.answered then return end
         -- Their player is reading the pop-up: wait as long as it stays up.
@@ -600,7 +626,19 @@ local function Begin(name, target, quiet)
         end
         Over(name, L["No answer from %s. Both characters need this version of Alts Forever or later, online at the same time on the same ruleset and faction."]:format(name))
     end
-    After(ANSWER_WITHIN, Check)
+    -- The wait starts when the hello really goes: it can sit behind a lockdown or another swap.
+    Send(name, target, Hello(nil, quiet), function() After(ANSWER_WITHIN, Check) end)
+end
+
+-- A ping or a hello while a swap runs means they've started over (a reload, say), so the
+-- swap on their side is gone and ours can't finish.
+local function StartedOver(name)
+    local s = sessions[name]
+    if not s or (s.ours and not s.answered) then return false end
+    s.keep = true
+    Drop(name)
+    Ended(name, L["Sync with %s stopped: %s."]:format(name, L["they started again"]))
+    return true
 end
 
 local pending -- the hello waiting on the player's answer
@@ -646,10 +684,7 @@ function handle.hello(msg, sender, name)
         return SendWant(s, name, msg.have)
     end
     local s = sessions[name]
-    if s and not Fresh(s) then
-        Stop(name, L["nothing heard for two minutes"])
-        s = nil
-    end
+    if StartedOver(name) then s = nil end
     if s then
         -- Both asked at once: take theirs as the answer to ours.
         if s.ours and not s.answered then
@@ -676,6 +711,7 @@ end
 function handle.ping(msg, sender, name)
     if not Trusted(name) or not ns.SyncAutoOn() then return end
     Keep(name, sender)
+    StartedOver(name)
     if sessions[name] or InCombatLockdown() then return end -- the 10 minute check tries again
     Begin(name, sender, true)
 end

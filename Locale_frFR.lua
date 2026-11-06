@@ -324,6 +324,7 @@ L["Characters you've synced with"] = "Personnages avec lesquels vous avez synchr
 L["Sending %d of %d"] = "Envoi : %d sur %d"
 L["Receiving %d of %d"] = "Réception : %d sur %d"
 L["nothing heard for two minutes"] = "aucune nouvelle depuis deux minutes"
+L["they started again"] = "il a recommencé"
 L["Sync by itself when both are online"] = "Synchroniser tout seul quand les deux sont en ligne"
 L["Once you've synced, your accounts swap changes by themselves whenever both are online: when either logs in, then every 10 minutes. Same as /af sync auto."] = "Après une première synchronisation, vos comptes échangent leurs changements tout seuls dès que les deux sont en ligne : à la connexion de l'un d'eux, puis toutes les 10 minutes. Comme /af sync auto."
 L["Synced with %s."] = "Synchronisé avec %s."

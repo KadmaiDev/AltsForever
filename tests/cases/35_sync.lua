@@ -38,13 +38,14 @@ function syncFrom(ns, sender, payload)
     end
 end
 
--- Sends everything queued (each message waits on a timer after the first). The 10 minute
--- check is left waiting: it would run for ever.
+-- Sends everything queued (each message waits on a timer after the first). The checks on a
+-- running swap and the 10 minute check are left waiting: with the clock stopped they'd run
+-- for ever.
 function syncPump()
     for _ = 1, 1000 do
         local due, later = {}, {}
         for _, fn in ipairs(wow.timers) do
-            local list = wow.delays[fn] >= 300 and later or due
+            local list = wow.delays[fn] >= 100 and later or due
             list[#list + 1] = fn
         end
         if #due == 0 then return end
@@ -713,4 +714,187 @@ end)
 test("a damaged automatic sync setting is dropped at load", function()
     local ns = autoStart({ syncAutoOff = "yes" })
     eq(ns.db.syncAutoOff, nil)
+end)
+
+-- A swap with Bob Smith that has started, with everything sent and theirs still to come.
+local function midSwap(ns, quiet)
+    if quiet then
+        ns.db.syncWith = { ["Bob Smith"] = true }
+        syncFrom(ns, "Bob Smith", { k = "ping" })
+    else
+        SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    end
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, reply = true, have = {} })
+    syncFrom(ns, "Bob Smith", { k = "plan", n = 40 })
+    syncPump()
+end
+
+test("a swap that stalls with the window closed ends by itself, and the next check tries again", function()
+    local ns = syncStart()
+    midSwap(ns, true)
+    wow.now = NOW + 121
+    wow.sent, wow.printed = {}, {}
+    runTimers() -- the check on the swap; the window was never opened
+    eq(progress(ns).going, false)
+    eq(syncPrinted(), "", "an automatic sync says nothing")
+
+    wow.now = NOW + 700
+    runTimers() -- the 10 minute check isn't blocked by the dead swap
+    eq(syncSent(ns, "Bob Smith")[1].auto, true)
+    autoAnswer(ns, "Bob Smith")
+    assert(progress(ns).status:find("Got 0 characters", 1, true), progress(ns).status)
+end)
+
+test("a sync you started says so if it stalls with the window closed", function()
+    local ns = syncStart()
+    midSwap(ns)
+    wow.now = NOW + 121
+    runTimers()
+    assert(syncPrinted():find("Sync with Bob Smith stopped: nothing heard for two minutes.", 1, true), syncPrinted())
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    assert(not syncPrinted():find("Already swapping", 1, true), "free to try again")
+end)
+
+test("a stalled swap doesn't swallow the other side's return, even before any check has run", function()
+    local ns = syncStart()
+    midSwap(ns, true)
+    wow.now = NOW + 121
+    wow.sent, wow.timers = {}, {} -- no check has noticed yet
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, auto = true, have = { ["Bob Smith"] = NOW + 121 } })
+    syncPump()
+    eq(syncKinds(syncSent(ns, "Bob Smith")), "hello,want", "answered as a new swap")
+    eq(syncSent(ns, "Bob Smith")[2].keys[1], "Bob Smith")
+end)
+
+test("a swap held up for over two minutes carries on if the messages start again", function()
+    local ns = syncStart()
+    midSwap(ns)
+    wow.now = NOW + 130 -- their chat lockdown ended before any check here came round
+    syncFrom(ns, "Bob Smith", { k = "char", key = "New Alt", c = alt("New Alt", "MAGE", { updated = NOW }) })
+    eq(ns.db.chars["New Alt"].class, "MAGE")
+    eq(progress(ns).going, true)
+end)
+
+test("a reload on the other side part way through starts a new swap", function()
+    -- They came back well inside the two minutes: their half of the old swap is gone.
+    local ns = syncStart()
+    midSwap(ns, true)
+    wow.sent = {}
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, auto = true, have = {} })
+    syncPump()
+    eq(syncKinds(syncSent(ns, "Bob Smith")), "hello,want")
+
+    ns = syncStart()
+    midSwap(ns, true)
+    wow.sent = {}
+    syncFrom(ns, "Bob Smith", { k = "ping" })
+    eq(syncSent(ns, "Bob Smith")[1].k, "hello", "their login ping does the same")
+    eq(syncSent(ns, "Bob Smith")[1].reply, nil)
+end)
+
+test("the wait for an answer starts when the hello goes, however long it was held up", function()
+    local ns = syncStart()
+    wow.chatLockdown = true
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    eq(#wow.sent, 0)
+    wow.now = NOW + 30 -- past the 20 s wait, still locked down
+    runTimers()
+    eq(syncPrinted():find("No answer", 1, true), nil, "nothing has gone out yet")
+    eq(#wow.sent, 0)
+
+    wow.chatLockdown = nil
+    runTimers()
+    eq(syncSent(ns, "Bob Smith")[1].k, "hello")
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, reply = true, have = { ["Bob Smith"] = NOW + 30 } })
+    syncFrom(ns, "Bob Smith", { k = "char", key = "Bob Smith", c = alt("Bob Smith", "WARRIOR", { updated = NOW + 30 }) })
+    syncFrom(ns, "Bob Smith", { k = "want", keys = {} })
+    syncFrom(ns, "Bob Smith", { k = "done", n = 1 })
+    syncPump()
+    eq(ns.db.chars["Bob Smith"].class, "WARRIOR", "the swap finished")
+    assert(syncPrinted():find("Got 1 characters from Bob Smith.", 1, true), syncPrinted())
+end)
+
+test("a sync that ends sends nothing more", function()
+    local ns = syncStart()
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, reply = true, have = {} })
+    syncFrom(ns, "Bob Smith", { k = "want", keys = { "Aldric", "Tarn Moon" } })
+    local before = #wow.sent
+    syncFrom(ns, "Bob Smith", { k = "no" })
+    syncPump()
+    eq(#wow.sent, before, "what was queued for them went with it")
+end)
+
+test("a held-up hello given up on never goes out late", function()
+    local ns = syncStart()
+    wow.chatLockdown = true
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    wow.now = NOW + 121
+    for _ = 1, 3 do runTimers() end
+    assert(syncPrinted():find("Sync with Bob Smith stopped", 1, true), syncPrinted())
+    wow.chatLockdown = nil
+    syncPump()
+    eq(#wow.sent, 0)
+end)
+
+-- The message that carried this character to the other side.
+local function sent(ns, key)
+    for _, msg in ipairs(syncSent(ns)) do
+        if msg.k == "char" and msg.key == key then return msg end
+    end
+end
+
+test("mail sent to an offline character leaves the time the rested XP estimate counts from", function()
+    local ns = syncStart()
+    local tarn = ns.db.chars["Tarn Moon"]
+    local updated, seen = tarn.updated, tarn.seen
+    wow.outbox = { { 100, 20 } }
+    wow.now = NOW + 60
+    SendMail("Tarn Moon", "subject", "")
+    wow.fire("MAIL_SEND_SUCCESS")
+    eq(tarn.updated, updated)
+    eq(tarn.seen, seen)
+    eq(tarn.changed, NOW + 60)
+end)
+
+test("the next sync takes in an offline character's new mail from the other account", function()
+    local ns = syncStart()
+    local stamp = NOW + 60
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, reply = true, have = { ["Tarn Moon"] = stamp } })
+    syncPump()
+    local keys = syncSent(ns)[2].keys
+    eq(keys[1], "Tarn Moon", "theirs is newer: asked for")
+
+    syncFrom(ns, "Bob Smith", { k = "char", key = "Tarn Moon", c = alt("Tarn Moon", "DRUID",
+        { updated = NOW - DAY, changed = stamp, mail = { [100] = 20 } }) })
+    eq(ns.db.chars["Tarn Moon"].mail[100], 20)
+    eq(ns.db.chars["Tarn Moon"].changed, stamp)
+end)
+
+test("what you change on an offline character is offered to the other account", function()
+    local ns = syncStart()
+    wow.outbox = { { 100, 20 } }
+    wow.now = NOW + 60
+    SendMail("Tarn Moon", "subject", "")
+    wow.fire("MAIL_SEND_SUCCESS")
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    eq(syncSent(ns, "Bob Smith")[1].have["Tarn Moon"], NOW + 60, "mail")
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, reply = true, have = {} })
+    syncFrom(ns, "Bob Smith", { k = "want", keys = { "Tarn Moon" } })
+    syncPump()
+    eq(sent(ns, "Tarn Moon").c.mail[100], 20, "and it travels with the character")
+
+    ns = syncStart()
+    wow.now = NOW + 90
+    assert(ns.SetRole("Tarn Moon", "healer"))
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    eq(syncSent(ns, "Bob Smith")[1].have["Tarn Moon"], NOW + 90, "a role chosen for them")
+end)
+
+test("a damaged offline change time is dropped at load", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.login({ v = 2, chars = { ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { changed = "soon" }) } })
+    eq(ns.db.chars["Tarn Moon"].changed, nil)
 end)
