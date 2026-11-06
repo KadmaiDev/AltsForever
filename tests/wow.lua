@@ -499,7 +499,29 @@ function M.load(files)
     M.outboxMoney = 0
     GetSendMailMoney = function() return M.outboxMoney end
     M.timers = {}
-    C_Timer = { After = function(_, fn) M.timers[#M.timers + 1] = fn end }
+    M.delays = {} -- [timer function] = seconds, for telling long waits from short ones
+    C_Timer = { After = function(seconds, fn)
+        M.timers[#M.timers + 1] = fn
+        M.delays[fn] = seconds
+    end }
+    -- Chat message filters: M.chatFilter(event, text) says whether a line would be hidden.
+    ERR_CHAT_PLAYER_NOT_FOUND_S = "No player named '%s' is currently playing."
+    M.filters = {}
+    ChatFrame_AddMessageEventFilter = function(event, fn)
+        M.filters[event] = M.filters[event] or {}
+        table.insert(M.filters[event], fn)
+    end
+    ChatFrame_RemoveMessageEventFilter = function(event, fn)
+        for i, f in ipairs(M.filters[event] or {}) do
+            if f == fn then return table.remove(M.filters[event], i) end
+        end
+    end
+    function M.chatFilter(event, text)
+        for _, fn in ipairs(M.filters[event] or {}) do
+            if fn(nil, event, text) then return true end
+        end
+        return false
+    end
     GetMoney = function() return M.money end
     C_CurrencyInfo = {
         GetCoinTextureString = function(copper, height)

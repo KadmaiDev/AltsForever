@@ -38,11 +38,18 @@ function syncFrom(ns, sender, payload)
     end
 end
 
--- Sends everything queued (each message waits on a timer after the first).
+-- Sends everything queued (each message waits on a timer after the first). The 10 minute
+-- check is left waiting: it would run for ever.
 function syncPump()
     for _ = 1, 1000 do
-        if #wow.timers == 0 then return end
-        runTimers()
+        local due, later = {}, {}
+        for _, fn in ipairs(wow.timers) do
+            local list = wow.delays[fn] >= 300 and later or due
+            list[#list + 1] = fn
+        end
+        if #due == 0 then return end
+        wow.timers = later
+        for _, fn in ipairs(due) do fn() end
     end
     error("never finished")
 end
@@ -464,4 +471,246 @@ test("the sync window needs a name, and /af sync alone opens it", function()
     f.box:SetText("Bob Smith")
     f.box.scripts.OnEnterPressed(f.box)
     eq(syncSent(ns, "Bob Smith")[1].k, "hello", "Enter works too")
+end)
+
+-- You (Aldric), having synced with Bob Smith and New Alt before; both on your ruleset and faction.
+local function autoStart(saved)
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    local db = { v = 2, syncWith = { ["Bob Smith"] = true, ["New Alt"] = true }, chars = {
+        ["Bob Smith"] = alt("Bob Smith", "WARRIOR", { updated = NOW - HOUR }),
+        ["New Alt"] = alt("New Alt", "MAGE", { updated = NOW - DAY }),
+        ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { updated = NOW - DAY }) } }
+    for k, v in pairs(saved or {}) do db[k] = v end
+    wow.login(db)
+    wow.printed, wow.sent = {}, {}
+    return ns
+end
+
+-- The other side's whole answer to our quiet hello, with nothing of theirs to send.
+local function autoAnswer(ns, name)
+    syncFrom(ns, name, { k = "hello", v = 1, reply = true, auto = true, have = { [name] = NOW } })
+    syncFrom(ns, name, { k = "want", keys = {} })
+    syncFrom(ns, name, { k = "done", n = 0 })
+    syncPump()
+end
+
+test("at login the characters from your other accounts are tried, most recently played first", function()
+    local ns = autoStart()
+    syncPump()
+    eq(syncKinds(syncSent(ns, "Bob Smith")), "ping")
+    eq(syncKinds(syncSent(ns, "New Alt")), "ping")
+    eq(wow.sent[1][4], "Bob Smith")
+    eq(#syncSent(ns, "Tarn Moon"), 0, "one of this account's own")
+    eq(syncPrinted():find("Bob Smith", 1, true), nil, "nothing said in chat")
+end)
+
+test("nothing is sent at login with no one synced before, with it off, or out of reach", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.login({ v = 2, chars = { ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { updated = NOW }) } })
+    wow.sent = {}
+    syncPump()
+    eq(#wow.sent, 0, "a player who never synced sends nothing")
+
+    ns = autoStart({ syncAutoOff = true })
+    syncPump()
+    eq(#wow.sent, 0)
+
+    ns = autoStart()
+    ns.db.chars["Bob Smith"].faction = "Horde"
+    ns.db.chars["New Alt"].realm = "ElsewhereRealm"
+    ns.char.realm = "HomeRealm"
+    syncPump()
+    eq(#wow.sent, 0, "whispers don't cross rulesets or factions")
+end)
+
+test("at most ten characters are tried, and the one you're on never", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    local with, chars = {}, {}
+    for i = 1, 15 do
+        local key = "Alt Number" .. i
+        with[key] = true
+        chars[key] = alt(key, "MAGE", { updated = NOW - i })
+    end
+    with["Aldric"] = true
+    wow.login({ v = 2, syncWith = with, chars = chars })
+    eq(ns.db.syncWith["Aldric"], nil, "you logged in here, so it's ours")
+    wow.sent = {}
+    syncPump()
+    eq(#wow.sent, 10)
+    eq(wow.sent[1][4], "Alt Number1"); eq(wow.sent[10][4], "Alt Number10")
+end)
+
+test("a ping from a character you trust starts a quiet swap, never a pop-up", function()
+    local ns = syncStart()
+    ns.db.syncWith = { ["Bob Smith"] = true }
+    syncFrom(ns, "Bob Smith", { k = "ping" })
+    local hello = syncSent(ns, "Bob Smith")[1]
+    eq(hello.k, "hello"); eq(hello.auto, true)
+    eq(ns.SyncProgress(), nil, "not in the window until they answer")
+    autoAnswer(ns, "Bob Smith")
+    eq(wow.printed[1]:match(": (.*)$"), "Synced with Bob Smith.")
+    eq(#wow.printed, 1, "one line, nothing else")
+    assert(progress(ns).status:find("Got 0 characters", 1, true))
+    eq(wow.popup, nil)
+
+    -- And once a session: later swaps say nothing.
+    wow.printed = {}
+    syncFrom(ns, "Bob Smith", { k = "ping" })
+    autoAnswer(ns, "Bob Smith")
+    eq(syncPrinted(), "")
+end)
+
+test("an automatic hello is answered quietly if trusted, refused without asking if not", function()
+    local ns = syncStart()
+    ns.db.syncWith = { ["Bob Smith"] = true }
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, auto = true, have = { ["Bob Smith"] = NOW } })
+    syncPump()
+    eq(syncKinds(syncSent(ns, "Bob Smith")), "hello,want")
+    eq(syncSent(ns, "Bob Smith")[1].auto, true)
+    eq(syncPrinted(), "", "nobody asked, so nothing said")
+
+    ns = syncStart()
+    syncFrom(ns, "Cara Lin", { k = "hello", v = 1, auto = true, have = {} })
+    syncPump()
+    eq(wow.popup, nil, "a stranger can't raise the pop-up this way")
+    eq(syncKinds(syncSent(ns, "Cara Lin")), "no")
+    eq(ns.db.syncWith, nil)
+
+    ns = autoStart({ syncAutoOff = true })
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, auto = true, have = {} })
+    syncPump()
+    eq(syncKinds(syncSent(ns, "Bob Smith")), "no", "turned off here")
+end)
+
+test("a ping is ignored from strangers, with it off, and during a swap", function()
+    local ns = syncStart()
+    syncFrom(ns, "Cara Lin", { k = "ping" })
+    eq(#wow.sent, 0); eq(wow.popup, nil)
+
+    ns = autoStart({ syncAutoOff = true })
+    syncFrom(ns, "Bob Smith", { k = "ping" })
+    eq(#wow.sent, 0)
+
+    ns = syncStart()
+    ns.db.syncWith = { ["Bob Smith"] = true }
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    wow.sent = {}
+    syncFrom(ns, "Bob Smith", { k = "ping" })
+    eq(#wow.sent, 0, "already swapping")
+end)
+
+test("in combat a ping waits for the 10 minute check", function()
+    local ns = syncStart()
+    ns.db.syncWith = { ["Bob Smith"] = true }
+    wow.inCombat = true
+    syncFrom(ns, "Bob Smith", { k = "ping" })
+    eq(#wow.sent, 0)
+    wow.inCombat = nil
+    wow.now = NOW + 600
+    runTimers()
+    eq(syncSent(ns, "Bob Smith")[1].auto, true)
+end)
+
+test("while both stay online they swap every 10 minutes; once they go it stops", function()
+    local ns = syncStart()
+    ns.db.syncWith = { ["Bob Smith"] = true }
+    syncFrom(ns, "Bob Smith", { k = "ping" })
+    autoAnswer(ns, "Bob Smith")
+
+    -- Their check came first: ours finds it was just done.
+    wow.sent = {}
+    wow.now = NOW + 300
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, auto = true, have = {} })
+    syncFrom(ns, "Bob Smith", { k = "want", keys = {} })
+    syncFrom(ns, "Bob Smith", { k = "done", n = 0 })
+    syncPump()
+    wow.sent = {}
+    wow.now = NOW + 310
+    runTimers()
+    eq(#wow.sent, 0, "swapped ten seconds ago")
+
+    wow.now = NOW + 1000
+    runTimers()
+    eq(syncSent(ns, "Bob Smith")[1].auto, true, "time for another")
+    assert(wow.delays[wow.timers[1]] ~= nil)
+
+    -- No answer: they've logged out. Nothing in chat, and the checks stop.
+    wow.printed = {}
+    syncPump()
+    eq(syncPrinted(), "")
+    runTimers() -- the 10 minute check, finding no one
+    wow.sent = {}
+    wow.now = NOW + 2000
+    syncPump()
+    eq(#wow.timers, 0, "no timers left running")
+    eq(#wow.sent, 0)
+end)
+
+test("a sync you started by hand keeps going by itself afterwards", function()
+    local ns = syncStart()
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    autoAnswer(ns, "Bob Smith")
+    wow.sent = {}
+    wow.now = NOW + 600
+    runTimers()
+    eq(syncSent(ns, "Bob Smith")[1].auto, true)
+end)
+
+test("characters a sync brings in are remembered, so any of them can be found next time", function()
+    local ns = syncStart()
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, reply = true, have = {} })
+    syncFrom(ns, "Bob Smith", { k = "char", key = "New Alt", c = alt("New Alt", "MAGE", { updated = NOW }) })
+    eq(ns.db.syncWith["New Alt"], true)
+    eq(ns.db.syncWith["Tarn Moon"], nil, "not this account's own")
+    ns.ForgetCharacter("New Alt")
+    eq(ns.db.syncWith["New Alt"], nil)
+end)
+
+test("the \"no such player\" line is hidden only for the character just tried, and only briefly", function()
+    local ns = autoStart()
+    local line = "No player named '%s' is currently playing."
+    runTimers() -- the wait after login: the pings go out
+    eq(wow.chatFilter("CHAT_MSG_SYSTEM", line:format("Bob Smith")), true)
+    eq(wow.chatFilter("CHAT_MSG_SYSTEM", line:format("Bob")), true, "if the game prints the first name")
+    eq(wow.chatFilter("CHAT_MSG_SYSTEM", line:format("Bob Smith-Realm")), true)
+    eq(wow.chatFilter("CHAT_MSG_SYSTEM", line:format("Someone Else")), false, "your own typo still shows")
+    eq(wow.chatFilter("CHAT_MSG_SYSTEM", "Bob Smith has come online."), false)
+    eq(wow.chatFilter("CHAT_MSG_SYSTEM", wow.SECRET), false)
+    syncPump()
+    eq(wow.chatFilter("CHAT_MSG_SYSTEM", line:format("Bob Smith")), false, "over after a few seconds")
+    eq(#(wow.filters.CHAT_MSG_SYSTEM or {}), 0, "the filter is gone")
+end)
+
+test("the tick box and /af sync auto turn it off and on; on looks straight away", function()
+    local ns = autoStart()
+    syncPump()
+    wow.sent = {}
+    ns.ToggleSync(true)
+    local f = AltsForeverSyncFrame
+    eq(f.auto:GetChecked(), true, "on by default")
+    f.auto:SetChecked(false)
+    f.auto.scripts.OnClick(f.auto)
+    eq(ns.db.syncAutoOff, true)
+    syncFrom(ns, "Bob Smith", { k = "ping" })
+    eq(#wow.sent, 0)
+
+    SlashCmdList.ALTSFOREVER("sync auto")
+    assert(syncPrinted():find("Automatic sync on.", 1, true))
+    eq(ns.db.syncAutoOff, nil, "saves stay small")
+    eq(f.auto:GetChecked(), true)
+    syncPump()
+    eq(syncKinds(syncSent(ns, "Bob Smith")), "ping")
+
+    SlashCmdList.ALTSFOREVER("sync auto")
+    assert(syncPrinted():find("Automatic sync off.", 1, true))
+    eq(f.auto:GetChecked(), false)
+end)
+
+test("a damaged automatic sync setting is dropped at load", function()
+    local ns = autoStart({ syncAutoOff = "yes" })
+    eq(ns.db.syncAutoOff, nil)
 end)

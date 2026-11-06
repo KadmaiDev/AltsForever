@@ -153,7 +153,7 @@ local CHAR_FIELDS = {
 local DB_FIELDS = {
     icons = "table", goldDays = "table", goldDaysBy = "table", factions = "table",
     recipeInfo = "table", collapsedGroups = "table", session = "table", itemNames = "table",
-    itemQuality = "table", rulesets = "table", syncWith = "table", forgotten = "table",
+    itemQuality = "table", rulesets = "table", syncWith = "table", forgotten = "table", syncAutoOff = "boolean",
     legacyPool = "number", scale = "number", minimapAngle = "number", bagsCols = "number",
     bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
 }
@@ -743,6 +743,7 @@ function commands.help()
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
     Print(L["/af lockouts lists the raids and dungeons each character is saved to, and when they reset."])
     Print(L["/af sync and the name of your character on another game account swaps characters with it, so both accounts see all of them. Both need to be online at the same time, on the same ruleset and faction."])
+    Print(L["/af sync auto turns syncing by itself on or off."])
     Print(L["/af rulesets shows or hides your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; they can't trade with this one."])
     Print(L["Or use the minimap button (right-click for options)."])
 end

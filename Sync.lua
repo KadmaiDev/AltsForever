@@ -4,14 +4,20 @@
 -- which the game allows only on the same ruleset and faction. Each side sends every character
 -- it knows that the other lacks or has older, so one pair carries every ruleset and faction.
 --
--- /af sync First Last starts it. The other side asks its player first, unless the sender is
--- already one of its characters (from an earlier sync) or one it agreed to before
+-- /af sync First Last, or the window, starts it. The other side asks its player first, unless
+-- the sender is already one of its characters (from an earlier sync) or one it agreed to before
 -- (db.syncWith). Nothing is ever read from a stranger beyond a small hello.
+--
+-- After that it runs by itself unless turned off (db.syncAutoOff): 15 s after login a small
+-- ping goes to the characters most recently seen in db.syncWith, which holds everyone a sync
+-- brought in. A trusted character online answers with a quiet hello, then the two swap again
+-- every 10 minutes while both stay online. A ping or an automatic hello never asks the player.
 --
 -- Messages (addon prefix "AltsForever", WHISPER): a payload is a table serialised by Encode
 -- (no loadstring: a parser that only builds tables) and sent in pieces of up to 250 bytes,
 -- each led by a marker: "a" whole, "b" first, "c" middle, "d" last.
---   hello  { k = "hello", v = PROTOCOL, reply = true|nil, have = { [key] = stamp } }
+--   ping   { k = "ping" }                           anyone there? (at login; see above)
+--   hello  { k = "hello", v = PROTOCOL, reply = true|nil, auto = true|nil, have = { [key] = stamp } }
 --   want   { k = "want", keys = { key, ... } }      the other side's characters we lack or have older
 --   plan   { k = "plan", n = messages }             how many messages follow, for the progress bar
 --   char   { k = "char", key, c = character, ri = recipe info, fn = faction names, rs = ruleset }
@@ -20,9 +26,10 @@
 --   no / busy                                      declined / in combat or asking about another
 -- A character's stamp is its newest seen/updated time; the one logged in is now.
 --
--- Worked in game between two accounts on 2026-11-06 (Brak Ironhorn and Vespera Ashward). The
--- sender's name format is handled as "First Last", "First Last-Realm", or a first name that
--- matches one known character. /af sync debug prints each step.
+-- Worked in game between two accounts on 2026-11-06 (Brak Ironhorn and Vespera Ashward): the
+-- sender came as "First Last", every send was Success, though
+-- AreOutgoingAddonChatMessagesRestricted() said true. "First Last-Realm" and a first name that
+-- matches one known character are handled too. /af sync debug prints each step.
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
@@ -43,6 +50,10 @@ local ANSWER_WITHIN = 20    -- seconds to wait for the other side's hello
 local ASK_WITHIN = 65       -- once they say their player is being asked (the pop-up waits 60)
 local QUIET = 120           -- a session with nothing heard for this long is over
 local TICK = 5              -- seconds between checks on a stalled sync, only with the window open
+local AUTO_DELAY = 15       -- seconds after login before looking for your other accounts
+local AUTO_EVERY = 600      -- seconds between swaps while both stay online
+local AUTO_MOST = 10        -- characters tried at login
+local HIDE_FOR = 10         -- seconds "no such player" lines stay out of chat after trying someone
 local STRANGER_LIMIT = 4096 -- the most buffered from someone not agreed to yet (a hello)
 local LIMIT = 1048576       -- the most buffered for one payload from anyone
 local MAX_DEPTH = 8
@@ -187,6 +198,10 @@ local queue, head, pumping = {}, 1, false
 local sessions = {} -- [full name] = { target = name to whisper, ours = we started it, ... }
 local current       -- the latest session, kept after it ends so the window can show how it went
 local Pump, Refresh -- Refresh: the window's, set when it's made
+local Keep          -- remembers who to swap with again
+local partner       -- { name, target }: who we last swapped with; nil once they've gone
+local lastSwap = 0
+local told = {}     -- [name] = said in chat that it's syncing, once a session
 
 local function After(seconds, fn)
     if C_Timer and C_Timer.After then C_Timer.After(seconds, fn) end
@@ -222,14 +237,27 @@ end
 -- `why` is what went wrong, as told to the player; nil for a swap that finished.
 local function Ended(name, why)
     local s = sessions[name]
-    if s then s.over, s.why = true, why end
+    if s then
+        s.over, s.why = true, why
+        if not why then
+            lastSwap = time()
+            Keep(name, s.target)
+            if s.quiet and not told[name] then
+                told[name] = true
+                ns.Print(L["Synced with %s."]:format(name))
+            end
+        elseif s.quiet and not s.keep and partner and partner.name == name then
+            partner = nil -- they've gone: their next login finds us again
+        end
+    end
     sessions[name] = nil
     Notify()
 end
 
--- Tells the player how it ended, in chat and in the window.
+-- Tells the player how it ended, in chat and in the window; an automatic sync says nothing.
 local function Over(name, why)
-    ns.Print(why)
+    local s = sessions[name]
+    if not (s and s.quiet) then ns.Print(why) end
     Ended(name, why)
 end
 
@@ -306,6 +334,43 @@ local function Send(name, target, payload, after)
 end
 
 ---------------------------------------------------------------------------
+-- Trying a character who may be offline: the game may answer with a "no such player" line in
+-- chat. Only that line, about the name just tried, is held back, and only for a few seconds.
+---------------------------------------------------------------------------
+local tried     -- [name as the game may print it] = true, while the filter is on
+local notFound  -- the game's line as a pattern, capturing the name
+local hiding = 0
+
+local function HideNotFound(_, _, text)
+    if not tried or issecretvalue(text) or type(text) ~= "string" then return false end
+    local name = text:match(notFound)
+    if not name then return false end
+    return tried[name:match("^(.-)%-[^%-]+$") or name] == true
+end
+
+local function StopHiding()
+    hiding = hiding - 1
+    if hiding > 0 then return end
+    tried = nil
+    local remove = ChatFrame_RemoveMessageEventFilter or (ChatFrameUtil and ChatFrameUtil.RemoveMessageEventFilter)
+    if remove then remove("CHAT_MSG_SYSTEM", HideNotFound) end
+end
+
+local function HideOffline(name)
+    local add = ChatFrame_AddMessageEventFilter or (ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter)
+    if not add or type(ERR_CHAT_PLAYER_NOT_FOUND_S) ~= "string" then return end
+    if not tried then
+        tried = {}
+        notFound = notFound or ("^" .. ERR_CHAT_PLAYER_NOT_FOUND_S:gsub("%p", "%%%0"):gsub("%%%%s", "(.+)") .. "$")
+        add("CHAT_MSG_SYSTEM", HideNotFound)
+    end
+    tried[name] = true
+    tried[name:match("^(%S+)") or name] = true
+    hiding = hiding + 1
+    After(HIDE_FOR, StopHiding)
+end
+
+---------------------------------------------------------------------------
 -- Characters
 ---------------------------------------------------------------------------
 local function Stamp(c)
@@ -359,6 +424,11 @@ end
 
 local RULESETS = { normal = true, pvp = true, rp = true, hardcore = true }
 
+local function Remember(name)
+    ns.db.syncWith = ns.db.syncWith or {}
+    ns.db.syncWith[name] = true
+end
+
 local function Changed()
     ns.InvalidateCache()
     if ns.UpgradesChanged then ns.UpgradesChanged() end -- and the character sheet's anvils
@@ -384,6 +454,7 @@ local function Merge(msg)
         db.forgotten[key] = nil
         if next(db.forgotten) == nil then db.forgotten = nil end
     end
+    Remember(key) -- theirs, so it's worth trying next time, whichever alt they're on
     -- What tooltips need to read their recipes, reputations and ruleset, where we lack it.
     if type(msg.ri) == "table" then
         for prof, list in pairs(msg.ri) do
@@ -441,11 +512,6 @@ local function Trusted(name)
     return name ~= ns.charKey and (ns.db.chars[name] ~= nil or (ns.db.syncWith and ns.db.syncWith[name]) == true)
 end
 
-local function Remember(name)
-    ns.db.syncWith = ns.db.syncWith or {}
-    ns.db.syncWith[name] = true
-end
-
 ---------------------------------------------------------------------------
 -- The conversation
 ---------------------------------------------------------------------------
@@ -466,10 +532,16 @@ local function Finish(name)
     if s and s.sent and s.received then Ended(name) end
 end
 
+-- An automatic hello that may go unanswered doesn't take over the window until it's answered.
 local function NewSession(name, s)
     s.name, s.got, s.at = name, 0, time()
-    sessions[name], current = s, s
+    sessions[name] = s
+    if not (s.quiet and s.ours) then current = s end
     return s
+end
+
+local function Hello(reply, auto)
+    return { k = "hello", v = PROTOCOL, reply = reply, auto = auto, have = Stamps() }
 end
 
 -- Every character is cut into pieces first, so the other side can be told how many to expect.
@@ -490,7 +562,7 @@ local function SendChars(s, name, keys)
     Send(name, s.target, { k = "plan", n = total })
     for _, pieces in ipairs(batches) do Queue(name, s.target, pieces, nil, true) end
     Queue(name, s.target, closing, function()
-        ns.Print(L["Sent %d characters to %s."]:format(n, name))
+        if not s.quiet then ns.Print(L["Sent %d characters to %s."]:format(n, name)) end
         s.sent, s.sentChars = true, n
         Finish(name)
         Notify()
@@ -499,13 +571,36 @@ local function SendChars(s, name, keys)
 end
 
 -- They asked, and we agreed (or had before): our hello back, and what we want of theirs.
-local function Accept(sender, name, have)
+local function Accept(sender, name, have, quiet)
     Remember(name)
-    local s = NewSession(name, { target = sender })
-    ns.Print(L["Swapping characters with %s..."]:format(name))
+    local s = NewSession(name, { target = sender, quiet = quiet })
+    if not quiet then ns.Print(L["Swapping characters with %s..."]:format(name)) end
     Notify()
-    Send(name, sender, { k = "hello", v = PROTOCOL, reply = true, have = Stamps() })
+    Send(name, sender, Hello(true, quiet))
     SendWant(s, name, have)
+end
+
+-- Starts a swap from this side. `quiet`: nobody asked for it, so nothing is said in chat, and
+-- no answer just means they're not there.
+local function Begin(name, target, quiet)
+    local s = NewSession(name, { target = target, ours = true, quiet = quiet })
+    if quiet then
+        HideOffline(name)
+    else
+        ns.Print(L["Asking %s to swap characters..."]:format(name))
+        Notify()
+    end
+    Send(name, target, Hello(nil, quiet))
+    local function Check()
+        if sessions[name] ~= s or s.answered then return end
+        -- Their player is reading the pop-up: wait as long as it stays up.
+        if s.asking and not s.waited then
+            s.waited = true
+            return After(ASK_WITHIN, Check)
+        end
+        Over(name, L["No answer from %s. Both characters need this version of Alts Forever or later, online at the same time on the same ruleset and faction."]:format(name))
+    end
+    After(ANSWER_WITHIN, Check)
 end
 
 local pending -- the hello waiting on the player's answer
@@ -545,7 +640,7 @@ function handle.hello(msg, sender, name)
     if msg.reply then
         local s = sessions[name]
         if not s or not s.ours or s.answered then return end
-        s.answered, s.target = true, sender
+        s.answered, s.target, current = true, sender, s
         Remember(name)
         Notify()
         return SendWant(s, name, msg.have)
@@ -558,21 +653,31 @@ function handle.hello(msg, sender, name)
     if s then
         -- Both asked at once: take theirs as the answer to ours.
         if s.ours and not s.answered then
-            s.answered, s.target = true, sender
+            s.answered, s.target, current = true, sender, s
             Remember(name)
             Notify()
-            Send(name, sender, { k = "hello", v = PROTOCOL, reply = true, have = Stamps() })
+            Send(name, sender, Hello(true, s.quiet))
             SendWant(s, name, msg.have)
         end
         return
     end
-    if Trusted(name) and not InCombatLockdown() then return Accept(sender, name, msg.have) end
+    -- Nobody is here to ask about an automatic hello, so it's never put to the player.
+    if msg.auto and not (Trusted(name) and ns.SyncAutoOn()) then return Send(name, sender, { k = "no" }) end
+    if Trusted(name) and not InCombatLockdown() then return Accept(sender, name, msg.have, msg.auto == true) end
     if declined[name] then return Send(name, sender, { k = "no" }) end
     if pending or InCombatLockdown() then return Send(name, sender, { k = "busy" }) end
     pending = { sender = sender, name = name, have = msg.have }
     AskDialog()
     StaticPopup_Show("ALTSFOREVER_SYNC", name, nil, pending)
     Send(name, sender, { k = "asking" })
+end
+
+-- A character of theirs logged in. From a stranger it's nothing at all.
+function handle.ping(msg, sender, name)
+    if not Trusted(name) or not ns.SyncAutoOn() then return end
+    Keep(name, sender)
+    if sessions[name] or InCombatLockdown() then return end -- the 10 minute check tries again
+    Begin(name, sender, true)
 end
 
 function handle.asking(msg, sender, name)
@@ -605,7 +710,7 @@ end
 function handle.done(msg, sender, name)
     local s = sessions[name]
     if not s then return end
-    ns.Print(L["Got %d characters from %s."]:format(s.got, name))
+    if not s.quiet then ns.Print(L["Got %d characters from %s."]:format(s.got, name)) end
     s.received = true
     if s.inTotal then s.inDone = s.inTotal end
     Finish(name)
@@ -618,7 +723,9 @@ function handle.no(msg, sender, name)
 end
 
 function handle.busy(msg, sender, name)
-    if not sessions[name] then return end
+    local s = sessions[name]
+    if not s then return end
+    s.keep = true -- they're there: try again at the next check
     Over(name, L["%s is busy (in combat, or answering another request). Try again in a moment."]:format(name))
 end
 
@@ -672,6 +779,10 @@ function ns.SyncWith(target)
         verbose = not verbose
         return ns.Print(verbose and L["Sync details on."] or L["Sync details off."])
     end
+    if target:lower() == "auto" then
+        ns.SetSyncAuto(not ns.SyncAutoOn())
+        return ns.Print(ns.SyncAutoOn() and L["Automatic sync on."] or L["Automatic sync off."])
+    end
     if target == "" then return ns.ToggleSync(true) end
     local name = target:match("^(.-)%-[^%-]+$") or target
     if name:lower() == (ns.charKey or ""):lower() then return ns.Print(L["That's the character you're on."]) end
@@ -681,20 +792,56 @@ function ns.SyncWith(target)
         local ok, on = pcall(restricted)
         Debug("outgoing addon messages restricted: %s", ok and tostring(on) or "?")
     end
-    local s = NewSession(name, { target = target, ours = true })
-    ns.Print(L["Asking %s to swap characters..."]:format(name))
-    Notify()
-    Send(name, target, { k = "hello", v = PROTOCOL, have = Stamps() })
-    local function Check()
-        if sessions[name] ~= s or s.answered then return end
-        -- Their player is reading the pop-up: wait as long as it stays up.
-        if s.asking and not s.waited then
-            s.waited = true
-            return After(ASK_WITHIN, Check)
-        end
-        Over(name, L["No answer from %s. Both characters need this version of Alts Forever or later, online at the same time on the same ruleset and faction."]:format(name))
+    Begin(name, target)
+end
+
+---------------------------------------------------------------------------
+-- Keeping in sync by itself
+---------------------------------------------------------------------------
+function ns.SyncAutoOn() return not ns.db.syncAutoOff end
+
+local autoTicking = false
+
+-- While they stay online, every AUTO_EVERY. Whoever's check comes first swaps; the other's
+-- then finds it was just done.
+local function AutoTick()
+    autoTicking = false
+    if not partner or not ns.SyncAutoOn() then return end
+    if time() - lastSwap >= AUTO_EVERY - 30 and not sessions[partner.name] and not InCombatLockdown() then
+        Begin(partner.name, partner.target, true)
     end
-    After(ANSWER_WITHIN, Check)
+    autoTicking = true
+    After(AUTO_EVERY, AutoTick)
+end
+
+function Keep(name, target)
+    if not ns.SyncAutoOn() then return end
+    partner = { name = name, target = target }
+    if not autoTicking then
+        autoTicking = true
+        After(AUTO_EVERY, AutoTick)
+    end
+end
+
+-- Asks the characters most likely to be online on your other accounts. Only those on this
+-- ruleset and faction: whispers don't reach the rest.
+local function FindOthers()
+    if not ns.SyncAutoOn() then return end
+    local n = 0
+    for _, key in ipairs(ns.SyncPartners()) do
+        local c = ns.db.chars[key]
+        if key ~= ns.charKey and not (c and ns.Elsewhere(c)) and n < AUTO_MOST then
+            n = n + 1
+            HideOffline(key)
+            Send(key, key, { k = "ping" })
+        end
+    end
+end
+
+function ns.SetSyncAuto(on)
+    ns.db.syncAutoOff = not on and true or nil
+    if on then FindOthers() else partner = nil end
+    Notify()
 end
 
 ---------------------------------------------------------------------------
@@ -744,7 +891,7 @@ function ns.SyncProgress()
     return fill, text, status, not s.over
 end
 
-local WIDTH, HEIGHT = 380, 200
+local WIDTH, HEIGHT = 380, 228
 local frame
 local ticking = false
 
@@ -762,6 +909,7 @@ function Refresh()
     frame.status:SetText(status or "")
     frame.start:SetEnabled(not going)
     frame.pick:SetShown(next(ns.db.syncWith or {}) ~= nil)
+    frame.auto:SetChecked(ns.SyncAutoOn())
     if going and not ticking then
         ticking = true
         After(TICK, Tick)
@@ -862,6 +1010,24 @@ local function CreateWindow()
     f.status:SetPoint("RIGHT", f, "RIGHT", -18, 0)
     f.status:SetJustifyH("LEFT")
 
+    local auto = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+    auto:SetSize(26, 26)
+    auto:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 8)
+    auto:SetScript("OnClick", function(self) ns.SetSyncAuto(self:GetChecked() and true or false) end)
+    auto:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["Sync by itself when both are online"])
+        GameTooltip:AddLine(L["Once you've synced, your accounts swap changes by themselves whenever both are online: when either logs in, then every 10 minutes. Same as /af sync auto."], 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    auto:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ns.SkinCheck(auto)
+    f.auto = auto
+    f.autoLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    f.autoLabel:SetPoint("LEFT", auto, "RIGHT", 4, 0)
+    f.autoLabel:SetText(L["Sync by itself when both are online"])
+    ns.SkinText(f.autoLabel)
+
     ns.SkinWindow(f)
     f:SetScript("OnShow", function(self)
         self:Raise()
@@ -893,4 +1059,10 @@ function ns.StartSync()
     local register = C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix
     if register then pcall(register, PREFIX) end
     ns.On("CHAT_MSG_ADDON", OnMessage)
+    -- Logged in here, so it's ours: nothing to look for on another account.
+    if ns.db.syncWith then
+        ns.db.syncWith[ns.charKey] = nil
+        if next(ns.db.syncWith) == nil then ns.db.syncWith = nil end
+    end
+    After(AUTO_DELAY, FindOthers)
 end
