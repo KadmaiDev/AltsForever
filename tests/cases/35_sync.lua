@@ -129,10 +129,10 @@ test("/af sync: hello, then each side asks for what it lacks or has older, and t
     syncFrom(ns, "Bob Smith-Realm", { k = "want", keys = { "Aldric", "Tarn Moon", "Nobody" } })
     syncPump()
     sent = syncSent(ns, "Bob Smith-Realm")
-    eq(syncKinds(sent), "want,char,char,done")
-    eq(sent[2].key, "Aldric"); eq(sent[2].c.updated, NOW + 60, "you, as of now")
-    eq(sent[3].key, "Tarn Moon"); eq(sent[3].c.bags[118], 2)
-    eq(sent[4].n, 2)
+    eq(syncKinds(sent), "want,plan,char,char,done")
+    eq(sent[3].key, "Aldric"); eq(sent[3].c.updated, NOW + 60, "you, as of now")
+    eq(sent[4].key, "Tarn Moon"); eq(sent[4].c.bags[118], 2)
+    eq(sent[5].n, 2)
     assert(syncPrinted():find("Sent 2 characters to Bob Smith.", 1, true))
 
     -- Theirs arrive.
@@ -175,6 +175,8 @@ test("a stranger's hello asks the player first; accepting swaps, declining says 
     eq(ns.db.chars["Cara Lin"], nil)
 
     StaticPopupDialogs.ALTSFOREVER_SYNC.OnAccept(nil, wow.popup.data)
+    eq(AltsForeverSyncFrame:IsShown(), true, "the player agreed, so the window shows how it goes")
+    AltsForeverSyncFrame:Hide()
     syncPump()
     local sent = syncSent(ns, "Cara Lin")
     eq(syncKinds(sent), "asking,hello,want")
@@ -308,4 +310,158 @@ test("other addons' messages, other channels and broken pieces are ignored", fun
     wow.fire("CHAT_MSG_ADDON", "AltsForever", "b{:$k;$hello;$pad;$" .. ("x"):rep(249), "WHISPER", "Cara Lin")
     wow.fire("CHAT_MSG_ADDON", "AltsForever", "d;$have;{}}", "WHISPER", "Cara Lin")
     eq(wow.popup.text, "Cara Lin")
+end)
+
+-- Sync's progress as a table, for reading in tests.
+local function progress(ns)
+    local fill, text, status, going = ns.SyncProgress()
+    return { fill = fill, text = text, status = status, going = going }
+end
+
+-- How many messages a payload takes.
+local function piecesOf(ns, payload) return #ns.SyncPieces(ns.SyncEncode(payload)) end
+
+test("sync progress counts what's sent and received, and fills when both sides are done", function()
+    local ns = syncStart()
+    eq(ns.SyncProgress(), nil, "no sync yet")
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    local p = progress(ns)
+    eq(p.fill, 0); eq(p.text, ""); eq(p.going, true)
+    assert(p.status:find("Asking Bob Smith", 1, true), p.status)
+    syncFrom(ns, "Bob Smith", { k = "asking" })
+    assert(progress(ns).status:find("Waiting for Bob Smith", 1, true))
+
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, reply = true, have = { ["Bob Smith"] = NOW } })
+    assert(progress(ns).status:find("Swapping characters with Bob Smith", 1, true))
+
+    -- They want both of ours: told how many messages to expect, and counted out as they go.
+    syncFrom(ns, "Bob Smith", { k = "want", keys = { "Aldric", "Tarn Moon" } })
+    local plan
+    for _, msg in ipairs(syncSent(ns, "Bob Smith")) do if msg.k == "plan" then plan = msg end end
+    while not plan do
+        runTimers()
+        for _, msg in ipairs(syncSent(ns, "Bob Smith")) do if msg.k == "plan" then plan = msg end end
+    end
+    assert(plan.n >= 3, "two characters and the closing message")
+    p = progress(ns)
+    eq(p.text, ("Sending 0 of %d"):format(plan.n))
+    runTimers()
+    eq(progress(ns).text, ("Sending 1 of %d"):format(plan.n))
+    assert(progress(ns).fill > 0)
+    syncPump()
+    p = progress(ns)
+    eq(p.text, ("Sending %d of %d"):format(plan.n, plan.n)); eq(p.going, true, "theirs still to come")
+    eq(p.fill, 1, "all that's known of is done")
+
+    -- Theirs: the bar takes them in, and goes back to part way until they arrive.
+    local char = { k = "char", key = "Bob Smith", c = alt("Bob Smith", "WARRIOR", { updated = NOW }) }
+    local n = piecesOf(ns, char) + 1
+    syncFrom(ns, "Bob Smith", { k = "plan", n = n })
+    p = progress(ns)
+    eq(p.text, ("Sending %d of %d · Receiving 0 of %d"):format(plan.n, plan.n, n))
+    eq(p.fill, plan.n / (plan.n + n))
+    syncFrom(ns, "Bob Smith", char)
+    eq(progress(ns).text, ("Sending %d of %d · Receiving %d of %d"):format(plan.n, plan.n, n - 1, n))
+    syncFrom(ns, "Bob Smith", { k = "done", n = 1 })
+    p = progress(ns)
+    eq(p.fill, 1); eq(p.going, false)
+    eq(p.status, "Got 1 characters from Bob Smith. Sent 2 characters to Bob Smith.")
+end)
+
+test("a plan from someone with no sync going is ignored, and a bad one changes nothing", function()
+    local ns = syncStart()
+    syncFrom(ns, "Cara Lin", { k = "plan", n = 5 })
+    eq(ns.SyncProgress(), nil)
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, reply = true, have = {} })
+    syncFrom(ns, "Bob Smith", { k = "plan", n = "lots" })
+    syncFrom(ns, "Bob Smith", { k = "plan", n = 0 })
+    eq(progress(ns).text, "")
+end)
+
+test("the sync window shows why a sync ended, and a stalled one ends", function()
+    local ns = syncStart()
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    syncFrom(ns, "Bob Smith", { k = "no" })
+    local p = progress(ns)
+    eq(p.status, "Bob Smith declined."); eq(p.going, false)
+    eq(p.fill, 0, "a sync that failed doesn't read as finished")
+
+    ns = syncStart()
+    wow.sendResults = { 12 } -- TargetOffline
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    eq(progress(ns).status, "Sync with Bob Smith stopped: they're not online.")
+
+    -- They vanish part way, with the window open: its check notices, without any message.
+    ns = syncStart()
+    ns.ToggleSync(true)
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, reply = true, have = {} })
+    syncFrom(ns, "Bob Smith", { k = "plan", n = 40 })
+    runTimers()
+    eq(AltsForeverSyncFrame.start:IsEnabled(), false, "one at a time")
+    wow.now = NOW + 121
+    runTimers()
+    eq(AltsForeverSyncFrame.status:GetText(), "Sync with Bob Smith stopped: nothing heard for two minutes.")
+    eq(AltsForeverSyncFrame.start:IsEnabled(), true, "free to try again")
+    runTimers()
+    eq(#wow.timers, 0, "and the window stops checking")
+end)
+
+test("sending keeps a sync alive when the other side has nothing to send", function()
+    local ns = syncStart()
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, reply = true, have = {} })
+    syncFrom(ns, "Bob Smith", { k = "want", keys = { "Aldric" } })
+    for _ = 1, 3 do
+        wow.now = wow.now + 100
+        runTimers()
+        eq(progress(ns).going, true, "not taken for a stall")
+    end
+end)
+
+test("the overview's sync button opens the window, which remembers who you synced with", function()
+    local ns = syncStart()
+    ns.db.syncWith = { ["Old Friend"] = true, ["Tarn Moon"] = true, ["Bob Smith"] = true }
+    ns.db.chars["Bob Smith"] = alt("Bob Smith", "WARRIOR", { updated = NOW - HOUR })
+    eq(table.concat(ns.SyncPartners(), ","), "Bob Smith,Tarn Moon,Old Friend", "most recently played first")
+
+    ns.ToggleOverview()
+    local button = AltsForeverFrame.syncButton
+    button.scripts.OnClick(button)
+    local f = AltsForeverSyncFrame
+    eq(f:IsShown(), true)
+    eq(f.box:GetText(), "Bob Smith", "ready to go again")
+    eq(f.pick:IsShown(), true)
+
+    f.pick.scripts.OnClick(f.pick)
+    eq(wow.menu.items[2].text, "Tarn Moon")
+    wow.menu.items[2].fn()
+    eq(f.box:GetText(), "Tarn Moon")
+
+    f.start.scripts.OnClick(f.start)
+    eq(syncSent(ns, "Tarn Moon")[1].k, "hello")
+    eq(f.start:IsEnabled(), false)
+    assert(f.status:GetText():find("Asking Tarn Moon", 1, true), f.status:GetText())
+    f:Hide()
+
+    button.scripts.OnClick(button)
+    eq(f:IsShown(), true)
+    button.scripts.OnClick(button)
+    eq(f:IsShown(), false, "the button closes it again")
+end)
+
+test("the sync window needs a name, and /af sync alone opens it", function()
+    local ns = syncStart()
+    SlashCmdList.ALTSFOREVER("sync")
+    local f = AltsForeverSyncFrame
+    eq(f:IsShown(), true)
+    eq(f.box:GetText(), "")
+    eq(f.pick:IsShown(), false, "nobody to list yet")
+    f.box:SetText("   ")
+    f.start.scripts.OnClick(f.start)
+    eq(#wow.sent, 0)
+    f.box:SetText("Bob Smith")
+    f.box.scripts.OnEnterPressed(f.box)
+    eq(syncSent(ns, "Bob Smith")[1].k, "hello", "Enter works too")
 end)

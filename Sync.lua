@@ -13,15 +13,16 @@
 -- each led by a marker: "a" whole, "b" first, "c" middle, "d" last.
 --   hello  { k = "hello", v = PROTOCOL, reply = true|nil, have = { [key] = stamp } }
 --   want   { k = "want", keys = { key, ... } }      the other side's characters we lack or have older
+--   plan   { k = "plan", n = messages }             how many messages follow, for the progress bar
 --   char   { k = "char", key, c = character, ri = recipe info, fn = faction names, rs = ruleset }
 --   done   { k = "done", n = characters sent }
 --   asking                                         their player is being asked
 --   no / busy                                      declined / in combat or asking about another
 -- A character's stamp is its newest seen/updated time; the one logged in is now.
 --
--- Not yet tried in game: whether WHISPER addon messages reach another account's character on
--- Forever, the sender's name format (handled: "First Last", "First Last-Realm", or a first
--- name that matches one known character), and the throttle. /af sync debug prints each step.
+-- Worked in game between two accounts on 2026-11-06 (Brak Ironhorn and Vespera Ashward). The
+-- sender's name format is handled as "First Last", "First Last-Realm", or a first name that
+-- matches one known character. /af sync debug prints each step.
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
@@ -41,6 +42,7 @@ local TRIES = 60            -- tries at one message before giving up
 local ANSWER_WITHIN = 20    -- seconds to wait for the other side's hello
 local ASK_WITHIN = 65       -- once they say their player is being asked (the pop-up waits 60)
 local QUIET = 120           -- a session with nothing heard for this long is over
+local TICK = 5              -- seconds between checks on a stalled sync, only with the window open
 local STRANGER_LIMIT = 4096 -- the most buffered from someone not agreed to yet (a hello)
 local LIMIT = 1048576       -- the most buffered for one payload from anyone
 local MAX_DEPTH = 8
@@ -183,7 +185,8 @@ end
 ---------------------------------------------------------------------------
 local queue, head, pumping = {}, 1, false
 local sessions = {} -- [full name] = { target = name to whisper, ours = we started it, ... }
-local Pump
+local current       -- the latest session, kept after it ends so the window can show how it went
+local Pump, Refresh -- Refresh: the window's, set when it's made
 
 local function After(seconds, fn)
     if C_Timer and C_Timer.After then C_Timer.After(seconds, fn) end
@@ -212,8 +215,22 @@ local function Lockdown()
     return ok and not issecretvalue(on) and on == true
 end
 
-local function Ended(name)
+local function Notify()
+    if Refresh then Refresh() end
+end
+
+-- `why` is what went wrong, as told to the player; nil for a swap that finished.
+local function Ended(name, why)
+    local s = sessions[name]
+    if s then s.over, s.why = true, why end
     sessions[name] = nil
+    Notify()
+end
+
+-- Tells the player how it ended, in chat and in the window.
+local function Over(name, why)
+    ns.Print(why)
+    Ended(name, why)
 end
 
 local function Fresh(s)
@@ -227,8 +244,7 @@ local function Stop(name, why)
         if queue[i].name ~= name then kept[#kept + 1] = queue[i] end
     end
     queue, head = kept, 1
-    if sessions[name] then ns.Print(L["Sync with %s stopped: %s."]:format(name, why)) end
-    Ended(name)
+    if sessions[name] then Over(name, L["Sync with %s stopped: %s."]:format(name, why)) end
 end
 
 function Pump()
@@ -249,6 +265,14 @@ function Pump()
     Debug("send %d bytes to %s: %s", #m.text, m.target, ok and ResultName(result) or tostring(result))
     if ok and (result == nil or result == true or result == Result("Success", 0)) then
         head = head + 1
+        local s = sessions[m.name]
+        if s then
+            s.at = time() -- still going, even if they have nothing to send us
+            if m.counted then
+                s.outDone = s.outDone + 1
+                Notify()
+            end
+        end
         if m.after then m.after() end
         return After(PACE, Pump)
     end
@@ -265,16 +289,20 @@ function Pump()
     return Pump()
 end
 
--- Queues a payload for the session's name; `after` runs once its last piece has gone.
-local function Send(name, target, payload, after)
-    local text = ns.SyncEncode(payload)
-    if not text then return end
-    local pieces = ns.SyncPieces(text)
+-- Queues a payload's pieces for the session's name; `after` runs once the last has gone.
+-- `counted` pieces move the progress bar.
+local function Queue(name, target, pieces, after, counted)
     for i, piece in ipairs(pieces) do
         local mark = #pieces == 1 and "a" or i == 1 and "b" or i == #pieces and "d" or "c"
-        queue[#queue + 1] = { name = name, target = target, text = mark .. piece, after = i == #pieces and after or nil }
+        queue[#queue + 1] = { name = name, target = target, text = mark .. piece, counted = counted,
+            after = i == #pieces and after or nil }
     end
     if not pumping then Pump() end
+end
+
+local function Send(name, target, payload, after)
+    local text = ns.SyncEncode(payload)
+    if text then Queue(name, target, ns.SyncPieces(text), after) end
 end
 
 ---------------------------------------------------------------------------
@@ -438,28 +466,44 @@ local function Finish(name)
     if s and s.sent and s.received then Ended(name) end
 end
 
+local function NewSession(name, s)
+    s.name, s.got, s.at = name, 0, time()
+    sessions[name], current = s, s
+    return s
+end
+
+-- Every character is cut into pieces first, so the other side can be told how many to expect.
 local function SendChars(s, name, keys)
-    local n = 0
+    local batches, n = {}, 0
     for _, key in ipairs(type(keys) == "table" and keys or {}) do
         local c = type(key) == "string" and ns.db.chars[key]
-        if c then
-            Send(name, s.target, Package(key, c))
+        local text = c and ns.SyncEncode(Package(key, c))
+        if text then
+            batches[#batches + 1] = ns.SyncPieces(text)
             n = n + 1
         end
     end
-    Send(name, s.target, { k = "done", n = n }, function()
+    local closing = ns.SyncPieces(ns.SyncEncode({ k = "done", n = n }))
+    local total = #closing
+    for _, pieces in ipairs(batches) do total = total + #pieces end
+    s.outDone, s.outTotal = 0, total
+    Send(name, s.target, { k = "plan", n = total })
+    for _, pieces in ipairs(batches) do Queue(name, s.target, pieces, nil, true) end
+    Queue(name, s.target, closing, function()
         ns.Print(L["Sent %d characters to %s."]:format(n, name))
-        s.sent = true
+        s.sent, s.sentChars = true, n
         Finish(name)
-    end)
+        Notify()
+    end, true)
+    Notify()
 end
 
 -- They asked, and we agreed (or had before): our hello back, and what we want of theirs.
 local function Accept(sender, name, have)
     Remember(name)
-    local s = { target = sender, got = 0, at = time() }
-    sessions[name] = s
+    local s = NewSession(name, { target = sender })
     ns.Print(L["Swapping characters with %s..."]:format(name))
+    Notify()
     Send(name, sender, { k = "hello", v = PROTOCOL, reply = true, have = Stamps() })
     SendWant(s, name, have)
 end
@@ -481,6 +525,7 @@ local function AskDialog()
         OnAccept = function(_, data)
             pending = nil
             Accept(data.sender, data.name, data.have)
+            ns.ToggleSync(true) -- the player just agreed: show them how it's going
         end,
         OnCancel = function(_, data)
             pending = nil
@@ -502,11 +547,12 @@ function handle.hello(msg, sender, name)
         if not s or not s.ours or s.answered then return end
         s.answered, s.target = true, sender
         Remember(name)
+        Notify()
         return SendWant(s, name, msg.have)
     end
     local s = sessions[name]
     if s and not Fresh(s) then
-        Ended(name)
+        Stop(name, L["nothing heard for two minutes"])
         s = nil
     end
     if s then
@@ -514,6 +560,7 @@ function handle.hello(msg, sender, name)
         if s.ours and not s.answered then
             s.answered, s.target = true, sender
             Remember(name)
+            Notify()
             Send(name, sender, { k = "hello", v = PROTOCOL, reply = true, have = Stamps() })
             SendWant(s, name, msg.have)
         end
@@ -533,6 +580,7 @@ function handle.asking(msg, sender, name)
     if not s or not s.ours or s.answered or s.asking then return end
     s.asking = true
     ns.Print(L["Waiting for %s to accept..."]:format(name))
+    Notify()
 end
 
 function handle.want(msg, sender, name)
@@ -540,6 +588,13 @@ function handle.want(msg, sender, name)
     if not s or s.wanted then return end
     s.wanted = true
     SendChars(s, name, msg.keys)
+end
+
+function handle.plan(msg, sender, name)
+    local s = sessions[name]
+    if not s or type(msg.n) ~= "number" or msg.n < 1 then return end
+    s.inDone, s.inTotal = 0, floor(msg.n)
+    Notify()
 end
 
 function handle.char(msg, sender, name)
@@ -552,19 +607,19 @@ function handle.done(msg, sender, name)
     if not s then return end
     ns.Print(L["Got %d characters from %s."]:format(s.got, name))
     s.received = true
+    if s.inTotal then s.inDone = s.inTotal end
     Finish(name)
+    Notify()
 end
 
 function handle.no(msg, sender, name)
     if not sessions[name] then return end
-    ns.Print(L["%s declined."]:format(name))
-    Ended(name)
+    Over(name, L["%s declined."]:format(name))
 end
 
 function handle.busy(msg, sender, name)
     if not sessions[name] then return end
-    ns.Print(L["%s is busy (in combat, or answering another request). Try again in a moment."]:format(name))
-    Ended(name)
+    Over(name, L["%s is busy (in combat, or answering another request). Try again in a moment."]:format(name))
 end
 
 local buffers = {} -- [sender] = { pieces, bytes }
@@ -574,8 +629,15 @@ local function OnMessage(prefix, text, channel, sender)
     if issecretvalue(text) or issecretvalue(sender) or type(text) ~= "string" or type(sender) ~= "string" then return end
     local name = FullName(sender)
     Debug("%d bytes from %s (%s)", #text, sender, name)
-    if sessions[name] then sessions[name].at = time() end
-    local limit = (Trusted(name) or sessions[name]) and LIMIT or STRANGER_LIMIT
+    local s = sessions[name]
+    if s then
+        s.at = time()
+        if s.inTotal and s.inDone < s.inTotal then
+            s.inDone = s.inDone + 1
+            Notify()
+        end
+    end
+    local limit = (Trusted(name) or s) and LIMIT or STRANGER_LIMIT
     local mark, body = sub(text, 1, 1), sub(text, 2)
     local payload
     if mark == "a" then
@@ -610,7 +672,7 @@ function ns.SyncWith(target)
         verbose = not verbose
         return ns.Print(verbose and L["Sync details on."] or L["Sync details off."])
     end
-    if target == "" then return ns.Print(L["/af sync and the name of your character on another game account swaps characters with it: both online at the same time, on the same ruleset and faction, with Alts Forever."]) end
+    if target == "" then return ns.ToggleSync(true) end
     local name = target:match("^(.-)%-[^%-]+$") or target
     if name:lower() == (ns.charKey or ""):lower() then return ns.Print(L["That's the character you're on."]) end
     if Fresh(sessions[name]) then return ns.Print(L["Already swapping characters with %s."]:format(name)) end
@@ -619,9 +681,9 @@ function ns.SyncWith(target)
         local ok, on = pcall(restricted)
         Debug("outgoing addon messages restricted: %s", ok and tostring(on) or "?")
     end
-    local s = { target = target, ours = true, got = 0, at = time() }
-    sessions[name] = s
+    local s = NewSession(name, { target = target, ours = true })
     ns.Print(L["Asking %s to swap characters..."]:format(name))
+    Notify()
     Send(name, target, { k = "hello", v = PROTOCOL, have = Stamps() })
     local function Check()
         if sessions[name] ~= s or s.answered then return end
@@ -630,10 +692,201 @@ function ns.SyncWith(target)
             s.waited = true
             return After(ASK_WITHIN, Check)
         end
-        Ended(name)
-        ns.Print(L["No answer from %s. Both characters need this version of Alts Forever or later, online at the same time on the same ruleset and faction."]:format(name))
+        Over(name, L["No answer from %s. Both characters need this version of Alts Forever or later, online at the same time on the same ruleset and faction."]:format(name))
     end
     After(ANSWER_WITHIN, Check)
+end
+
+---------------------------------------------------------------------------
+-- The window: a name, a button and a progress bar. Everything above works without it.
+---------------------------------------------------------------------------
+-- Characters synced with before, the most recently played first.
+function ns.SyncPartners()
+    local list, stamps = {}, {}
+    for key in pairs(ns.db.syncWith or {}) do
+        list[#list + 1] = key
+        local c = ns.db.chars[key]
+        stamps[key] = c and Stamp(c) or 0
+    end
+    table.sort(list, function(a, b)
+        if stamps[a] ~= stamps[b] then return stamps[a] > stamps[b] end
+        return a < b
+    end)
+    return list
+end
+
+-- How the latest sync stands: the bar's fill (0 to 1), its text, the line under it, and
+-- whether one is still going. Nothing at all if there hasn't been one.
+function ns.SyncProgress()
+    local s = current
+    if not s then return nil end
+    if not s.over and not Fresh(s) then Stop(s.name, L["nothing heard for two minutes"]) end
+    local outDone, outTotal, inDone, inTotal = s.outDone or 0, s.outTotal or 0, s.inDone or 0, s.inTotal or 0
+    local fill = outTotal + inTotal > 0 and (outDone + inDone) / (outTotal + inTotal) or 0
+    if s.over and not s.why then fill = 1 end
+    local text = ""
+    if s.outTotal then text = L["Sending %d of %d"]:format(outDone, outTotal) end
+    if s.inTotal then
+        local receiving = L["Receiving %d of %d"]:format(inDone, inTotal)
+        text = text == "" and receiving or text .. " · " .. receiving
+    end
+    local status
+    if s.why then
+        status = s.why
+    elseif s.over then
+        status = L["Got %d characters from %s."]:format(s.got, s.name) .. " "
+            .. L["Sent %d characters to %s."]:format(s.sentChars or 0, s.name)
+    elseif s.ours and not s.answered then
+        status = (s.asking and L["Waiting for %s to accept..."] or L["Asking %s to swap characters..."]):format(s.name)
+    else
+        status = L["Swapping characters with %s..."]:format(s.name)
+    end
+    return fill, text, status, not s.over
+end
+
+local WIDTH, HEIGHT = 380, 200
+local frame
+local ticking = false
+
+-- A sync that stalls sends no messages to wake the window, so it checks while it's open.
+local function Tick()
+    ticking = false
+    if frame and frame:IsShown() and current and not current.over then Refresh() end
+end
+
+function Refresh()
+    if not frame or not frame:IsShown() then return end
+    local fill, text, status, going = ns.SyncProgress()
+    frame.bar:SetValue(fill or 0)
+    frame.barText:SetText(text or "")
+    frame.status:SetText(status or "")
+    frame.start:SetEnabled(not going)
+    frame.pick:SetShown(next(ns.db.syncWith or {}) ~= nil)
+    if going and not ticking then
+        ticking = true
+        After(TICK, Tick)
+    end
+end
+
+local function Start()
+    local name = frame.box:GetText() or ""
+    if not name:find("%S") then return frame.box:SetFocus() end
+    frame.box:ClearFocus()
+    ns.SyncWith(name)
+end
+
+local function PickPartner(owner)
+    MenuUtil.CreateContextMenu(owner, function(_, root)
+        for _, key in ipairs(ns.SyncPartners()) do
+            root:CreateButton(key, function() frame.box:SetText(key) end)
+        end
+    end)
+end
+
+local function CreateWindow()
+    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverSyncFrame", UIParent, "BasicFrameTemplateWithInset")
+    if not ok then f = CreateFrame("Frame", "AltsForeverSyncFrame", UIParent, "BackdropTemplate") end
+    frame = f
+    f:SetSize(WIDTH, HEIGHT)
+    f:SetPoint("CENTER")
+    f:SetFrameStrata("DIALOG")
+    f:SetToplevel(true)
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    f:SetClampedToScreen(true)
+    f.title = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    if not f.TitleText then f.title:SetPoint("TOP", 0, -6) end
+    f.title:SetText(L["Sync with another account"])
+
+    f.hint = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.hint:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -36)
+    f.hint:SetPoint("RIGHT", f, "RIGHT", -18, 0)
+    f.hint:SetJustifyH("LEFT")
+    f.hint:SetText(L["Log in on both accounts at once, on the same ruleset and faction, then enter the full name of your character on the other account."])
+
+    -- Sync button on the right, the list of earlier characters left of it, the name in the rest.
+    local start = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    start:SetSize(80, 22)
+    start:SetPoint("TOPRIGHT", f, "TOPRIGHT", -16, -86)
+    start:SetText(L["Sync"])
+    start:SetScript("OnClick", Start)
+    ns.SkinButton(start)
+    f.start = start
+
+    local pick = CreateFrame("Button", nil, f)
+    pick:SetSize(22, 22)
+    pick:SetPoint("RIGHT", start, "LEFT", -6, 0)
+    pick:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up")
+    pick:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    pick:SetScript("OnClick", PickPartner)
+    pick:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["Characters you've synced with"])
+        GameTooltip:Show()
+    end)
+    pick:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    f.pick = pick
+
+    local okBox, box = pcall(CreateFrame, "EditBox", "AltsForeverSyncBox", f, "InputBoxTemplate")
+    if not okBox then box = CreateFrame("EditBox", "AltsForeverSyncBox", f) end
+    box:SetHeight(22)
+    box:SetPoint("LEFT", f, "LEFT", 24, 0)
+    box:SetPoint("TOP", start, "TOP", 0, 0)
+    box:SetPoint("RIGHT", pick, "LEFT", -8, 0)
+    box:SetAutoFocus(false)
+    box:SetScript("OnEnterPressed", Start)
+    box:SetScript("OnEscapePressed", function() f:Hide() end)
+    ns.SkinEditBox(box)
+    f.box = box
+
+    local bar = CreateFrame("StatusBar", nil, f)
+    bar:SetHeight(20)
+    bar:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -118)
+    bar:SetPoint("RIGHT", f, "RIGHT", -18, 0)
+    bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    bar:SetStatusBarColor(0.2, 0.7, 0.3)
+    bar:SetMinMaxValues(0, 1)
+    bar:SetValue(0)
+    local back = bar:CreateTexture(nil, "BACKGROUND")
+    back:SetAllPoints()
+    back:SetColorTexture(0, 0, 0, 0.5)
+    f.bar = bar
+    f.barText = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.barText:SetPoint("CENTER")
+
+    f.status = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    f.status:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", 0, -8)
+    f.status:SetPoint("RIGHT", f, "RIGHT", -18, 0)
+    f.status:SetJustifyH("LEFT")
+
+    ns.SkinWindow(f)
+    f:SetScript("OnShow", function(self)
+        self:Raise()
+        if (box:GetText() or "") == "" then
+            box:SetText(current and current.name or ns.SyncPartners()[1] or "")
+        end
+        Refresh()
+    end)
+    f:SetScript("OnHide", function()
+        box:ClearFocus()
+        GameTooltip:Hide()
+    end)
+    -- Escape closes it, like Blizzard's own windows.
+    if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverSyncFrame" end
+    f:Hide()
+    ns.GamepadWindow(f)
+    ns.ScaleWindow(f)
+end
+
+-- Opens or closes the window; `open` only ever opens it.
+function ns.ToggleSync(open)
+    if not frame then CreateWindow() end
+    if frame:IsShown() and not open then return frame:Hide() end
+    frame:Show()
+    frame:Raise()
 end
 
 function ns.StartSync()
