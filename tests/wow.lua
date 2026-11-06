@@ -22,7 +22,7 @@ local KNOWN_EVENTS = {
     TRADE_SKILL_DATA_SOURCE_CHANGED = true, TRADE_SKILL_CLOSE = true, NEW_RECIPE_LEARNED = true,
     TIME_PLAYED_MSG = true, UNIT_NAME_UPDATE = true, UPDATE_FACTION = true,
     TRAIT_CONFIG_UPDATED = true, TRAIT_TREE_CURRENCY_INFO_UPDATED = true, GET_ITEM_INFO_RECEIVED = true,
-    UPDATE_INSTANCE_INFO = true, ENCOUNTER_END = true, BOSS_KILL = true, CHAT_MSG_ADDON = true,
+    CHAT_MSG_ADDON = true,
 }
 
 -- Resets every global and loads the addon files fresh. Returns the addon namespace.
@@ -621,15 +621,6 @@ function M.load(files)
         ExpandFactionHeader = function() M.expanded = true end,
     }
 
-    -- Saved instances, as GetSavedInstanceInfo returns them: { name, reset (seconds left),
-    -- locked, extended, difficultyName, numEncounters, encounterProgress }.
-    M.saves, M.raidInfoRequests = {}, 0
-    RequestRaidInfo = function() M.raidInfoRequests = M.raidInfoRequests + 1 end
-    GetNumSavedInstances = function() return #M.saves end
-    GetSavedInstanceInfo = function(i)
-        local s = M.saves[i]
-        return s[1], 1000 + i, s[2], 9, s[3], s[4], 0, true, 40, s[5], s[6], s[7]
-    end
     -- Addon messages: every one sent is recorded in M.sent ({ prefix, text, chatType, target });
     -- the game's answer is the next of M.sendResults, else Success.
     M.sent, M.sendResults, M.prefixes, M.chatLockdown = {}, {}, {}, nil

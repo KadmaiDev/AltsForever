@@ -49,7 +49,6 @@ Crates.lua
 Tooltip.lua
 Options.lua
 Reputation.lua
-Lockouts.lua
 Sync.lua
 Skin.lua
 Gamepad.lua
