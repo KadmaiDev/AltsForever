@@ -627,6 +627,68 @@ test("a ping in combat swaps as soon as the fight ends", function()
     eq(#wow.sent, 0)
 end)
 
+test("an automatic hello in combat is told busy, and we swap as soon as the fight ends", function()
+    -- Logging in mid fight: our ping finds them idle, and their answer arrives in the fight.
+    local ns = syncStart()
+    ns.db.syncWith = { ["Bob Smith"] = true }
+    wow.inCombat = true
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, auto = true, have = { ["Bob Smith"] = NOW } })
+    syncPump()
+    eq(syncKinds(syncSent(ns, "Bob Smith")), "busy")
+    wow.sent = {}
+    wow.inCombat = nil
+    wow.fire("PLAYER_REGEN_ENABLED")
+    local hello = syncSent(ns, "Bob Smith")[1]
+    eq(hello.k, "hello")
+    eq(hello.auto, true)
+    -- And they're remembered: the 10 minute swaps go on from here.
+    autoAnswer(ns, "Bob Smith")
+    wow.sent = {}
+    wow.now = NOW + 600
+    runTimers()
+    eq(syncSent(ns, "Bob Smith")[1].auto, true)
+end)
+
+test("an automatic hello in combat from a stranger, or with auto sync off, leaves nothing to do", function()
+    local ns = syncStart()
+    wow.inCombat = true
+    syncFrom(ns, "Some Stranger", { k = "hello", v = 1, auto = true, have = {} })
+    syncPump()
+    eq(syncKinds(syncSent(ns, "Some Stranger")), "no")
+    wow.sent = {}
+    wow.inCombat = nil
+    wow.fire("PLAYER_REGEN_ENABLED")
+    syncPump()
+    eq(#wow.sent, 0)
+
+    ns = syncStart()
+    ns.db.syncWith = { ["Bob Smith"] = true }
+    ns.SetSyncAuto(false)
+    wow.inCombat = true
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, auto = true, have = {} })
+    syncPump()
+    eq(syncKinds(syncSent(ns, "Bob Smith")), "no")
+    wow.sent = {}
+    wow.inCombat = nil
+    wow.fire("PLAYER_REGEN_ENABLED")
+    syncPump()
+    eq(#wow.sent, 0)
+end)
+
+test("a hello the player sent by hand in combat is still only told busy", function()
+    local ns = syncStart()
+    ns.db.syncWith = { ["Bob Smith"] = true }
+    wow.inCombat = true
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, have = {} })
+    syncPump()
+    eq(syncKinds(syncSent(ns, "Bob Smith")), "busy")
+    wow.sent = {}
+    wow.inCombat = nil
+    wow.fire("PLAYER_REGEN_ENABLED")
+    syncPump()
+    eq(#wow.sent, 0, "they'll try again, and they've been told why")
+end)
+
 test("a fight ending does nothing with no swap due, or with it turned off since", function()
     local ns = syncStart()
     ns.db.syncWith = { ["Bob Smith"] = true }

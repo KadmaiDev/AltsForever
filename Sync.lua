@@ -700,6 +700,11 @@ function handle.hello(msg, sender, name)
     -- Nobody is here to ask about an automatic hello, so it's never put to the player.
     if msg.auto and not (Trusted(name) and ns.SyncAutoOn()) then return Send(name, sender, { k = "no" }) end
     if Trusted(name) and not InCombatLockdown() then return Accept(sender, name, msg.have, msg.auto == true) end
+    if msg.auto then -- trusted, so what stopped it is a fight: it's on us to swap after
+        Keep(name, sender)
+        afterCombat = true
+        return Send(name, sender, { k = "busy" })
+    end
     if declined[name] then return Send(name, sender, { k = "no" }) end
     if pending or InCombatLockdown() then return Send(name, sender, { k = "busy" }) end
     pending = { sender = sender, name = name, have = msg.have }

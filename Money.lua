@@ -286,9 +286,16 @@ local function GoldGroup(realm, faction)
     return ruleset .. "|" .. (faction or "")
 end
 
+local function KeepLarger(into, days)
+    for day, total in pairs(days) do
+        if not into[day] or total > into[day] then into[day] = total end
+    end
+end
+
 -- Up to 1.1.0 groups were keyed by realm name, and one ruleset can have several. Moves each
 -- to its ruleset's key; two realms' histories become one, keeping the larger of a day's
--- two readings. Nothing to do once done: the keys are then already right.
+-- two readings, the main history included, whoever is logged in. Nothing to do once done:
+-- the keys are then already right.
 local function FoldGoldGroups(db)
     local function Key(group)
         local realm, faction = group:match("^(.-)|(.*)$")
@@ -309,12 +316,19 @@ local function FoldGoldGroups(db)
         by[group] = nil
         local into = by[key]
         if into then
-            for day, total in pairs(days) do
-                if not into[day] or total > into[day] then into[day] = total end
-            end
+            KeepLarger(into, days)
         else
             by[key] = days
         end
+    end
+    -- A group with the main history only has a history here too if a realm just folded onto
+    -- it. (One still to claim the main history has no db.goldGroup yet: StartMoney's rule.)
+    local main = db.goldGroup and by[db.goldGroup]
+    if main then
+        db.goldDays = db.goldDays or {}
+        KeepLarger(db.goldDays, main)
+        by[db.goldGroup] = nil
+        if next(by) == nil then db.goldDaysBy = nil end
     end
 end
 

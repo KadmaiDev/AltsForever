@@ -521,6 +521,39 @@ test("two realms' history kept apart from the main one becomes one, the larger r
     eq(db.goldDaysBy["CAMWOWUS9Realm2RP|Horde"], nil)
 end)
 
+test("a realm folding into the main history never lowers it, whoever logs in first", function()
+    local today = math.floor(NOW / 86400)
+    local y, y2 = today - 1, today - 2
+    local function saved()
+        return { goldGroup = RP10 .. "|Alliance", goldDays = { [y] = 900 },
+            goldDaysBy = { [RP11 .. "|Alliance"] = { [y] = 40, [y2] = 70 } } }
+    end
+
+    -- Logged in on that group.
+    twoRealmsStart(saved())
+    eq(AltsForeverDB.goldDays[y], 900, "the main reading is the larger: it stays")
+    eq(AltsForeverDB.goldDays[y2], 70, "a day only the other realm had joins it")
+    eq(AltsForeverDB.goldDaysBy, nil)
+
+    -- Updated on a character of another group, then back.
+    twoRealmsStart(saved())
+    local db = AltsForeverDB
+    db.goldGroup, db.goldDays = RP10 .. "|Alliance", { [y] = 900 }
+    db.goldDaysBy = { [RP11 .. "|Alliance"] = { [y] = 40, [y2] = 70 } }
+    wow.load(FILES)
+    wow.player.name, wow.player.realm, wow.player.faction = "Red Alt", RP11, "Horde"
+    wow.login(db)
+    db = AltsForeverDB
+    eq(db.goldGroup, "rp|Alliance")
+    eq(db.goldDays[y], 900)
+    eq(db.goldDays[y2], 70)
+    eq(db.goldDaysBy["rp|Alliance"], nil, "folded at once, not left for that group's next login")
+    wow.load(FILES)
+    wow.player.name, wow.player.realm, wow.player.faction = "Far Alt", RP11, "Alliance"
+    wow.login(db)
+    eq(AltsForeverDB.goldDays[y], 900, "still, back on that group")
+end)
+
 test("the richest group counts a ruleset's realms together", function()
     local ns = twoRealmsStart()
     local chars = AltsForeverDB.chars
