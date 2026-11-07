@@ -201,6 +201,7 @@ local Pump, Refresh -- Refresh: the window's, set when it's made
 local Keep          -- remembers who to swap with again
 local partner       -- { name, target }: who we last swapped with; nil once they've gone
 local lastSwap = 0
+local afterCombat = false -- a swap fell due in combat: it runs as soon as the fight ends
 local told = {}     -- [name] = said in chat that it's syncing, once a session
 
 local function After(seconds, fn)
@@ -699,6 +700,11 @@ function handle.hello(msg, sender, name)
     -- Nobody is here to ask about an automatic hello, so it's never put to the player.
     if msg.auto and not (Trusted(name) and ns.SyncAutoOn()) then return Send(name, sender, { k = "no" }) end
     if Trusted(name) and not InCombatLockdown() then return Accept(sender, name, msg.have, msg.auto == true) end
+    if msg.auto then -- trusted, so what stopped it is a fight: it's on us to swap after
+        Keep(name, sender)
+        afterCombat = true
+        return Send(name, sender, { k = "busy" })
+    end
     if declined[name] then return Send(name, sender, { k = "no" }) end
     if pending or InCombatLockdown() then return Send(name, sender, { k = "busy" }) end
     pending = { sender = sender, name = name, have = msg.have }
@@ -712,7 +718,11 @@ function handle.ping(msg, sender, name)
     if not Trusted(name) or not ns.SyncAutoOn() then return end
     Keep(name, sender)
     StartedOver(name)
-    if sessions[name] or InCombatLockdown() then return end -- the 10 minute check tries again
+    if sessions[name] then return end
+    if InCombatLockdown() then
+        afterCombat = true
+        return
+    end
     Begin(name, sender, true)
 end
 
@@ -838,16 +848,31 @@ function ns.SyncAutoOn() return not ns.db.syncAutoOff end
 
 local autoTicking = false
 
--- While they stay online, every AUTO_EVERY. Whoever's check comes first swaps; the other's
--- then finds it was just done.
+local function SwapNow()
+    if partner and not sessions[partner.name] then Begin(partner.name, partner.target, true) end
+end
+
+-- While they stay online, AUTO_EVERY after the last swap. Whoever's check comes first swaps;
+-- the other's then finds it was just done and waits out the rest, so a swap for any reason
+-- (a login, say) moves the next one back rather than costing a whole extra wait.
 local function AutoTick()
     autoTicking = false
     if not partner or not ns.SyncAutoOn() then return end
-    if time() - lastSwap >= AUTO_EVERY - 30 and not sessions[partner.name] and not InCombatLockdown() then
-        Begin(partner.name, partner.target, true)
-    end
     autoTicking = true
+    local left = lastSwap + AUTO_EVERY - time()
+    if left > 0 then return After(left, AutoTick) end
     After(AUTO_EVERY, AutoTick)
+    if InCombatLockdown() then
+        afterCombat = true
+    else
+        SwapNow()
+    end
+end
+
+local function CombatOver()
+    if not afterCombat then return end
+    afterCombat = false
+    SwapNow() -- turning it off clears the partner, so this does nothing then
 end
 
 function Keep(name, target)
@@ -1095,6 +1120,7 @@ function ns.StartSync()
     local register = C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix
     if register then pcall(register, PREFIX) end
     ns.On("CHAT_MSG_ADDON", OnMessage)
+    ns.On("PLAYER_REGEN_ENABLED", CombatOver)
     -- Logged in here, so it's ours: nothing to look for on another account.
     if ns.db.syncWith then
         ns.db.syncWith[ns.charKey] = nil
