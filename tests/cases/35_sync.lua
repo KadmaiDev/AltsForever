@@ -524,6 +524,13 @@ test("nothing is sent at login with no one synced before, with it off, or out of
     ns.char.realm = "HomeRealm"
     syncPump()
     eq(#wow.sent, 0, "whispers don't cross rulesets or factions")
+
+    -- Another realm name of the same ruleset is the same world.
+    ns = autoStart()
+    ns.db.chars["Bob Smith"].realm = "CAMWOWUS2Realm11RP"
+    ns.char.realm = "CAMWOWUS2Realm10RP"
+    syncPump()
+    eq(#syncSent(ns, "Bob Smith"), 1, "pinged")
 end)
 
 test("at most ten characters are tried, and the one you're on never", function()

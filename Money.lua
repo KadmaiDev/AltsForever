@@ -38,7 +38,7 @@ local dayOffset, today, nextDay = 0, nil, 0
 local sessionStart -- this character's gold at login
 -- This ruleset and faction's history: they can't trade with others, so each keeps its own.
 -- db.goldDays is db.goldGroup's; any other group's is db.goldDaysBy[group], keyed
--- "realm|faction". The history from before groups were recorded (all characters' gold)
+-- "ruleset|faction". The history from before groups were recorded (all characters' gold)
 -- goes to the group with the most gold, almost always the player's main one, whoever
 -- they log in on first: until a character of that group logs in, it waits unclaimed.
 local days
@@ -256,21 +256,66 @@ end
 -- other, and no other ruleset known for that faction has more than theirs. (Right after
 -- updating, other characters' rulesets aren't known yet; their faction always is.)
 function ns.RichestGroup(char)
-    local byFaction, byRealm = {}, {}
+    local byFaction, byRuleset = {}, {}
     for _, c in pairs(ns.db.chars) do
         local m = c.money or 0
         if c.faction then byFaction[c.faction] = (byFaction[c.faction] or 0) + m end
-        if c.realm and c.faction == char.faction then byRealm[c.realm] = (byRealm[c.realm] or 0) + m end
+        if c.realm and c.faction == char.faction then
+            local r = ns.RulesetOf(c.realm)
+            byRuleset[r] = (byRuleset[r] or 0) + m
+        end
     end
     local mine = char.faction and byFaction[char.faction] or 0
     for f, m in pairs(byFaction) do
         if f ~= char.faction and m > mine then return false end
     end
-    local here = char.realm and byRealm[char.realm] or 0
-    for realm, m in pairs(byRealm) do
-        if realm ~= char.realm and m > here then return false end
+    local mineRuleset = char.realm and ns.RulesetOf(char.realm)
+    local here = mineRuleset and byRuleset[mineRuleset] or 0
+    for ruleset, m in pairs(byRuleset) do
+        if ruleset ~= mineRuleset and m > here then return false end
     end
     return true
+end
+
+-- A group's key. The beta's keep their realm names: that's how ns.LeaveBeta finds them.
+local function GoldGroup(realm, faction)
+    local ruleset = ""
+    if realm and realm ~= "" then
+        ruleset = ns.BetaRealm(realm) and realm or ns.RulesetOf(realm)
+    end
+    return ruleset .. "|" .. (faction or "")
+end
+
+-- Up to 1.1.0 groups were keyed by realm name, and one ruleset can have several. Moves each
+-- to its ruleset's key; two realms' histories become one, keeping the larger of a day's
+-- two readings. Nothing to do once done: the keys are then already right.
+local function FoldGoldGroups(db)
+    local function Key(group)
+        local realm, faction = group:match("^(.-)|(.*)$")
+        return realm and GoldGroup(realm, faction) or group
+    end
+    if db.goldGroup then db.goldGroup = Key(db.goldGroup) end
+    local by = db.goldDaysBy
+    if not by then return end
+    local moved
+    for group in pairs(by) do
+        if Key(group) ~= group then
+            moved = moved or {}
+            moved[#moved + 1] = group
+        end
+    end
+    for _, group in ipairs(moved or {}) do
+        local key, days = Key(group), by[group]
+        by[group] = nil
+        local into = by[key]
+        if into then
+            for day, total in pairs(days) do
+                if not into[day] or total > into[day] then into[day] = total end
+            end
+        else
+            by[key] = days
+        end
+    end
 end
 
 function ns.StartMoney()
@@ -283,7 +328,8 @@ function ns.StartMoney()
     utc.isdst = date("*t", now).isdst
     dayOffset = now - time(utc)
     local db = ns.db
-    local group = (char.realm or "") .. "|" .. (char.faction or "")
+    FoldGoldGroups(db)
+    local group = GoldGroup(char.realm, char.faction)
     db.goldDays = db.goldDays or {}
     if not db.goldGroup and ns.RichestGroup(char) then db.goldGroup = group end
     if db.goldGroup ~= group then
