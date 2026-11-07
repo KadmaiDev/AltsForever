@@ -1,4 +1,4 @@
-## Alts Forever 1.1.1 (not yet released)
+## Alts Forever 1.1.1
 
 - **Characters on one ruleset are no longer split up:** the game can give characters on the same ruleset different realm names (Realm10RP and Realm11RP). They now count as one group, so they share a heading in the overview and show up for each other in the mailbox's Send to list, tooltips, gold totals and sync. Gold history kept separately for each realm name is joined up too. Thanks to Aaron for the report.
 - **Sync timing:** a sync that falls due while you're in combat now runs as soon as the fight ends, and syncing by itself really is every 10 minutes (it could take up to 20).
