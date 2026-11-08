@@ -427,7 +427,10 @@ end
 local function Package(key, c)
     local copy = {}
     for k, v in pairs(c) do copy[k] = v end
-    if c == ns.char then copy.updated = time() end
+    if c == ns.char then
+        copy.updated = time()
+        if ns.TouchRun then ns.TouchRun() end -- runs is shared with the copy: sent as of now
+    end
     local db, ri, fn = ns.db, nil, nil
     for prof, list in pairs(c.recipes or {}) do
         local info = db.recipeInfo and db.recipeInfo[prof]

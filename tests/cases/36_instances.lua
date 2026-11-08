@@ -35,6 +35,15 @@ local function relog(ns, where, login, later)
     return ns
 end
 
+-- Bob Smith, a trusted character on another account, swaps with us and wants Aldric.
+local function bobWantsYou(ns)
+    ns.db.syncWith = { ["Bob Smith"] = true }
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, have = {} })
+    syncPump()
+    syncFrom(ns, "Bob Smith", { k = "want", keys = { "Aldric" } })
+    syncPump()
+end
+
 local function count(ns)
     return ns.InstanceCounts(wow.now)[1].n
 end
@@ -88,21 +97,23 @@ test("a corpse run, a reload or walking back into the same copy isn't a new inst
     wow.now = NOW + 900
     enter(nil)
     enter(RFC)
-    eq(#ns.char.runs, 2)
+    eq(count(ns), 2)
     cast(53)
-    eq(#ns.char.runs, 1, "the same copy: joined"); eq(ns.char.runs[1].left, nil)
-    eq(count(ns), 1)
+    eq(#ns.char.runs, 2, "each visit kept"); eq(ns.char.runs[1].left, NOW + 900); eq(ns.char.runs[2].left, nil)
+    eq(count(ns), 1, "the same copy counts once")
+    eq(ns.InstanceCounts(wow.now)[1].free, wow.now + HOUR, "for as long as the later visit")
 
     -- Reset, then in again: another copy.
     wow.now = NOW + 1200
     enter(nil)
     enter(RFC)
     cast(54)
-    eq(#ns.char.runs, 2, "a new copy is a new instance")
-    eq(ns.char.runs[1].left, NOW + 1200)
+    eq(#ns.char.runs, 3)
+    eq(ns.char.runs[2].left, NOW + 1200)
     cast(99)
-    eq(ns.char.runs[2].zone, 54, "only the first cast is read")
-    eq(count(ns), 2)
+    eq(ns.char.runs[3].zone, 54, "only the first cast is read")
+    eq(count(ns), 2, "a new copy is a new instance")
+    eq(ns.InstanceCounts(wow.now)[1].free, NOW + 1200 + HOUR)
 end)
 
 test("logging in inside a copy that was reset meanwhile counts it as new", function()
@@ -133,18 +144,30 @@ test("logging in inside a copy that was reset meanwhile counts it as new", funct
     eq(#ns.char.runs, 1, "the same copy after all"); eq(ns.char.runs[1].left, nil)
 end)
 
-test("a copy another of your characters was in this hour isn't counted twice", function()
+test("a copy another of your characters was in this hour counts once, while you're still tracked", function()
+    -- Low was there until 50 minutes ago; you go in now.
     local saved = overviewAlts()
     saved.account = "mine"
     saved.chars["Low"].account = "mine"
-    saved.chars["Low"].runs = { { at = NOW - 600, left = NOW - 300, map = 389, zone = 53 } }
+    saved.chars["Low"].runs = { { at = NOW - 4000, left = NOW - 3000, map = 389, zone = 53 } }
     local ns = start(saved)
     enter(RFC)
     eq(count(ns), 2, "until the copy is known")
     cast(53)
-    eq(ns.char.runs, nil); eq(count(ns), 1)
+    eq(count(ns), 1)
+    eq(#ns.char.runs, 1, "your visit is kept"); eq(ns.db.chars["Low"].runs[1].left, NOW - 3000, "theirs as it was")
+
+    -- Past Low's hour, still inside: still counting.
+    wow.now = NOW + 1200
+    eq(count(ns), 1)
+    eq(ns.InstanceCounts(wow.now)[1].free, wow.now + HOUR)
+    wow.now = NOW + 1500
     enter(nil)
-    eq(ns.db.chars["Low"].runs[1].left, NOW - 300, "theirs is left as it was")
+    eq(ns.char.runs[1].left, NOW + 1500, "your leaving is recorded")
+    wow.now = NOW + 1500 + HOUR - 1
+    eq(count(ns), 1)
+    wow.now = NOW + 1500 + HOUR
+    eq(count(ns), 0)
 end)
 
 test("another account in the same copy counts for that account, and yours for yours", function()
@@ -162,11 +185,52 @@ test("another account in the same copy counts for that account, and yours for yo
 
     -- Two hours on, still inside as of their last sync: still counting.
     wow.now = NOW + 2 * HOUR
-    ns.db.chars["High"].updated = NOW + 2 * HOUR - 300
+    local run = ns.db.chars["High"].runs[1]
+    run.last = NOW + 2 * HOUR - 300
     eq(ns.InstanceCounts(wow.now)[2].n, 1)
     eq(ns.InstanceCounts(wow.now)[2].free, NOW + 2 * HOUR - 300 + HOUR)
-    ns.db.chars["High"].updated = NOW - 700
-    eq(ns.InstanceCounts(wow.now)[2].n, 0, "an hour after they were last seen inside")
+    ns.db.chars["High"].updated = NOW + 2 * HOUR
+    run.last = NOW - 700
+    eq(ns.InstanceCounts(wow.now)[2].n, 0, "an hour after they were last known inside, whatever else changed")
+end)
+
+test("a visit never closed ends when you were last known inside, however much happens after", function()
+    local saved = { v = 2, chars = { ["Aldric"] = alt("Aldric", "MAGE", { updated = NOW - 3600,
+        runs = { { at = NOW - 1800, map = 389, zone = 53 }, { at = NOW - 3000, last = NOW - 1200, map = 36 } } }) } }
+    local ns = start(saved) -- logged in outdoors
+    local runs = ns.char.runs -- oldest first
+    eq(runs[2].left, NOW - 1800, "closed: never known inside after entering")
+    eq(runs[1].left, NOW - 1200, "closed when last known inside")
+    eq(count(ns), 2)
+    -- Playing on: character updates and a sync don't move them.
+    wow.now = NOW + 600
+    wow.fire("PLAYER_XP_UPDATE", "player")
+    bobWantsYou(ns)
+    local sentRuns
+    for _, msg in ipairs(syncSent(ns, "Bob Smith")) do
+        if msg.k == "char" then sentRuns = msg.c.runs end
+    end
+    eq(sentRuns[2].left, NOW - 1800, "sent closed")
+    wow.now = NOW - 1800 + HOUR
+    eq(count(ns), 1)
+    wow.now = NOW - 1200 + HOUR
+    eq(count(ns), 0)
+end)
+
+test("sync sends the visit you're in as of now", function()
+    local ns = start(nil)
+    enter(RFC)
+    cast(53)
+    wow.now = NOW + 900
+    wow.sent = {}
+    bobWantsYou(ns)
+    local sentChar
+    for _, msg in ipairs(syncSent(ns, "Bob Smith")) do
+        if msg.k == "char" then sentChar = msg.c end
+    end
+    assert(sentChar, "sent")
+    eq(sentChar.account, ns.db.account)
+    eq(sentChar.runs[1].last, NOW + 900); eq(sentChar.runs[1].left, nil); eq(sentChar.runs[1].zone, 53)
 end)
 
 test("secret answers from the game are never counted on", function()
@@ -215,7 +279,8 @@ test("damaged instance records are repaired at load", function()
     local saved = overviewAlts()
     saved.account = 7
     saved.chars["High"].runs = { { at = NOW, map = 389 }, "x", { at = "soon", map = 389 },
-        { at = NOW - 60, map = 36, left = "later" }, { at = NOW - 120, map = 36, zone = 5, name = "The Deadmines" } }
+        { at = NOW - 60, map = 36, left = "later" }, { at = NOW - 120, map = 36, zone = 5, name = "The Deadmines" },
+        { at = NOW - 30, map = 36, last = "later" } }
     saved.chars["Low"].runs = { { map = 389 } }
     saved.chars["Far"].account = {}
     wow.now = NOW

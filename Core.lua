@@ -188,6 +188,7 @@ local function RepairChar(c)
         for _, r in pairs(c.runs) do
             if type(r) == "table" and type(r.at) == "number" and type(r.map) == "number"
                 and (r.left == nil or type(r.left) == "number") and (r.zone == nil or type(r.zone) == "number")
+                and (r.last == nil or type(r.last) == "number")
                 and (r.name == nil or type(r.name) == "string") then
                 kept[#kept + 1] = r
             end

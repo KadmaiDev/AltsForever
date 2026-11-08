@@ -143,34 +143,31 @@ end
 ---------------------------------------------------------------------------
 -- Forever lets a game account enter 10 dungeons and raids an hour, all its characters together
 -- (Nova Instance Tracker's figures; the game doesn't tell addons). Each character keeps the
--- instances it entered as c.runs = { { at = entered, left = time it left, map = instance ID,
--- zone = the copy's ID, name = "Ragefire Chasm" }, ... }, oldest first, and c.account says
--- which game account it's on (db.account: made once per saved file, and the saved file is per
--- game account), so sync brings another account's count along with its characters. A run
--- counts until an hour after it was left (Nova's rule; the game's may count from entering, so
--- this errs on the safe side). Going back into the same copy isn't a new instance: a run is
+-- instances it entered as c.runs = { { at = entered, left = time it left, last = the latest
+-- time it was known to be inside while not left, map = instance ID, zone = the copy's ID,
+-- name = "Ragefire Chasm" }, ... }, oldest first, and c.account says which game account it's
+-- on (db.account: made once per saved file, and the saved file is per game account), so sync
+-- brings another account's count along with its characters. A run counts until an hour after
+-- it was left (Nova's rule; the game's may count from entering, so this errs on the safe
+-- side); one still open that isn't yours now counts until an hour after `last`, so another
+-- account's character still inside stays counted as long as syncs keep coming, and one that
+-- can't be closed stops in time. Going back into the same copy isn't a new instance: a run is
 -- reopened when the character comes back dead (a corpse run) or by logging in or reloading
--- there, and two runs into one copy are joined once a spell cast of yours there gives the
--- copy's ID, as Nova does (a cast's GUID is Cast-type-server-instance-copy-spell-n). The
--- overview's footer shows the counts, /af lockouts lists them.
+-- there, and runs of one account into one copy count once (a character going out and back in,
+-- or two characters of the account there), once a spell cast there gives the copy's ID, as
+-- Nova does (a cast's GUID is Cast-type-server-instance-copy-spell-n). Each run stays its own
+-- character's, so a character's own visit is always tracked to its end. The overview's footer
+-- shows the counts, /af lockouts lists them.
 local LIMIT, HOUR = 10, 3600
 ns.INSTANCE_LIMIT = LIMIT
 local current      -- the logged-in character's run while inside an instance
 local reopenedLeft -- when the run just reopened had been left, until the copy is known
 local castFrame
 
--- When a run of character c stops counting. One not left yet that isn't yours now (another
--- account's character still inside, as of the last sync, or a crash) was still going when c
--- was last updated.
-local function RunEnds(run, now, c)
+-- When a run stops counting.
+local function RunEnds(run, now)
     if run == current then return now + HOUR end
-    local last = run.left
-    if not last then
-        last = run.at
-        local updated = c and c.updated
-        if type(updated) == "number" and updated > last then last = updated end
-    end
-    return last + HOUR
+    return (run.left or run.last or run.at) + HOUR
 end
 
 -- Forgets runs that have stopped counting. Where it costs nothing in play: a loading screen,
@@ -180,11 +177,24 @@ function PruneRuns(now)
         local runs = c.runs
         if runs then
             for i = #runs, 1, -1 do
-                if RunEnds(runs[i], now, c) <= now then tremove(runs, i) end
+                if RunEnds(runs[i], now) <= now then tremove(runs, i) end
             end
             if #runs == 0 then c.runs = nil end
         end
     end
+end
+
+-- The logged-in character's runs still open that it isn't in (it logged in elsewhere, or the
+-- game never said it left): ended when it was last known to be inside.
+local function CloseOpen(c)
+    for _, run in ipairs(c.runs or EMPTY) do
+        if not run.left and run ~= current then run.left = run.last or run.at end
+    end
+end
+
+-- Sync is about to send the character you're on: you're inside as of now.
+function ns.TouchRun()
+    if current then current.last = time() end
 end
 
 local function Changed()
@@ -201,19 +211,6 @@ local function Here()
     name, map = Plain(name), Plain(map)
     if type(map) ~= "number" then return nil end
     return map, type(name) == "string" and name or nil
-end
-
--- Another run of this account into the same copy that still counts, and whose it is.
-local function SameCopy(run, now)
-    for _, c in pairs(ns.db.chars) do
-        if c.account == ns.db.account and c.runs then
-            for _, r in ipairs(c.runs) do
-                if r ~= run and r.map == run.map and r.zone == run.zone and RunEnds(r, now, c) > now then
-                    return r, c
-                end
-            end
-        end
-    end
 end
 
 local function WatchCasts(on)
@@ -235,24 +232,11 @@ local function OnCast(unit, guid)
     local c, now = ns.char, time()
     if current.zone and current.zone ~= zone then
         -- Reopened, but the copy is new (it was reset): a new instance after all.
-        current.left = reopenedLeft or now
+        current.left, current.last = reopenedLeft or current.last or now, nil
         current = { at = now, map = current.map, name = current.name, zone = zone }
         c.runs[#c.runs + 1] = current
     else
         current.zone = zone
-        local earlier, owner = SameCopy(current, now)
-        if earlier then
-            for i = #c.runs, 1, -1 do
-                if c.runs[i] == current then tremove(c.runs, i) break end
-            end
-            if #c.runs == 0 then c.runs = nil end
-            if owner == c then
-                earlier.left = nil
-                current = earlier
-            else
-                current = nil
-            end
-        end
     end
     reopenedLeft = nil
     Changed()
@@ -268,6 +252,7 @@ local function Entered(isLogin, isReload)
         current.left = now
         current = nil
     end
+    CloseOpen(c)
     if not map then
         WatchCasts(false)
         reopenedLeft = nil
@@ -288,6 +273,25 @@ local function Entered(isLogin, isReload)
     end
     WatchCasts(true)
     Changed()
+end
+
+-- Whether another run of the same account into the same copy stands for this one (the one
+-- that counts longest; on a tie the earlier, then the first by name), so the copy counts once.
+local function Shadowed(run, ends, key, account, now)
+    if not run.zone then return false end
+    for key2, c2 in pairs(ns.db.chars) do
+        if c2.account == account and c2.runs then
+            for _, r in ipairs(c2.runs) do
+                if r ~= run and r.zone == run.zone and r.map == run.map then
+                    local e = RunEnds(r, now)
+                    if e > ends or (e == ends and (r.at < run.at or (r.at == run.at and key2 < key))) then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
 end
 
 local function FirstName(key)
@@ -330,8 +334,8 @@ function ns.InstanceCounts(now)
                 a.main, a.played = key, played
             end
             for _, run in ipairs(c.runs or EMPTY) do
-                local ends = RunEnds(run, now, c)
-                if ends > now then
+                local ends = RunEnds(run, now)
+                if ends > now and not Shadowed(run, ends, key, id, now) then
                     a.n = a.n + 1
                     if not a.free or ends < a.free then a.free = ends end
                 end
