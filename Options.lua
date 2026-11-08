@@ -56,9 +56,19 @@ local function Rescale(f, scale)
     end
 end
 
-local function ApplyScale()
+-- A window's scale: the size chosen, or less if it set f.maxScale (the most at which it
+-- still fits on screen: Lockouts.lua).
+local function ScaleFor(f)
     local scale = ns.WindowScale()
-    for _, f in ipairs(windows) do Rescale(f, scale) end
+    if f.maxScale and f.maxScale < scale then return f.maxScale end
+    return scale
+end
+
+-- After a window changes its maxScale.
+function ns.FitWindow(f) Rescale(f, ScaleFor(f)) end
+
+local function ApplyScale()
+    for _, f in ipairs(windows) do Rescale(f, ScaleFor(f)) end
     if ns.BagsWindowChanged then ns.BagsWindowChanged() end -- its default height is a share of the screen
 end
 
@@ -77,10 +87,10 @@ end
 -- Window Scale may have changed while it was closed.
 function ns.ScaleWindow(f)
     windows[#windows + 1] = f
-    f:SetScale(ns.WindowScale())
+    f:SetScale(ScaleFor(f))
     f:HookScript("OnShow", function(self)
         HookEllesmere()
-        local scale = ns.WindowScale()
+        local scale = ScaleFor(self)
         if self:GetScale() ~= scale then Rescale(self, scale) end
     end)
 end

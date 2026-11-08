@@ -479,11 +479,19 @@ end
 function FillPanel()
     local now = time()
     ns.PruneSaves(now)
-    -- The screen in our windows' units: the window never grows past it (peer review). Too
-    -- many characters to fit across: the raid grid repeats in blocks of what fits; too many
-    -- rows: it scrolls (mouse wheel or the page buttons). 0 = not known, no limit.
-    local scale = ns.WindowScale()
-    local sw, sh = UIParent:GetWidth() / scale, UIParent:GetHeight() / scale
+    -- The screen in the window's units: it never grows past it (peer review). Too many
+    -- characters to fit across: the raid grid repeats in blocks of what fits; too many rows:
+    -- it scrolls (mouse wheel or the page buttons). A window size so big that even its
+    -- narrowest layout or fewest rows don't fit (300% on a small screen): it's drawn smaller,
+    -- just enough to fit. 0 = not known, no limit.
+    local w, h = UIParent:GetWidth(), UIParent:GetHeight()
+    local most = math.huge
+    if w > 0 then most = w / MIN_WIDTH end
+    if h > 0 then most = math.min(most, h / (30 + MIN_ROWS * ROW_HEIGHT + 16 + 66)) end -- title, rows, two gaps, footer
+    panel.maxScale = most < ns.WindowScale() and floor(most * 100) / 100 or nil
+    ns.FitWindow(panel)
+    local scale = math.min(ns.WindowScale(), panel.maxScale or math.huge)
+    local sw, sh = w / scale, h / scale
     local delay = 60
     local n, y = 0, -30
     local function Next(gap)

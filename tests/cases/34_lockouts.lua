@@ -186,6 +186,48 @@ test("a Lockouts window too big for the screen repeats the grid in blocks and sc
     f.up.scripts.OnClick(f.up)
     assert(f.footer.text:find("1-23 of 30", 1, true), f.footer.text)
     assert(lockoutWindow():find("[MAGE]Alt01 | [MAGE]Alt02 | [MAGE]Alt03 | [MAGE]Alt04 | [MAGE]Alt05 | [MAGE]Alt06 | [MAGE]Alt07 | [MAGE]Alt08\n", 1, true), lockoutWindow())
+    eq(f.scale, 1.5, "fits at the size chosen")
+
+    -- 300% on the same screen: even the narrowest layout is wider than the screen at that
+    -- size, so it's drawn just small enough to fit. Another account's ten visits too.
+    local runs = {}
+    for i = 1, 10 do runs[i] = { at = NOW - 3000, left = NOW - 600 + i * 60, map = 389, name = "Ragefire Chasm" } end
+    ns.db.chars["Alt02"].account, ns.db.chars["Alt02"].runs = "other", runs
+    ns.SetWindowScale(3)
+    SlashCmdList.ALTSFOREVER("lockouts"); SlashCmdList.ALTSFOREVER("lockouts")
+    eq(f.scale < 3, true, "smaller than chosen: " .. f.scale)
+    eq(f.width * f.scale <= 1280, true, "fits across: " .. f.width * f.scale)
+    eq(f.height * f.scale <= 720, true, "fits down: " .. f.height * f.scale)
+    local seen, pages = {}, 0
+    repeat
+        for line in lockoutWindow():gmatch("[^\n]+") do seen[line] = true end
+        pages = pages + 1
+        f.down.scripts.OnClick(f.down)
+    until not f.down:IsEnabled() or pages > 20
+    for line in lockoutWindow():gmatch("[^\n]+") do seen[line] = true end
+    assert(seen["Alt02's account | |cffff800010/10|r"], "the account")
+    for i = 1, 10 do
+        assert(seen["Ragefire Chasm | [MAGE]Alt02 | frees in " .. (50 + i) .. " min"], "visit " .. i .. ": who and when")
+    end
+    local all = {}
+    for line in pairs(seen) do all[#all + 1] = line end
+    all = table.concat(all, "\n")
+    for i = 1, 20 do assert(all:find(("[MAGE]Alt%02d"):format(i), 1, true), "character " .. i .. " in the grid") end
+    ns.db.chars["Alt02"].runs = nil
+    -- A wide but short screen: its height decides.
+    UIParent.width, UIParent.height = 1920, 480
+    SlashCmdList.ALTSFOREVER("lockouts"); SlashCmdList.ALTSFOREVER("lockouts")
+    eq(f.height * f.scale <= 480, true, "fits down: " .. f.height * f.scale)
+    eq(f.width * f.scale <= 1920, true)
+    -- The screen shrinking while it's open: refitted at its next refill.
+    ns.SetWindowScale(1.5)
+    UIParent.width, UIParent.height = 1280, 720
+    SlashCmdList.ALTSFOREVER("lockouts"); SlashCmdList.ALTSFOREVER("lockouts")
+    eq(f.scale, 1.5)
+    UIParent.width, UIParent.height = 600, 400
+    ns.LockoutsChanged()
+    eq(f.width * f.scale <= 600 and f.height * f.scale <= 400, true, "refitted: " .. f.width * f.scale .. " x " .. f.height * f.scale)
+
     -- A big screen: all in one, no paging.
     UIParent.width, UIParent.height = 3840, 2160
     ns.SetWindowScale(1)
