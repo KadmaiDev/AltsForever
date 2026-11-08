@@ -1,4 +1,4 @@
-## Alts Forever 1.2.0 (not yet released)
+## Alts Forever 1.2.0
 
 - **Lockouts:** the raids each character is saved to, and when each resets, as with SavedInstances on retail. A new Lockouts column in the overview, the list (with bosses killed) when you hover a character, and `/af lockouts`. Read each time you log in on a character and after every boss kill. Forever's raids aren't out yet, so the column stays empty until then (dungeons don't lock you out).
 - **Instances this hour:** Forever lets each game account enter 10 dungeons and raids an hour, all its characters together. The overview's footer now counts them ("Instances this hour: 3/10", in orange with the wait once you reach 10), and `/af lockouts` says when the next one frees up. Going back into the same dungeon (a corpse run, a reload, stepping out and in) isn't counted twice. With your accounts synced, you see each account's count by its most played character ("Kadmai 3/10, Brak 1/10").
