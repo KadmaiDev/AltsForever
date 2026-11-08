@@ -157,7 +157,8 @@ local DB_FIELDS = {
     itemQuality = "table", rulesets = "table", syncWith = "table", forgotten = "table", syncAutoOff = "boolean",
     legacyPool = "number", scale = "number", minimapAngle = "number", bagsCols = "number",
     bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
-    account = "string",
+    account = "string", tooltipsOff = "boolean", countsOff = "boolean", craftTipsOff = "boolean",
+    cratesOff = "boolean", goldTipOff = "boolean", barsOff = "boolean",
 }
 
 -- Keeps only entries whose key and value are of these types (value nil = any).
@@ -608,19 +609,51 @@ function commands.mail()
     if not ns.PrintMailWarnings(math.huge) then Print(L["No mail with items or gold on record."]) end
 end
 
+-- A tooltip part's switch: says it's on or off, and that nothing shows while all of
+-- Alts Forever is off in tooltips (/af tooltips).
+local function TipPrint(msg)
+    Print(msg)
+    if not ns.TooltipsOn() then Print(L["Alts Forever adds nothing to tooltips until you turn it back on with /af tooltips."]) end
+end
+
+function commands.tooltips()
+    ns.SetTooltips(not ns.TooltipsOn())
+    Print(ns.TooltipsOn() and L["Alts Forever in tooltips on."] or L["Alts Forever in tooltips off. /af tooltips turns it back on."])
+end
+
 function commands.counts()
     ns.SetCounts(not ns.CountsOn())
-    Print(ns.CountsOn() and L["Item counts in tooltips on."] or L["Item counts in tooltips off."])
+    TipPrint(ns.CountsOn() and L["Item counts in tooltips on."] or L["Item counts in tooltips off."])
+end
+
+function commands.crafting()
+    ns.SetCraftTips(not ns.CraftTipsOn())
+    TipPrint(ns.CraftTipsOn() and L["Can craft and recipes in tooltips on."] or L["Can craft and recipes in tooltips off."])
+end
+
+function commands.crates()
+    ns.SetCrates(not ns.CratesOn())
+    TipPrint(ns.CratesOn() and L["Waylaid Crate materials in tooltips on."] or L["Waylaid Crate materials in tooltips off."])
+end
+
+function commands.gold()
+    ns.SetGoldTip(not ns.GoldTipOn())
+    TipPrint(ns.GoldTipOn() and L["Your characters' gold on your bag money on."] or L["Your characters' gold on your bag money off."])
+end
+
+function commands.bars()
+    ns.SetBars(not ns.BarsOn())
+    TipPrint(ns.BarsOn() and L["Your characters on the XP and reputation bars on."] or L["Your characters on the XP and reputation bars off."])
 end
 
 function commands.skillups()
     ns.SetSkillups(not ns.SkillupsOn())
-    Print(ns.db.skillupsOff and L["Skill-up details in tooltips off."] or L["Skill-up details in tooltips on."])
+    TipPrint(ns.db.skillupsOff and L["Skill-up details in tooltips off."] or L["Skill-up details in tooltips on."])
 end
 
 function commands.rulesets()
     ns.SetOtherRulesets(not ns.OtherRulesetsOn())
-    Print(ns.OtherRulesetsOn() and L["Characters on other rulesets or factions are shown in tooltips."]
+    TipPrint(ns.OtherRulesetsOn() and L["Characters on other rulesets or factions are shown in tooltips."]
         or L["Characters on other rulesets or factions are hidden in tooltips."])
 end
 
@@ -655,7 +688,7 @@ end
 
 function commands.upgrades()
     ns.SetUpgrades(not ns.UpgradesOn())
-    Print(ns.UpgradesOn() and L["Upgrades in item tooltips on."] or L["Upgrades in item tooltips off."])
+    TipPrint(ns.UpgradesOn() and L["Upgrades in item tooltips on."] or L["Upgrades in item tooltips off."])
 end
 
 -- /af legacy lists Legacy points to spend and Well Rested ranks; on/off sets the reminders.
@@ -735,22 +768,9 @@ function commands.rep()
     ns.ToggleReputation()
 end
 
--- /af lockouts: every character's raid and dungeon saves still running (Lockouts.lua).
--- Then the instances each account has entered this hour.
+-- /af lockouts: the Lockouts window (Lockouts.lua).
 function commands.lockouts()
-    local now = time()
-    local lines, runs = ns.LockoutLines(now), ns.InstanceLines(now)
-    if #lines == 0 and #runs == 0 then
-        return Print(L["No lockouts on record. They're read each time you log in on a character."])
-    end
-    if #lines > 0 then
-        Print(L["Lockouts:"])
-        for _, line in ipairs(lines) do Print("  " .. line) end
-    end
-    if #runs > 0 then
-        Print(L["Instances this hour (the game allows %d per account):"]:format(ns.INSTANCE_LIMIT))
-        for _, line in ipairs(runs) do Print("  " .. line) end
-    end
+    ns.ToggleLockouts()
 end
 
 -- /af sync First Last: swaps characters with your character on another game account (Sync.lua).
@@ -771,6 +791,7 @@ end
 function commands.help()
     Print(L["by Kadmai. /af opens the overview. Also: /af rep | export | mail | list | delete Name | skillups | sendmail | minimap | stats | mem"])
     Print(L["/af search (or /afs), with or without a name, finds an item on any of your characters, or who can craft it."])
+    Print(L["/af tooltips turns everything Alts Forever adds to tooltips on or off. /af crafting, crates, gold and bars turn one part on or off."])
     Print(L["/af counts turns the item counts in tooltips on or off (if another addon, such as Baganator, already shows them)."])
     Print(L["/af bags or /af bank, with a name for another character, shows their bags or bank slot by slot."])
     Print(L["/af icons picks the icons item tooltips use for bags, bank, mail and worn items."])
@@ -780,8 +801,7 @@ function commands.help()
     Print(L["/af scale 150 makes Alts Forever's windows one and a half times their size (any size from 50 to 300), on top of the game's UI scale."])
     if ns.HasEllesmereScale() then Print(L["/af scale eui makes them follow EllesmereUI's Window Scale again (the default)."]) end
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
-    Print(L["/af lockouts lists the raids and dungeons each character is saved to, and when they reset."])
-    Print(L["/af lockouts also counts the dungeons and raids each game account has entered this hour."])
+    Print(L["/af lockouts opens your characters' raid lockouts and the instances each game account has entered this hour."])
     Print(L["/af sync and the name of your character on another game account swaps characters with it, so both accounts see all of them. Both need to be online at the same time, on the same ruleset and faction."])
     Print(L["/af sync auto turns syncing by itself on or off."])
     Print(L["/af rulesets shows or hides your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; they can't trade with this one."])

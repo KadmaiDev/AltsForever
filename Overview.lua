@@ -475,6 +475,73 @@ local function Refresh()
     frame:SetHeight(54 + y + 32)
 end
 
+---------------------------------------------------------------------------
+-- Panels opened beside the overview (Reputation, Lockouts): each goes where it covers
+-- neither the overview nor another of them that's open, as far as the screen allows
+-- (owner, 2026-11-08: one placed below a low overview was pushed up over it by the screen
+-- edge, and the two opened in the same spot). Tried in turn: below the overview, beside or
+-- below another open panel, above the overview, right of it, left of it, left of another;
+-- the first that fits on screen covering nothing wins, else below the overview as before.
+-- Anchored to the overview (or that panel), so they follow it when it's dragged. Our windows
+-- share one scale, so their edges compare directly. Placed when opened, after it's sized.
+---------------------------------------------------------------------------
+local GAP = 4
+local dockable = {}
+
+-- A window's edges, or nil if the game hasn't laid it out.
+local function Edges(f)
+    local l, r, t, b = f:GetLeft(), f:GetRight(), f:GetTop(), f:GetBottom()
+    if issecretvalue(l) or issecretvalue(r) or issecretvalue(t) or issecretvalue(b) then return nil end
+    if type(l) ~= "number" or type(r) ~= "number" or type(t) ~= "number" or type(b) ~= "number" then return nil end
+    return { f, l, r, t, b }
+end
+
+function ns.DockToOverview(panel)
+    dockable[panel] = true
+    panel:ClearAllPoints()
+    local overview = AltsForeverFrame
+    if not (overview and overview:IsShown()) then return panel:SetPoint("CENTER") end
+    local ov = Edges(overview)
+    local w, h = panel:GetWidth(), panel:GetHeight()
+    local scale = ns.WindowScale()
+    local sw, sh = UIParent:GetWidth() / scale, UIParent:GetHeight() / scale
+    if ov and w > 0 and h > 0 and sw > 0 and sh > 0 then
+        local taken, others = { ov }, {}
+        for other in pairs(dockable) do
+            if other ~= panel and other:IsShown() then
+                local e = Edges(other)
+                if e then taken[#taken + 1], others[#others + 1] = e, e end
+            end
+        end
+        local function Fits(x, top)
+            local right, bottom = x + w, top - h
+            if x < 0 or right > sw or bottom < 0 or top > sh then return false end
+            for _, e in ipairs(taken) do
+                if x < e[3] and right > e[2] and top > e[5] and bottom < e[4] then return false end
+            end
+            return true
+        end
+        local function Try(x, top, point, rel, relPoint, dx, dy)
+            if not Fits(x, top) then return false end
+            panel:SetPoint(point, rel, relPoint, dx, dy)
+            return true
+        end
+        local l, r, t, b = ov[2], ov[3], ov[4], ov[5]
+        if Try(l, b - GAP, "TOPLEFT", overview, "BOTTOMLEFT", 0, -GAP) then return end
+        for _, e in ipairs(others) do
+            if Try(e[3] + GAP, e[4], "TOPLEFT", e[1], "TOPRIGHT", GAP, 0) then return end
+            if Try(e[2], e[5] - GAP, "TOPLEFT", e[1], "BOTTOMLEFT", 0, -GAP) then return end
+        end
+        if Try(l, t + GAP + h, "BOTTOMLEFT", overview, "TOPLEFT", 0, GAP) then return end
+        if Try(r + GAP, t, "TOPLEFT", overview, "TOPRIGHT", GAP, 0) then return end
+        if Try(l - GAP - w, t, "TOPRIGHT", overview, "TOPLEFT", -GAP, 0) then return end
+        for _, e in ipairs(others) do
+            if Try(e[2] - GAP - w, e[4], "TOPRIGHT", e[1], "TOPLEFT", -GAP, 0) then return end
+        end
+    end
+    panel:SetPoint("TOPLEFT", overview, "BOTTOMLEFT", 0, -GAP)
+end
+
 local function CreateWindow()
     -- Room for the left inset, every column, and the right border.
     local width = 12 + 20
@@ -549,10 +616,25 @@ local function CreateWindow()
     end)
     rep:SetScript("OnLeave", function() GameTooltip:Hide() end)
     f.repButton = rep
-    -- Bags and bank window button, left of the reputation button.
+    -- Lockouts window button, left of the reputation button.
+    local lockouts = CreateFrame("Button", nil, f)
+    lockouts:SetSize(16, 16)
+    lockouts:SetPoint("RIGHT", rep, "LEFT", -6, 0)
+    lockouts:SetNormalTexture("Interface\\Icons\\INV_Misc_Key_03")
+    lockouts:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    lockouts:SetScript("OnClick", function() ns.ToggleLockouts() end)
+    lockouts:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["Lockouts"])
+        GameTooltip:AddLine(L["Your characters' raid lockouts, and the instances each game account has entered this hour"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    lockouts:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    f.lockoutsButton = lockouts
+    -- Bags and bank window button, left of the lockouts button.
     local bags = CreateFrame("Button", nil, f)
     bags:SetSize(16, 16)
-    bags:SetPoint("RIGHT", rep, "LEFT", -6, 0)
+    bags:SetPoint("RIGHT", lockouts, "LEFT", -6, 0)
     bags:SetNormalTexture("Interface\\Icons\\INV_Misc_Bag_08")
     bags:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
     bags:SetScript("OnClick", function() ns.ShowBags(ns.charKey, "bags") end)

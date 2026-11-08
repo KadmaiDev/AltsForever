@@ -80,19 +80,234 @@ test("the overview counts each character's saves; the row tooltip lists them, so
     assert(text:find("Lockouts\nOnyxia's Lair = 5h\nMolten Core = 3/10 · 3d 1h", 1, true), text)
 end)
 
-test("/af lockouts lists every character with saves", function()
+-- The Lockouts window's shown rows, one line each: its texts joined by " | ".
+function lockoutWindow()
+    local out = {}
+    for _, row in ipairs(AltsForeverLockoutsFrame.lines) do
+        if row.shown then
+            local parts = {}
+            for _, fs in ipairs({ row.heading, row.a, row.b, row.c, unpack(row.cells) }) do
+                if fs.shown and fs.text and fs.text ~= "" then parts[#parts + 1] = fs.text end
+            end
+            out[#out + 1] = table.concat(parts, " | ")
+        end
+    end
+    return table.concat(out, "\n")
+end
+
+test("the Lockouts window lists raids down and characters with saves across", function()
     local ns = wow.load(FILES)
     wow.now = NOW
-    wow.login(lockoutAlts())
+    local saved = lockoutAlts()
+    saved.chars["Far"].saves = { ["Molten Core"] = NOW + 3 * DAY + HOUR }
+    wow.login(saved)
     SlashCmdList.ALTSFOREVER("lockouts")
-    local text = table.concat(wow.printed, "\n")
-    assert(text:find("[PRIEST]High: Onyxia's Lair (5h), Molten Core (3/10 · 3d 1h)", 1, true), text)
-    assert(not text:find("Low", 1, true), text)
+    local f = AltsForeverLockoutsFrame
+    eq(f.shown, true)
+    eq(lockoutWindow(), table.concat({
+        "Instances this hour (10 per game account)",
+        G .. "None entered this hour.|r",
+        "Raid lockouts",
+        "[MAGE]Far | [PRIEST]High",
+        "Onyxia's Lair | " .. G .. "-|r | Saved",
+        "Molten Core | Saved | 3/10",
+    }, "\n"))
+    local row = f.lines[6]
+    row.scripts.OnEnter(row)
+    eq(textOf(GameTooltip.lines), "Molten Core\n[MAGE]Far = 3d 1h\n[PRIEST]High = 3/10 · 3d 1h")
+    SlashCmdList.ALTSFOREVER("lockouts")
+    eq(f.shown, false, "again closes it")
+
+    -- The overview's key button opens it too.
+    SlashCmdList.ALTSFOREVER("")
+    AltsForeverFrame.lockoutsButton.scripts.OnClick(AltsForeverFrame.lockoutsButton)
+    eq(f.shown, true)
+    eq(f.point[2], AltsForeverFrame, "below the overview")
+
+    -- A save read while it's open shows at once.
+    wow.saves = { { "Zul'Gurub", 2 * DAY, true, false, "20 Player", 10, 2 } }
+    wow.fire("UPDATE_INSTANCE_INFO")
+    assert(lockoutWindow():find("Zul'Gurub | 2/10", 1, true), lockoutWindow())
 
     wow.load(FILES)
     wow.login(nil)
     SlashCmdList.ALTSFOREVER("lockouts")
-    assert(table.concat(wow.printed, "\n"):find("No lockouts on record", 1, true))
+    assert(lockoutWindow():find("No lockouts on record", 1, true), lockoutWindow())
+end)
+
+test("forgetting a character while the Lockouts window is open takes them out of it", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    local saved = lockoutAlts()
+    saved.chars["Far"].saves = { ["Molten Core"] = NOW + 3 * DAY + HOUR }
+    wow.login(saved)
+    SlashCmdList.ALTSFOREVER("lockouts")
+    local f = AltsForeverLockoutsFrame
+    local row = f.lines[6] -- Molten Core
+    SlashCmdList.ALTSFOREVER("delete Far")
+    assert(not lockoutWindow():find("Far", 1, true), lockoutWindow())
+    row.scripts.OnEnter(row)
+    eq(textOf(GameTooltip.lines), "Molten Core\n[PRIEST]High = 3/10 · 3d 1h")
+    -- A row still listing them (no refill) doesn't break its tooltip.
+    row.keys = { "Far", "High" }
+    row.scripts.OnEnter(row)
+    eq(textOf(GameTooltip.lines), "Molten Core\n[PRIEST]High = 3/10 · 3d 1h")
+end)
+
+test("a Lockouts window too big for the screen repeats the grid in blocks and scrolls", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    local saved = { v = 2, chars = {} }
+    for i = 1, 20 do
+        local name = ("Alt%02d"):format(i)
+        saved.chars[name] = alt(name, "MAGE", { level = 60 - i, saves = { ["Molten Core"] = NOW + DAY, ["Onyxia's Lair"] = NOW + 2 * DAY } })
+    end
+    for i = 1, 6 do saved.chars["Alt01"].saves["Raid " .. i] = NOW + 3 * DAY + i end
+    wow.login(saved)
+    UIParent.width, UIParent.height = 1280, 720
+    ns.SetWindowScale(1.5) -- 853 x 480 in the window's units
+    SlashCmdList.ALTSFOREVER("lockouts")
+    local f = AltsForeverLockoutsFrame
+    eq(f.width <= 853, true, "fits across: " .. f.width)
+    eq(f.width, 8 + 170 + 8 * 80 + 16, "8 characters across")
+    eq(f.height <= 480, true, "fits down: " .. f.height)
+    local n = 0
+    for _, row in ipairs(f.lines) do if row.shown then n = n + 1 end end
+    eq(n, 23, "the rows that fit (the gaps between sections take room)")
+    assert(f.footer.text:find("1-23 of 30", 1, true), f.footer.text) -- 2 + 1 + 3 blocks (8, 8, 4 characters) of 1 + 8 rows
+    eq(f.up.shown, true); eq(f.up:IsEnabled(), false); eq(f.down:IsEnabled(), true)
+    -- Every character is there, in blocks of 8.
+    f.scripts.OnMouseWheel(f, -1)
+    f.down.scripts.OnClick(f.down)
+    local all = lockoutWindow()
+    assert(f.footer.text:find("7-30 of 30", 1, true), f.footer.text)
+    assert(all:find("[MAGE]Alt17 | [MAGE]Alt18 | [MAGE]Alt19 | [MAGE]Alt20", 1, true), all)
+    eq(f.down:IsEnabled(), false, "at the end")
+    f.up.scripts.OnClick(f.up)
+    assert(f.footer.text:find("1-23 of 30", 1, true), f.footer.text)
+    assert(lockoutWindow():find("[MAGE]Alt01 | [MAGE]Alt02 | [MAGE]Alt03 | [MAGE]Alt04 | [MAGE]Alt05 | [MAGE]Alt06 | [MAGE]Alt07 | [MAGE]Alt08\n", 1, true), lockoutWindow())
+    eq(f.scale, 1.5, "fits at the size chosen")
+
+    -- 300% on the same screen: even the narrowest layout is wider than the screen at that
+    -- size, so it's drawn just small enough to fit. Another account's ten visits too.
+    local runs = {}
+    for i = 1, 10 do runs[i] = { at = NOW - 3000, left = NOW - 600 + i * 60, map = 389, name = "Ragefire Chasm" } end
+    ns.db.chars["Alt02"].account, ns.db.chars["Alt02"].runs = "other", runs
+    ns.SetWindowScale(3)
+    SlashCmdList.ALTSFOREVER("lockouts"); SlashCmdList.ALTSFOREVER("lockouts")
+    eq(f.scale < 3, true, "smaller than chosen: " .. f.scale)
+    eq(f.width * f.scale <= 1280, true, "fits across: " .. f.width * f.scale)
+    eq(f.height * f.scale <= 720, true, "fits down: " .. f.height * f.scale)
+    local seen, pages = {}, 0
+    repeat
+        for line in lockoutWindow():gmatch("[^\n]+") do seen[line] = true end
+        pages = pages + 1
+        f.down.scripts.OnClick(f.down)
+    until not f.down:IsEnabled() or pages > 20
+    for line in lockoutWindow():gmatch("[^\n]+") do seen[line] = true end
+    assert(seen["Alt02's account | |cffff800010/10|r"], "the account")
+    for i = 1, 10 do
+        assert(seen["Ragefire Chasm | [MAGE]Alt02 | frees in " .. (50 + i) .. " min"], "visit " .. i .. ": who and when")
+    end
+    local all = {}
+    for line in pairs(seen) do all[#all + 1] = line end
+    all = table.concat(all, "\n")
+    for i = 1, 20 do assert(all:find(("[MAGE]Alt%02d"):format(i), 1, true), "character " .. i .. " in the grid") end
+    ns.db.chars["Alt02"].runs = nil
+    -- A wide but short screen: its height decides.
+    UIParent.width, UIParent.height = 1920, 480
+    SlashCmdList.ALTSFOREVER("lockouts"); SlashCmdList.ALTSFOREVER("lockouts")
+    eq(f.height * f.scale <= 480, true, "fits down: " .. f.height * f.scale)
+    eq(f.width * f.scale <= 1920, true)
+    -- The screen shrinking while it's open: refitted at its next refill.
+    ns.SetWindowScale(1.5)
+    UIParent.width, UIParent.height = 1280, 720
+    SlashCmdList.ALTSFOREVER("lockouts"); SlashCmdList.ALTSFOREVER("lockouts")
+    eq(f.scale, 1.5)
+    UIParent.width, UIParent.height = 600, 400
+    ns.LockoutsChanged()
+    eq(f.width * f.scale <= 600 and f.height * f.scale <= 400, true, "refitted: " .. f.width * f.scale .. " x " .. f.height * f.scale)
+
+    -- A big screen: all in one, no paging.
+    UIParent.width, UIParent.height = 3840, 2160
+    ns.SetWindowScale(1)
+    SlashCmdList.ALTSFOREVER("lockouts"); SlashCmdList.ALTSFOREVER("lockouts")
+    eq(f.width, 8 + 170 + 20 * 80 + 16)
+    eq(f.footer.text, ""); eq(f.down.shown, false)
+end)
+
+test("Reputation and Lockouts open where they cover neither the overview nor each other", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.login(lockoutAlts())
+    UIParent.width, UIParent.height = 1920, 1080
+    SlashCmdList.ALTSFOREVER("")
+    local ov = AltsForeverFrame
+    local function anchor(f) return f.point[1] .. " " .. (f.point[2] == ov and "overview" or f.point[2] == UIParent and "screen"
+        or f.point[2] and f.point[2].frameName or tostring(f.point[2])) .. " " .. tostring(f.point[3]) end
+    -- Lays a window out where its anchor puts it (the fake has no layout engine).
+    local function lay(f)
+        local p, rel, relPoint, dx, dy = unpack(f.point)
+        local r = rel.rect
+        local x = relPoint:find("LEFT") and r[1] or r[2]
+        local y = relPoint:find("TOP") and r[3] or r[4]
+        x, y = x + (dx or 0), y + (dy or 0)
+        local w, h = f.width, f.height
+        local left = p:find("LEFT") and x or x - w
+        local top = p:find("TOP") and y or y + h
+        f.rect = { left, left + w, top, top - h }
+    end
+    local function open(cmd, name)
+        SlashCmdList.ALTSFOREVER(cmd)
+        lay(_G[name])
+    end
+    local lock, rep
+
+    -- Room below: the first goes there, the second beside it.
+    ov.rect = { 100, 1100, 1000, 600 }
+    open("lockouts", "AltsForeverLockoutsFrame")
+    lock = AltsForeverLockoutsFrame
+    eq(anchor(lock), "TOPLEFT overview BOTTOMLEFT")
+    open("rep", "AltsForeverRepFrame")
+    rep = AltsForeverRepFrame
+    eq(anchor(rep), "TOPLEFT AltsForeverLockoutsFrame TOPRIGHT", "beside it, not on top of it")
+    SlashCmdList.ALTSFOREVER("rep")
+
+    -- No room beside it: below it.
+    UIParent.width = 700
+    ov.rect = { 10, 690, 1070, 700 }
+    SlashCmdList.ALTSFOREVER("lockouts"); open("lockouts", "AltsForeverLockoutsFrame")
+    eq(anchor(lock), "TOPLEFT overview BOTTOMLEFT")
+    open("rep", "AltsForeverRepFrame")
+    eq(anchor(rep), "TOPLEFT AltsForeverLockoutsFrame BOTTOMLEFT")
+    SlashCmdList.ALTSFOREVER("rep")
+    SlashCmdList.ALTSFOREVER("lockouts")
+    UIParent.width = 1920
+
+    -- The overview low on the screen: above it.
+    ov.rect = { 100, 1100, 400, 50 }
+    open("lockouts", "AltsForeverLockoutsFrame")
+    eq(anchor(lock), "BOTTOMLEFT overview TOPLEFT")
+    SlashCmdList.ALTSFOREVER("lockouts")
+    -- As tall as the screen: to its right; at the right edge: to its left.
+    ov.rect = { 100, 1100, 1075, 5 }
+    open("lockouts", "AltsForeverLockoutsFrame")
+    eq(anchor(lock), "TOPLEFT overview TOPRIGHT")
+    SlashCmdList.ALTSFOREVER("lockouts")
+    ov.rect = { 800, 1915, 1075, 5 }
+    open("lockouts", "AltsForeverLockoutsFrame")
+    eq(anchor(lock), "TOPRIGHT overview TOPLEFT")
+    SlashCmdList.ALTSFOREVER("lockouts")
+    -- Nowhere free: below it, as before.
+    ov.rect = { 0, 1920, 1080, 0 }
+    open("lockouts", "AltsForeverLockoutsFrame")
+    eq(anchor(lock), "TOPLEFT overview BOTTOMLEFT")
+    SlashCmdList.ALTSFOREVER("lockouts")
+
+    -- Without the overview: the middle of the screen.
+    ov:Hide()
+    SlashCmdList.ALTSFOREVER("lockouts")
+    eq(anchor(lock), "CENTER nil nil")
 end)
 
 test("damaged saves are repaired at load", function()

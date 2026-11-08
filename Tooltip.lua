@@ -302,6 +302,25 @@ function ns.SetCounts(on)
     ns.db.countsOff = not on or nil
 end
 
+-- Everything we add to tooltips, on or off as a whole (a player's request, 2026-11-08: they
+-- want the game's tooltips untouched and the overview, bags and search kept). Off, nothing
+-- is added to item, trainer, bag money or XP/reputation bar tooltips; each part's own
+-- setting is kept for when it's turned back on. Each part also has its own switch.
+function ns.TooltipsOn() return not ns.db.tooltipsOff end
+function ns.SetTooltips(on) ns.db.tooltipsOff = not on or nil end
+-- Can craft and recipe status (Known / Can learn / Needs skill).
+function ns.CraftTipsOn() return not ns.db.craftTipsOff end
+function ns.SetCraftTips(on) ns.db.craftTipsOff = not on or nil end
+-- The Waylaid Crate materials grid.
+function ns.CratesOn() return not ns.db.cratesOff end
+function ns.SetCrates(on) ns.db.cratesOff = not on or nil end
+-- Your characters' gold on the bag money (Money.lua).
+function ns.GoldTipOn() return not ns.db.goldTipOff end
+function ns.SetGoldTip(on) ns.db.goldTipOff = not on or nil end
+-- Your other characters on the XP and reputation bars (Bars.lua).
+function ns.BarsOn() return not ns.db.barsOff end
+function ns.SetBars(on) ns.db.barsOff = not on or nil end
+
 function ns.InvalidateCache()
     wipe(cache)
     wipe(names)
@@ -371,7 +390,7 @@ end
 
 
 local function OnItem(tt, data)
-    if (tt ~= GameTooltip and tt ~= ItemRefTooltip) or tt:IsForbidden() then return end
+    if (tt ~= GameTooltip and tt ~= ItemRefTooltip) or ns.db.tooltipsOff or tt:IsForbidden() then return end
     local id = data and data.id
     if issecretvalue(id) then return end
     if not id then
@@ -379,12 +398,13 @@ local function OnItem(tt, data)
         id = link and GetItemInfoInstant(link)
     end
     if id then
-        ns.AddRecipeLines(tt, id, data)
+        local db = ns.db
+        if not db.craftTipsOff then ns.AddRecipeLines(tt, id, data) end
         ns.AddUpgradeLines(tt, id, data)
-        ns.AddCraftLines(tt, id)
+        if not db.craftTipsOff then ns.AddCraftLines(tt, id) end
         ns.AddSkillupLines(tt, id)
-        ns.AddCrateLines(tt, id, data)
-        if not ns.db.countsOff then ns.AddLines(tt, id) end
+        if not db.cratesOff then ns.AddCrateLines(tt, id, data) end
+        if not db.countsOff then ns.AddLines(tt, id) end
     end
 end
 
