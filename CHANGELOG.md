@@ -1,7 +1,16 @@
-## Alts Forever 1.1.0 (not yet released: to be tried in the live game first)
+## Alts Forever 1.2.0 (not yet released)
 
 - **Lockouts:** the raids and dungeons each character is saved to, and when each resets. A new Lockouts column in the overview, the list (with bosses killed) when you hover a character, and `/af lockouts`. Read each time you log in on a character and after every boss kill.
-- **Sync with your other game accounts:** the new sync button at the top of the overview (or `/af sync`) opens a window: enter the name of your character on another game account (under the same Battle.net account or not), press Sync and a progress bar shows how it's going. It swaps everything Alts Forever knows between the two, so both see all your characters. After that it keeps itself up to date: whenever both accounts are online they swap changes by themselves, when either logs in and then every 10 minutes (untick it in the sync window, or `/af sync auto`). Both characters must be online at the same time, on the same ruleset and faction; the other side is asked to accept the first time. Each side sends every character it knows, so syncing one pair brings your characters on every ruleset and faction. A character you forget stays forgotten unless it's played again.
+
+## Alts Forever 1.1.1
+
+- **Characters on one ruleset are no longer split up:** the game can give characters on the same ruleset different realm names (Realm10RP and Realm11RP). They now count as one group, so they share a heading in the overview and show up for each other in the mailbox's Send to list, tooltips, gold totals and sync. Gold history kept separately for each realm name is joined up too. Thanks to Aaron for the report.
+- **Sync timing:** a sync that falls due while you're in combat now runs as soon as the fight ends, and syncing by itself really is every 10 minutes (it could take up to 20).
+
+## Alts Forever 1.1.0
+
+- **Sync with your other game accounts:** see all your characters from every account, under the same Battle.net account or not. Press the new sync button at the top of the overview (or type `/af sync`), enter the name of your character on the other account and press Sync; a progress bar shows how it's going. Both characters must be online at the same time, on the same ruleset and faction, and the other side is asked to accept the first time. Each side sends every character it knows, so one sync brings your characters on every ruleset and faction.
+- **Stays in sync by itself:** once you've synced, your accounts swap changes on their own whenever both are online, when either logs in and then every 10 minutes. Untick it in the sync window, or type `/af sync auto`. A character you forget stays forgotten unless it's played again.
 
 ## Alts Forever 1.0.2
 

@@ -23,6 +23,7 @@ local KNOWN_EVENTS = {
     TIME_PLAYED_MSG = true, UNIT_NAME_UPDATE = true, UPDATE_FACTION = true,
     TRAIT_CONFIG_UPDATED = true, TRAIT_TREE_CURRENCY_INFO_UPDATED = true, GET_ITEM_INFO_RECEIVED = true,
     UPDATE_INSTANCE_INFO = true, ENCOUNTER_END = true, BOSS_KILL = true, CHAT_MSG_ADDON = true,
+    PLAYER_REGEN_ENABLED = true,
 }
 
 -- Resets every global and loads the addon files fresh. Returns the addon namespace.

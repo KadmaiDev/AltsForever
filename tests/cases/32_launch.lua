@@ -60,7 +60,7 @@ test("first login on a live realm: the beta's characters are forgotten, settings
     assert(betaLine():find("(4)", 1, true), betaLine())
     eq(AltsForeverDB.countsOff, true, "settings kept")
     eq(AltsForeverDB.goldDays[100], nil, "the beta's gold history is gone")
-    eq(AltsForeverDB.goldGroup, "Realm|Alliance", "this group's history is the main one now")
+    eq(AltsForeverDB.goldGroup, "normal|Alliance", "this group's history is the main one now")
     eq(AltsForeverDB.goldDaysBy, nil)
     eq(AltsForeverDB.collapsedGroups, nil)
     eq(AltsForeverDB.legacyPool, 0, "Legacy points read afresh: the live account has none yet")

@@ -231,6 +231,7 @@ function ns.StartMail()
         -- Mail you send lasts 30 days, then goes back to you.
         local at = time() + SENT_MAIL_DAYS * DAY
         if not alt.mailExpires or at < alt.mailExpires then alt.mailExpires, alt.mailDeletes = at, nil end
+        alt.changed = time() -- so a sync with another account picks it up
         wipe(pending)
         pendingMoney = 0
         ns.InvalidateCache()

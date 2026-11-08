@@ -145,7 +145,7 @@ local CHAR_FIELDS = {
     money = "number", level = "number", xp = "number", xpMax = "number", rested = "number",
     seen = "number", updated = "number", ilvl = "number", dura = "number", played = "number",
     playedAt = "number", mailExpires = "number", spec = "number", wellRested = "number",
-    legacySpent = "number", bankAt = "number",
+    legacySpent = "number", bankAt = "number", changed = "number",
     bags = "table", bank = "table", mail = "table", equip = "table", gear = "table",
     layout = "table", profs = "table", profMax = "table", recipes = "table", crafts = "table",
     reps = "table", duraSlots = "table", saves = "table", saveKills = "table",
@@ -269,16 +269,47 @@ end
 
 ---------------------------------------------------------------------------
 -- Rulesets. Forever has no realm list, but each ruleset (Normal, PvP, Roleplaying,
--- Hardcore) is its own world with its own auction house and mail, and the client reports
--- one realm name for it (the owner's Normal characters: "ClassicBetaPvE2"). Characters on
--- different rulesets can't mail or trade, so each character's realm name is recorded at
--- login and characters are grouped by it. A character not logged in since (no realm yet)
--- counts as being on yours, so nothing disappears until they log in once. Mail never
--- crosses factions either, on any ruleset, so the other faction is treated the same way.
+-- Hardcore) is its own world with its own auction house and mail. The client reports a realm
+-- name, and one ruleset can have several ("CAMWOWUS2Realm10RP", "CAMWOWUS2Realm11RP": a
+-- player's characters on the same ruleset, 2026-11-07), so a realm name says which ruleset
+-- a character is on and no more. Characters on different rulesets can't mail or trade, so
+-- each character's realm name is recorded at login and characters are grouped by its
+-- ruleset. A character not logged in since (no realm yet) counts as being on yours, so
+-- nothing disappears until they log in once. Mail never crosses factions either, on any
+-- ruleset, so the other faction is treated the same way.
 ---------------------------------------------------------------------------
 function ns.PlayerRealm()
     local realm = GetNormalizedRealmName and GetNormalizedRealmName()
     if type(realm) == "string" and not issecretvalue(realm) and realm ~= "" then return realm end
+end
+
+local RULESET_NAMES = { normal = L["Normal"], pvp = L["PvP"], rp = L["Roleplaying"], hardcore = L["Hardcore"] }
+
+-- What a realm name says about its ruleset, false if nothing. Kept per name: this is asked
+-- for every character in a tooltip's list.
+local named = {}
+local function NamedRuleset(realm)
+    local ruleset = named[realm]
+    if ruleset == nil then
+        local r = realm:lower()
+        ruleset = r:find("hardcore", 1, true) and "hardcore"
+            or r:find("pvp%d*$") and "pvp"
+            or (r:find("rp%d*$") or r:find("roleplay", 1, true)) and "rp"
+            or (r:find("pve%d*$") or r:find("normal", 1, true)) and "normal"
+            or false
+        named[realm] = ruleset
+    end
+    return ruleset
+end
+
+-- A realm's ruleset ("normal", "pvp", "rp", "hardcore"): as the game told us, else from the
+-- name; a realm that doesn't say counts as a world of its own, under its own name. The
+-- game's "normal" only means no rule it was asked about was on, so the name beats that.
+function ns.RulesetOf(realm)
+    local told = ns.db.rulesets and ns.db.rulesets[realm]
+    if not RULESET_NAMES[told] then told = nil end
+    if told and told ~= "normal" then return told end
+    return NamedRuleset(realm) or told or realm
 end
 
 -- Out of mail's reach from the character you're on: another ruleset or the other faction
@@ -286,7 +317,10 @@ end
 function ns.Elsewhere(c)
     local me = ns.char
     if not me or c == me then return false end
-    if c.realm and me.realm and c.realm ~= me.realm then return true end
+    if c.realm and me.realm and c.realm ~= me.realm
+        and ns.RulesetOf(c.realm) ~= ns.RulesetOf(me.realm) then
+        return true
+    end
     return c.faction ~= nil and me.faction ~= nil and c.faction ~= me.faction
 end
 
@@ -321,43 +355,22 @@ function ns.PlayerRuleset()
     return asked and "normal" or nil
 end
 
-local RULESET_NAMES = { normal = "Normal", pvp = "PvP", rp = "Roleplaying", hardcore = "Hardcore" }
-
--- The ruleset's name, in the player's language: as the game told us for that realm, else
--- from the realm name; a realm name that doesn't say is shown as it is.
-local function RulesetBase(realm)
-    local known = ns.db.rulesets and RULESET_NAMES[ns.db.rulesets[realm]]
-    if known then return L[known] end
-    local r = realm:lower()
-    if r:find("hardcore", 1, true) then return L["Hardcore"] end
-    if r:find("pvp%d*$") then return L["PvP"] end
-    if r:find("rp%d*$") or r:find("roleplay", 1, true) then return L["Roleplaying"] end
-    if r:find("pve%d*$") or r:find("normal", 1, true) then return L["Normal"] end
-    return realm
-end
-
--- Two realms with the same ruleset (the beta has "ClassicBetaPvE" and "...PvE2") are
--- told apart by their realm names.
+-- The ruleset's name, in the player's language; a realm name that doesn't say is shown as
+-- it is.
 function ns.RulesetLabel(realm)
     if not realm then return L["Not sorted yet (log in on them once)"] end
-    local base = RulesetBase(realm)
-    if base == realm then return realm end
-    for _, c in pairs(ns.db.chars) do
-        if c.realm and c.realm ~= realm and RulesetBase(c.realm) == base then
-            return base .. " (" .. realm .. ")"
-        end
-    end
-    return base
+    return RULESET_NAMES[ns.RulesetOf(realm)] or realm
 end
 
 -- What tells your characters' groups apart: rulesets once two are known, factions once
 -- both are played. Neither: one group, no headings.
 function ns.GroupParts()
-    local realm, faction, byRealm, byFaction
+    local ruleset, faction, byRealm, byFaction
     for _, c in pairs(ns.db.chars) do
         if c.realm then
-            if realm and realm ~= c.realm then byRealm = true end
-            realm = c.realm
+            local r = ns.RulesetOf(c.realm)
+            if ruleset and ruleset ~= r then byRealm = true end
+            ruleset = r
         end
         if c.faction then
             if faction and faction ~= c.faction then byFaction = true end
@@ -370,7 +383,8 @@ end
 -- A character's group for the parts in use (from GroupParts), and its heading, e.g.
 -- "PvP · Horde". A realm not known yet is "?".
 function ns.GroupKey(c, byRealm, byFaction)
-    return (byRealm and (c.realm or "?") or "") .. "|" .. (byFaction and (c.faction or "?") or "")
+    local ruleset = byRealm and (c.realm and ns.RulesetOf(c.realm) or "?") or ""
+    return ruleset .. "|" .. (byFaction and (c.faction or "?") or "")
 end
 
 local function FactionName(f)

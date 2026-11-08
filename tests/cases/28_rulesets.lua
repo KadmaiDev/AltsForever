@@ -1,6 +1,6 @@
 -- Tests: rulesets. Loaded by tests/run.lua.
 -- Each ruleset (Normal, PvP, Roleplaying, Hardcore) is its own world with its own auction
--- house and mail; the client reports one realm name per ruleset.
+-- house and mail; the client reports a realm name, and a ruleset can have several.
 
 PVE, PVP = "ClassicBetaPvE2", "ClassicBetaPvP"
 
@@ -44,7 +44,7 @@ test("each character's ruleset is recorded at login; a secret or empty one is ig
     eq(AltsForeverDB.chars["Aldric"].realm, nil)
 end)
 
-test("ruleset names: from the realm name, told apart when two share a ruleset", function()
+test("ruleset names: from the realm name, the same for two realms of one ruleset", function()
     local ns = rulesetStart()
     eq(ns.RulesetLabel(PVP), "PvP")
     eq(ns.RulesetLabel(PVE), "Normal")
@@ -53,7 +53,7 @@ test("ruleset names: from the realm name, told apart when two share a ruleset", 
     eq(ns.RulesetLabel("Somewhere"), "Somewhere", "a name that doesn't say is shown as it is")
     eq(ns.RulesetLabel(nil), "Not sorted yet (log in on them once)")
     AltsForeverDB.chars["Tarn Moon"].realm = "ClassicBetaPvE"
-    eq(ns.RulesetLabel(PVE), "Normal (ClassicBetaPvE2)")
+    eq(ns.RulesetLabel(PVE), "Normal")
 end)
 
 test("ruleset names: the game's own answer, recorded per realm, beats the realm name", function()
@@ -68,7 +68,7 @@ test("ruleset names: the game's own answer, recorded per realm, beats the realm 
     eq(ns.RulesetLabel("Forever-3"), "PvP")
     eq(ns.RulesetLabel("Forever-1"), "Forever-1", "not asked yet: the realm name as it is")
     eq(ns.RulesetLabel("SomeRP"), "Roleplaying", "still read from the name")
-    eq(ns.RulesetLabel(PVP), "PvP (ClassicBetaPvP)", "told apart from the game's PvP")
+    eq(ns.RulesetLabel(PVP), "PvP", "the same name as the game's PvP")
     -- Logging in on Tarn's realm, a Normal one, whose name says nothing.
     saved = AltsForeverDB
     wow.load(FILES)
@@ -387,4 +387,177 @@ test("claiming the history from before, a group keeps its own days too", functio
     eq(AltsForeverDB.goldDays[yesterday], 9000, "its own reading wins")
     eq(AltsForeverDB.goldDaysBy[PVE .. "|Horde"], nil, "no longer kept apart")
     eq(AltsForeverDB.goldDaysBy[PVP .. "|Alliance"][yesterday], 100, "other groups untouched")
+end)
+
+-- As a player reported (2026-11-07): one ruleset, two realm names. Five Alliance characters
+-- on one, two on the other, each saw only their own realm's.
+RP10, RP11 = "CAMWOWUS2Realm10RP", "CAMWOWUS2Realm11RP"
+
+function twoRealmsStart(extra)
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.player.realm = RP10
+    wow.money = 1000
+    wow.setBag(0, 16, { { 2589, 1 } })
+    local saved = { v = 2, chars = {
+        ["Near Alt"] = alt("Near Alt", "DRUID", { realm = RP10, faction = "Alliance", money = 300,
+            bags = { [2589] = 10 } }),
+        ["Far Alt"] = alt("Far Alt", "MAGE", { realm = RP11, faction = "Alliance", money = 200,
+            bags = { [2589] = 7 } }),
+        ["Red Alt"] = alt("Red Alt", "ROGUE", { realm = RP11, faction = "Horde", money = 50,
+            bags = { [2589] = 3 } }),
+        ["Pve Alt"] = alt("Pve Alt", "PRIEST", { realm = "CAMWOWUS2Realm1PvE", faction = "Alliance",
+            money = 70, bags = { [2589] = 5 } }),
+    } }
+    for k, v in pairs(extra or {}) do saved[k] = v end
+    wow.login(saved)
+    return ns
+end
+
+function mailKeys(ns)
+    local keys = {}
+    for _, e in ipairs(ns.SendToAltEntries()) do keys[#keys + 1] = e.key end
+    table.sort(keys)
+    return table.concat(keys, ",")
+end
+
+test("two realm names of one ruleset are one world: mail, tooltips and gold", function()
+    local ns = twoRealmsStart()
+    eq(ns.RulesetOf(RP10), "rp")
+    eq(ns.RulesetOf(RP11), "rp")
+    eq(ns.Elsewhere(AltsForeverDB.chars["Far Alt"]), false)
+    eq(ns.Elsewhere(AltsForeverDB.chars["Red Alt"]), true, "the other faction")
+    eq(ns.Elsewhere(AltsForeverDB.chars["Pve Alt"]), true, "another ruleset")
+    eq(mailKeys(ns), "Far Alt,Near Alt")
+    local text = rulesetHover(2589)
+    assert(text:find("Total = 18", 1, true), "you 1 + Near 10 + Far 7\n" .. text)
+    assert(not text:find("Red", 1, true) and not text:find("Pve", 1, true), text)
+end)
+
+test("logged in on the smaller realm, the list is the same world", function()
+    local ns = twoRealmsStart()
+    local saved = AltsForeverDB
+    ns = wow.load(FILES)
+    wow.player.name, wow.player.realm = "Far Alt", RP11
+    wow.login(saved)
+    eq(mailKeys(ns), "Aldric,Near Alt")
+end)
+
+test("two realm names of one ruleset share one group and heading", function()
+    local ns = twoRealmsStart()
+    local chars = AltsForeverDB.chars
+    local byRealm, byFaction = ns.GroupParts()
+    eq(byRealm, true, "RP and Normal")
+    eq(ns.GroupKey(chars["Near Alt"], byRealm, byFaction), ns.GroupKey(chars["Far Alt"], byRealm, byFaction))
+    assert(ns.GroupKey(chars["Far Alt"], byRealm, byFaction) ~= ns.GroupKey(chars["Pve Alt"], byRealm, byFaction))
+    eq(ns.GroupLabel(chars["Far Alt"], byRealm, byFaction), "Roleplaying · Alliance")
+    eq(ns.GroupLabel(chars["Near Alt"], byRealm, byFaction), "Roleplaying · Alliance")
+
+    -- Only those two realms: no ruleset headings at all.
+    chars["Pve Alt"], chars["Red Alt"] = nil, nil
+    byRealm, byFaction = ns.GroupParts()
+    eq(byRealm, false)
+    eq(byFaction, false)
+end)
+
+test("the game's normal doesn't override a realm name that says otherwise", function()
+    -- "normal" means no rule it asked about was on, not that it knows the ruleset.
+    local ns = twoRealmsStart({ rulesets = { [RP11] = "normal" } })
+    eq(ns.RulesetOf(RP11), "rp")
+    eq(ns.RulesetOf("Forever-1"), "Forever-1", "says nothing, not asked")
+    AltsForeverDB.rulesets["Forever-1"] = "normal"
+    eq(ns.RulesetOf("Forever-1"), "normal", "says nothing: the game's answer stands")
+    AltsForeverDB.rulesets["OddPvE"] = "pvp"
+    eq(ns.RulesetOf("OddPvE"), "pvp", "any other answer beats the name")
+    AltsForeverDB.rulesets["OddRP"] = "junk"
+    eq(ns.RulesetOf("OddRP"), "rp", "a damaged answer is no answer")
+end)
+
+test("realms that don't say stay apart, whatever their names", function()
+    local ns = twoRealmsStart()
+    AltsForeverDB.chars["Near Alt"].realm = "Forever-2"
+    AltsForeverDB.chars["Far Alt"].realm = "Forever-3"
+    ns.char.realm = "Forever-2"
+    eq(ns.Elsewhere(AltsForeverDB.chars["Near Alt"]), false)
+    eq(ns.Elsewhere(AltsForeverDB.chars["Far Alt"]), true)
+    eq(ns.RulesetLabel("Forever-3"), "Forever-3")
+end)
+
+test("gold history kept per realm name folds into its ruleset's, in place", function()
+    local today = math.floor(NOW / 86400)
+    local d1, d2, d3 = today - 3, today - 2, today - 1
+    twoRealmsStart({ goldGroup = RP10 .. "|Alliance", goldDays = { [d1] = 500, [d2] = 600 },
+        goldDaysBy = {
+            [RP11 .. "|Alliance"] = { [d2] = 900, [d3] = 40 },
+            [RP11 .. "|Horde"] = { [d1] = 7 },
+            ["CAMWOWUS2Realm1PvE|Alliance"] = { [d1] = 8 },
+        } })
+    local db = AltsForeverDB
+    eq(db.goldGroup, "rp|Alliance")
+    eq(db.goldDays[d1], 500, "the main history kept")
+    eq(db.goldDays[d2], 900, "the other realm's reading joins it, and its own wins as before")
+    eq(db.goldDays[d3], 40)
+    eq(db.goldDaysBy["rp|Alliance"], nil, "no longer kept apart")
+    eq(db.goldDaysBy[RP11 .. "|Alliance"], nil)
+    eq(db.goldDaysBy["rp|Horde"][d1], 7, "the other faction keeps its own")
+    eq(db.goldDaysBy["normal|Alliance"][d1], 8, "the other ruleset too")
+end)
+
+test("two realms' history kept apart from the main one becomes one, the larger reading kept", function()
+    local today = math.floor(NOW / 86400)
+    twoRealmsStart({ goldGroup = "CAMWOWUS2Realm1PvE|Alliance", goldDays = { [today - 3] = 1 },
+        goldDaysBy = {
+            ["CAMWOWUS9Realm1RP|Horde"] = { [today - 2] = 30, [today - 3] = 5, [today - 4] = 11 },
+            ["CAMWOWUS9Realm2RP|Horde"] = { [today - 2] = 20, [today - 1] = 9, [today - 4] = 44 },
+        } })
+    local db = AltsForeverDB
+    eq(db.goldGroup, "normal|Alliance")
+    local h = db.goldDaysBy["rp|Horde"]
+    eq(h[today - 3], 5)
+    eq(h[today - 2], 30, "the larger, from the first realm")
+    eq(h[today - 4], 44, "the larger, from the second: whichever is folded first")
+    eq(h[today - 1], 9)
+    eq(db.goldDaysBy["CAMWOWUS9Realm1RP|Horde"], nil)
+    eq(db.goldDaysBy["CAMWOWUS9Realm2RP|Horde"], nil)
+end)
+
+test("a realm folding into the main history never lowers it, whoever logs in first", function()
+    local today = math.floor(NOW / 86400)
+    local y, y2 = today - 1, today - 2
+    local function saved()
+        return { goldGroup = RP10 .. "|Alliance", goldDays = { [y] = 900 },
+            goldDaysBy = { [RP11 .. "|Alliance"] = { [y] = 40, [y2] = 70 } } }
+    end
+
+    -- Logged in on that group.
+    twoRealmsStart(saved())
+    eq(AltsForeverDB.goldDays[y], 900, "the main reading is the larger: it stays")
+    eq(AltsForeverDB.goldDays[y2], 70, "a day only the other realm had joins it")
+    eq(AltsForeverDB.goldDaysBy, nil)
+
+    -- Updated on a character of another group, then back.
+    twoRealmsStart(saved())
+    local db = AltsForeverDB
+    db.goldGroup, db.goldDays = RP10 .. "|Alliance", { [y] = 900 }
+    db.goldDaysBy = { [RP11 .. "|Alliance"] = { [y] = 40, [y2] = 70 } }
+    wow.load(FILES)
+    wow.player.name, wow.player.realm, wow.player.faction = "Red Alt", RP11, "Horde"
+    wow.login(db)
+    db = AltsForeverDB
+    eq(db.goldGroup, "rp|Alliance")
+    eq(db.goldDays[y], 900)
+    eq(db.goldDays[y2], 70)
+    eq(db.goldDaysBy["rp|Alliance"], nil, "folded at once, not left for that group's next login")
+    wow.load(FILES)
+    wow.player.name, wow.player.realm, wow.player.faction = "Far Alt", RP11, "Alliance"
+    wow.login(db)
+    eq(AltsForeverDB.goldDays[y], 900, "still, back on that group")
+end)
+
+test("the richest group counts a ruleset's realms together", function()
+    local ns = twoRealmsStart()
+    local chars = AltsForeverDB.chars
+    chars["Near Alt"].money, chars["Far Alt"].money, chars["Pve Alt"].money = 300, 300, 500
+    ns.char.money = 0
+    eq(ns.RichestGroup(ns.char), true, "RP 600 across two realms beats Normal's 500")
 end)
