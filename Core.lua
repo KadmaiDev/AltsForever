@@ -148,7 +148,8 @@ local CHAR_FIELDS = {
     legacySpent = "number", bankAt = "number", changed = "number",
     bags = "table", bank = "table", mail = "table", equip = "table", gear = "table",
     layout = "table", profs = "table", profMax = "table", recipes = "table", crafts = "table",
-    reps = "table", duraSlots = "table",
+    reps = "table", duraSlots = "table", saves = "table", saveKills = "table",
+    account = "string", runs = "table",
 }
 local DB_FIELDS = {
     icons = "table", goldDays = "table", goldDaysBy = "table", factions = "table",
@@ -156,6 +157,7 @@ local DB_FIELDS = {
     itemQuality = "table", rulesets = "table", syncWith = "table", forgotten = "table", syncAutoOff = "boolean",
     legacyPool = "number", scale = "number", minimapAngle = "number", bagsCols = "number",
     bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
+    account = "string",
 }
 
 -- Keeps only entries whose key and value are of these types (value nil = any).
@@ -179,6 +181,21 @@ local function RepairChar(c)
     if c.profMax then KeepOnly(c.profMax, "string", "number") end
     if c.recipes then KeepOnly(c.recipes, "string", "table") end
     if c.crafts then KeepOnly(c.crafts, "string", "table") end
+    if c.saves then KeepOnly(c.saves, "string", "number") end
+    if c.saveKills then KeepOnly(c.saveKills, "string", "string") end
+    if c.runs then
+        local kept = {}
+        for _, r in pairs(c.runs) do
+            if type(r) == "table" and type(r.at) == "number" and type(r.map) == "number"
+                and (r.left == nil or type(r.left) == "number") and (r.zone == nil or type(r.zone) == "number")
+                and (r.last == nil or type(r.last) == "number")
+                and (r.name == nil or type(r.name) == "string") then
+                kept[#kept + 1] = r
+            end
+        end
+        table.sort(kept, function(a, b) return a.at < b.at end)
+        c.runs = kept[1] and kept or nil
+    end
     if c.layout then
         KeepOnly(c.layout, "number", "table")
         for _, slots in pairs(c.layout) do
@@ -512,6 +529,7 @@ ns.On("PLAYER_LOGIN", function()
     ns.StartUpgrades()
     ns.StartFlyout()
     ns.StartReputation()
+    ns.StartLockouts()
     ns.StartSync()
     ns.StartOptions()
     ns.StartBroker()
@@ -717,6 +735,24 @@ function commands.rep()
     ns.ToggleReputation()
 end
 
+-- /af lockouts: every character's raid and dungeon saves still running (Lockouts.lua).
+-- Then the instances each account has entered this hour.
+function commands.lockouts()
+    local now = time()
+    local lines, runs = ns.LockoutLines(now), ns.InstanceLines(now)
+    if #lines == 0 and #runs == 0 then
+        return Print(L["No lockouts on record. They're read each time you log in on a character."])
+    end
+    if #lines > 0 then
+        Print(L["Lockouts:"])
+        for _, line in ipairs(lines) do Print("  " .. line) end
+    end
+    if #runs > 0 then
+        Print(L["Instances this hour (the game allows %d per account):"]:format(ns.INSTANCE_LIMIT))
+        for _, line in ipairs(runs) do Print("  " .. line) end
+    end
+end
+
 -- /af sync First Last: swaps characters with your character on another game account (Sync.lua).
 function commands.sync(arg)
     ns.SyncWith(arg)
@@ -744,6 +780,8 @@ function commands.help()
     Print(L["/af scale 150 makes Alts Forever's windows one and a half times their size (any size from 50 to 300), on top of the game's UI scale."])
     if ns.HasEllesmereScale() then Print(L["/af scale eui makes them follow EllesmereUI's Window Scale again (the default)."]) end
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
+    Print(L["/af lockouts lists the raids and dungeons each character is saved to, and when they reset."])
+    Print(L["/af lockouts also counts the dungeons and raids each game account has entered this hour."])
     Print(L["/af sync and the name of your character on another game account swaps characters with it, so both accounts see all of them. Both need to be online at the same time, on the same ruleset and faction."])
     Print(L["/af sync auto turns syncing by itself on or off."])
     Print(L["/af rulesets shows or hides your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; they can't trade with this one."])

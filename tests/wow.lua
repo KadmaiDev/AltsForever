@@ -22,7 +22,8 @@ local KNOWN_EVENTS = {
     TRADE_SKILL_DATA_SOURCE_CHANGED = true, TRADE_SKILL_CLOSE = true, NEW_RECIPE_LEARNED = true,
     TIME_PLAYED_MSG = true, UNIT_NAME_UPDATE = true, UPDATE_FACTION = true,
     TRAIT_CONFIG_UPDATED = true, TRAIT_TREE_CURRENCY_INFO_UPDATED = true, GET_ITEM_INFO_RECEIVED = true,
-    CHAT_MSG_ADDON = true, PLAYER_REGEN_ENABLED = true,
+    UPDATE_INSTANCE_INFO = true, ENCOUNTER_END = true, BOSS_KILL = true, CHAT_MSG_ADDON = true,
+    PLAYER_REGEN_ENABLED = true, UNIT_SPELLCAST_SUCCEEDED = true,
 }
 
 -- Resets every global and loads the addon files fresh. Returns the addon namespace.
@@ -230,6 +231,8 @@ function M.load(files)
         self.events[event] = true
     end
     function frameMethods:UnregisterEvent(event) self.events[event] = nil end
+    -- The unit isn't checked: the handler gets it and must look.
+    function frameMethods:RegisterUnitEvent(event) self:RegisterEvent(event) end
     function frameMethods:IsEventRegistered(event) return self.events[event] == true end
     function frameMethods:SetScript(script, fn)
         self.scripts[script] = fn
@@ -621,6 +624,36 @@ function M.load(files)
         ExpandFactionHeader = function() M.expanded = true end,
     }
 
+    -- Saved instances, as GetSavedInstanceInfo returns them: { name, reset (seconds left),
+    -- locked, extended, difficultyName, numEncounters, encounterProgress }.
+    M.saves, M.raidInfoRequests = {}, 0
+    -- The instance you're in: { name, kind ("party", "raid", "pvp"), map = instance ID }, or
+    -- nil outside; M.dead = a ghost or corpse.
+    M.instance, M.dead = nil, nil
+    IsInInstance = function()
+        if not M.instance then return false, "none" end
+        return true, M.instance.kind
+    end
+    GetInstanceInfo = function()
+        local i = M.instance
+        if not i then return "Durotar", "none", 0, "", 0, 0, false, 1 end
+        return i.name, i.kind, 1, "Normal", 5, 0, false, i.map, 5
+    end
+    UnitIsDeadOrGhost = function()
+        if M.dead == M.SECRET then return M.SECRET end
+        return M.dead == true
+    end
+    strsplit = function(sep, s)
+        local parts = {}
+        for part in (s .. sep):gmatch("(.-)" .. sep:gsub("%p", "%%%0")) do parts[#parts + 1] = part end
+        return unpack(parts)
+    end
+    RequestRaidInfo = function() M.raidInfoRequests = M.raidInfoRequests + 1 end
+    GetNumSavedInstances = function() return #M.saves end
+    GetSavedInstanceInfo = function(i)
+        local s = M.saves[i]
+        return s[1], 1000 + i, s[2], 9, s[3], s[4], 0, true, 40, s[5], s[6], s[7]
+    end
     -- Addon messages: every one sent is recorded in M.sent ({ prefix, text, chatType, target });
     -- the game's answer is the next of M.sendResults, else Success.
     M.sent, M.sendResults, M.prefixes, M.chatLockdown = {}, {}, {}, nil

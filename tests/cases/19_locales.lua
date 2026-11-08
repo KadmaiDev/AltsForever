@@ -76,7 +76,7 @@ test("on a Spanish client your own row says you're online in Spanish", function(
     wow.now = NOW
     wow.login(overviewAlts())
     SlashCmdList.ALTSFOREVER("")
-    eq(cell(overviewRows()[1], 14), "|cff20ff20En línea|r")
+    eq(cell(overviewRows()[1], 15), "|cff20ff20En línea|r")
 end)
 
 test("on an English client nothing is translated", function()

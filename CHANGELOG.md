@@ -1,3 +1,8 @@
+## Alts Forever 1.2.0
+
+- **Lockouts:** the raids each character is saved to, and when each resets, as with SavedInstances on retail. A new Lockouts column in the overview, the list (with bosses killed) when you hover a character, and `/af lockouts`. Read each time you log in on a character and after every boss kill. Forever's raids aren't out yet, so the column stays empty until then (dungeons don't lock you out).
+- **Instances this hour:** Forever lets each game account enter 10 dungeons and raids an hour, all its characters together. The overview's footer now counts them ("Instances this hour: 3/10", in orange with the wait once you reach 10), and `/af lockouts` says when the next one frees up. Going back into the same dungeon (a corpse run, a reload, stepping out and in) isn't counted twice. With your accounts synced, you see each account's count by its most played character ("Kadmai 3/10, Brak 1/10").
+
 ## Alts Forever 1.1.1
 
 - **Characters on one ruleset are no longer split up:** the game can give characters on the same ruleset different realm names (Realm10RP and Realm11RP). They now count as one group, so they share a heading in the overview and show up for each other in the mailbox's Send to list, tooltips, gold totals and sync. Gold history kept separately for each realm name is joined up too. Thanks to Aaron for the report.
