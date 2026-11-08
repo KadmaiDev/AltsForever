@@ -549,10 +549,25 @@ local function CreateWindow()
     end)
     rep:SetScript("OnLeave", function() GameTooltip:Hide() end)
     f.repButton = rep
-    -- Bags and bank window button, left of the reputation button.
+    -- Lockouts window button, left of the reputation button.
+    local lockouts = CreateFrame("Button", nil, f)
+    lockouts:SetSize(16, 16)
+    lockouts:SetPoint("RIGHT", rep, "LEFT", -6, 0)
+    lockouts:SetNormalTexture("Interface\\Icons\\INV_Misc_Key_03")
+    lockouts:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    lockouts:SetScript("OnClick", function() ns.ToggleLockouts() end)
+    lockouts:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["Lockouts"])
+        GameTooltip:AddLine(L["Your characters' raid lockouts, and the instances each game account has entered this hour"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    lockouts:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    f.lockoutsButton = lockouts
+    -- Bags and bank window button, left of the lockouts button.
     local bags = CreateFrame("Button", nil, f)
     bags:SetSize(16, 16)
-    bags:SetPoint("RIGHT", rep, "LEFT", -6, 0)
+    bags:SetPoint("RIGHT", lockouts, "LEFT", -6, 0)
     bags:SetNormalTexture("Interface\\Icons\\INV_Misc_Bag_08")
     bags:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
     bags:SetScript("OnClick", function() ns.ShowBags(ns.charKey, "bags") end)

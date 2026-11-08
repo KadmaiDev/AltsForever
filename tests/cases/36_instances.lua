@@ -156,6 +156,10 @@ test("a copy another of your characters was in this hour counts once, while you'
     cast(53)
     eq(count(ns), 1)
     eq(#ns.char.runs, 1, "your visit is kept"); eq(ns.db.chars["Low"].runs[1].left, NOW - 3000, "theirs as it was")
+    SlashCmdList.ALTSFOREVER("lockouts")
+    local window = lockoutWindow()
+    assert(window:find("Aldric's account | 1/10\nRagefire Chasm | [MAGE]Aldric | inside now\nRaid lockouts", 1, true),
+        "the copy listed once, by the visit that counts longest: " .. window)
 
     -- Past Low's hour, still inside: still counting.
     wow.now = NOW + 1200
@@ -255,8 +259,9 @@ test("each account's count shows in the overview and /af lockouts, by its most p
     saved.chars["High"].account, saved.chars["High"].played = "other", 500
     saved.chars["Far"].account, saved.chars["Far"].played = "other", 9000
     local runs = {}
-    for i = 1, 10 do runs[i] = { at = NOW - 3000 + i * 60, left = NOW - 2900 + i * 60, map = 389 } end
-    saved.chars["Far"].runs = runs -- the first stops counting at NOW + 760: 13 minutes
+    -- Entered in turn, left in the other order: the last stops counting at NOW + 760, 13 minutes.
+    for i = 1, 10 do runs[i] = { at = NOW - 4000 + i * 60, left = NOW - 2240 - i * 60, map = 389 } end
+    saved.chars["Far"].runs = runs
     local ns = start(saved)
     enter(RFC)
     SlashCmdList.ALTSFOREVER("")
@@ -264,12 +269,31 @@ test("each account's count shows in the overview and /af lockouts, by its most p
     assert(text:find("Instances this hour: Aldric 1/10, Far |cffff800010/10 (13 min)|r     Total played:", 1, true), text)
 
     SlashCmdList.ALTSFOREVER("lockouts")
-    local P = "|cff66ccffAlts Forever|r: "
-    text = table.concat(wow.printed, "\n")
-    assert(text:find(P .. "Instances this hour (the game allows 10 per account):\n"
-        .. P .. "  Aldric's account: 1, the next frees in 60 min\n"
-        .. P .. "  Far's account: 10, the next frees in 13 min", 1, true), text)
-    assert(not text:find("No lockouts", 1, true), text)
+    local window = lockoutWindow()
+    local far = {}
+    for i = 1, 10 do far[i] = G .. "?|r | [MAGE]Far | frees in " .. (12 + i) .. " min" end
+    eq(window, table.concat({
+        "Instances this hour (10 per game account)",
+        "Aldric's account | 1/10",
+        "Ragefire Chasm | [MAGE]Aldric | inside now",
+        "Far's account | |cffff800010/10|r",
+        table.concat(far, "\n"),
+        "Raid lockouts",
+        G .. "No lockouts on record. They're read each time you log in on a character.|r",
+    }, "\n"))
+
+    -- A visit's tooltip: when it was entered and left.
+    local row = AltsForeverLockoutsFrame.lines[5]
+    row.scripts.OnEnter(row)
+    eq(textOf(GameTooltip.lines), "?\nEntered " .. os.date("%H:%M", NOW - 3400) .. "\nLeft " .. os.date("%H:%M", NOW - 2840))
+    row = AltsForeverLockoutsFrame.lines[3]
+    row.scripts.OnEnter(row)
+    eq(textOf(GameTooltip.lines), "Ragefire Chasm\nEntered " .. os.date("%H:%M", NOW) .. "\ninside now")
+
+    -- Leaving while it's open updates it.
+    wow.now = NOW + 60
+    enter(nil)
+    assert(lockoutWindow():find("Ragefire Chasm | [MAGE]Aldric | frees in 60 min", 1, true), lockoutWindow())
 
     eq(ns.InstanceText(NOW + 1400), "Instances this hour: Aldric 1/10", "an account with none counting is left out")
 end)

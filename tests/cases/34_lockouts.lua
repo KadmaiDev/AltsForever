@@ -80,19 +80,59 @@ test("the overview counts each character's saves; the row tooltip lists them, so
     assert(text:find("Lockouts\nOnyxia's Lair = 5h\nMolten Core = 3/10 · 3d 1h", 1, true), text)
 end)
 
-test("/af lockouts lists every character with saves", function()
+-- The Lockouts window's shown rows, one line each: its texts joined by " | ".
+function lockoutWindow()
+    local out = {}
+    for _, row in ipairs(AltsForeverLockoutsFrame.lines) do
+        if row.shown then
+            local parts = {}
+            for _, fs in ipairs({ row.heading, row.a, row.b, row.c, unpack(row.cells) }) do
+                if fs.shown and fs.text and fs.text ~= "" then parts[#parts + 1] = fs.text end
+            end
+            out[#out + 1] = table.concat(parts, " | ")
+        end
+    end
+    return table.concat(out, "\n")
+end
+
+test("the Lockouts window lists raids down and characters with saves across", function()
     local ns = wow.load(FILES)
     wow.now = NOW
-    wow.login(lockoutAlts())
+    local saved = lockoutAlts()
+    saved.chars["Far"].saves = { ["Molten Core"] = NOW + 3 * DAY + HOUR }
+    wow.login(saved)
     SlashCmdList.ALTSFOREVER("lockouts")
-    local text = table.concat(wow.printed, "\n")
-    assert(text:find("[PRIEST]High: Onyxia's Lair (5h), Molten Core (3/10 · 3d 1h)", 1, true), text)
-    assert(not text:find("Low", 1, true), text)
+    local f = AltsForeverLockoutsFrame
+    eq(f.shown, true)
+    eq(lockoutWindow(), table.concat({
+        "Instances this hour (10 per game account)",
+        G .. "None entered this hour.|r",
+        "Raid lockouts",
+        "[MAGE]Far | [PRIEST]High",
+        "Onyxia's Lair | " .. G .. "-|r | Saved",
+        "Molten Core | Saved | 3/10",
+    }, "\n"))
+    local row = f.lines[6]
+    row.scripts.OnEnter(row)
+    eq(textOf(GameTooltip.lines), "Molten Core\n[MAGE]Far = 3d 1h\n[PRIEST]High = 3/10 · 3d 1h")
+    SlashCmdList.ALTSFOREVER("lockouts")
+    eq(f.shown, false, "again closes it")
+
+    -- The overview's key button opens it too.
+    SlashCmdList.ALTSFOREVER("")
+    AltsForeverFrame.lockoutsButton.scripts.OnClick(AltsForeverFrame.lockoutsButton)
+    eq(f.shown, true)
+    eq(f.point[2], AltsForeverFrame, "below the overview")
+
+    -- A save read while it's open shows at once.
+    wow.saves = { { "Zul'Gurub", 2 * DAY, true, false, "20 Player", 10, 2 } }
+    wow.fire("UPDATE_INSTANCE_INFO")
+    assert(lockoutWindow():find("Zul'Gurub | 2/10", 1, true), lockoutWindow())
 
     wow.load(FILES)
     wow.login(nil)
     SlashCmdList.ALTSFOREVER("lockouts")
-    assert(table.concat(wow.printed, "\n"):find("No lockouts on record", 1, true))
+    assert(lockoutWindow():find("No lockouts on record", 1, true), lockoutWindow())
 end)
 
 test("damaged saves are repaired at load", function()
