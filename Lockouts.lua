@@ -577,17 +577,12 @@ local function CreatePanel()
     ns.ScaleWindow(f)
 end
 
--- Opens the window below the overview if it's open; again closes it.
+-- Opens the window beside the overview if it's open (ns.DockToOverview); again closes it.
 function ns.ToggleLockouts()
     if not panel then CreatePanel() end
     if panel:IsShown() then return panel:Hide() end
-    panel:ClearAllPoints()
-    if AltsForeverFrame and AltsForeverFrame:IsShown() then
-        panel:SetPoint("TOPLEFT", AltsForeverFrame, "BOTTOMLEFT", 0, -4)
-    else
-        panel:SetPoint("CENTER")
-    end
     FillPanel()
+    ns.DockToOverview(panel)
     panel:Show()
 end
 

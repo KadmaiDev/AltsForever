@@ -265,18 +265,13 @@ local function CreatePanel()
     ns.ScaleWindow(f)
 end
 
--- Opens the panel beside the overview if it's open; again closes it.
+-- Opens the panel beside the overview if it's open (ns.DockToOverview); again closes it.
 function ns.ToggleReputation()
     if not panel then CreatePanel() end
     if panel:IsShown() then return panel:Hide() end
     offset = 0
-    panel:ClearAllPoints()
-    if AltsForeverFrame and AltsForeverFrame:IsShown() then
-        panel:SetPoint("TOPLEFT", AltsForeverFrame, "BOTTOMLEFT", 0, -4)
-    else
-        panel:SetPoint("CENTER")
-    end
     Fill()
+    ns.DockToOverview(panel)
     panel:Show()
 end
 

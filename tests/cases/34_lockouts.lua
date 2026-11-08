@@ -135,6 +135,80 @@ test("the Lockouts window lists raids down and characters with saves across", fu
     assert(lockoutWindow():find("No lockouts on record", 1, true), lockoutWindow())
 end)
 
+test("Reputation and Lockouts open where they cover neither the overview nor each other", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.login(lockoutAlts())
+    UIParent.width, UIParent.height = 1920, 1080
+    SlashCmdList.ALTSFOREVER("")
+    local ov = AltsForeverFrame
+    local function anchor(f) return f.point[1] .. " " .. (f.point[2] == ov and "overview" or f.point[2] == UIParent and "screen"
+        or f.point[2] and f.point[2].frameName or tostring(f.point[2])) .. " " .. tostring(f.point[3]) end
+    -- Lays a window out where its anchor puts it (the fake has no layout engine).
+    local function lay(f)
+        local p, rel, relPoint, dx, dy = unpack(f.point)
+        local r = rel.rect
+        local x = relPoint:find("LEFT") and r[1] or r[2]
+        local y = relPoint:find("TOP") and r[3] or r[4]
+        x, y = x + (dx or 0), y + (dy or 0)
+        local w, h = f.width, f.height
+        local left = p:find("LEFT") and x or x - w
+        local top = p:find("TOP") and y or y + h
+        f.rect = { left, left + w, top, top - h }
+    end
+    local function open(cmd, name)
+        SlashCmdList.ALTSFOREVER(cmd)
+        lay(_G[name])
+    end
+    local lock, rep
+
+    -- Room below: the first goes there, the second beside it.
+    ov.rect = { 100, 1100, 1000, 600 }
+    open("lockouts", "AltsForeverLockoutsFrame")
+    lock = AltsForeverLockoutsFrame
+    eq(anchor(lock), "TOPLEFT overview BOTTOMLEFT")
+    open("rep", "AltsForeverRepFrame")
+    rep = AltsForeverRepFrame
+    eq(anchor(rep), "TOPLEFT AltsForeverLockoutsFrame TOPRIGHT", "beside it, not on top of it")
+    SlashCmdList.ALTSFOREVER("rep")
+
+    -- No room beside it: below it.
+    UIParent.width = 700
+    ov.rect = { 10, 690, 1070, 700 }
+    SlashCmdList.ALTSFOREVER("lockouts"); open("lockouts", "AltsForeverLockoutsFrame")
+    eq(anchor(lock), "TOPLEFT overview BOTTOMLEFT")
+    open("rep", "AltsForeverRepFrame")
+    eq(anchor(rep), "TOPLEFT AltsForeverLockoutsFrame BOTTOMLEFT")
+    SlashCmdList.ALTSFOREVER("rep")
+    SlashCmdList.ALTSFOREVER("lockouts")
+    UIParent.width = 1920
+
+    -- The overview low on the screen: above it.
+    ov.rect = { 100, 1100, 400, 50 }
+    open("lockouts", "AltsForeverLockoutsFrame")
+    eq(anchor(lock), "BOTTOMLEFT overview TOPLEFT")
+    SlashCmdList.ALTSFOREVER("lockouts")
+    -- As tall as the screen: to its right; at the right edge: to its left.
+    ov.rect = { 100, 1100, 1075, 5 }
+    open("lockouts", "AltsForeverLockoutsFrame")
+    eq(anchor(lock), "TOPLEFT overview TOPRIGHT")
+    SlashCmdList.ALTSFOREVER("lockouts")
+    ov.rect = { 800, 1915, 1075, 5 }
+    open("lockouts", "AltsForeverLockoutsFrame")
+    eq(anchor(lock), "TOPRIGHT overview TOPLEFT")
+    SlashCmdList.ALTSFOREVER("lockouts")
+    -- Nowhere free: below it, as before.
+    ov.rect = { 0, 1920, 1080, 0 }
+    open("lockouts", "AltsForeverLockoutsFrame")
+    eq(anchor(lock), "TOPLEFT overview BOTTOMLEFT")
+    SlashCmdList.ALTSFOREVER("lockouts")
+
+    -- Without the overview: the middle of the screen.
+    ov:Hide()
+    SlashCmdList.ALTSFOREVER("lockouts")
+    eq(anchor(lock), "CENTER nil nil")
+end)
+
 test("damaged saves are repaired at load", function()
     local ns = wow.load(FILES)
     local saved = overviewAlts()

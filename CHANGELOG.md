@@ -1,6 +1,7 @@
 ## Alts Forever 1.3.0 (not yet released)
 
 - **Lockouts window:** the new key button at the top of the overview (or `/af lockouts`) opens a window with the instances each game account has entered this hour, listing every one still counting with the character who went in and when it frees up (hover one for when you entered and left), and your raid lockouts with raids down and characters across, as in the Reputation panel (hover a raid for each character's bosses killed and reset). It updates while open. `/af lockouts` no longer prints to chat.
+- **Reputation and Lockouts beside the overview:** they now open where they don't cover the overview or each other: below it, beside or below the other one, above it, or to its side, wherever the screen has room. One opened under an overview near the bottom of the screen used to be pushed up over it.
 
 ## Alts Forever 1.2.0
 

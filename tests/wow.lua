@@ -260,6 +260,11 @@ function M.load(files)
     function frameMethods:SetScale(s) self.scale = s end
     function frameMethods:GetScale() return self.scale or 1 end
     function frameMethods:GetCenter() if self.center then return unpack(self.center) end end
+    -- Edges as a test lays them out: self.rect = { left, right, top, bottom }; nil until then.
+    function frameMethods:GetLeft() return self.rect and self.rect[1] end
+    function frameMethods:GetRight() return self.rect and self.rect[2] end
+    function frameMethods:GetTop() return self.rect and self.rect[3] end
+    function frameMethods:GetBottom() return self.rect and self.rect[4] end
     function frameMethods:SetMinMaxValues(lo, hi) self.min, self.max = lo, hi end
     function frameMethods:GetValue() return self.value end
     function frameMethods:SetValue(v)
