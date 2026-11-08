@@ -554,7 +554,7 @@ end
 -- (the tooltip's processingInfo names the getter and its index), whose item
 -- GetTrainerServiceItemLink(index) links (checked in game 2026-10-15, Copper Dagger).
 local function OnSpell(tt, data)
-    if tt ~= GameTooltip or tt:IsForbidden() or not ns.UpgradesOn() then return end
+    if tt ~= GameTooltip or not (ns.TooltipsOn() and ns.UpgradesOn()) or tt:IsForbidden() then return end
     local info = tt.processingInfo
     if type(info) ~= "table" or info.getterName ~= "GetTrainerService" or not GetTrainerServiceItemLink then return end
     local index = type(info.getterArgs) == "table" and info.getterArgs[1]

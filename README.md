@@ -10,7 +10,7 @@ A World of Warcraft: Forever addon that adds a total and a per-character breakdo
 
 Locations are shown as icons: a linen bag (bags), banker (bank), mailbox (mail) and white shirt (wearing). You can pick your own icons, or words instead, with `/af icons`.
 
-The current character always comes first. Other characters are sorted by count. Already have counts from a bag addon such as Baganator? Turn ours off with **Show item counts** in the options (or `/af counts`); everything else in the tooltip stays.
+The current character always comes first. Other characters are sorted by count. Already have counts from a bag addon such as Baganator? Turn ours off with **Show item counts** in the options (or `/af counts`); everything else in the tooltip stays. Rather keep the game's tooltips as they are? Untick **Show Alts Forever in tooltips** (or `/af tooltips`): nothing is added to any tooltip, while the overview, bags, search and everything you open yourself still work. The boxes under it turn each part on or off.
 
 Hovering the money at the bottom of your bags lists each character's gold and the total, laid out the same way (also in ElvUI's bags, and in EllesmereUI's when its own gold tracking is turned off). Hovering the **experience bar** lists your other characters still levelling, with their level, XP and rested XP, and hovering the **reputation bar** lists their standing with the faction you're watching.
 
@@ -125,6 +125,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af upgrades` | Turn upgrades in item tooltips on or off |
 | `/af anvils` | Show or hide the anvils on your character sheet that mark craftable upgrades |
 | `/af itemnames` | Save item names and qualities in the saved file when you log out, only for reading it outside the game (off by default) |
+| `/af tooltips` | Turn everything Alts Forever adds to tooltips on or off. `/af crafting`, `/af crates`, `/af gold` and `/af bars` turn Can craft and recipes, Waylaid Crate materials, your alts' gold on the bag money, and your alts on the XP and reputation bars on or off |
 | `/af counts` | Turn the item counts in tooltips on or off, e.g. if Baganator or Bagnon already shows them (Can craft, skill-ups, upgrades and crates stay) |
 | `/af rulesets` | Show or hide your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; hidden by default |
 | `/af legacy` | List each character's Legacy points to spend and Well Rested rank; `/af legacy on` or `off` turns the chat reminders on or off |

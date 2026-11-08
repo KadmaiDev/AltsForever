@@ -156,7 +156,11 @@ function ns.AddMoneyLines(tt)
     if ns.StatsOn() then AddStats(tt) end
 end
 
+-- Off with "Show Alts Forever in tooltips" or "Show alts' gold on bag money" (Tooltip.lua).
+local function GoldShown() return ns.TooltipsOn() and ns.GoldTipOn() end
+
 local function OnEnter(self)
+    if not GoldShown() then return end
     local tt = GameTooltip
     local owner = tt:IsShown() and tt:GetOwner()
     -- If the game already shows a tooltip here, add to it; otherwise open our own.
@@ -210,6 +214,7 @@ end
 
 -- Our gold tooltip just above a bag addon's money display.
 local function ShowAbove(self)
+    if not GoldShown() then return end
     local tt = GameTooltip
     tt:SetOwner(self, "ANCHOR_NONE")
     tt:ClearAllPoints()

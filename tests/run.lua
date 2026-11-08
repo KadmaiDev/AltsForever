@@ -95,6 +95,7 @@ CASES = {
     "34_lockouts.lua",
     "35_sync.lua",
     "36_instances.lua",
+    "37_tooltips.lua",
 }
 do
     local where = {}

@@ -81,6 +81,8 @@ local function HookBar(bar, ownTooltip, add)
     if not bar or bar.altsForeverHooked or not bar.HookScript then return end
     bar.altsForeverHooked = true
     bar:HookScript("OnEnter", function(self)
+        -- Off with "Show Alts Forever in tooltips" or "Show alts on the XP and reputation bars".
+        if not (ns.TooltipsOn() and ns.BarsOn()) then return end
         local tt = GameTooltip
         if tt:IsForbidden() then return end
         if tt:IsShown() then

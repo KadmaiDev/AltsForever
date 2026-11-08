@@ -157,7 +157,8 @@ local DB_FIELDS = {
     itemQuality = "table", rulesets = "table", syncWith = "table", forgotten = "table", syncAutoOff = "boolean",
     legacyPool = "number", scale = "number", minimapAngle = "number", bagsCols = "number",
     bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
-    account = "string",
+    account = "string", tooltipsOff = "boolean", countsOff = "boolean", craftTipsOff = "boolean",
+    cratesOff = "boolean", goldTipOff = "boolean", barsOff = "boolean",
 }
 
 -- Keeps only entries whose key and value are of these types (value nil = any).
@@ -608,19 +609,51 @@ function commands.mail()
     if not ns.PrintMailWarnings(math.huge) then Print(L["No mail with items or gold on record."]) end
 end
 
+-- A tooltip part's switch: says it's on or off, and that nothing shows while all of
+-- Alts Forever is off in tooltips (/af tooltips).
+local function TipPrint(msg)
+    Print(msg)
+    if not ns.TooltipsOn() then Print(L["Alts Forever adds nothing to tooltips until you turn it back on with /af tooltips."]) end
+end
+
+function commands.tooltips()
+    ns.SetTooltips(not ns.TooltipsOn())
+    Print(ns.TooltipsOn() and L["Alts Forever in tooltips on."] or L["Alts Forever in tooltips off. /af tooltips turns it back on."])
+end
+
 function commands.counts()
     ns.SetCounts(not ns.CountsOn())
-    Print(ns.CountsOn() and L["Item counts in tooltips on."] or L["Item counts in tooltips off."])
+    TipPrint(ns.CountsOn() and L["Item counts in tooltips on."] or L["Item counts in tooltips off."])
+end
+
+function commands.crafting()
+    ns.SetCraftTips(not ns.CraftTipsOn())
+    TipPrint(ns.CraftTipsOn() and L["Can craft and recipes in tooltips on."] or L["Can craft and recipes in tooltips off."])
+end
+
+function commands.crates()
+    ns.SetCrates(not ns.CratesOn())
+    TipPrint(ns.CratesOn() and L["Waylaid Crate materials in tooltips on."] or L["Waylaid Crate materials in tooltips off."])
+end
+
+function commands.gold()
+    ns.SetGoldTip(not ns.GoldTipOn())
+    TipPrint(ns.GoldTipOn() and L["Your characters' gold on your bag money on."] or L["Your characters' gold on your bag money off."])
+end
+
+function commands.bars()
+    ns.SetBars(not ns.BarsOn())
+    TipPrint(ns.BarsOn() and L["Your characters on the XP and reputation bars on."] or L["Your characters on the XP and reputation bars off."])
 end
 
 function commands.skillups()
     ns.SetSkillups(not ns.SkillupsOn())
-    Print(ns.db.skillupsOff and L["Skill-up details in tooltips off."] or L["Skill-up details in tooltips on."])
+    TipPrint(ns.db.skillupsOff and L["Skill-up details in tooltips off."] or L["Skill-up details in tooltips on."])
 end
 
 function commands.rulesets()
     ns.SetOtherRulesets(not ns.OtherRulesetsOn())
-    Print(ns.OtherRulesetsOn() and L["Characters on other rulesets or factions are shown in tooltips."]
+    TipPrint(ns.OtherRulesetsOn() and L["Characters on other rulesets or factions are shown in tooltips."]
         or L["Characters on other rulesets or factions are hidden in tooltips."])
 end
 
@@ -655,7 +688,7 @@ end
 
 function commands.upgrades()
     ns.SetUpgrades(not ns.UpgradesOn())
-    Print(ns.UpgradesOn() and L["Upgrades in item tooltips on."] or L["Upgrades in item tooltips off."])
+    TipPrint(ns.UpgradesOn() and L["Upgrades in item tooltips on."] or L["Upgrades in item tooltips off."])
 end
 
 -- /af legacy lists Legacy points to spend and Well Rested ranks; on/off sets the reminders.
@@ -758,6 +791,7 @@ end
 function commands.help()
     Print(L["by Kadmai. /af opens the overview. Also: /af rep | export | mail | list | delete Name | skillups | sendmail | minimap | stats | mem"])
     Print(L["/af search (or /afs), with or without a name, finds an item on any of your characters, or who can craft it."])
+    Print(L["/af tooltips turns everything Alts Forever adds to tooltips on or off. /af crafting, crates, gold and bars turn one part on or off."])
     Print(L["/af counts turns the item counts in tooltips on or off (if another addon, such as Baganator, already shows them)."])
     Print(L["/af bags or /af bank, with a name for another character, shows their bags or bank slot by slot."])
     Print(L["/af icons picks the icons item tooltips use for bags, bank, mail and worn items."])
