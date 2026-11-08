@@ -298,6 +298,37 @@ test("each account's count shows in the overview and /af lockouts, by its most p
     eq(ns.InstanceText(NOW + 1400), "Instances this hour: Aldric 1/10", "an account with none counting is left out")
 end)
 
+test("the open Lockouts window counts down and drops visits as they run out, with no event", function()
+    local saved = overviewAlts()
+    saved.chars["Far"].account, saved.chars["Far"].played = "other", 9000
+    -- Two visits: the first frees at NOW + 760 (13 min), the other at NOW + 1900.
+    saved.chars["Far"].runs = { { at = NOW - 3000, left = NOW - 2840, map = 389 }, { at = NOW - 2000, left = NOW - 1700, map = 389 } }
+    local ns = start(saved)
+    SlashCmdList.ALTSFOREVER("lockouts")
+    local function nextRefresh()
+        local fn = wow.timers[#wow.timers]
+        wow.timers[#wow.timers] = nil
+        return fn, wow.delays[fn]
+    end
+    assert(lockoutWindow():find("Far's account | 2/10\n" .. G .. "?|r | [MAGE]Far | frees in 13 min", 1, true), lockoutWindow())
+    local fn, delay = nextRefresh()
+    eq(delay, 40, "when 13 min turns to 12")
+    wow.now = NOW + 40
+    fn()
+    assert(lockoutWindow():find("frees in 12 min", 1, true), lockoutWindow())
+    fn, delay = nextRefresh()
+    eq(delay, 60)
+    wow.now = NOW + 760
+    fn()
+    assert(lockoutWindow():find("Far's account | 1/10\n" .. G .. "?|r | [MAGE]Far | frees in 19 min", 1, true), lockoutWindow())
+    -- Closed: a refresh still pending does nothing, and none follows.
+    fn = nextRefresh()
+    AltsForeverLockoutsFrame:Hide()
+    local before = #wow.timers
+    fn()
+    eq(#wow.timers, before)
+end)
+
 test("damaged instance records are repaired at load", function()
     local ns = wow.load(FILES)
     local saved = overviewAlts()

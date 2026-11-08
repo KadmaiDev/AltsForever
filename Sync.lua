@@ -463,6 +463,7 @@ local function Changed()
     ns.InvalidateCache()
     if ns.UpgradesChanged then ns.UpgradesChanged() end -- and the character sheet's anvils
     if ns.RefreshOverview then ns.RefreshOverview() end
+    if ns.LockoutsChanged then ns.LockoutsChanged() end -- their saves and visits this hour
 end
 
 -- Takes in a character the other side sent, if it's newer than ours; returns true if so.

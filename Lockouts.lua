@@ -10,7 +10,7 @@ if ns.disabled then return end -- another copy of Alts Forever is running (Core.
 local L = ns.L
 
 local pairs, ipairs, type, pcall, time = pairs, ipairs, type, pcall, time
-local tonumber, format, ceil, random = tonumber, string.format, math.ceil, math.random
+local tonumber, format, ceil, floor, random = tonumber, string.format, math.ceil, math.floor, math.random
 local tremove, sort, concat = table.remove, table.sort, table.concat
 local issecretvalue = issecretvalue or function() return false end
 
@@ -20,6 +20,10 @@ local panel, FillPanel -- the Lockouts window (below), once opened
 
 local function PanelChanged()
     if panel and panel:IsShown() then FillPanel() end
+end
+-- For changes made elsewhere: a character forgotten (Options.lua), a sync (Sync.lua).
+function ns.LockoutsChanged()
+    PanelChanged()
 end
 
 -- A value from the game, or nil if it's secret.
@@ -364,7 +368,28 @@ end
 ---------------------------------------------------------------------------
 local ROW_HEIGHT, NAME_WIDTH, CHAR_WIDTH, WHEN_WIDTH, CELL_WIDTH = 16, 170, 150, 110, 80
 local MIN_WIDTH = 8 + NAME_WIDTH + CHAR_WIDTH + WHEN_WIDTH + 24
+local MIN_ROWS = 8 -- shown however small the screen
 local lines = {}
+local offset = 0 -- rows scrolled past, when they don't all fit on screen
+local tick = 0 -- the pending refresh's number: an older one does nothing
+
+-- While open, the window refills itself when the next "frees in" minute ticks over (or a
+-- visit or save runs out), at least once a minute (peer review: it stood still otherwise).
+local function Refresh(delay)
+    if not (C_Timer and C_Timer.After) then return end
+    tick = tick + 1
+    local mine = tick
+    C_Timer.After(delay, function()
+        if mine == tick and panel and panel:IsShown() then FillPanel() end
+    end)
+end
+
+-- Seconds until a time ends or the minute it shows ("frees in 3 min", rounded up) changes.
+local function NextChange(delay, ends, now)
+    local d = (ends - now) % 60
+    if d == 0 then d = 60 end
+    return d < delay and d or delay
+end
 
 local function BySoonest2(a, b)
     if a.ends ~= b.ends then return a.ends < b.ends end
@@ -394,8 +419,8 @@ local function LineTooltip(row)
         GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
         GameTooltip:AddLine(row.raid)
         for _, key in ipairs(row.keys) do
-            local c = ns.db.chars[key]
-            local at = c.saves and c.saves[row.raid]
+            local c = ns.db.chars[key] -- nil if forgotten since (it's refilled then too)
+            local at = c and c.saves and c.saves[row.raid]
             if at then
                 local kills = c.saveKills and c.saveKills[row.raid]
                 local left = ns.ExpiryText(at - now)
@@ -454,14 +479,18 @@ end
 function FillPanel()
     local now = time()
     ns.PruneSaves(now)
+    -- The screen in our windows' units: the window never grows past it (peer review). Too
+    -- many characters to fit across: the raid grid repeats in blocks of what fits; too many
+    -- rows: it scrolls (mouse wheel or the page buttons). 0 = not known, no limit.
+    local scale = ns.WindowScale()
+    local sw, sh = UIParent:GetWidth() / scale, UIParent:GetHeight() / scale
+    local delay = 60
     local n, y = 0, -30
     local function Next(gap)
         y = y - (gap or 0)
         n = n + 1
         local row = Line(n)
-        row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, y)
-        row:SetPoint("RIGHT", panel, "RIGHT", -8, 0)
+        row.top = y
         y = y - ROW_HEIGHT
         row.heading:Hide()
         row.a:Hide()
@@ -488,6 +517,7 @@ function FillPanel()
             if a.n >= LIMIT then count = ORANGE .. count .. "|r" end
             Place(row.c, row, whenX, WHEN_WIDTH, count, "RIGHT")
             for _, visit in ipairs(Visits(now, a.id)) do
+                delay = NextChange(delay, visit.ends, now)
                 row = Next()
                 row.visit = visit
                 Place(row.a, row, 16, NAME_WIDTH - 12, visit.run.name or (GREY .. "?|r"))
@@ -522,34 +552,83 @@ function FillPanel()
         if resets[x] ~= resets[z] then return resets[x] < resets[z] end
         return x < z
     end)
+    for _, at in pairs(resets) do delay = NextChange(delay, at, now) end
+    local across = #keys
+    if sw > 0 then across = math.max(1, math.min(across, floor((sw - 8 - NAME_WIDTH - 32) / CELL_WIDTH))) end
     if #raids == 0 then
         row = Next()
         Place(row.a, row, 16, MIN_WIDTH - 32, GREY .. L["No lockouts on record. They're read each time you log in on a character."] .. "|r")
     else
-        row = Next()
-        for j, key in ipairs(keys) do
-            row.cells[j] = row.cells[j] or Text(row)
-            Place(row.cells[j], row, NAME_WIDTH + (j - 1) * CELL_WIDTH, CELL_WIDTH, ns.ShortName(key, ns.db.chars[key]), "CENTER")
-        end
-        for _, name in ipairs(raids) do
-            row = Next()
-            row.raid, row.keys = name, keys
-            Place(row.a, row, 4, NAME_WIDTH, name)
-            for j, key in ipairs(keys) do
-                local c = ns.db.chars[key]
-                local at = c.saves and c.saves[name]
-                local text = GREY .. "-|r"
-                if at then text = c.saveKills and c.saveKills[name] or L["Saved"] end
-                row.cells[j] = row.cells[j] or Text(row)
-                Place(row.cells[j], row, NAME_WIDTH + (j - 1) * CELL_WIDTH, CELL_WIDTH, text, "CENTER")
+        for from = 1, #keys, across do
+            local to = math.min(#keys, from + across - 1)
+            row = Next(from > 1 and 8 or 0)
+            for j = from, to do
+                local key = keys[j]
+                row.cells[j - from + 1] = row.cells[j - from + 1] or Text(row)
+                Place(row.cells[j - from + 1], row, NAME_WIDTH + (j - from) * CELL_WIDTH, CELL_WIDTH, ns.ShortName(key, ns.db.chars[key]), "CENTER")
+            end
+            for _, name in ipairs(raids) do
+                row = Next()
+                row.raid, row.keys = name, keys
+                Place(row.a, row, 4, NAME_WIDTH, name)
+                for j = from, to do
+                    local c = ns.db.chars[keys[j]]
+                    local at = c.saves and c.saves[name]
+                    local text = GREY .. "-|r"
+                    if at then text = c.saveKills and c.saveKills[name] or L["Saved"] end
+                    row.cells[j - from + 1] = row.cells[j - from + 1] or Text(row)
+                    Place(row.cells[j - from + 1], row, NAME_WIDTH + (j - from) * CELL_WIDTH, CELL_WIDTH, text, "CENTER")
+                end
             end
         end
     end
 
-    for i = n + 1, #lines do lines[i]:Hide() end
-    local width = 8 + NAME_WIDTH + #keys * CELL_WIDTH + 16
+    -- The rows that fit, from the offset; the rest hidden. Measured by where they sit, as
+    -- the gaps between sections take room too. The title above, the footer below.
+    local room = sh > 0 and sh - 30 - 50 or math.huge
+    local function Fits(from, to) return lines[from].top - (lines[to].top - ROW_HEIGHT) <= room end
+    local function LastFrom(from)
+        local i = from
+        while i < n and Fits(from, i + 1) do i = i + 1 end
+        return math.max(i, math.min(n, from + MIN_ROWS - 1))
+    end
+    local paging = LastFrom(1) < n
+    if paging then
+        local lowest = n -- the first row of the last page
+        while lowest > 1 and Fits(lowest - 1, n) do lowest = lowest - 1 end
+        offset = math.max(0, math.min(offset, lowest - 1))
+    else
+        offset = 0
+    end
+    local first = offset + 1
+    local last = LastFrom(first)
+    local fit = last - first + 1
+    local shift = lines[first].top + 30 -- the first shown row at the top
+    for i = 1, #lines do
+        local r = lines[i]
+        if i < first or i > last then
+            r:Hide()
+        else
+            r:ClearAllPoints()
+            r:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, r.top - shift)
+            r:SetPoint("RIGHT", panel, "RIGHT", -8, 0)
+        end
+    end
+    panel.pageRows = fit
+    panel.footer:SetText(paging and (GREY .. first .. "-" .. last .. " " .. L["of %d (scroll for more)"]:format(n) .. "|r") or "")
+    panel.up:SetShown(paging)
+    panel.down:SetShown(paging)
+    panel.up:SetEnabled(offset > 0)
+    panel.down:SetEnabled(last < n)
+    local width = 8 + NAME_WIDTH + across * CELL_WIDTH + 16
     panel:SetWidth(width > MIN_WIDTH and width or MIN_WIDTH)
-    panel:SetHeight(-y + 14)
+    panel:SetHeight(-(lines[last].top - shift - ROW_HEIGHT) + 14 + (paging and 22 or 0))
+    Refresh(delay)
+end
+
+local function Scroll(rows)
+    offset = math.max(0, offset + rows)
+    FillPanel()
 end
 
 local function CreatePanel()
@@ -567,9 +646,19 @@ local function CreatePanel()
     f:SetScript("OnDragStart", f.StartMoving)
     f:SetScript("OnDragStop", f.StopMovingOrSizing)
     f:SetClampedToScreen(true)
+    f:EnableMouseWheel(true)
+    f:SetScript("OnMouseWheel", function(_, delta) Scroll(-delta * 3) end)
     local title = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     if not f.TitleText then title:SetPoint("TOP", 0, -6) end
     title:SetText(L["Lockouts"])
+    f.footer = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.footer:SetPoint("BOTTOM", f, "BOTTOM", 0, 10)
+    ns.SkinText(f.footer)
+    -- Page buttons when it doesn't all fit (a controller has no mouse wheel).
+    f.down = ns.PageButton(f, false, function() Scroll(f.pageRows or MIN_ROWS) end)
+    f.down:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -10, 6)
+    f.up = ns.PageButton(f, true, function() Scroll(-(f.pageRows or MIN_ROWS)) end)
+    f.up:SetPoint("RIGHT", f.down, "LEFT", -2, 0)
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverLockoutsFrame" end
     ns.SkinWindow(f)
     f:Hide()
@@ -581,6 +670,7 @@ end
 function ns.ToggleLockouts()
     if not panel then CreatePanel() end
     if panel:IsShown() then return panel:Hide() end
+    offset = 0
     FillPanel()
     ns.DockToOverview(panel)
     panel:Show()

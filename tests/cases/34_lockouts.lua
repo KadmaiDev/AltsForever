@@ -135,6 +135,65 @@ test("the Lockouts window lists raids down and characters with saves across", fu
     assert(lockoutWindow():find("No lockouts on record", 1, true), lockoutWindow())
 end)
 
+test("forgetting a character while the Lockouts window is open takes them out of it", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    local saved = lockoutAlts()
+    saved.chars["Far"].saves = { ["Molten Core"] = NOW + 3 * DAY + HOUR }
+    wow.login(saved)
+    SlashCmdList.ALTSFOREVER("lockouts")
+    local f = AltsForeverLockoutsFrame
+    local row = f.lines[6] -- Molten Core
+    SlashCmdList.ALTSFOREVER("delete Far")
+    assert(not lockoutWindow():find("Far", 1, true), lockoutWindow())
+    row.scripts.OnEnter(row)
+    eq(textOf(GameTooltip.lines), "Molten Core\n[PRIEST]High = 3/10 · 3d 1h")
+    -- A row still listing them (no refill) doesn't break its tooltip.
+    row.keys = { "Far", "High" }
+    row.scripts.OnEnter(row)
+    eq(textOf(GameTooltip.lines), "Molten Core\n[PRIEST]High = 3/10 · 3d 1h")
+end)
+
+test("a Lockouts window too big for the screen repeats the grid in blocks and scrolls", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    local saved = { v = 2, chars = {} }
+    for i = 1, 20 do
+        local name = ("Alt%02d"):format(i)
+        saved.chars[name] = alt(name, "MAGE", { level = 60 - i, saves = { ["Molten Core"] = NOW + DAY, ["Onyxia's Lair"] = NOW + 2 * DAY } })
+    end
+    for i = 1, 6 do saved.chars["Alt01"].saves["Raid " .. i] = NOW + 3 * DAY + i end
+    wow.login(saved)
+    UIParent.width, UIParent.height = 1280, 720
+    ns.SetWindowScale(1.5) -- 853 x 480 in the window's units
+    SlashCmdList.ALTSFOREVER("lockouts")
+    local f = AltsForeverLockoutsFrame
+    eq(f.width <= 853, true, "fits across: " .. f.width)
+    eq(f.width, 8 + 170 + 8 * 80 + 16, "8 characters across")
+    eq(f.height <= 480, true, "fits down: " .. f.height)
+    local n = 0
+    for _, row in ipairs(f.lines) do if row.shown then n = n + 1 end end
+    eq(n, 23, "the rows that fit (the gaps between sections take room)")
+    assert(f.footer.text:find("1-23 of 30", 1, true), f.footer.text) -- 2 + 1 + 3 blocks (8, 8, 4 characters) of 1 + 8 rows
+    eq(f.up.shown, true); eq(f.up:IsEnabled(), false); eq(f.down:IsEnabled(), true)
+    -- Every character is there, in blocks of 8.
+    f.scripts.OnMouseWheel(f, -1)
+    f.down.scripts.OnClick(f.down)
+    local all = lockoutWindow()
+    assert(f.footer.text:find("7-30 of 30", 1, true), f.footer.text)
+    assert(all:find("[MAGE]Alt17 | [MAGE]Alt18 | [MAGE]Alt19 | [MAGE]Alt20", 1, true), all)
+    eq(f.down:IsEnabled(), false, "at the end")
+    f.up.scripts.OnClick(f.up)
+    assert(f.footer.text:find("1-23 of 30", 1, true), f.footer.text)
+    assert(lockoutWindow():find("[MAGE]Alt01 | [MAGE]Alt02 | [MAGE]Alt03 | [MAGE]Alt04 | [MAGE]Alt05 | [MAGE]Alt06 | [MAGE]Alt07 | [MAGE]Alt08\n", 1, true), lockoutWindow())
+    -- A big screen: all in one, no paging.
+    UIParent.width, UIParent.height = 3840, 2160
+    ns.SetWindowScale(1)
+    SlashCmdList.ALTSFOREVER("lockouts"); SlashCmdList.ALTSFOREVER("lockouts")
+    eq(f.width, 8 + 170 + 20 * 80 + 16)
+    eq(f.footer.text, ""); eq(f.down.shown, false)
+end)
+
 test("Reputation and Lockouts open where they cover neither the overview nor each other", function()
     local ns = wow.load(FILES)
     wow.now = NOW

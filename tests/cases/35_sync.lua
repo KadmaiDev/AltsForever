@@ -144,7 +144,9 @@ test("/af sync: hello, then each side asks for what it lacks or has older, and t
     eq(sent[5].n, 2)
     assert(syncPrinted():find("Sent 2 characters to Bob Smith.", 1, true))
 
-    -- Theirs arrive.
+    -- Theirs arrive, with the Lockouts window open: it shows them as they come.
+    SlashCmdList.ALTSFOREVER("lockouts")
+    assert(not lockoutWindow():find("Bob's account", 1, true), lockoutWindow())
     local link = "|cff1eff00|Hitem:2589::::::::|h[Linen Cloth]|h|r"
     syncFrom(ns, "Bob Smith-Realm", { k = "char", key = "Bob Smith",
         c = alt("Bob Smith", "WARRIOR", { updated = NOW, bags = { [2589] = 3 },
@@ -157,6 +159,8 @@ test("/af sync: hello, then each side asks for what it lacks or has older, and t
     syncFrom(ns, "Bob Smith-Realm", { k = "char", key = "Tarn Moon", c = alt("Tarn Moon", "DRUID", { updated = NOW - 2 * DAY }) })
     syncFrom(ns, "Bob Smith-Realm", { k = "done", n = 4 })
     assert(syncPrinted():find("Got 2 characters from Bob Smith.", 1, true), syncPrinted())
+    local window = lockoutWindow()
+    assert(window:find("Bob's account | 1/10", 1, true) and window:find("Molten Core | Saved", 1, true), window)
     local bob = ns.db.chars["Bob Smith"]
     eq(bob.bags[2589], 3); eq(bob.gear[1], link); eq(bob.saves["Molten Core"], NOW + DAY)
     eq(bob.account, "theirs"); eq(bob.runs[1].zone, 53); eq(bob.runs[1].name, "Ragefire Chasm")
