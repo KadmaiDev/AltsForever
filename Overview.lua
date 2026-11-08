@@ -468,7 +468,9 @@ local function Refresh()
     frame.credit:SetText(#keys == 1 and (GREY .. L["Log in on your other characters once to add them here."] .. "|r")
         or L["Alts Forever by Kadmai"])
     -- Split by ruleset, each heading has its gold: one total would mix what can't be traded.
-    footer:SetText(L["Total played: %s"]:format(ns.FormatPlayed(played))
+    local instances = ns.InstanceText(now)
+    footer:SetText((instances and (instances .. "     ") or "")
+        .. L["Total played: %s"]:format(ns.FormatPlayed(played))
         .. (split and "" or ("     " .. L["Total gold: %s"]:format(GetCoinTextureString(total)))))
     frame:SetHeight(54 + y + 32)
 end

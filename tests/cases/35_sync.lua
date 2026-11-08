@@ -139,6 +139,7 @@ test("/af sync: hello, then each side asks for what it lacks or has older, and t
     sent = syncSent(ns, "Bob Smith-Realm")
     eq(syncKinds(sent), "want,plan,char,char,done")
     eq(sent[3].key, "Aldric"); eq(sent[3].c.updated, NOW + 60, "you, as of now")
+    eq(sent[3].c.account, ns.db.account, "with the account you're on")
     eq(sent[4].key, "Tarn Moon"); eq(sent[4].c.bags[118], 2)
     eq(sent[5].n, 2)
     assert(syncPrinted():find("Sent 2 characters to Bob Smith.", 1, true))
@@ -147,7 +148,8 @@ test("/af sync: hello, then each side asks for what it lacks or has older, and t
     local link = "|cff1eff00|Hitem:2589::::::::|h[Linen Cloth]|h|r"
     syncFrom(ns, "Bob Smith-Realm", { k = "char", key = "Bob Smith",
         c = alt("Bob Smith", "WARRIOR", { updated = NOW, bags = { [2589] = 3 },
-            gear = { [1] = link }, saves = { ["Molten Core"] = NOW + DAY }, recipes = { Tailoring = { ["bolt of linen cloth"] = true } } }),
+            gear = { [1] = link }, saves = { ["Molten Core"] = NOW + DAY }, recipes = { Tailoring = { ["bolt of linen cloth"] = true } },
+            account = "theirs", runs = { { at = NOW - 600, left = NOW - 60, map = 389, zone = 53, name = "Ragefire Chasm" } } }),
         ri = { Tailoring = { ["bolt of linen cloth"] = "75;Bolt of Linen Cloth;2996,2589:2" } }, fn = { [72] = "Stormwind" } })
     syncFrom(ns, "Bob Smith-Realm", { k = "char", key = "New Alt", rs = "pvp",
         c = alt("New Alt", "MAGE", { realm = "Other", faction = "Horde", updated = NOW - HOUR }) })
@@ -157,6 +159,7 @@ test("/af sync: hello, then each side asks for what it lacks or has older, and t
     assert(syncPrinted():find("Got 2 characters from Bob Smith.", 1, true), syncPrinted())
     local bob = ns.db.chars["Bob Smith"]
     eq(bob.bags[2589], 3); eq(bob.gear[1], link); eq(bob.saves["Molten Core"], NOW + DAY)
+    eq(bob.account, "theirs"); eq(bob.runs[1].zone, 53); eq(bob.runs[1].name, "Ragefire Chasm")
     eq(ns.db.chars["New Alt"].class, "MAGE")
     eq(ns.char.money, wow.money, "the character you're on is never overwritten")
     eq(ns.db.chars["Tarn Moon"].bags[118], 2, "an older copy is ignored")
