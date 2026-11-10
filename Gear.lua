@@ -36,23 +36,24 @@ local BOTTOM = { 16, 17, 18 }
 -- Just after login the game may know an item is in a slot (GetInventoryItemID) before
 -- it can give its link, or know nothing about the equipment yet at all. Neither may
 -- wipe what was recorded before, so those slots keep their old link and this returns
--- true to ask for another try shortly.
+-- true to ask for another try shortly. The second value is true if any slot's link
+-- changed (durability alone doesn't count), for upgrades, which depend only on the links.
 function ns.ScanGear(c)
     local gear = c.gear or {}
-    local incomplete, anything = false, false
+    local incomplete, anything, changed = false, false, c.gear == nil
     for slot in pairs(SLOT_NAMES) do
         if GetInventoryItemID("player", slot) then anything = true break end
     end
-    if not anything and next(gear) then return true end
+    if not anything and next(gear) then return true, false end
 
     for slot in pairs(SLOT_NAMES) do
         local link = GetInventoryItemLink("player", slot)
         if not issecretvalue(link) and link then
-            gear[slot] = link
+            if gear[slot] ~= link then gear[slot], changed = link, true end
         elseif GetInventoryItemID("player", slot) then
             incomplete = true -- item there, link not ready: keep the old one
-        else
-            gear[slot] = nil
+        elseif gear[slot] ~= nil then
+            gear[slot], changed = nil, true
         end
     end
     c.gear = gear
@@ -70,7 +71,7 @@ function ns.ScanGear(c)
     end
     c.duraSlots = low
     if lowest or not incomplete then c.dura = lowest end
-    return incomplete
+    return incomplete, changed
 end
 
 -- An item link's name in its quality colour, without the [brackets].
@@ -227,15 +228,26 @@ end
 
 function ns.StartGear()
     local char = ns.char
-    local retries = 0
+    -- Retries in a row while item links are still loading, and whether one is due: one
+    -- timer at a time, however many equipment and durability events come meanwhile.
+    local retries, waiting = 0, false
+    local Retry
     local function Scan()
-        -- Retry every 2 seconds, up to 5 times, while item links are still loading.
-        if ns.ScanGear(char) and retries < 5 and C_Timer then
-            retries = retries + 1
-            C_Timer.After(2, Scan)
+        -- Retry every 2 seconds, up to 5 times in a row, while item links are still loading.
+        local incomplete, changed = ns.ScanGear(char)
+        if not incomplete then
+            retries = 0
+        elseif not waiting and retries < 5 and C_Timer then
+            retries, waiting = retries + 1, true
+            C_Timer.After(2, Retry)
         end
-        if ns.UpgradesChanged then ns.UpgradesChanged() end
+        -- Upgrades depend on the links only, not on durability ticks.
+        if changed and ns.UpgradesChanged then ns.UpgradesChanged() end
         if panel and panel:IsShown() and shownKey == ns.charKey then Fill() end
+    end
+    Retry = function()
+        waiting = false
+        Scan()
     end
     -- Not at logout: by then the game may already report empty slots.
     ns.On("PLAYER_EQUIPMENT_CHANGED", Scan)

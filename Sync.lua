@@ -481,6 +481,7 @@ local function Changed()
     if ns.UpgradesChanged then ns.UpgradesChanged() end -- and the character sheet's anvils
     if ns.RefreshOverview then ns.RefreshOverview() end
     if ns.LockoutsChanged then ns.LockoutsChanged() end -- their saves and visits this hour
+    if ns.ReputationChanged then ns.ReputationChanged() end -- their standings
     if ns.RecipesChanged then ns.RecipesChanged() end -- their professions
 end
 

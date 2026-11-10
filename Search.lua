@@ -577,8 +577,19 @@ local function CreateWindow()
             local function Again()
                 if not frame:IsShown() or opened ~= this then return end
                 tries = tries + 1
+                -- The same search again: the item selected and the scroll stay where the
+                -- player left them, if it's still found (ns.SearchMatches starts at the top).
+                local e = matches[selected]
+                local id, top = e and e.id, offset
                 local missing = Build()
-                Update()
+                ns.SearchMatches(box:GetText())
+                for i = 1, #matches do
+                    if matches[i].id == id then
+                        selected, offset = i, top
+                        break
+                    end
+                end
+                Render()
                 if missing and tries < NAME_TRIES then C_Timer.After(1, Again) end
             end
             C_Timer.After(1, Again)

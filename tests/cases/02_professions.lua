@@ -145,6 +145,21 @@ test("recipe tooltip: names match regardless of capitalisation", function()
     eq(wow.hover(GameTooltip, 5001, text)[3][2], "|cff20ff20Known|r")
 end)
 
+test("recipe tooltip: the name is cut at the first colon, ASCII or full-width (Chinese clients)", function()
+    local ns = wow.load(FILES)
+    wow.profs = { { "Engineering", 107 } }
+    local FW = "\239\188\154" -- "："
+    local SCHEMATIC = "\229\155\190\231\186\184" -- a Chinese word for the prefix
+    local a = wow.recipeItem(5101, SCHEMATIC .. FW .. "Mechanical Squirrel", "Engineering", 100)
+    local b = wow.recipeItem(5102, SCHEMATIC .. FW .. "Gnome: Mk II", "Engineering", 100)
+    local c = wow.recipeItem(5103, "Schematic: Arc" .. FW .. "Light", "Engineering", 100)
+    wow.login(nil)
+    ns.char.recipes = { Engineering = { ["mechanical squirrel"] = true, ["gnome: mk ii"] = true, ["arc" .. FW .. "light"] = true } }
+    eq(wow.hover(GameTooltip, 5101, a)[3][2], "|cff20ff20Known|r", "full-width colon")
+    eq(wow.hover(GameTooltip, 5102, b)[3][2], "|cff20ff20Known|r", "the full-width one comes first")
+    eq(wow.hover(GameTooltip, 5103, c)[3][2], "|cff20ff20Known|r", "the ASCII one comes first")
+end)
+
 test("recipe tooltip: updates when you learn the recipe", function()
     wow.load(FILES)
     wow.profs = { { "Engineering", 107 } }

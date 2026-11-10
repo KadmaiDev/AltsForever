@@ -71,6 +71,36 @@ test("crate totals follow your bags, and names that load later", function()
     assert(text:find("Total = " .. crateCells(CG .. "26|r", CD .. "0|r", CG .. "7|r", CG .. "3|r"), 1, true), text)
 end)
 
+test("a material's name that never loads: the crate stops looking it up after 5 more hovers", function()
+    crateStart()
+    wow.itemNames[9003] = nil -- never loads; Greater Astral Essence is owned by nobody
+    local function asked()
+        local n = 0
+        for _, id in ipairs(wow.itemLoads or {}) do if id == 9003 then n = n + 1 end end
+        return n
+    end
+    wow.itemLoads = {}
+    for _ = 1, 6 do wow.hover(GameTooltip, CRATE, CRATE_TEXT) end
+    -- Asked once per character holding it (three) on each index pass.
+    eq(asked(), 18, "the first hover and 5 more")
+    for _ = 1, 10 do wow.hover(GameTooltip, CRATE, CRATE_TEXT) end
+    eq(asked(), 18, "then no more index passes or rebuilds")
+    -- Your bags change: it tries again.
+    wow.setBag(0, 16, { { 9003, 5 } })
+    wow.fire("BAG_UPDATE", 0)
+    wow.fire("BAG_UPDATE_DELAYED")
+    wow.hover(GameTooltip, CRATE, CRATE_TEXT)
+    eq(asked(), 21)
+    -- And once the name comes (after the cap), a new count picks it up.
+    wow.itemNames[9003] = "Small Glowing Shard"
+    for _ = 1, 10 do wow.hover(GameTooltip, CRATE, CRATE_TEXT) end
+    wow.setBag(0, 16, { { 9003, 4 } })
+    wow.fire("BAG_UPDATE", 0)
+    wow.fire("BAG_UPDATE_DELAYED")
+    local text = textOf(wow.hover(GameTooltip, CRATE, CRATE_TEXT))
+    assert(text:find("Total = " .. crateCells(CG .. "26|r", CD .. "0|r", CG .. "7|r", CD .. "0|r"), 1, true), text)
+end)
+
 test("a crate first seen half-loaded (auction house) gets its lines once the tooltip fills in", function()
     crateStart()
     wow.uncached[CRATE] = true

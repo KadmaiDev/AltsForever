@@ -137,6 +137,9 @@ end
 ---------------------------------------------------------------------------
 local rows, plain = {}, {}
 local lastId, lastVer, lastMissing = nil, nil, false
+-- Rebuilds for the same item and counts while a material's name is missing: a name that
+-- never loads would otherwise cost an index pass and a rebuild on every hover.
+local tries, MAX_TRIES = 0, 5
 
 local function ByCount(a, b)
     if a.you ~= b.you then return a.you end
@@ -221,7 +224,9 @@ local function OnCleared(tt) shownFirst[tt], shownRows[tt] = nil, nil end
 function ns.AddCrateLines(tt, id, data)
     local p = Parse(tt, id, data)
     if not p then return end
-    if id ~= lastId or ns.version ~= lastVer or lastMissing then
+    local fresh = id ~= lastId or ns.version ~= lastVer
+    if fresh or lastMissing and tries < MAX_TRIES then
+        tries = fresh and 0 or tries + 1
         local missing = Resolve(p)
         if missing then
             Index()

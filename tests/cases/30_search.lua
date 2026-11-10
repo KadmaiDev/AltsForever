@@ -484,6 +484,36 @@ test("opened from the bags window of a character on another ruleset, the search 
     eq(searchRows():find("Far Gloves", 1, true), nil, searchRows())
 end)
 
+test("the search running again for late names keeps the selected item and the scroll; typing starts at the top", function()
+    searchStart()
+    for id = 8101, 8112 do
+        wow.item(id, "Rag " .. id, {})
+        AltsForeverDB.chars["Tarn Moon"].bags[id] = 1
+    end
+    wow.item(7002, "Gone Rag", {})
+    wow.itemNames[7002] = nil -- never loads, so it keeps trying
+    AltsForeverDB.chars["Tarn Moon"].bags[7002] = 1
+    wow.timers = {}
+    SlashCmdList.ALTSFOREVERSEARCH("rag")
+    local box = AltsForeverSearchBox
+    for _ = 1, 10 do box.scripts.OnArrowPressed(box, "DOWN") end
+    local rows = {}
+    for _, r in ipairs({ AltsForeverSearchFrame:GetChildren() }) do
+        if r.index then rows[r.index] = r end
+    end
+    local function lit()
+        for _, r in ipairs(rows) do if r.lit:IsShown() then return r.entry.id end end
+    end
+    eq(rows[1].entry.id, 8104); eq(lit(), 8111)
+    runTimers() -- the second's search again
+    eq(#wow.timers, 1, "still waiting for the name")
+    eq(rows[1].entry.id, 8104, "scrolled where it was")
+    eq(lit(), 8111, "the same item selected")
+    searchType("rag")
+    eq(rows[1].entry.id, 8101, "typing: back to the top")
+    eq(lit(), 8101)
+end)
+
 test("names slower than a second are still waited for, a few times, then no more", function()
     searchStart()
     wow.item(7001, "Late Cloth", {})

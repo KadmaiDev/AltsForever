@@ -124,6 +124,7 @@ function ns.ForgetCharacter(key)
     ns.PruneRecipeInfo()
     ns.InvalidateCache()
     if ns.LockoutsChanged then ns.LockoutsChanged() end -- an open Lockouts window may list them
+    if ns.ReputationChanged then ns.ReputationChanged() end -- and an open Reputation panel
     if ns.RecipesChanged then ns.RecipesChanged() end -- closes their profession window
     -- The character sheet's anvils may list what they could craft.
     if ns.CharacterSheetChanged then ns.CharacterSheetChanged() end

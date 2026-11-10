@@ -86,6 +86,63 @@ test("retries stop after five tries", function()
     eq(runs, 5)
 end)
 
+test("equipment events while links load share one retry timer; a complete scan earns the retries back", function()
+    wow.load(FILES)
+    wow.inventory[1] = 3000 -- link not ready
+    wow.player.name = "Aldric Vane" -- a full name, so only gear retries are scheduled
+    wow.login(nil)
+    runTimers() -- the login's other timers; the gear retry schedules another
+    local function gearTimers()
+        local n = 0
+        for _, fn in ipairs(wow.timers) do if wow.delays[fn] == 2 then n = n + 1 end end
+        return n
+    end
+    eq(gearTimers(), 1)
+    for _ = 1, 10 do
+        wow.fire("PLAYER_EQUIPMENT_CHANGED", 1)
+        wow.fire("UPDATE_INVENTORY_DURABILITY")
+    end
+    eq(gearTimers(), 1, "still one, however many events")
+    local rounds = 1 -- the one runTimers above
+    while gearTimers() > 0 and rounds < 20 do runTimers() rounds = rounds + 1 end
+    eq(rounds, 5, "five retries in all, not spent by the burst")
+    -- The link comes: a complete scan. A later item still loading gets five tries again.
+    wow.gearLinks[1] = itemLink(3000, "Hunting Cap")
+    wow.fire("PLAYER_EQUIPMENT_CHANGED", 1)
+    eq(gearTimers(), 0)
+    wow.inventory[1], wow.gearLinks[1] = 3001, nil
+    wow.fire("PLAYER_EQUIPMENT_CHANGED", 1)
+    eq(gearTimers(), 1, "retries start again")
+    rounds = 0
+    while gearTimers() > 0 and rounds < 20 do runTimers() rounds = rounds + 1 end
+    eq(rounds, 5)
+end)
+
+test("durability changes alone don't count as an upgrade change; a new item does", function()
+    local ns = wow.load(FILES)
+    wow.gearLinks[1], wow.inventory[1] = itemLink(3000, "Hunting Cap"), 3000
+    wow.gearLinks[2], wow.inventory[2] = itemLink(3002, "Amulet"), 3002
+    wow.durability[1] = { 40, 50 }
+    wow.login(nil)
+    runTimers()
+    SlashCmdList.ALTSFOREVER("")
+    clickRow("Aldric")
+    local v = ns.UpgradesVersion()
+    wow.durability[1] = { 30, 50 }
+    wow.fire("UPDATE_INVENTORY_DURABILITY")
+    eq(ns.UpgradesVersion(), v, "durability only")
+    eq(AltsForeverGearFrame.footer.text, "Lowest durability: |cffffffff60%|r", "the gear panel still follows it")
+    wow.fire("PLAYER_EQUIPMENT_CHANGED", 1)
+    eq(ns.UpgradesVersion(), v, "the same item")
+    wow.gearLinks[1], wow.inventory[1] = itemLink(3005, "Better Hat"), 3005
+    wow.fire("PLAYER_EQUIPMENT_CHANGED", 1)
+    eq(ns.UpgradesVersion() > v, true, "a new item")
+    v = ns.UpgradesVersion()
+    wow.gearLinks[2], wow.inventory[2] = nil, nil
+    wow.fire("PLAYER_EQUIPMENT_CHANGED", 2)
+    eq(ns.UpgradesVersion() > v, true, "a slot emptied")
+end)
+
 test("logging out doesn't wipe the recorded gear", function()
     local ns = wow.load(FILES)
     wow.gearLinks[1] = itemLink(3000, "Hunting Cap")
