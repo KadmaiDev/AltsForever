@@ -274,14 +274,23 @@ local function SetRank(bar, prof, skill, maxSkill, c)
     local name = "Skillbar_Fill_Flipbook_" .. (KitOf(prof) or "")
     if not HasAtlas(name) then name = "Skillbar_Fill_Flipbook_DefaultBlue" end
     local info = HasAtlas(name) and GetAtlasInfo(name)
-    local l, top, _, bottom, r
+    -- The atlas's place in its file: from its info, else read back after setting it.
+    local l, top, r, bottom
     if info then
         t:SetAtlas(name, false)
-        l, top, _, bottom, r = t:GetTexCoord()
+        l, r, top, bottom = info.leftTexCoord, info.rightTexCoord, info.topTexCoord, info.bottomTexCoord
+        if type(l) ~= "number" or type(r) ~= "number" or type(top) ~= "number" or type(bottom) ~= "number" then
+            local _
+            l, top, _, bottom, r = t:GetTexCoord()
+        end
     end
     if type(l) == "number" and type(top) == "number" and type(bottom) == "number" and type(r) == "number" then
+        -- The game plays the fill's flipbook once (2 columns, rows of 34) and rests on its last
+        -- frame (setToFinalAlpha); its first frame is nearly empty. So the last frame, bottom
+        -- right, cut to the skill.
         local rows = max(1, floor((info.height or 34) / 34 + 0.5))
-        t:SetTexCoord(l, l + (r - l) / 2 * frac, top, top + (bottom - top) / rows)
+        local half = (r - l) / 2
+        t:SetTexCoord(l + half, l + half + half * frac, top + (bottom - top) * (rows - 1) / rows, bottom)
     else
         t:SetColorTexture(0.25, 0.5, 0.9, 0.9)
     end
@@ -310,14 +319,14 @@ local function MakeRankBar(f)
     bar:SetSize(453, 18)
     bar:SetPoint("TOPLEFT", f, "TOPLEFT", 110, -40)
     bar.bg = bar:CreateTexture(nil, "BACKGROUND")
-    bar.bg:SetPoint("CENTER")
+    bar.bg:SetPoint("TOPLEFT")
     bar.fill = bar:CreateTexture(nil, "ARTWORK")
     bar.fill:SetPoint("TOPLEFT", 5, -3)
     bar.fill:SetHeight(18)
     bar.border = bar:CreateTexture(nil, "OVERLAY")
-    bar.border:SetPoint("CENTER")
+    bar.border:SetPoint("TOPLEFT")
     bar.text = bar:CreateFontString(nil, "OVERLAY", "Number12FontOutline")
-    bar.text:SetPoint("CENTER", 0, 1)
+    bar.text:SetPoint("CENTER", 0, -3)
     if Flat() then
         -- EllesmereUI's flat bar: a dark trough with its thin border, white text.
         local trough = bar:CreateTexture(nil, "BACKGROUND", nil, -1)
