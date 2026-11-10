@@ -1,3 +1,7 @@
+## Alts Forever 1.3.1 (not yet released)
+
+- **Upgrades for protection paladins:** spell damage now counts for a paladin judged as a tank, as much as Stamina or Defense: most of a protection paladin's threat is holy damage (seals, Consecration, Retribution Aura). Before, a helm with spell damage scored as if it had none, so the Defense one always won. Warrior tanks are unchanged. A paladin you already set to Tank stays that way.
+
 ## Alts Forever 1.3.0
 
 - **Lockouts window:** the new key button at the top of the overview (or `/af lockouts`) opens a window with the instances each game account has entered this hour, listing every one still counting with the character who went in and when it frees up (hover one for when you entered and left), and your raid lockouts with raids down and characters across, as in the Reputation panel (hover a raid for each character's bosses killed and reset). It updates while open, counting down each visit's minutes. With more characters or visits than fit on your screen, the raid grid repeats in blocks and the window scrolls (mouse wheel or the arrows). `/af lockouts` no longer prints to chat.
