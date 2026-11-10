@@ -1,4 +1,4 @@
-## Alts Forever 1.3.1 (not yet released)
+## Alts Forever 1.4.0 (not yet released)
 
 - **Instances this hour on every character:** the overview's Lockouts column now shows each character's game account's count ("2/10", orange at 10/10) on every character of that account, so you can see at a glance who can still go in, then the number of raid lockouts the character has, after a key icon. Hover a character for the account's visits still counting, then their lockouts. The counts and the footer's wait now update by themselves while the overview is open, so an account at 10/10 shows free again as soon as a visit stops counting. A character not logged in since 1.2.0 shows "?" until they are, rather than looking free.
 - **Upgrades for protection paladins:** spell damage now counts for a paladin judged as a tank, as much as Stamina or Defense: most of a protection paladin's threat is holy damage (seals, Consecration, Retribution Aura). Before, a helm with spell damage scored as if it had none, so the Defense one always won. Warrior tanks are unchanged. A paladin you already set to Tank stays that way.
