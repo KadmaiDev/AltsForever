@@ -34,6 +34,8 @@ Type `/af` to open the **overview**: every character with level and XP, rested X
 
 **Mail expiry:** a few seconds after you log in, Alts Forever warns in chat if any character has mail with items or gold expiring within 3 days, and says whether it'll be returned to the sender or deleted. The overview's Mail column shows how long each character has; `/af mail` lists them all.
 
+**Your alts' professions:** the anvil button at the top of the overview, **Professions** in a character's right-click menu, or `/af prof Name`, opens a window to browse a character's recipes, even while they're offline, laid out like the game's profession window: a tab per profession, the rank bar, the recipes in the game's categories with their skill-up arrows, how many they could make from their bags and bank (" [3] "), and each recipe's reagents with how many they have. Search and filter (have materials, has skill-up) as in the game. Colours are from the last time that character opened the profession, except that a recipe turns grey once their skill has passed its grey point. The game's own window can show another character's profession only while they're online.
+
 Hovering a recipe (pattern, schematic, formula...) lists your characters who have that profession: **Known**, **Can learn**, **Needs 120 (107)** (required skill, their skill), or **Not scanned**. Open each profession window once on each character so Alts Forever knows which recipes they've learned.
 
 **Can craft:** hovering any item that one of your characters knows how to make adds a "Can craft" section listing them one per line (the current character first). This also comes from opening each profession window once.
@@ -106,7 +108,7 @@ Options > AddOns > Alts Forever has every setting, with a short explanation of e
 
 ## Commands
 
-Everything below can also be done by clicking: **click the Alts Forever minimap button** (or Alts Forever in the minimap's addon menu) to open the overview, **right-click it** (or the cog in the overview) for options. Drag the button to move it around the minimap, or hide it from the options menu. With a data broker display such as Bazooka, Titan Panel or ChocolateBar, Alts Forever is there too (click and right-click work the same), so you can hide the minimap button and keep it there. And **right-click a character in the overview** to see their gear, bags or bank, choose their upgrade role, or forget them.
+Everything below can also be done by clicking: **click the Alts Forever minimap button** (or Alts Forever in the minimap's addon menu) to open the overview, **right-click it** (or the cog in the overview) for options. Drag the button to move it around the minimap, or hide it from the options menu. With a data broker display such as Bazooka, Titan Panel or ChocolateBar, Alts Forever is there too (click and right-click work the same), so you can hide the minimap button and keep it there. And **right-click a character in the overview** to see their gear, bags, bank or professions, choose their upgrade role, or forget them.
 
 | Command | What it does |
 |---|---|
@@ -115,6 +117,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af export` | Show every character as text to copy: for a spreadsheet, notes or a Markdown table |
 | `/af sync [Full Name]` | Open the sync window, or swap characters with your character on another game account, e.g. `/af sync Thessa Oakenbrook` |
 | `/af sync auto` | Turn syncing by itself on or off |
+| `/af prof [name]` | Open a character's professions (yours without a name) |
 | `/af lockouts` | Open or close the Lockouts window: the instances each game account has entered this hour, and each character's raid lockouts |
 | `/af icons` | Choose the icons item tooltips use for bags, bank, mail and worn items |
 | `/af bags [name]`, `/af bank [name]` | Show your bags or bank slot by slot, or another character's, e.g. `/af bank Tarnia` |

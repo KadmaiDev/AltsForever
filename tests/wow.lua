@@ -48,7 +48,9 @@ function M.load(files)
     -- The open profession window: which profession, and every recipe in it. A recipe
     -- is { name, learned, prof?, item? (what the schematic says it makes), link?,
     -- grey? (maxTrivialLevel), reagents? { { itemID, qty }, ... } }.
+    -- cat?, icon?, diff? (relativeDifficulty), made? (quantityMin) as the game gives them.
     M.tradeskill = { ready = true, linked = false, guild = false, prof = nil, recipes = {} }
+    M.categories = {}
     M.frames = {}
     M.printed = {}
     M.postCalls = {}
@@ -165,7 +167,7 @@ function M.load(files)
     end
     GetProfessionInfo = function(i)
         local p = M.profs[i]
-        return p[1], 136243, p[2], p[3] or 150
+        return p[1], p.icon or 136243, p[2], p[3] or 150, 0, 0, p.line
     end
     local ts = function() return M.tradeskill end
     -- Profession names by skill line, in the client's language (M.skillLineNames).
@@ -183,7 +185,8 @@ function M.load(files)
         end,
         GetRecipeInfo = function(id)
             local r = ts().recipes[id]
-            return r and { recipeID = id, name = r.name, learned = r.learned, maxTrivialLevel = r.grey }
+            return r and { recipeID = id, name = r.name, learned = r.learned, maxTrivialLevel = r.grey,
+                categoryID = r.cat, icon = r.icon, relativeDifficulty = r.diff }
         end,
         GetProfessionInfoByRecipeID = function(id)
             local r = ts().recipes[id]
@@ -193,11 +196,17 @@ function M.load(files)
         GetRecipeSchematic = function(id)
             local r = ts().recipes[id]
             M.schematics = (M.schematics or 0) + 1
+            if r and r.noSchematic then return nil end
             local slots = {}
             for i, x in ipairs(r and r.reagents or {}) do
                 slots[i] = { quantityRequired = x[2], reagents = { { itemID = x[1] } } }
             end
-            return { recipeID = id, outputItemID = r and r.item, reagentSlotSchematics = slots }
+            return { recipeID = id, outputItemID = r and r.item, reagentSlotSchematics = slots, quantityMin = r and r.made or 1 }
+        end,
+        -- Recipe categories: M.categories[id] = { name, uiOrder }.
+        GetCategoryInfo = function(id)
+            local c = M.categories[id]
+            return c and { categoryID = id, name = c[1], uiOrder = c[2] }
         end,
         GetRecipeItemLink = function(id)
             local r = ts().recipes[id]
@@ -325,6 +334,20 @@ function M.load(files)
     function frameMethods:GetRegions() return unpack(self.regions or {}) end
     function frameMethods:GetObjectType() return self.kind end
     function frameMethods:CreateTexture() return newObject("Texture") end
+    function frameMethods:CreateMaskTexture() return newObject("MaskTexture") end
+    function frameMethods:CreateAnimationGroup()
+        local group = newObject("AnimationGroup")
+        group.plays = 0
+        function group:Play() self.plays = self.plays + 1 end
+        function group:CreateAnimation(kind)
+            local a = newObject(kind)
+            function a:SetFlipBookRows(n) self.rows = n end
+            function a:SetFlipBookColumns(n) self.columns = n end
+            function a:SetFlipBookFrames(n) self.frames = n end
+            return a
+        end
+        return group
+    end
     CreateFrame = function(kind, name, parent, template)
         if template and M.missingTemplates[template] then error("Couldn't find inherited node \"" .. template .. "\"") end
         local f = newObject(kind, name)
@@ -334,6 +357,20 @@ function M.load(files)
         return f
     end
     M.missingTemplates = {}
+    -- Atlases the client has: M.atlases[name] = { width, height, ..., file } (none unless set).
+    M.atlases = {}
+    C_Texture = { GetAtlasInfo = function(name) return M.atlases[name] end }
+    function frameMethods:SetAtlas(name, _, _, _, wrapH, wrapV)
+        self.atlas = name
+        self.wrap = wrapH and { wrapH, wrapV }
+        self.texCoord = { 0, 1, 0, 1 }
+    end
+    function frameMethods:SetTexCoord(l, r, t, b) self.texCoord = { l, r, t, b } end
+    -- The eight corner values, as the game gives them: UL, LL, UR, LR (x, y each).
+    function frameMethods:GetTexCoord()
+        local c = self.texCoord or { 0, 1, 0, 1 }
+        return c[1], c[3], c[1], c[4], c[2], c[3], c[2], c[4]
+    end
     -- The ruleset the game reports (as Nova Instance Tracker reads it on Forever): a rule name
     -- from M.player.ruleset is active; a secret answer when M.player.ruleset is M.SECRET.
     Enum.GameRule = { HardcoreRuleset = 101, RPRuleset = 102, PvPRuleset = 103 }

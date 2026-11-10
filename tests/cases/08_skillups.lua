@@ -35,9 +35,9 @@ test("a profession scan records grey points, and reagents of known recipes, acco
     wow.schematics = 0
     greyWindow({ squirrel = true })
     local info = AltsForeverDB.recipeInfo.Engineering
-    eq(info["mechanical squirrel"], "100;Mechanical Squirrel;,4361:1,2589:2")
+    eq(info["mechanical squirrel"], "100;Mechanical Squirrel;,4361:1,2589:2;1001", "then its recipe ID")
     eq(info["rough dynamite"], nil, "nobody knows it: not stored")
-    eq(info["shadow goggles"], "150;Shadow Goggles;,4359:4", "known by another character: grey refreshed, reagents kept")
+    eq(info["shadow goggles"], "150;Shadow Goggles;,4359:4;1003", "known by another character: grey refreshed, reagents kept")
     eq(wow.schematics, 1, "schematics are read only for learned recipes")
 end)
 
@@ -48,7 +48,7 @@ test("learning a recipe records its reagents and what it makes", function()
     wow.fire("TRADE_SKILL_CLOSE")
     wow.tradeskill.recipes[1003].learned = true
     wow.fire("NEW_RECIPE_LEARNED", 1003)
-    eq(AltsForeverDB.recipeInfo.Engineering["shadow goggles"], "150;Shadow Goggles;,4359:4")
+    eq(AltsForeverDB.recipeInfo.Engineering["shadow goggles"], "150;Shadow Goggles;,4359:4;1003")
     eq(ns.char.crafts.Engineering[GOGGLES_ITEM], "shadow goggles")
 end)
 
@@ -273,7 +273,7 @@ test("a scan only records recipes of the window's profession", function()
     eq(ns.char.recipes.Blacksmithing["charred wolf meat"], nil, "a Cooking recipe in the list")
     eq(ns.char.crafts.Blacksmithing[WOLF_MEAT], nil)
     eq(AltsForeverDB.recipeInfo.Blacksmithing["charred wolf meat"], nil)
-    eq(AltsForeverDB.recipeInfo.Blacksmithing["rough copper vest"], "55;Rough Copper Vest;,2840:4")
+    eq(AltsForeverDB.recipeInfo.Blacksmithing["rough copper vest"], "55;Rough Copper Vest;,2840:4;3001")
 end)
 
 test("strays saved by 0.2.x are removed from every character, keeping the rest", function()
@@ -300,7 +300,7 @@ test("strays saved by 0.2.x are removed from every character, keeping the rest",
     eq(v.crafts.Blacksmithing[WOLF_MEAT], nil)
     eq(v.crafts.Blacksmithing[777], true, "saved before 0.3.0: can't be checked, kept")
     local info = AltsForeverDB.recipeInfo.Blacksmithing
-    eq(info["rough copper vest"], "55;Rough Copper Vest;,2840:4", "grey refreshed")
+    eq(info["rough copper vest"], "55;Rough Copper Vest;,2840:4;3001", "grey refreshed")
     eq(info["charred wolf meat"], nil); eq(info["herb baked egg"], nil)
     local lw = AltsForeverDB.recipeInfo.Leatherworking
     eq(lw["pincer bites"], nil, "strays under professions nobody opened are cleared too")

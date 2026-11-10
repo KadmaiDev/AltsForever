@@ -149,7 +149,7 @@ local CHAR_FIELDS = {
     bags = "table", bank = "table", mail = "table", equip = "table", gear = "table",
     layout = "table", profs = "table", profMax = "table", recipes = "table", crafts = "table",
     reps = "table", duraSlots = "table", saves = "table", saveKills = "table",
-    account = "string", runs = "table",
+    account = "string", runs = "table", recipesAt = "table",
 }
 local DB_FIELDS = {
     icons = "table", goldDays = "table", goldDaysBy = "table", factions = "table",
@@ -158,7 +158,7 @@ local DB_FIELDS = {
     legacyPool = "number", scale = "number", minimapAngle = "number", bagsCols = "number",
     bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
     account = "string", tooltipsOff = "boolean", countsOff = "boolean", craftTipsOff = "boolean",
-    cratesOff = "boolean", goldTipOff = "boolean", barsOff = "boolean",
+    cratesOff = "boolean", goldTipOff = "boolean", barsOff = "boolean", recipeCategories = "table", profArt = "table",
 }
 
 -- Keeps only entries whose key and value are of these types (value nil = any).
@@ -182,6 +182,7 @@ local function RepairChar(c)
     if c.profMax then KeepOnly(c.profMax, "string", "number") end
     if c.recipes then KeepOnly(c.recipes, "string", "table") end
     if c.crafts then KeepOnly(c.crafts, "string", "table") end
+    if c.recipesAt then KeepOnly(c.recipesAt, "string", "number") end
     if c.saves then KeepOnly(c.saves, "string", "number") end
     if c.saveKills then KeepOnly(c.saveKills, "string", "string") end
     if c.runs then
@@ -230,6 +231,8 @@ local function Repair(saved)
         KeepOnly(saved.recipeInfo, "string", "table")
         for _, recipes in pairs(saved.recipeInfo) do KeepOnly(recipes, "string", "string") end
     end
+    if saved.recipeCategories then KeepOnly(saved.recipeCategories, "number", "string") end
+    if saved.profArt then KeepOnly(saved.profArt, "string", "string") end
     local chars = saved.chars
     -- A character under a key that isn't a name moves to its own name if that's free.
     local moved = {}
@@ -764,6 +767,14 @@ end
 function commands.bags(arg) ShowBags(arg, "bags") end
 function commands.bank(arg) ShowBags(arg, "bank") end
 
+-- /af prof [name]: a character's professions, as the game's profession window shows them.
+function commands.prof(arg)
+    local key = arg == "" and ns.charKey or FindChar(arg)
+    if not key then return Print(L["No character named '%s'. Use /af list."]:format(arg)) end
+    ns.ShowRecipes(key)
+end
+commands.professions = commands.prof
+
 function commands.rep()
     ns.ToggleReputation()
 end
@@ -794,6 +805,7 @@ function commands.help()
     Print(L["/af tooltips turns everything Alts Forever adds to tooltips on or off. /af crafting, crates, gold and bars turn one part on or off."])
     Print(L["/af counts turns the item counts in tooltips on or off (if another addon, such as Baganator, already shows them)."])
     Print(L["/af bags or /af bank, with a name for another character, shows their bags or bank slot by slot."])
+    Print(L["/af prof, with a name for another character, shows their professions and recipes."])
     Print(L["/af icons picks the icons item tooltips use for bags, bank, mail and worn items."])
     Print(L["/af upgrades turns upgrade hints in item tooltips on or off. /af role Name role sets what a character's upgrades are judged by (melee, ranged, caster, healer, tank, feral or auto)."])
     Print(L["/af itemnames turns saving item names in Alts Forever's saved file on or off (only for reading it outside the game)."])

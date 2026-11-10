@@ -212,7 +212,7 @@ test("hovering a row shows rested details, hearthstone and item level", function
     -- 2 days away, not resting: 6 blocks of 8h x 1.25% x 1000 XP = 75 XP (8% of the level)
     assert(text:find("Rested = 75 XP (|cffff80008%|r)", 1, true), text)
     assert(text:find("out in the world", 1, true), text)
-    assert(text:find("Right-click to forget this character", 1, true), "how to forget them is shown")
+    assert(text:find("Right-click for bags, professions and more", 1, true), "the menu is mentioned")
     local you = overviewRows()[1]
     you.scripts.OnEnter(you)
     local mine = {}

@@ -20,7 +20,8 @@
 --   hello  { k = "hello", v = PROTOCOL, reply = true|nil, auto = true|nil, have = { [key] = stamp } }
 --   want   { k = "want", keys = { key, ... } }      the other side's characters we lack or have older
 --   plan   { k = "plan", n = messages }             how many messages follow, for the progress bar
---   char   { k = "char", key, c = character, ri = recipe info, fn = faction names, rs = ruleset }
+--   char   { k = "char", key, c = character, ri = recipe info, fn = faction names, rs = ruleset,
+--            rc = recipe categories, pa = profession icons }
 --   done   { k = "done", n = characters sent }
 --   asking                                         their player is being asked
 --   no / busy                                      declined / in combat or asking about another
@@ -431,7 +432,7 @@ local function Package(key, c)
         copy.updated = time()
         if ns.TouchRun then ns.TouchRun() end -- runs is shared with the copy: sent as of now
     end
-    local db, ri, fn = ns.db, nil, nil
+    local db, ri, fn, rc = ns.db, nil, nil, nil
     for prof, list in pairs(c.recipes or {}) do
         local info = db.recipeInfo and db.recipeInfo[prof]
         for name in pairs(info and list or {}) do
@@ -439,7 +440,23 @@ local function Package(key, c)
                 ri = ri or {}
                 ri[prof] = ri[prof] or {}
                 ri[prof][name] = info[name]
+                -- The category it's filed under, for the alts' profession window.
+                local cat = select(5, ns.ParseRecipeInfo(info[name]))
+                local catInfo = cat and db.recipeCategories and db.recipeCategories[cat]
+                if catInfo then
+                    rc = rc or {}
+                    rc[cat] = catInfo
+                end
             end
+        end
+    end
+    -- Their professions' icons, for the same window.
+    local pa
+    for prof in pairs(c.profs or {}) do
+        local art = db.profArt and db.profArt[prof]
+        if art then
+            pa = pa or {}
+            pa[prof] = art
         end
     end
     for id in pairs(c.reps or {}) do
@@ -449,7 +466,7 @@ local function Package(key, c)
             fn[id] = name
         end
     end
-    return { k = "char", key = key, c = copy, ri = ri, fn = fn, rs = c.realm and db.rulesets and db.rulesets[c.realm] }
+    return { k = "char", key = key, c = copy, ri = ri, fn = fn, rc = rc, pa = pa, rs = c.realm and db.rulesets and db.rulesets[c.realm] }
 end
 
 local RULESETS = { normal = true, pvp = true, rp = true, hardcore = true }
@@ -464,6 +481,7 @@ local function Changed()
     if ns.UpgradesChanged then ns.UpgradesChanged() end -- and the character sheet's anvils
     if ns.RefreshOverview then ns.RefreshOverview() end
     if ns.LockoutsChanged then ns.LockoutsChanged() end -- their saves and visits this hour
+    if ns.RecipesChanged then ns.RecipesChanged() end -- their professions
 end
 
 -- Takes in a character the other side sent, if it's newer than ours; returns true if so.
@@ -493,9 +511,29 @@ local function Merge(msg)
                 db.recipeInfo = db.recipeInfo or {}
                 local mine = db.recipeInfo[prof] or {}
                 for name, info in pairs(list) do
-                    if type(name) == "string" and type(info) == "string" and mine[name] == nil then mine[name] = info end
+                    -- Theirs where we have none; else ours, with any field ours lacks taken
+                    -- from theirs (recipe ID, category, icon, or reagents).
+                    if type(name) == "string" and type(info) == "string" then
+                        mine[name] = mine[name] and ns.MergeRecipeInfo(mine[name], info) or info
+                    end
                 end
                 if next(mine) then db.recipeInfo[prof] = mine end
+            end
+        end
+    end
+    if type(msg.rc) == "table" then
+        for id, info in pairs(msg.rc) do
+            if type(id) == "number" and type(info) == "string" and info:match("^%-?%d+;[^;]+$") then
+                db.recipeCategories = db.recipeCategories or {}
+                db.recipeCategories[id] = db.recipeCategories[id] or info
+            end
+        end
+    end
+    if type(msg.pa) == "table" then
+        for prof, art in pairs(msg.pa) do
+            if type(prof) == "string" and type(art) == "string" and art:match("^%d+;[^;]*$") then
+                db.profArt = db.profArt or {}
+                db.profArt[prof] = db.profArt[prof] or art
             end
         end
     end

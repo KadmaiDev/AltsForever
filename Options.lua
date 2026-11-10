@@ -124,6 +124,7 @@ function ns.ForgetCharacter(key)
     ns.PruneRecipeInfo()
     ns.InvalidateCache()
     if ns.LockoutsChanged then ns.LockoutsChanged() end -- an open Lockouts window may list them
+    if ns.RecipesChanged then ns.RecipesChanged() end -- closes their profession window
     -- The character sheet's anvils may list what they could craft.
     if ns.CharacterSheetChanged then ns.CharacterSheetChanged() end
     return true
@@ -532,6 +533,9 @@ function ns.ShowCharacterMenu(owner, key)
         root:CreateButton(L["Gear"], function() ns.ShowGear(key) end)
         root:CreateButton(L["Bags"], function() ns.ShowBags(key, "bags") end)
         root:CreateButton(L["Bank"], function() ns.ShowBags(key, "bank") end)
+        -- Their professions, as the game's profession window shows them (Recipes.lua).
+        local profs = root:CreateButton(L["Professions"], function() ns.ShowRecipes(key) end)
+        if not (c.profs and next(c.profs)) then profs:SetEnabled(false) end
         -- The stats their upgrades are judged by: from talents, or the player's choice.
         local choices = ns.RoleChoices(c)
         if choices then

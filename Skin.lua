@@ -268,6 +268,20 @@ function ns.SkinBagsWindow(f)
     f.euiBg, f.euiLine = bg, edges
 end
 
+-- True with EllesmereUI's look on. Windows drawn with the game's own art (the profession
+-- window) fade it then for flat panels, as EllesmereUI does to the game's windows.
+function ns.SkinFlat() return skin ~= nil end
+
+-- A dropdown button (the game's filter button): EllesmereUI's flat one with its arrow.
+function ns.SkinDropdown(dd)
+    if skin and skin.Dropdown then pcall(skin.Dropdown, dd) end
+end
+
+-- EllesmereUI's flat panel with its thin border, on a part of a window (`opts` as its API's).
+function ns.SkinPanel(f, opts)
+    if skin and skin.Panel then pcall(skin.Panel, f, opts) end
+end
+
 -- A section heading in the bags window: EllesmereUI's are light grey, not gold.
 function ns.SkinHeading(fs)
     if skin then skin.Font(fs, 0.9, 0.9, 0.9) else ns.SkinText(fs) end

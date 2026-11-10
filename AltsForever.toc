@@ -33,6 +33,7 @@ Scanner.lua
 Mail.lua
 Money.lua
 Professions.lua
+Recipes.lua
 Character.lua
 Talents.lua
 Columns.lua
