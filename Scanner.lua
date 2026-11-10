@@ -139,6 +139,7 @@ function ns.StartScanner()
         ns.ScanContainers(BAGS, char.bags, char.layout)
         ns.version = ns.version + 1
         ns.BagsWindowChanged()
+        if ns.RecipesChanged then ns.RecipesChanged() end -- how many they could make
     end
 
     -- Bank contents can only be read while the bank is open; outside that the tabs
@@ -151,6 +152,7 @@ function ns.StartScanner()
         char.bankAt = time()
         ns.version = ns.version + 1
         ns.BagsWindowChanged()
+        if ns.RecipesChanged then ns.RecipesChanged() end -- how many they could make
     end
 
     local function BankOpened()

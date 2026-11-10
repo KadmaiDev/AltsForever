@@ -276,7 +276,7 @@ local function RowTooltip(row)
     if key == ns.charKey then
         tt:AddLine("|cff66ccff" .. L["Click to see gear"] .. "|r")
     else
-        tt:AddLine("|cff66ccff" .. L["Click to see gear"] .. " · " .. L["Right-click to forget this character"] .. "|r")
+        tt:AddLine("|cff66ccff" .. L["Click to see gear"] .. " · " .. L["Right-click for bags, professions and more"] .. "|r")
     end
     tt:Show()
     -- Line up the professions in the font the tooltip is shown in (a UI addon such as

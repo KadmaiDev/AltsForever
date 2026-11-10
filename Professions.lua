@@ -7,6 +7,7 @@ if ns.disabled then return end -- another copy of Alts Forever is running (Core.
 local L = ns.L
 
 local pairs, ipairs, next, wipe, tonumber, type, sort = pairs, ipairs, next, wipe, tonumber, type, table.sort
+local pcall, floor = pcall, math.floor
 local issecretvalue = issecretvalue or function() return false end
 local GetProfessions, GetProfessionInfo = GetProfessions, GetProfessionInfo
 local GetItemInfoInstant, GetItemNameByID = C_Item.GetItemInfoInstant, C_Item.GetItemNameByID
@@ -49,6 +50,18 @@ end
 -- incomplete changes nothing: one with a profession that couldn't be read, or, at login,
 -- one that finds none while some were known. Returns true if a profession was dropped.
 local read, readMax = {}, {} -- reused
+-- Each profession's icon and skill line, account-wide, for showing another character's
+-- profession (Recipes.lua): db.profArt[name] = "skillLine;icon". The game only tells the
+-- character you're on.
+local function Art(name, icon, line)
+    if issecretvalue(icon) or issecretvalue(line) or type(line) ~= "number" then return end
+    local art = line .. ";" .. ((type(icon) == "number" or type(icon) == "string") and icon or "")
+    local db = ns.db
+    if db.profArt and db.profArt[name] == art then return end
+    db.profArt = db.profArt or {}
+    db.profArt[name] = art
+end
+
 function ns.ScanSkills(c, live)
     local a, b, c3, d, e, f = GetProfessions()
     local profs, maxes = c.profs or {}, c.profMax or {}
@@ -59,9 +72,10 @@ function ns.ScanSkills(c, live)
     local unread = false
     local function Add(index)
         if not index then return end
-        local name, _, skill, max = GetProfessionInfo(index)
+        local name, icon, skill, max, _, _, line = GetProfessionInfo(index)
         if not issecretvalue(name) and not issecretvalue(skill) and name and skill then
             read[name] = skill
+            Art(name, icon, line)
             if not issecretvalue(max) and max and max > 0 then readMax[name] = max end
             return name
         end
@@ -139,12 +153,24 @@ local function InfoTable(prof)
     return t
 end
 
--- grey (number or nil), display name, reagents string.
+-- Since the alts' profession window (Recipes.lua, 2026-11-10) a value also carries, after the
+-- reagents, ";recipeID;categoryID;icon;made" (the game's recipe and category IDs, its icon file,
+-- how many one craft makes when more than one), each blank if not known; values saved before
+-- end at the reagents. Reagent strings never hold a ";".
+local INFO = "^(%d*);([^;]*);([^;]*);?(%d*);?(%d*);?(%d*);?(%d*)$"
+
+-- grey (number or nil), display name, reagents string, then recipeID, categoryID, icon and
+-- made (numbers or nil).
 local function ParseInfo(v)
     if type(v) ~= "string" then return nil, nil, "" end
-    local grey, name, reagents = v:match("^(%d*);([^;]*);(.*)$")
-    return tonumber(grey), name, reagents or ""
+    local grey, name, reagents, id, cat, icon, made = v:match(INFO)
+    if not name then
+        -- Not in the expected shape: whatever follows the name counts as reagents, as before.
+        grey, name, reagents = v:match("^(%d*);([^;]*);(.*)$")
+    end
+    return tonumber(grey), name, reagents or "", tonumber(id), tonumber(cat), tonumber(icon), tonumber(made)
 end
+ns.ParseRecipeInfo = ParseInfo
 
 function ns.RecipeGrey(prof, lname)
     local all = ns.db.recipeInfo
@@ -152,15 +178,49 @@ function ns.RecipeGrey(prof, lname)
     return t and (ParseInfo(t[lname]))
 end
 
-local function Record(info, r, lname, known)
-    local grey = r.maxTrivialLevel
-    if issecretvalue(grey) or type(grey) ~= "number" or grey <= 0 then grey = nil end
+-- A number from the game, or nil if it's secret or not a positive number.
+local function Count(v)
+    if issecretvalue(v) or type(v) ~= "number" or v <= 0 then return nil end
+    return v
+end
+
+-- `made`: how many one craft makes, from the schematic (nil keeps what was recorded).
+local function Record(info, r, lname, known, made)
+    local grey = Count(r.maxTrivialLevel)
     local old = info[lname]
     -- Known here, or by another character (then keep the reagents they recorded).
     if known or old then
-        local _, _, reagents = ParseInfo(old)
-        info[lname] = (grey or "") .. ";" .. r.name .. ";" .. (known or reagents)
+        local _, _, reagents, _, _, _, oldMade = ParseInfo(old)
+        made = Count(made) or oldMade
+        -- The added fields, without empty ones at the end (none: the old three-field form).
+        local extra = (";" .. (Count(r.recipeID) or "") .. ";" .. (Count(r.categoryID) or "") .. ";"
+            .. (Count(r.icon) or "") .. ";" .. (made and made > 1 and made or "")):gsub(";+$", "")
+        info[lname] = (grey or "") .. ";" .. r.name .. ";" .. (known or reagents) .. extra
     end
+end
+
+-- The categories recipes are filed under, account-wide: db.recipeCategories[categoryID] =
+-- "uiOrder;name" (the game's display order, then its name), for the alts' profession window.
+-- Read once per category per scan.
+local function RecordCategory(seen, id)
+    id = Count(id)
+    if not id or seen[id] or not TS.GetCategoryInfo then return end
+    seen[id] = true
+    local ok, cat = pcall(TS.GetCategoryInfo, id)
+    local name = ok and type(cat) == "table" and cat.name
+    if issecretvalue(name) or type(name) ~= "string" or name == "" or name:find(";", 1, true) then return end
+    local order = cat.uiOrder
+    if issecretvalue(order) or type(order) ~= "number" then order = 0 end
+    ns.db.recipeCategories = ns.db.recipeCategories or {}
+    ns.db.recipeCategories[id] = floor(order) .. ";" .. name
+end
+
+-- A recipe's colour for the character scanning it: Enum.TradeskillRelativeDifficulty
+-- (0 orange, 1 yellow, 2 green, 3 grey), stored where `true` (known) was; true if not given.
+local function Difficulty(r)
+    local d = r.relativeDifficulty
+    if issecretvalue(d) or type(d) ~= "number" or d < 0 or d > 3 then return true end
+    return d
 end
 
 -- Every recipe name stored anywhere for a profession: any character's list or recipeInfo.
@@ -221,8 +281,8 @@ function ns.ScanRecipes(c)
     local stored = StoredNames(prof)
     local ids = TS.GetAllRecipeIDs()
     local mine, found = {}, false
-    local learned, crafts, reagentsOf = {}, {}, {}
-    local unchecked
+    local learned, crafts, reagentsOf, madeOf = {}, {}, {}, {}
+    local unchecked, cats = nil, {}
     for _, id in ipairs(ids) do
         local r = TS.GetRecipeInfo(id)
         if r and r.name then
@@ -230,12 +290,13 @@ function ns.ScanRecipes(c)
             if r.learned or stored[lname] then
                 if ProfessionName(TS.GetProfessionInfoByRecipeID(id)) == prof then
                     found, mine[lname] = true, true
+                    RecordCategory(cats, r.categoryID)
                     if r.learned then
                         learned[lname] = r
                         local s = TS.GetRecipeSchematic and TS.GetRecipeSchematic(id, false)
                         local item = OutputItem(id, s)
                         if item then crafts[item] = lname end
-                        reagentsOf[lname] = Reagents(s)
+                        reagentsOf[lname], madeOf[lname] = Reagents(s), s and s.quantityMin
                     else
                         Record(InfoTable(prof), r, lname, nil) -- refresh the grey point
                     end
@@ -258,11 +319,16 @@ function ns.ScanRecipes(c)
     wipe(made)
     local info = InfoTable(prof)
     for lname, r in pairs(learned) do
-        known[lname] = true
-        Record(info, r, lname, reagentsOf[lname])
+        known[lname] = Difficulty(r)
+        Record(info, r, lname, reagentsOf[lname], madeOf[lname])
     end
     for item, lname in pairs(crafts) do made[item] = lname end
     c.recipes[prof], c.crafts[prof] = known, made
+    -- The skill the colours above were read at: once it moves on, they may be out of date.
+    -- Read now (a skill-up from crafting may not have been picked up yet).
+    ns.ScanSkills(c)
+    c.recipesAt = c.recipesAt or {}
+    c.recipesAt[prof] = c.profs and c.profs[prof]
     Repair(prof, mine)
     ns.PruneRecipeInfo() -- other professions' strays too (a few hundred lookups, window open only)
     ns.craftVersion = ns.craftVersion + 1
@@ -276,9 +342,10 @@ function ns.RecipeLearned(c, recipeID)
     -- Only add to a profession we've scanned; a partial list would read as "not learned".
     if not (learned and r and r.name) then return end
     local lname = r.name:lower()
-    learned[lname] = true
+    learned[lname] = Difficulty(r)
+    RecordCategory({}, r.categoryID)
     local s = TS.GetRecipeSchematic and TS.GetRecipeSchematic(recipeID, false)
-    Record(InfoTable(prof), r, lname, Reagents(s))
+    Record(InfoTable(prof), r, lname, Reagents(s), s and s.quantityMin)
     local crafts = c.crafts and c.crafts[prof]
     local item = crafts and OutputItem(recipeID, s)
     if item then crafts[item] = lname end
@@ -340,6 +407,7 @@ function ns.StartProfessions()
 
     local function Changed()
         ns.version = ns.version + 1
+        if ns.RecipesChanged then ns.RecipesChanged() end -- an open profession window showing this character
     end
 
     local function TryScan()

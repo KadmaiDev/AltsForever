@@ -48,7 +48,9 @@ function M.load(files)
     -- The open profession window: which profession, and every recipe in it. A recipe
     -- is { name, learned, prof?, item? (what the schematic says it makes), link?,
     -- grey? (maxTrivialLevel), reagents? { { itemID, qty }, ... } }.
+    -- cat?, icon?, diff? (relativeDifficulty), made? (quantityMin) as the game gives them.
     M.tradeskill = { ready = true, linked = false, guild = false, prof = nil, recipes = {} }
+    M.categories = {}
     M.frames = {}
     M.printed = {}
     M.postCalls = {}
@@ -165,7 +167,7 @@ function M.load(files)
     end
     GetProfessionInfo = function(i)
         local p = M.profs[i]
-        return p[1], 136243, p[2], p[3] or 150
+        return p[1], p.icon or 136243, p[2], p[3] or 150, 0, 0, p.line
     end
     local ts = function() return M.tradeskill end
     -- Profession names by skill line, in the client's language (M.skillLineNames).
@@ -183,7 +185,8 @@ function M.load(files)
         end,
         GetRecipeInfo = function(id)
             local r = ts().recipes[id]
-            return r and { recipeID = id, name = r.name, learned = r.learned, maxTrivialLevel = r.grey }
+            return r and { recipeID = id, name = r.name, learned = r.learned, maxTrivialLevel = r.grey,
+                categoryID = r.cat, icon = r.icon, relativeDifficulty = r.diff }
         end,
         GetProfessionInfoByRecipeID = function(id)
             local r = ts().recipes[id]
@@ -197,7 +200,12 @@ function M.load(files)
             for i, x in ipairs(r and r.reagents or {}) do
                 slots[i] = { quantityRequired = x[2], reagents = { { itemID = x[1] } } }
             end
-            return { recipeID = id, outputItemID = r and r.item, reagentSlotSchematics = slots }
+            return { recipeID = id, outputItemID = r and r.item, reagentSlotSchematics = slots, quantityMin = r and r.made or 1 }
+        end,
+        -- Recipe categories: M.categories[id] = { name, uiOrder }.
+        GetCategoryInfo = function(id)
+            local c = M.categories[id]
+            return c and { categoryID = id, name = c[1], uiOrder = c[2] }
         end,
         GetRecipeItemLink = function(id)
             local r = ts().recipes[id]
@@ -334,6 +342,10 @@ function M.load(files)
         return f
     end
     M.missingTemplates = {}
+    -- Atlases the client has: M.atlases[name] = { width, height, ..., file } (none unless set).
+    M.atlases = {}
+    C_Texture = { GetAtlasInfo = function(name) return M.atlases[name] end }
+    function frameMethods:SetAtlas(name) self.atlas = name end
     -- The ruleset the game reports (as Nova Instance Tracker reads it on Forever): a rule name
     -- from M.player.ruleset is active; a secret answer when M.player.ruleset is M.SECRET.
     Enum.GameRule = { HardcoreRuleset = 101, RPRuleset = 102, PvPRuleset = 103 }
