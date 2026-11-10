@@ -346,3 +346,47 @@ test("damaged instance records are repaired at load", function()
     eq(ns.db.chars["Far"].account, nil)
     assert(type(ns.db.account) == "string", "a new one made")
 end)
+
+test("the overview's Lockouts column: each account's instances this hour on its characters, then their raid saves", function()
+    local saved = overviewAlts()
+    saved.account = "mine"
+    saved.chars["Low"].account = "mine"
+    saved.chars["Low"].saves = { ["Molten Core"] = NOW + DAY }
+    saved.chars["High"].account, saved.chars["High"].saves = "other", {}
+    saved.chars["Far"].saves = {} -- saved nowhere, but whose account it is isn't known
+    local ns = start(saved)
+    enter(RFC)
+    cast(53)
+    SlashCmdList.ALTSFOREVER("")
+    local function row(name)
+        for _, r in ipairs(overviewRows()) do
+            if cell(r, 1):find(name, 1, true) then return r end
+        end
+    end
+    eq(cell(row("Aldric"), 12), "1/10", "you: your account's count, though your saves aren't read yet")
+    eq(cell(row("Low"), 12), "1/10  " .. LOCK_KEY .. "1", "the same count on the account's other characters, then their saves")
+    eq(cell(row("High"), 12), "", "another account with none this hour, saved nowhere")
+    eq(cell(row("Far"), 12), G .. "?|r", "account unknown: never shown as free")
+
+    -- The other account reaches the limit: orange on its characters.
+    local runs = {}
+    for i = 1, 10 do runs[i] = { at = NOW - 1200, left = NOW - 600, map = 389, name = "Ragefire Chasm" } end
+    ns.db.chars["High"].runs = runs
+    ns.RefreshOverview()
+    eq(cell(row("High"), 12), "|cffff800010/10|r")
+    eq(cell(row("Low"), 12), "1/10  " .. LOCK_KEY .. "1", "yours unchanged")
+
+    -- The row tooltip lists the account's visits, then the character's saves.
+    local r = row("Low")
+    r.scripts.OnEnter(r)
+    local text = textOf(GameTooltip.lines)
+    assert(text:find("Instances this hour: 1/10\nRagefire Chasm = Aldric · inside now\n \nLockouts\nMolten Core = ", 1, true), text)
+    r = row("High")
+    r.scripts.OnEnter(r)
+    text = textOf(GameTooltip.lines)
+    assert(text:find("Instances this hour: |cffff800010/10 (50 min)|r\nRagefire Chasm = High · frees in 50 min", 1, true), text)
+    assert(not text:find("Lockouts", 1, true), text)
+    r = row("Far")
+    r.scripts.OnEnter(r)
+    assert(not textOf(GameTooltip.lines):find("Instances this hour", 1, true))
+end)

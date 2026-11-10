@@ -31,8 +31,9 @@ local COLUMNS = {
     { title = "", width = 104, gap = 16 },
     { title = "", width = 34, right = true },
     { title = L["Mail"], width = 60, gap = 16 },
-    -- Raid and dungeon saves running: how many (the row tooltip lists them).
-    { title = L["Lockouts"], width = 64, center = true },
+    -- The account's instances this hour, then raid and dungeon saves running (the row
+    -- tooltip lists both): "2/10 <key>1".
+    { title = L["Lockouts"], width = 76, center = true },
     { title = L["Zone"], width = 140 },
     { title = L["Played"], width = 70, right = true },
     { title = L["Last seen"], width = 80, right = true },
@@ -410,6 +411,8 @@ local function Refresh()
             count[g] = (count[g] or 0) + 1
         end
     end
+    -- Counts each account's instances this hour, for the footer and each row's Lockouts cell.
+    local instances = ns.InstanceText(now)
     local collapsed = ns.db.collapsedGroups or {}
     local y, nHeads, group, hidden = 0, 0, nil, false
     for i, key in ipairs(keys) do
@@ -468,7 +471,6 @@ local function Refresh()
     frame.credit:SetText(#keys == 1 and (GREY .. L["Log in on your other characters once to add them here."] .. "|r")
         or L["Alts Forever by Kadmai"])
     -- Split by ruleset, each heading has its gold: one total would mix what can't be traded.
-    local instances = ns.InstanceText(now)
     footer:SetText((instances and (instances .. "     ") or "")
         .. L["Total played: %s"]:format(ns.FormatPlayed(played))
         .. (split and "" or ("     " .. L["Total gold: %s"]:format(GetCoinTextureString(total)))))

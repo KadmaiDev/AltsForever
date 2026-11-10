@@ -55,12 +55,16 @@ test("a secret answer from the game is left alone", function()
     eq(next(ns.char.saves), nil)
 end)
 
+-- The overview's Lockouts cell shows raid saves after the Lockouts window's key.
+LOCK_KEY = "|TInterface\\Icons\\INV_Misc_Key_03:0:0:0:0:64:64:5:59:5:59|t"
+
 local function lockoutAlts()
     local saved = overviewAlts()
     saved.chars["High"].saves = { ["Molten Core"] = NOW + 3 * DAY + HOUR, ["Onyxia's Lair"] = NOW + 5 * HOUR,
         ["Zul'Gurub"] = NOW - HOUR }
     saved.chars["High"].saveKills = { ["Molten Core"] = "3/10", ["Zul'Gurub"] = "4/10" }
     saved.chars["Low"].saves = {}
+    saved.account, saved.chars["Low"].account = "mine", "mine"
     return saved
 end
 
@@ -71,8 +75,9 @@ test("the overview counts each character's saves; the row tooltip lists them, so
     SlashCmdList.ALTSFOREVER("")
     local rows = overviewRows()
     eq(cell(rows[1], 12), G .. "?|r", "you: never read")
-    eq(cell(rows[3], 1), "[PRIEST]High"); eq(cell(rows[3], 12), "2")
-    eq(cell(rows[4], 1), "[ROGUE]Low"); eq(cell(rows[4], 12), "", "saved nowhere")
+    eq(cell(rows[2], 1), "[MAGE]Far"); eq(cell(rows[2], 12), G .. "?|r", "neither read nor their account known")
+    eq(cell(rows[3], 1), "[PRIEST]High"); eq(cell(rows[3], 12), LOCK_KEY .. "2", "the saves even with the account unknown")
+    eq(cell(rows[4], 1), "[ROGUE]Low"); eq(cell(rows[4], 12), "", "saved nowhere, and no instances this hour")
     eq(ns.db.chars["High"].saves["Zul'Gurub"], nil, "a save past its reset is forgotten when the overview opens")
     eq(ns.db.chars["High"].saveKills["Zul'Gurub"], nil)
     rows[3].scripts.OnEnter(rows[3])

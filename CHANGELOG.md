@@ -1,3 +1,7 @@
+## Alts Forever 1.3.1 (not yet released)
+
+- **Instances this hour on every character:** the overview's Lockouts column now shows each character's game account's count ("2/10", orange at 10/10) on every character of that account, so you can see at a glance who can still go in, then the number of raid lockouts the character has, after a key icon. Hover a character for the account's visits still counting, then their lockouts. A character not logged in since 1.2.0 shows "?" until they are, rather than looking free.
+
 ## Alts Forever 1.3.0
 
 - **Lockouts window:** the new key button at the top of the overview (or `/af lockouts`) opens a window with the instances each game account has entered this hour, listing every one still counting with the character who went in and when it frees up (hover one for when you entered and left), and your raid lockouts with raids down and characters across, as in the Reputation panel (hover a raid for each character's bosses killed and reset). It updates while open, counting down each visit's minutes. With more characters or visits than fit on your screen, the raid grid repeats in blocks and the window scrolls (mouse wheel or the arrows). `/af lockouts` no longer prints to chat.
