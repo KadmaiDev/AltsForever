@@ -1,4 +1,4 @@
-## Alts Forever 1.4.0 (not yet released)
+## Alts Forever 1.4.0
 
 - **Your alts' professions:** press the new anvil button at the top of the overview, right-click a character and choose **Professions**, or type `/af prof` and their name, to browse their recipes in a window laid out like the game's own profession window, even while they're offline: a tab for each profession, the rank bar, the recipes in the game's categories with the skill-up arrows they had when that character last opened it (grey once their skill has passed it), how many they could make from their bags and bank, and each recipe's reagents with how many they have. Search and filter as in the game (have materials, has skill-up). Open each profession once on each character after updating, so Alts Forever learns the categories and colours; until then their recipes are listed under Other, with a note saying so.
 - The overview's row hint now says right-click opens the menu (bags, professions and more), not only Forget.
