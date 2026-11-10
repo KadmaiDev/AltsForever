@@ -175,7 +175,7 @@ ns.ProfessionArt = Art
 function ns.RecipeTabs(c)
     local list = {}
     for _, p in ipairs(ns.AltProfessions(c)) do
-        if p.scanned or not GATHERING[Art(p.name) or 0] then list[#list + 1] = p end
+        if not GATHERING[Art(p.name) or 0] or (p.scanned and next(c.recipes[p.name])) then list[#list + 1] = p end
     end
     return list
 end
@@ -329,11 +329,13 @@ local function MakeRankBar(f)
     bar.fill:SetHeight(18)
     -- The mask that shows the skill's share of the fill (the game's, else a plain one).
     if type(bar.CreateMaskTexture) == "function" and type(bar.CreateAnimationGroup) == "function" then
+        -- The game's mask is 512x512 (seen in game 2026-11-10) and stays that tall: only its
+        -- width follows the skill. Squeezed to the bar's height, its dark parts hid the fill.
         local mask = bar:CreateMaskTexture()
         if not Atlas(mask, "Professions-skillbar-mask", true) then
             mask:SetTexture("Interface\\Buttons\\WHITE8X8", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+            mask:SetHeight(18)
         end
-        mask:SetHeight(18)
         mask:SetPoint("LEFT", bar.fill, "LEFT", 1, 0)
         bar.fill:AddMaskTexture(mask)
         bar.mask = mask
@@ -1088,7 +1090,15 @@ local function CreateWindow()
     f:Hide()
     f:SetPoint("CENTER")
     local sounds = SOUNDKIT or {}
-    f:HookScript("OnShow", function() if sounds.UI_PROFESSIONS_WINDOW_OPEN then PlaySound(sounds.UI_PROFESSIONS_WINDOW_OPEN) end end)
+    f:HookScript("OnShow", function()
+        if sounds.UI_PROFESSIONS_WINDOW_OPEN then PlaySound(sounds.UI_PROFESSIONS_WINDOW_OPEN) end
+        -- The rank bar's fill animation: one started while the window was hidden never runs.
+        local anim = f.rank.anim
+        if anim and f.rank.fillAtlas then
+            anim:Stop()
+            anim:Play()
+        end
+    end)
     f:HookScript("OnHide", function() if sounds.UI_PROFESSIONS_WINDOW_CLOSE then PlaySound(sounds.UI_PROFESSIONS_WINDOW_CLOSE) end end)
     ns.GamepadWindow(f)
     ns.ScaleWindow(f)

@@ -291,6 +291,7 @@ test("professions whose icon wasn't recorded: icons and gathering told apart by 
     local ns = wow.load(FILES)
     wow.ns = ns
     wow.atlases["Skillbar_Fill_Flipbook_DefaultBlue"] = { width = 900, height = 68 }
+    wow.atlases["Professions-skillbar-mask"] = { width = 512, height = 512 }
     local saved = smithAlt()
     saved.profArt = nil
     local c = saved.chars["Vesp Ash"]
@@ -299,6 +300,12 @@ test("professions whose icon wasn't recorded: icons and gathering told apart by 
     wow.login(saved)
     local tabs = ns.RecipeTabs(ns.db.chars["Vesp Ash"])
     eq(#tabs, 2, "Skinning gathers: no tab")
+    -- A gathering profession whose window was read (Fishing, in game) but has no recipes: none either.
+    ns.db.chars["Vesp Ash"].recipes.Skinning = {}
+    eq(#ns.RecipeTabs(ns.db.chars["Vesp Ash"]), 2)
+    ns.db.chars["Vesp Ash"].recipes.Skinning = { ["cured hide"] = 1 }
+    eq(#ns.RecipeTabs(ns.db.chars["Vesp Ash"]), 3, "with a recipe it has one")
+    ns.db.chars["Vesp Ash"].recipes.Skinning = nil
     eq(tabs[1].name, "Blacksmithing"); eq(tabs[2].name, "Mining")
     local line, icon = ns.ProfessionArt("Mining")
     eq(line, 186); eq(icon, "Interface\\Icons\\Trade_Mining")
@@ -312,12 +319,13 @@ test("professions whose icon wasn't recorded: icons and gathering told apart by 
     eq(bar.fill.atlas, "Skillbar_Fill_Flipbook_DefaultBlue")
     eq(bar.anim.flipbook.rows, 2); eq(bar.anim.flipbook.columns, 2); eq(bar.anim.flipbook.frames, 4)
     eq(bar.mask.width, 441 * 120 / 150)
-    eq(bar.anim.plays, 1)
+    eq(bar.mask.height, nil, "the game's mask keeps its own height")
+    eq(bar.anim.plays, 2, "once when filled while hidden, again when shown")
     ns.RecipesChanged()
-    eq(bar.anim.plays, 1, "nothing changed")
+    eq(bar.anim.plays, 2, "nothing changed")
     ns.db.chars["Vesp Ash"].profs.Blacksmithing = 121
     ns.RecipesChanged()
-    eq(bar.anim.plays, 2)
+    eq(bar.anim.plays, 3)
     eq(bar.mask.width, 441 * 121 / 150)
 end)
 
