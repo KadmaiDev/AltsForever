@@ -31,8 +31,9 @@ local COLUMNS = {
     { title = "", width = 104, gap = 16 },
     { title = "", width = 34, right = true },
     { title = L["Mail"], width = 60, gap = 16 },
-    -- Raid and dungeon saves running: how many (the row tooltip lists them).
-    { title = L["Lockouts"], width = 64, center = true },
+    -- The account's instances this hour, then raid and dungeon saves running (the row
+    -- tooltip lists both): "2/10 <key>1".
+    { title = L["Lockouts"], width = 76, center = true },
     { title = L["Zone"], width = 140 },
     { title = L["Played"], width = 70, right = true },
     { title = L["Last seen"], width = 80, right = true },
@@ -395,7 +396,27 @@ local function Place(f, y)
     f:SetPoint("RIGHT", frame, "RIGHT", -4, 0)
 end
 
-local function Refresh()
+-- While open, the overview refreshes itself when its instance counts change (a visit stops
+-- counting, or the wait at the limit ticks over), so an account at 10/10 shows free again
+-- without some other event. One timer at a time: a new one only for a sooner change, and a
+-- numbered `dueTick` so only the latest acts.
+local dueAt, dueTick = nil, 0
+local Refresh
+
+local function Due(now)
+    if not (C_Timer and C_Timer.After) then return end
+    local wait = ns.InstancesChangeIn(now)
+    if not wait or (dueAt and now + wait >= dueAt) then return end
+    dueTick, dueAt = dueTick + 1, now + wait
+    local mine = dueTick
+    C_Timer.After(wait, function()
+        if mine ~= dueTick then return end
+        dueAt = nil
+        if frame and frame:IsShown() then Refresh() end
+    end)
+end
+
+function Refresh()
     local now = time()
     local chars = ns.db.chars
     local keys = ns.OverviewOrder()
@@ -410,6 +431,9 @@ local function Refresh()
             count[g] = (count[g] or 0) + 1
         end
     end
+    -- Counts each account's instances this hour, for the footer and each row's Lockouts cell.
+    local instances = ns.InstanceText(now)
+    Due(now)
     local collapsed = ns.db.collapsedGroups or {}
     local y, nHeads, group, hidden = 0, 0, nil, false
     for i, key in ipairs(keys) do
@@ -468,7 +492,6 @@ local function Refresh()
     frame.credit:SetText(#keys == 1 and (GREY .. L["Log in on your other characters once to add them here."] .. "|r")
         or L["Alts Forever by Kadmai"])
     -- Split by ruleset, each heading has its gold: one total would mix what can't be traded.
-    local instances = ns.InstanceText(now)
     footer:SetText((instances and (instances .. "     ") or "")
         .. L["Total played: %s"]:format(ns.FormatPlayed(played))
         .. (split and "" or ("     " .. L["Total gold: %s"]:format(GetCoinTextureString(total)))))
