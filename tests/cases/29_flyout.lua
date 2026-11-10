@@ -194,15 +194,23 @@ test("an item that never loads: the open character sheet tries again at most 5 t
     for _ = 1, 5 do runTimers() end -- the login's own, with the sheet closed
     local runs, real = 0, ns.CraftableUpgrades
     ns.CraftableUpgrades = function(...) runs = runs + 1 return real(...) end
+    -- The game answers every request for it, and the load fails each time.
+    local answered = 0
+    local function step()
+        local loads = wow.itemLoads or {}
+        for i = answered + 1, #loads do wow.fire("GET_ITEM_INFO_RECEIVED", loads[i], false) end
+        answered = #loads
+        runTimers()
+    end
     PaperDollFrame:Show()
     eq(runs, 1)
-    for _ = 1, 20 do runTimers() end
-    eq(runs, 6, "the first pass and 5 retries")
+    for _ = 1, 20 do step() end
+    eq(runs, 6, "the first pass and 5 retries, failed loads or not")
     eq(#wow.timers, 0, "then no more timers")
     -- Opened afresh: it tries again, as many times.
     PaperDollFrame:Hide()
     PaperDollFrame:Show()
-    for _ = 1, 20 do runTimers() end
+    for _ = 1, 20 do step() end
     eq(runs, 12)
     eq(#wow.timers, 0)
     -- Once the item comes, the anvil shows.

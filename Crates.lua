@@ -92,6 +92,16 @@ end
 ---------------------------------------------------------------------------
 local index, indexed = {}, {}
 local indexVer, pending
+-- Names asked for (item ID -> true), and whether one of them has come since: the next hover
+-- then looks them up again even after its tries are spent (AddCrateLines).
+local asked, arrived, listening = {}, false, false
+
+local function Arrived(id, success)
+    -- A failed load (success false) brings no name: nothing to look up again.
+    if issecretvalue(id) or issecretvalue(success) or success == false or not asked[id] then return end
+    asked[id] = nil
+    arrived = true
+end
 
 local function Index()
     if indexVer == ns.version and not pending then return end
@@ -109,7 +119,16 @@ local function Index()
                         else
                             -- Not loaded yet: asked for, and looked up again next hover.
                             pending = true
-                            if C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(id) end
+                            if C_Item.RequestLoadItemDataByID then
+                                -- Upgrades.lua listens too, so ours stays registered once
+                                -- added; it returns at once for items it didn't ask for.
+                                if not listening then
+                                    listening = true
+                                    ns.On("GET_ITEM_INFO_RECEIVED", Arrived)
+                                end
+                                asked[id] = true
+                                C_Item.RequestLoadItemDataByID(id)
+                            end
                         end
                     end
                 end
@@ -225,8 +244,10 @@ function ns.AddCrateLines(tt, id, data)
     local p = Parse(tt, id, data)
     if not p then return end
     local fresh = id ~= lastId or ns.version ~= lastVer
-    if fresh or lastMissing and tries < MAX_TRIES then
-        tries = fresh and 0 or tries + 1
+    -- A name asked for has come: once more, even with the tries spent (it isn't one of them).
+    if fresh or lastMissing and (arrived or tries < MAX_TRIES) then
+        if fresh then tries = 0 elseif not arrived then tries = tries + 1 end
+        arrived = false
         local missing = Resolve(p)
         if missing then
             Index()

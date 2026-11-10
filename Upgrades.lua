@@ -698,7 +698,11 @@ local function SheetChanged()
     if ns.CharacterSheetChanged then ns.CharacterSheetChanged() end
 end
 
-local function ItemArrived()
+-- A failed load (success false) brings nothing new, and working the anvils out again would
+-- only ask for the same item again: an item that never loads would keep that going for ever,
+-- past the character sheet's own retry cap (Flyout.lua). Still waiting for a real arrival.
+local function ItemArrived(_, success)
+    if issecretvalue(success) or success == false then return end
     if waiting then
         waiting = false
         version = version + 1
