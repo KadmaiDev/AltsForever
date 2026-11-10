@@ -318,15 +318,17 @@ test("professions whose icon wasn't recorded: icons and gathering told apart by 
     local bar = f.rank
     eq(bar.fill.atlas, "Skillbar_Fill_Flipbook_DefaultBlue")
     eq(bar.anim.flipbook.rows, 2); eq(bar.anim.flipbook.columns, 2); eq(bar.anim.flipbook.frames, 4)
-    eq(bar.mask.width, 441 * 120 / 150)
+    eq(math.floor(bar.mask.width * 100 + 0.5), math.floor(453 * 120 / 150 * 100 + 0.5))
     eq(bar.mask.height, nil, "the game's mask keeps its own height")
+    eq(bar.mask.wrap[1], "CLAMPTOBLACKADDITIVE", "nothing shows past its edge")
+    eq(bar.mask.wrap[2], "CLAMPTOBLACKADDITIVE")
     eq(bar.anim.plays, 2, "once when filled while hidden, again when shown")
     ns.RecipesChanged()
     eq(bar.anim.plays, 2, "nothing changed")
     ns.db.chars["Vesp Ash"].profs.Blacksmithing = 121
     ns.RecipesChanged()
     eq(bar.anim.plays, 3)
-    eq(bar.mask.width, 441 * 121 / 150)
+    eq(math.floor(bar.mask.width * 100 + 0.5), math.floor(453 * 121 / 150 * 100 + 0.5))
 end)
 
 test("the skill scan records each profession's icon and skill line, and sync carries them", function()

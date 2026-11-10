@@ -359,8 +359,9 @@ function M.load(files)
     -- Atlases the client has: M.atlases[name] = { width, height, ..., file } (none unless set).
     M.atlases = {}
     C_Texture = { GetAtlasInfo = function(name) return M.atlases[name] end }
-    function frameMethods:SetAtlas(name)
+    function frameMethods:SetAtlas(name, _, _, _, wrapH, wrapV)
         self.atlas = name
+        self.wrap = wrapH and { wrapH, wrapV }
         self.texCoord = { 0, 1, 0, 1 }
     end
     function frameMethods:SetTexCoord(l, r, t, b) self.texCoord = { l, r, t, b } end

@@ -200,7 +200,7 @@ local LIST_W, LIST_TOP = 304, -72
 local ROW_H, CAT_H, SPACING, INDENT = 20, 25, 1, 10
 local AREA_H = HEIGHT + LIST_TOP - 5 - 35 - 5 -- the list's scrolling area
 local ROWS = floor(AREA_H / (ROW_H + SPACING)) + 1
-local BAR_W = 441
+local BAR_W, BAR_FRAME_W = 441, 453
 local SLOTS, SLOT_ROWS = 8, 4
 local NAME_TRIES = 5
 
@@ -287,7 +287,7 @@ local function SetRank(bar, prof, skill, maxSkill, c)
             anim.flipbook:SetFlipBookFrames(rows * 2)
         end
         t:SetWidth(BAR_W)
-        bar.mask:SetWidth(max(1, BAR_W * frac))
+        bar.mask:SetWidth(max(1, BAR_FRAME_W * frac)) -- the game's: the bar's width x the share
         if bar.shownSkill ~= skill or bar.shownProf ~= prof then
             bar.shownSkill, bar.shownProf = skill, prof
             anim:Stop()
@@ -331,8 +331,12 @@ local function MakeRankBar(f)
     if type(bar.CreateMaskTexture) == "function" and type(bar.CreateAnimationGroup) == "function" then
         -- The game's mask is 512x512 (seen in game 2026-11-10) and stays that tall: only its
         -- width follows the skill. Squeezed to the bar's height, its dark parts hid the fill.
+        -- Black past its edges, as the game's XML sets it (hWrapMode/vWrapMode): set from code
+        -- the art's edge repeats outwards instead, and the whole bar showed (owner, 2026-11-10).
         local mask = bar:CreateMaskTexture()
-        if not Atlas(mask, "Professions-skillbar-mask", true) then
+        if HasAtlas("Professions-skillbar-mask") then
+            mask:SetAtlas("Professions-skillbar-mask", true, nil, nil, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+        else
             mask:SetTexture("Interface\\Buttons\\WHITE8X8", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
             mask:SetHeight(18)
         end
