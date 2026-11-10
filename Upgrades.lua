@@ -36,7 +36,8 @@ local STATS = {
     ITEM_MOD_STRENGTH_SHORT = "str", ITEM_MOD_AGILITY_SHORT = "agi", ITEM_MOD_STAMINA_SHORT = "sta",
     ITEM_MOD_INTELLECT_SHORT = "int", ITEM_MOD_SPIRIT_SHORT = "spi",
     ITEM_MOD_ATTACK_POWER_SHORT = "ap", ITEM_MOD_RANGED_ATTACK_POWER_SHORT = "rap",
-    ITEM_MOD_SPELL_POWER_SHORT = "sp", ITEM_MOD_SPELL_HEALING_DONE_SHORT = "heal",
+    ITEM_MOD_SPELL_POWER_SHORT = "sp", ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = "sp", -- the second unchecked
+    ITEM_MOD_SPELL_HEALING_DONE_SHORT = "heal",
     ITEM_MOD_POWER_REGEN0_SHORT = "mp5", ITEM_MOD_MANA_REGENERATION_SHORT = "mp5",
     ITEM_MOD_CRIT_RATING_SHORT = "crit", ITEM_MOD_CRIT_MELEE_RATING_SHORT = "crit",
     ITEM_MOD_CRIT_RANGED_RATING_SHORT = "crit", ITEM_MOD_HIT_RATING_SHORT = "hit",
@@ -65,15 +66,20 @@ local WEIGHTS = {
     caster = { sp = 1, int = 0.5, spi = 0.3, sta = 0.4, mp5 = 1.5, spellcrit = 10, spellhit = 12, rdps = 3 },
     healer = { heal = 1, sp = 0.9, int = 0.6, spi = 0.5, sta = 0.3, mp5 = 2, spellcrit = 8, rdps = 1 },
 }
+-- A protection paladin tanks as a tank, but most of their threat is holy damage (seals,
+-- Consecration, Retribution Aura), so spell damage counts as much as Stamina or Defense.
+WEIGHTS.paladintank = { sp = 1.5 }
+for stat, weight in pairs(WEIGHTS.tank) do WEIGHTS.paladintank[stat] = weight end
 
 -- The word for each role, in menus and in /af role.
 local ROLE_NAMES = {
     hunter = L["Ranged"], rogue = L["Melee"], warrior = L["Melee"], paladin = L["Melee"],
-    enhancement = L["Melee"], feral = L["Feral"], tank = L["Tank"], caster = L["Caster"], healer = L["Healer"],
+    enhancement = L["Melee"], feral = L["Feral"], tank = L["Tank"], paladintank = L["Tank"],
+    caster = L["Caster"], healer = L["Healer"],
 }
 local ROLE_WORDS = {
     hunter = "ranged", rogue = "melee", warrior = "melee", paladin = "melee", enhancement = "melee",
-    feral = "feral", tank = "tank", caster = "caster", healer = "healer",
+    feral = "feral", tank = "tank", paladintank = "tank", caster = "caster", healer = "healer",
 }
 
 -- Per class (Classic's rules): the role of each talent tab, the levelling default, armour
@@ -83,7 +89,8 @@ local CLASSES = {
     WARRIOR = { tabs = { "warrior", "warrior", "tank" }, default = "warrior", dualWield = 20,
         armor = { [1] = 1, [2] = 1, [3] = 1, [4] = 40, [6] = 1 },
         weapons = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 13, 15, 16, 18 } },
-    PALADIN = { tabs = { "healer", "tank", "paladin" }, default = "paladin",
+    PALADIN = { tabs = { "healer", "paladintank", "paladin" }, default = "paladin",
+        aliases = { tank = "paladintank" }, -- a paladin's role saved before they had their own
         armor = { [1] = 1, [2] = 1, [3] = 1, [4] = 40, [6] = 1, [7] = 1 },
         weapons = { 0, 1, 4, 5, 6, 7, 8 } },
     HUNTER = { tabs = { "hunter", "hunter", "hunter" }, default = "hunter", dualWield = 20,
@@ -152,10 +159,18 @@ end
 function ns.RoleOf(c)
     local cls = CLASSES[c.class]
     if not cls then return nil end
-    if c.role and WEIGHTS[c.role] then
-        for _, r in ipairs(cls.choices) do if r == c.role then return r end end
+    local chosen = ns.ChosenRole(c)
+    if chosen and WEIGHTS[chosen] then
+        for _, r in ipairs(cls.choices) do if r == chosen then return r end end
     end
     return c.spec and cls.tabs[c.spec] or cls.default
+end
+
+-- The role the player chose for a character (nil = automatic), under its current name.
+function ns.ChosenRole(c)
+    local cls = CLASSES[c.class]
+    local aliases = cls and cls.aliases
+    return aliases and aliases[c.role] or c.role
 end
 
 -- The role talents (or the class default) give, ignoring the player's choice.
