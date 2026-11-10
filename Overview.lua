@@ -396,7 +396,27 @@ local function Place(f, y)
     f:SetPoint("RIGHT", frame, "RIGHT", -4, 0)
 end
 
-local function Refresh()
+-- While open, the overview refreshes itself when its instance counts change (a visit stops
+-- counting, or the wait at the limit ticks over), so an account at 10/10 shows free again
+-- without some other event. One timer at a time: a new one only for a sooner change, and a
+-- numbered `dueTick` so only the latest acts.
+local dueAt, dueTick = nil, 0
+local Refresh
+
+local function Due(now)
+    if not (C_Timer and C_Timer.After) then return end
+    local wait = ns.InstancesChangeIn(now)
+    if not wait or (dueAt and now + wait >= dueAt) then return end
+    dueTick, dueAt = dueTick + 1, now + wait
+    local mine = dueTick
+    C_Timer.After(wait, function()
+        if mine ~= dueTick then return end
+        dueAt = nil
+        if frame and frame:IsShown() then Refresh() end
+    end)
+end
+
+function Refresh()
     local now = time()
     local chars = ns.db.chars
     local keys = ns.OverviewOrder()
@@ -413,6 +433,7 @@ local function Refresh()
     end
     -- Counts each account's instances this hour, for the footer and each row's Lockouts cell.
     local instances = ns.InstanceText(now)
+    Due(now)
     local collapsed = ns.db.collapsedGroups or {}
     local y, nHeads, group, hidden = 0, 0, nil, false
     for i, key in ipairs(keys) do

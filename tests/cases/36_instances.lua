@@ -390,3 +390,49 @@ test("the overview's Lockouts column: each account's instances this hour on its 
     r.scripts.OnEnter(r)
     assert(not textOf(GameTooltip.lines):find("Instances this hour", 1, true))
 end)
+
+test("the open overview refreshes itself as visits stop counting, with no event", function()
+    local saved = overviewAlts()
+    saved.account = "mine"
+    saved.chars["High"].account, saved.chars["High"].saves = "other", {}
+    local runs = {}
+    for i = 1, 9 do runs[i] = { at = NOW - 1200, left = NOW - 600, map = 389 } end -- free at NOW + 3000
+    runs[10] = { at = NOW - 3400, left = NOW - 3300, map = 389 } -- free at NOW + 300
+    saved.chars["High"].runs = runs
+    local ns = start(saved)
+    SlashCmdList.ALTSFOREVER("")
+    local function high()
+        for _, r in ipairs(overviewRows()) do
+            if cell(r, 1):find("High", 1, true) then return cell(r, 12) end
+        end
+    end
+    local function nextRefresh()
+        local fn = wow.timers[#wow.timers]
+        wow.timers[#wow.timers] = nil
+        return fn, wow.delays[fn]
+    end
+    eq(high(), "|cffff800010/10|r")
+    assert(AltsForeverFrame.footer.text:find("10/10 (5 min)", 1, true), AltsForeverFrame.footer.text)
+    local fn, delay = nextRefresh()
+    eq(delay, 60, "at the limit: when the wait's minute ticks over")
+    wow.now = NOW + 60
+    fn()
+    assert(AltsForeverFrame.footer.text:find("10/10 (4 min)", 1, true), AltsForeverFrame.footer.text)
+    fn, delay = nextRefresh()
+    eq(delay, 60)
+    wow.now = NOW + 300
+    fn()
+    eq(high(), "9/10", "a visit stopped counting: no longer orange")
+    fn, delay = nextRefresh()
+    eq(delay, 2700, "under the limit: when the next visit stops counting")
+    -- Another refresh before then doesn't add a timer.
+    local before = #wow.timers
+    ns.RefreshOverview()
+    eq(#wow.timers, before)
+    -- Closed: the pending one does nothing (no refresh, so no timer after it), even with
+    -- visits still counting.
+    AltsForeverFrame:Hide()
+    wow.now = NOW + 2000
+    fn()
+    eq(#wow.timers, before)
+end)

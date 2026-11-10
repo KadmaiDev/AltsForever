@@ -1,6 +1,6 @@
 ## Alts Forever 1.3.1 (not yet released)
 
-- **Instances this hour on every character:** the overview's Lockouts column now shows each character's game account's count ("2/10", orange at 10/10) on every character of that account, so you can see at a glance who can still go in, then the number of raid lockouts the character has, after a key icon. Hover a character for the account's visits still counting, then their lockouts. A character not logged in since 1.2.0 shows "?" until they are, rather than looking free.
+- **Instances this hour on every character:** the overview's Lockouts column now shows each character's game account's count ("2/10", orange at 10/10) on every character of that account, so you can see at a glance who can still go in, then the number of raid lockouts the character has, after a key icon. Hover a character for the account's visits still counting, then their lockouts. The counts and the footer's wait now update by themselves while the overview is open, so an account at 10/10 shows free again as soon as a visit stops counting. A character not logged in since 1.2.0 shows "?" until they are, rather than looking free.
 
 ## Alts Forever 1.3.0
 

@@ -277,6 +277,14 @@ local function Minutes(seconds)
     return L["%d min"]:format(ceil(seconds / 60))
 end
 
+-- "3/10"; at the limit in orange, with the wait until one frees if `free` is given.
+local function CountText(n, free, now)
+    local text = n .. "/" .. LIMIT
+    if n < LIMIT then return text end
+    if free then text = text .. " (" .. Minutes(free - now) .. ")" end
+    return ORANGE .. text .. "|r"
+end
+
 local function ByAccount(a, b)
     local mine = ns.db.account
     if (a.id == mine) ~= (b.id == mine) then return a.id == mine end
@@ -329,8 +337,7 @@ function ns.InstanceText(now)
     wipe(parts)
     for _, a in ipairs(list) do
         if a.n > 0 then
-            local text = a.n .. "/" .. LIMIT
-            if a.n >= LIMIT then text = ORANGE .. text .. " (" .. Minutes(a.free - now) .. ")|r" end
+            local text = CountText(a.n, a.free, now)
             if #list > 1 then text = FirstName(a.main) .. " " .. text end
             parts[#parts + 1] = text
         end
@@ -407,8 +414,7 @@ local KEY = "|TInterface\\Icons\\INV_Misc_Key_03:0:0:0:0:64:64:5:59:5:59|t"
 
 function ns.LockoutText(c, now)
     local a = c.account and by[c.account]
-    local hourly = a and a.n > 0 and (a.n .. "/" .. LIMIT)
-    if hourly and a.n >= LIMIT then hourly = ORANGE .. hourly .. "|r" end
+    local hourly = a and a.n > 0 and CountText(a.n)
     local list = ns.ActiveSaves(c, now)
     local saves = list and #list > 0 and (KEY .. #list)
     if hourly and saves then return hourly .. "  " .. saves end
@@ -417,15 +423,28 @@ function ns.LockoutText(c, now)
     return ""
 end
 
+-- Seconds until the overview's instance counts next change, from the latest
+-- ns.InstanceCounts(now): an account's soonest visit stops counting, or, at the limit, the
+-- footer's "(12 min)" wait ticks over. nil when no account has any counting.
+function ns.InstancesChangeIn(now)
+    local wait
+    for _, a in ipairs(list) do
+        if a.n > 0 then
+            local d = a.free - now
+            if a.n >= LIMIT then d = NextChange(d, a.free, now) end
+            if not wait or d < wait then wait = d end
+        end
+    end
+    return wait
+end
+
 -- The row tooltip's lines (Overview.lua): the account's visits counting now, then the
 -- character's saves.
 function ns.AddLockoutLines(tt, c, now)
     local visits = c.account and Visits(now, c.account) or EMPTY
     if #visits > 0 then
-        local text = #visits .. "/" .. LIMIT
-        if #visits >= LIMIT then text = ORANGE .. text .. " (" .. Minutes(visits[1].ends - now) .. ")|r" end
         tt:AddLine(" ")
-        tt:AddLine(L["Instances this hour: %s"]:format(text))
+        tt:AddLine(L["Instances this hour: %s"]:format(CountText(#visits, visits[1].ends, now)))
         for _, v in ipairs(visits) do
             local when = v.run == current and L["inside now"] or L["frees in %s"]:format(Minutes(v.ends - now))
             tt:AddDoubleLine(v.run.name or "?", FirstName(v.key) .. " · " .. when, 1, 1, 1, 1, 1, 1)
@@ -549,9 +568,7 @@ function FillPanel()
             any = true
             row = Next()
             Place(row.a, row, 4, whenX, L["%s's account"]:format(FirstName(a.main)))
-            local count = a.n .. "/" .. LIMIT
-            if a.n >= LIMIT then count = ORANGE .. count .. "|r" end
-            Place(row.c, row, whenX, WHEN_WIDTH, count, "RIGHT")
+            Place(row.c, row, whenX, WHEN_WIDTH, CountText(a.n), "RIGHT")
             for _, visit in ipairs(Visits(now, a.id)) do
                 delay = NextChange(delay, visit.ends, now)
                 row = Next()
