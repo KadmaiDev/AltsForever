@@ -242,6 +242,43 @@ test("talents pick the role, a choice from the menu or /af role overrides it", f
     eq(wow.menuItem("Upgrade role"), nil)
 end)
 
+test("a protection paladin counts spell damage as threat; a warrior tank doesn't", function()
+    -- Vespera's two helms (Blacksmithing 95): same Stamina, spell damage against Defense.
+    local crusader = upItem(5090, "Crusader's Silvered Chain Helm", { sub = 3, loc = "INVTYPE_HEAD",
+        stats = { ITEM_MOD_STAMINA_SHORT = 9, ITEM_MOD_SPELL_POWER_SHORT = 11 } })
+    local protector = upItem(5091, "Protector's Silvered Chain Helm", { sub = 3, loc = "INVTYPE_HEAD",
+        stats = { ITEM_MOD_STAMINA_SHORT = 9, ITEM_MOD_DEFENSE_SKILL_RATING_SHORT = 7 } })
+    local ns = upStart({
+        ["Vesp Ash"] = alt("Vesp Ash", "PALADIN", { level = 23, spec = 2, gear = {} }),
+        ["Brak Horn"] = alt("Brak Horn", "WARRIOR", { level = 23, spec = 3, gear = {} }),
+    })
+    local pala, warrior = ns.db.chars["Vesp Ash"], ns.db.chars["Brak Horn"]
+    eq(ns.RoleOf(pala), "paladintank", "Protection tab")
+    eq(ns.RoleName(ns.RoleOf(pala)), "Tank")
+    -- 9 x 1.5 + 11 x 1.5 = 30 against 9 x 1.5 + 7 x 1.5 = 24.
+    eq(ns.ItemScore(crusader, ns.RoleOf(pala)), 30)
+    eq(ns.ItemScore(protector, ns.RoleOf(pala)), 24)
+    eq(ns.RoleOf(warrior), "tank")
+    eq(ns.ItemScore(crusader, "tank"), 13.5, "spell damage is nothing to a warrior")
+    eq(ns.ItemScore(protector, "tank"), 24)
+    -- A paladin's tank role chosen before they had their own still counts, and is ticked.
+    pala.spec, pala.role = 3, "tank"
+    eq(ns.RoleOf(pala), "paladintank")
+    ns.ShowCharacterMenu(UIParent, "Vesp Ash")
+    local roles = wow.menuItem("Upgrade role")
+    local ticked = {}
+    for _, item in ipairs(roles.items) do
+        if item.isSelected() then ticked[#ticked + 1] = item.text end
+    end
+    eq(table.concat(ticked, " | "), "Tank")
+    -- /af role still takes "tank", and stores the paladin's own.
+    SlashCmdList.ALTSFOREVER("role Vesp Ash auto")
+    eq(pala.role, nil)
+    SlashCmdList.ALTSFOREVER("role Vesp Ash tank")
+    eq(pala.role, "paladintank")
+    eq(ns.RoleOf(pala), "paladintank")
+end)
+
 test("talent tabs are the groups of columns; the stray far column counts as the third", function()
     local ns = wow.load(FILES)
     -- Kadmai's ranked talents (checked in game) among the hunter tree's columns.

@@ -543,7 +543,7 @@ function ns.ShowCharacterMenu(owner, key)
             roles:CreateRadio(L["Automatic (%s)"]:format(ns.RoleName(ns.AutoRole(c))),
                 function() return not c.role end, function() ns.SetRole(key, nil) end)
             for _, role in ipairs(choices) do
-                roles:CreateRadio(ns.RoleName(role), function() return c.role == role end,
+                roles:CreateRadio(ns.RoleName(role), function() return ns.ChosenRole(c) == role end,
                     function() ns.SetRole(key, role) end)
             end
         end
