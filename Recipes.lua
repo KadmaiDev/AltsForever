@@ -87,7 +87,8 @@ end
 -- The character's recipes in a profession, as the window lists them: categories in the
 -- game's order, recipes by name. `search` (lower case) narrows by recipe name; `filters`:
 -- { craftable = only ones they have the materials for, skillups = only ones not grey }.
--- Returns the categories, or nil if the profession hasn't been scanned. Each category:
+-- Returns the categories, or nil if the profession hasn't been scanned, and true as a second
+-- value if any recipe was read before categories were recorded. Each category:
 -- { name, order, recipes = { { lname, name, colour, count, item, icon, made, recipeID,
 -- reagents = { { itemID, qty } }, grey } } }.
 function ns.RecipeBook(c, prof, search, filters)
@@ -99,10 +100,11 @@ function ns.RecipeBook(c, prof, search, filters)
     for id, lname in pairs(c.crafts and c.crafts[prof] or {}) do
         if type(lname) == "string" then items[lname] = id end
     end
-    local byCat, list = {}, {}
+    local byCat, list, old = {}, {}, false
     for lname, value in pairs(known) do
         if not search or search == "" or lname:find(search, 1, true) then
             local grey, name, reagentText, recipeID, catID, icon, made = ns.ParseRecipeInfo(info[lname])
+            if not catID then old = true end
             local reagents = ReagentList(reagentText)
             local item = items[lname]
             local r = { lname = lname, name = name or lname, colour = Colour(c, prof, value, grey),
@@ -126,17 +128,46 @@ function ns.RecipeBook(c, prof, search, filters)
     end
     sort(list, ByOrder)
     for _, cat in ipairs(list) do sort(cat.recipes, ByName) end
-    return list
+    return list, old
 end
 
 -- Gathering professions have no recipe window (Mining has smelting): no tab for them unless
 -- something was read. By skill line, so it works in every language.
 local GATHERING = { [182] = true, [393] = true, [356] = true }
 
--- A profession's skill line and icon, recorded account-wide by the skill scan.
+-- Every profession's skill line (classic IDs, as GetProfessionInfo gives them) and its icon,
+-- for a profession whose character hasn't logged in since its icon was first recorded.
+local ICONS = { [129] = "Spell_Holy_SealOfSacrifice", [164] = "Trade_BlackSmithing", [165] = "Trade_LeatherWorking",
+    [171] = "Trade_Alchemy", [182] = "Trade_Herbalism", [185] = "INV_Misc_Food_15", [186] = "Trade_Mining",
+    [197] = "Trade_Tailoring", [202] = "Trade_Engineering", [333] = "Trade_Engraving", [356] = "Trade_Fishing",
+    [393] = "INV_Misc_Pelt_Wolf_01" }
+
+-- Profession names in the player's language to skill lines, from the game (kept once every
+-- name is known: profession data may not be loaded at first).
+local lines
+local function LineOf(prof)
+    if lines then return lines[prof] end
+    local map, complete = {}, true
+    local ts = C_TradeSkillUI
+    for line in pairs(ICONS) do
+        local name = ts and ts.GetTradeSkillDisplayName and ts.GetTradeSkillDisplayName(line)
+        if not issecretvalue(name) and type(name) == "string" and name ~= "" then
+            map[name] = line
+        else
+            complete = false
+        end
+    end
+    if complete then lines = map end
+    return map[prof]
+end
+
+-- A profession's skill line and icon: as the skill scan recorded them, else from the game's
+-- names and the icons above.
 local function Art(prof)
     local line, icon = (ns.db.profArt and ns.db.profArt[prof] or ""):match("^(%d+);(.*)$")
-    return tonumber(line), tonumber(icon) or (icon ~= "" and icon) or nil
+    line, icon = tonumber(line), tonumber(icon) or (icon ~= "" and icon) or nil
+    line = line or LineOf(prof)
+    return line, icon or (line and ICONS[line] and "Interface\\Icons\\" .. ICONS[line]) or nil
 end
 ns.ProfessionArt = Art
 
@@ -207,7 +238,21 @@ end
 
 local function Flat() return ns.SkinFlat and ns.SkinFlat() or false end
 
-local function KitOf(prof) return KITS[Art(prof) or 0] end
+local kitNames
+local function KitOf(prof)
+    local line = Art(prof)
+    if not line then return nil end
+    local ts = C_TradeSkillUI
+    local ok, info = pcall(ts and ts.GetProfessionInfoBySkillLineID or error, line)
+    if ok and type(info) == "table" and type(info.profession) == "number" and type(Enum.Profession) == "table" then
+        if not kitNames then
+            kitNames = {}
+            for name, value in pairs(Enum.Profession) do kitNames[value] = name end
+        end
+        if kitNames[info.profession] then return kitNames[info.profession] end
+    end
+    return KITS[line]
+end
 
 local function InColour(text, colour)
     return colour and HEX[colour] and ("|cff" .. HEX[colour] .. text .. "|r") or text
@@ -229,12 +274,14 @@ local function SetRank(bar, prof, skill, maxSkill, c)
     local name = "Skillbar_Fill_Flipbook_" .. (KitOf(prof) or "")
     if not HasAtlas(name) then name = "Skillbar_Fill_Flipbook_DefaultBlue" end
     local info = HasAtlas(name) and GetAtlasInfo(name)
-    if info and info.file and info.leftTexCoord then
+    local l, top, _, bottom, r
+    if info then
+        t:SetAtlas(name, false)
+        l, top, _, bottom, r = t:GetTexCoord()
+    end
+    if type(l) == "number" and type(top) == "number" and type(bottom) == "number" and type(r) == "number" then
         local rows = max(1, floor((info.height or 34) / 34 + 0.5))
-        local l, top = info.leftTexCoord, info.topTexCoord
-        local w = (info.rightTexCoord - l) / 2
-        t:SetTexture(info.file)
-        t:SetTexCoord(l, l + w * frac, top, top + (info.bottomTexCoord - top) / rows)
+        t:SetTexCoord(l, l + (r - l) / 2 * frac, top, top + (bottom - top) / rows)
     else
         t:SetColorTexture(0.25, 0.5, 0.9, 0.9)
     end
@@ -367,7 +414,6 @@ local function MakeRow(area)
     row.catText:SetPoint("LEFT", 8, 0)
     row.catText:SetTextColor(1, 0.82, 0)
     row.toggle = row:CreateTexture(nil, "OVERLAY")
-    row.toggle:SetSize(20, 20)
     row.toggle:SetPoint("RIGHT", -6, 0)
     -- A recipe: its skill-up arrow, name and count; the game's selected and hover art.
     row.skill = row:CreateTexture(nil, "OVERLAY")
@@ -413,7 +459,8 @@ local function SetRow(row, e)
         row.selectedTex:Hide()
         row.hoverTex:Hide()
         local folded = collapsed[e.name]
-        if not Atlas(row.toggle, folded and "common-button-list-plus" or "common-button-list-minus") then
+        if not Atlas(row.toggle, folded and "common-button-list-plus" or "common-button-list-minus", true) then
+            row.toggle:SetSize(16, 16)
             row.toggle:SetTexture(folded and "Interface\\Buttons\\UI-PlusButton-Up" or "Interface\\Buttons\\UI-MinusButton-Up")
         end
         return
@@ -642,8 +689,9 @@ end
 
 local function MakeDetails(f)
     local d = CreateFrame("Frame", nil, f)
-    d:SetSize(360, 484)
+    d:SetWidth(360)
     d:SetPoint("TOPLEFT", f.list, "TOPRIGHT", 2, 0)
+    d:SetPoint("BOTTOMLEFT", f.list, "BOTTOMRIGHT", 2, 0)
     d.bg = d:CreateTexture(nil, "BACKGROUND")
     d.bg:SetAllPoints()
     f.details = d
@@ -694,7 +742,11 @@ local function MakeDetails(f)
     d.empty = d:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     d.empty:SetPoint("CENTER", 0, 20)
     d.empty:SetWidth(300)
-    for _, fs in ipairs({ d.name, d.desc, d.reagentsLabel, d.empty }) do ns.SkinText(fs) end
+    d.note = d:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    d.note:SetPoint("BOTTOMLEFT", 20, 14)
+    d.note:SetWidth(320)
+    d.note:SetJustifyH("LEFT")
+    for _, fs in ipairs({ d.name, d.desc, d.reagentsLabel, d.empty, d.note }) do ns.SkinText(fs) end
 end
 
 -- Fills the recipe panel; returns true if an item name was still loading.
@@ -875,7 +927,7 @@ function Fill()
     if not frame then return end
     local c = shownKey and ns.db.chars[shownKey]
     if not c then return frame:Hide() end
-    frame.who:SetText(ns.ColoredName(shownKey, c))
+    frame.who:SetText(ns.ShortName(shownKey, c))
     local tabs = ShowTabs(c)
     local found
     for _, p in ipairs(tabs) do if p.name == shownProf then found = p end end
@@ -888,7 +940,8 @@ function Fill()
     end
     local d = frame.details
     wipe(entries)
-    local book = found and ns.RecipeBook(c, found.name, searchText, filters)
+    local book, old
+    if found then book, old = ns.RecipeBook(c, found.name, searchText, filters) end
     if found then
         SetTitle(found.name)
         SetPortrait(select(2, Art(found.name)))
@@ -929,6 +982,7 @@ function Fill()
             or L["%s knows no %s recipes."]:format(who, found.name))
     end
     d.empty:SetShown(chosen == nil)
+    d.note:SetText(old and L["Open %s on %s once to sort these recipes into the game's categories and show their skill-up arrows."]:format(found.name, who) or "")
     -- Reagent names still loading: once more a second later, a few times at most.
     if loading and nameTries < NAME_TRIES and C_Timer then
         nameTries = nameTries + 1
@@ -1026,6 +1080,24 @@ function ns.ShowRecipes(key, prof, keep)
         ns.DockToOverview(frame)
         frame:Show()
     end
+end
+
+-- The overview's button: the window on the character you're on, or if they have no
+-- professions the first character who has; again closes it.
+function ns.ToggleRecipes()
+    if frame and frame:IsShown() then return frame:Hide() end
+    local chars = ns.db.chars
+    local key = ns.charKey
+    if not (chars[key] and HasProfessions(chars[key])) then
+        key = nil
+        for _, k in ipairs(ns.OverviewOrder()) do
+            if HasProfessions(chars[k]) then
+                key = k
+                break
+            end
+        end
+    end
+    ns.ShowRecipes(key or ns.charKey)
 end
 
 -- A profession scan, bag change or sync while it's open: shown again.

@@ -345,7 +345,16 @@ function M.load(files)
     -- Atlases the client has: M.atlases[name] = { width, height, ..., file } (none unless set).
     M.atlases = {}
     C_Texture = { GetAtlasInfo = function(name) return M.atlases[name] end }
-    function frameMethods:SetAtlas(name) self.atlas = name end
+    function frameMethods:SetAtlas(name)
+        self.atlas = name
+        self.texCoord = { 0, 1, 0, 1 }
+    end
+    function frameMethods:SetTexCoord(l, r, t, b) self.texCoord = { l, r, t, b } end
+    -- The eight corner values, as the game gives them: UL, LL, UR, LR (x, y each).
+    function frameMethods:GetTexCoord()
+        local c = self.texCoord or { 0, 1, 0, 1 }
+        return c[1], c[3], c[1], c[4], c[2], c[3], c[2], c[4]
+    end
     -- The ruleset the game reports (as Nova Instance Tracker reads it on Forever): a rule name
     -- from M.player.ruleset is active; a secret answer when M.player.ruleset is M.SECRET.
     Enum.GameRule = { HardcoreRuleset = 101, RPRuleset = 102, PvPRuleset = 103 }

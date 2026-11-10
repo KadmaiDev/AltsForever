@@ -389,3 +389,5 @@ L["Recipe colours are from when %s last opened it, at skill %d."] = "Rezeptfarbe
 L["Right-click for bags, professions and more"] = "Rechtsklick für Taschen, Berufe und mehr"
 L["Sometimes a skill-up"] = "Manchmal ein Fertigkeitspunkt"
 L["Usually a skill-up"] = "Meist ein Fertigkeitspunkt"
+L["Open %s on %s once to sort these recipes into the game's categories and show their skill-up arrows."] = "Öffne %s einmal auf %s, um diese Rezepte in die Kategorien des Spiels zu ordnen und ihre Fertigkeitspfeile zu zeigen."
+L["Any character's professions and recipes, even while they're offline"] = "Berufe und Rezepte jedes Charakters, auch wenn er offline ist"

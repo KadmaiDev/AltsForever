@@ -654,10 +654,25 @@ local function CreateWindow()
     end)
     lockouts:SetScript("OnLeave", function() GameTooltip:Hide() end)
     f.lockoutsButton = lockouts
-    -- Bags and bank window button, left of the lockouts button.
+    -- Professions window button, left of the lockouts button (Recipes.lua).
+    local profs = CreateFrame("Button", nil, f)
+    profs:SetSize(16, 16)
+    profs:SetPoint("RIGHT", lockouts, "LEFT", -6, 0)
+    profs:SetNormalTexture("Interface\\Icons\\Trade_BlackSmithing")
+    profs:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    profs:SetScript("OnClick", function() ns.ToggleRecipes() end)
+    profs:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["Professions"])
+        GameTooltip:AddLine(L["Any character's professions and recipes, even while they're offline"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    profs:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    f.profsButton = profs
+    -- Bags and bank window button, left of the professions button.
     local bags = CreateFrame("Button", nil, f)
     bags:SetSize(16, 16)
-    bags:SetPoint("RIGHT", lockouts, "LEFT", -6, 0)
+    bags:SetPoint("RIGHT", profs, "LEFT", -6, 0)
     bags:SetNormalTexture("Interface\\Icons\\INV_Misc_Bag_08")
     bags:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
     bags:SetScript("OnClick", function() ns.ShowBags(ns.charKey, "bags") end)

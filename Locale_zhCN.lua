@@ -389,3 +389,5 @@ L["Recipe colours are from when %s last opened it, at skill %d."] = "配方颜�
 L["Right-click for bags, professions and more"] = "右键查看背包、专业等"
 L["Sometimes a skill-up"] = "有时提升技能"
 L["Usually a skill-up"] = "通常提升技能"
+L["Open %s on %s once to sort these recipes into the game's categories and show their skill-up arrows."] = "打开一次%s（在 %s 上），即可按游戏的分类整理这些配方并显示技能提升箭头。"
+L["Any character's professions and recipes, even while they're offline"] = "任意角色的专业技能和配方，即使其不在线"

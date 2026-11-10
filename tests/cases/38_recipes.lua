@@ -170,6 +170,11 @@ test("an alt's recipes: the game's categories in order, colours as of now, what 
     book = ns.RecipeBook(c, "Blacksmithing", "sharp")
     eq(#book, 2); eq(book[1].recipes[1].name, "Rough Sharpening Stone")
     eq(ns.RecipeBook(c, "Cooking"), nil, "never opened")
+    local _, old = ns.RecipeBook(c, "Blacksmithing")
+    eq(old, true, "one recipe read before categories were")
+    c.recipes.Blacksmithing["old recipe"] = nil
+    _, old = ns.RecipeBook(c, "Blacksmithing")
+    eq(old, false)
     -- Tabs: no Herbalism (gathering, nothing read), Cooking though never opened.
     local tabs = ns.RecipeTabs(c)
     eq(#tabs, 2); eq(tabs[1].name, "Blacksmithing"); eq(tabs[2].name, "Cooking")
@@ -188,7 +193,7 @@ test("the profession window shows an offline alt's recipes as the game's window 
     eq(f:IsShown(), true)
     eq(f.titleText, "Blacksmithing")
     eq(f.rank.text:GetText():find("120", 1, true) ~= nil, true)
-    eq(f.who:GetText():find("Vesp Ash", 1, true) ~= nil, true)
+    eq(f.who:GetText(), "[PALADIN]Vesp", "first name only: a full one didn't fit")
     eq(f.tabs[1].prof, "Blacksmithing"); eq(f.tabs[2].prof, "Cooking"); eq(f.tabs[3], nil)
     eq(recipeRows(f), "# Weapon Stones | Rough Sharpening Stone [3]  | # Camping | Sharpening Wheel [1]  | "
         .. "# Mail Chestguards | Rough Bronze Cuirass [1] ^ | # Other | old recipe")
@@ -199,6 +204,8 @@ test("the profession window shows an offline alt's recipes as the game's window 
     eq(d.slots[1].name:GetText(), "3/1 Rough Stone")
     eq(d.slots[2]:IsShown(), false)
     eq(d.empty:IsShown(), false)
+    eq(d.note:GetText(), "Open Blacksmithing on Vesp Ash once to sort these recipes into the game's categories and show their skill-up arrows.",
+        "one recipe was read before categories were")
     -- Another recipe.
     f.rows[4].scripts.OnClick(f.rows[4])
     eq(d.name:GetText(), "Sharpening Wheel")
@@ -232,6 +239,15 @@ test("the profession window shows an offline alt's recipes as the game's window 
     eq(recipeRows(f), "")
     eq(d.empty:GetText():find("hasn't opened Cooking", 1, true) ~= nil, true)
     eq(d.output:IsShown(), false)
+    -- The overview's button: the character you're on has none, so the first who has; again closes it.
+    f:Hide()
+    ns.ToggleOverview(true)
+    AltsForeverFrame.profsButton.scripts.OnClick(AltsForeverFrame.profsButton)
+    eq(f:IsShown(), true)
+    eq(f.who:GetText(), "[PALADIN]Vesp")
+    AltsForeverFrame.profsButton.scripts.OnClick(AltsForeverFrame.profsButton)
+    eq(f:IsShown(), false)
+    ns.ShowRecipes("Vesp Ash", "Cooking")
     -- The same again closes it; /af prof opens it.
     ns.ShowRecipes("Vesp Ash")
     eq(f:IsShown(), false)
@@ -269,6 +285,30 @@ test("the profession window: reagent names still loading, a character without pr
     ns.ShowRecipes("Vesp Ash")
     ns.ForgetCharacter("Vesp Ash")
     eq(f:IsShown(), false)
+end)
+
+test("professions whose icon wasn't recorded: icons and gathering told apart by the game's names", function()
+    local ns = wow.load(FILES)
+    wow.ns = ns
+    wow.atlases["Skillbar_Fill_Flipbook_DefaultBlue"] = { width = 900, height = 68 }
+    local saved = smithAlt()
+    saved.profArt = nil
+    local c = saved.chars["Vesp Ash"]
+    c.profs = { Blacksmithing = 120, Skinning = 40, Mining = 30 }
+    c.prof1, c.prof2 = "Blacksmithing", "Skinning"
+    wow.login(saved)
+    local tabs = ns.RecipeTabs(ns.db.chars["Vesp Ash"])
+    eq(#tabs, 2, "Skinning gathers: no tab")
+    eq(tabs[1].name, "Blacksmithing"); eq(tabs[2].name, "Mining")
+    local line, icon = ns.ProfessionArt("Mining")
+    eq(line, 186); eq(icon, "Interface\\Icons\\Trade_Mining")
+    ns.ShowRecipes("Vesp Ash")
+    local f = AltsForeverRecipesFrame
+    eq(f.tabs[2].icon.texture, "Interface\\Icons\\Trade_Mining")
+    eq(f.tabs[1].icon.texture, 134400, "no name from the game for Blacksmithing here: the question mark")
+    -- The rank bar: the first frame of the fill (2 columns, 2 rows of 34), cut at 120/150.
+    local tc = f.rank.fill.texCoord
+    eq(tc[1], 0); eq(math.floor(tc[2] * 100 + 0.5), 40); eq(tc[3], 0); eq(tc[4], 0.5)
 end)
 
 test("the skill scan records each profession's icon and skill line, and sync carries them", function()
