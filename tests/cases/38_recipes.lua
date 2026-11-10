@@ -98,6 +98,41 @@ test("sync carries recipe categories, and a fuller recipe record replaces an old
     eq(ns.db.chars["Bob Smith"].recipes.Blacksmithing["sharpening wheel"], 3)
 end)
 
+test("recipe records are merged field by field: what either side knows is kept (peer review)", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.login({ v = 2, syncWith = { ["Bob Smith"] = true },
+        recipeInfo = { Blacksmithing = {
+            ["sharpening wheel"] = "90;Sharpening Wheel;,2835:1,2840:1",
+            ["rough sharpening stone"] = "65;Rough Sharpening Stone;;5002;20;900002" } } })
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, have = {} })
+    syncPump()
+    syncFrom(ns, "Bob Smith", { k = "char", key = "Bob Smith", c = alt("Bob Smith", "WARRIOR", { updated = NOW,
+            recipes = { Blacksmithing = { ["sharpening wheel"] = 3, ["rough sharpening stone"] = 3 } } }),
+        ri = { Blacksmithing = {
+            -- Theirs has the IDs but no reagents (read without a schematic): ours are kept.
+            ["sharpening wheel"] = "90;Sharpening Wheel;;5001;10;900001",
+            -- As many fields as ours, with the reagents ours lacks: they fill it.
+            ["rough sharpening stone"] = "65;Rough Sharpening Stone;,2835:1;5002;20;900002" } } })
+    local info = ns.db.recipeInfo.Blacksmithing
+    eq(info["sharpening wheel"], "90;Sharpening Wheel;,2835:1,2840:1;5001;10;900001")
+    eq(info["rough sharpening stone"], "65;Rough Sharpening Stone;,2835:1;5002;20;900002")
+end)
+
+test("a profession scan without a recipe's schematic keeps the reagents already known", function()
+    local ns = wow.load(FILES)
+    wow.login({ v = 2, recipeInfo = { Blacksmithing = {
+        ["sharpening wheel"] = "90;Sharpening Wheel;,2835:1,2840:1;5001;10;900001;3" } } })
+    smithWindow(96)
+    eq(AltsForeverDB.recipeInfo.Blacksmithing["sharpening wheel"], "90;Sharpening Wheel;,2835:1,2840:1;5001;10;900001")
+    wow.tradeskill.recipes[5001].noSchematic = true
+    wow.tradeskill.recipes[5001].cat = nil
+    wow.fire("TRADE_SKILL_LIST_UPDATE")
+    wow.fire("TRADE_SKILL_SHOW")
+    eq(AltsForeverDB.recipeInfo.Blacksmithing["sharpening wheel"], "90;Sharpening Wheel;,2835:1,2840:1;5001;10;900001",
+        "reagents and category kept")
+end)
+
 -- A smith who last opened Blacksmithing at 96 and is 120 now: the wheel has gone grey since.
 -- Bags and bank hold enough for one wheel, three stones and one cuirass.
 function smithAlt(extra)

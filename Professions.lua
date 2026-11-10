@@ -172,6 +172,26 @@ local function ParseInfo(v)
 end
 ns.ParseRecipeInfo = ParseInfo
 
+-- The stored form of a recipe's fields: the added ones without empty ones at the end (none:
+-- the old three-field form).
+local function JoinInfo(grey, name, reagents, id, cat, icon, made)
+    local extra = (";" .. (id or "") .. ";" .. (cat or "") .. ";" .. (icon or "") .. ";"
+        .. (made and made > 1 and made or "")):gsub(";+$", "")
+    return (grey or "") .. ";" .. name .. ";" .. reagents .. extra
+end
+
+-- Two records of one recipe as one: each field from `main` where it has it, else from
+-- `other`, so neither side's knowledge is lost (a reading without reagents, as when the game
+-- gives no schematic, never wipes the reagents already known). Peer review, 2026-11-10.
+local function MergeInfo(main, other)
+    local g1, n1, r1, i1, c1, ic1, m1 = ParseInfo(main)
+    local g2, n2, r2, i2, c2, ic2, m2 = ParseInfo(other)
+    if not n1 or n1 == "" then return n2 and other or main end
+    if not n2 then return main end
+    return JoinInfo(g1 or g2, n1, r1 ~= "" and r1 or r2, i1 or i2, c1 or c2, ic1 or ic2, m1 or m2)
+end
+ns.MergeRecipeInfo = MergeInfo
+
 function ns.RecipeGrey(prof, lname)
     local all = ns.db.recipeInfo
     local t = all and all[prof]
@@ -190,12 +210,15 @@ local function Record(info, r, lname, known, made)
     local old = info[lname]
     -- Known here, or by another character (then keep the reagents they recorded).
     if known or old then
-        local _, _, reagents, _, _, _, oldMade = ParseInfo(old)
-        made = Count(made) or oldMade
-        -- The added fields, without empty ones at the end (none: the old three-field form).
-        local extra = (";" .. (Count(r.recipeID) or "") .. ";" .. (Count(r.categoryID) or "") .. ";"
-            .. (Count(r.icon) or "") .. ";" .. (made and made > 1 and made or "")):gsub(";+$", "")
-        info[lname] = (grey or "") .. ";" .. r.name .. ";" .. (known or reagents) .. extra
+        -- What this reading says, over what was known: a field it lacks keeps its old value.
+        local new = JoinInfo(grey, r.name, known or "", Count(r.recipeID), Count(r.categoryID), Count(r.icon), Count(made))
+        local merged = old and MergeInfo(new, old) or new
+        -- A schematic that says one is made per craft says so, though one is stored as nothing.
+        if old and Count(made) == 1 then
+            local g, n, reagents, id, cat, icon = ParseInfo(merged)
+            merged = JoinInfo(g, n, reagents, id, cat, icon, nil)
+        end
+        info[lname] = merged
     end
 end
 

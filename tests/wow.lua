@@ -196,6 +196,7 @@ function M.load(files)
         GetRecipeSchematic = function(id)
             local r = ts().recipes[id]
             M.schematics = (M.schematics or 0) + 1
+            if r and r.noSchematic then return nil end
             local slots = {}
             for i, x in ipairs(r and r.reagents or {}) do
                 slots[i] = { quantityRequired = x[2], reagents = { { itemID = x[1] } } }

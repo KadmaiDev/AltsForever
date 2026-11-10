@@ -471,12 +471,6 @@ end
 
 local RULESETS = { normal = true, pvp = true, rp = true, hardcore = true }
 
--- How many fields a recipeInfo value has (more since the alts' profession window).
-local function Fields(info)
-    local _, n = info:gsub(";", "")
-    return n
-end
-
 local function Remember(name)
     ns.db.syncWith = ns.db.syncWith or {}
     ns.db.syncWith[name] = true
@@ -517,11 +511,10 @@ local function Merge(msg)
                 db.recipeInfo = db.recipeInfo or {}
                 local mine = db.recipeInfo[prof] or {}
                 for name, info in pairs(list) do
-                    -- Theirs where we have none, or where it says more (recorded since the
-                    -- alts' profession window: recipe ID, category, icon).
-                    if type(name) == "string" and type(info) == "string"
-                        and (mine[name] == nil or Fields(info) > Fields(mine[name])) then
-                        mine[name] = info
+                    -- Theirs where we have none; else ours, with any field ours lacks taken
+                    -- from theirs (recipe ID, category, icon, or reagents).
+                    if type(name) == "string" and type(info) == "string" then
+                        mine[name] = mine[name] and ns.MergeRecipeInfo(mine[name], info) or info
                     end
                 end
                 if next(mine) then db.recipeInfo[prof] = mine end
