@@ -333,6 +333,20 @@ function M.load(files)
     function frameMethods:GetRegions() return unpack(self.regions or {}) end
     function frameMethods:GetObjectType() return self.kind end
     function frameMethods:CreateTexture() return newObject("Texture") end
+    function frameMethods:CreateMaskTexture() return newObject("MaskTexture") end
+    function frameMethods:CreateAnimationGroup()
+        local group = newObject("AnimationGroup")
+        group.plays = 0
+        function group:Play() self.plays = self.plays + 1 end
+        function group:CreateAnimation(kind)
+            local a = newObject(kind)
+            function a:SetFlipBookRows(n) self.rows = n end
+            function a:SetFlipBookColumns(n) self.columns = n end
+            function a:SetFlipBookFrames(n) self.frames = n end
+            return a
+        end
+        return group
+    end
     CreateFrame = function(kind, name, parent, template)
         if template and M.missingTemplates[template] then error("Couldn't find inherited node \"" .. template .. "\"") end
         local f = newObject(kind, name)

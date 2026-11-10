@@ -265,8 +265,10 @@ local function ColourLines(tt, r)
 end
 
 ---------------------------------------------------------------------------
--- Rank bar: the game's frame and trough, filled with the first frame of the profession's
--- animated fill (a flipbook of 2 columns, 34 rows of art each), cut to the skill.
+-- Rank bar: the game's frame and trough, and its fill as the game draws it: the profession's
+-- fill art played once as a flipbook (2 columns, rows of 34, 2 seconds) and shown through a
+-- mask cut to the skill, so it comes to rest exactly where the game's own bar does. The
+-- animation is the game's (no script runs while it plays); it plays when the bar changes.
 ---------------------------------------------------------------------------
 local function SetRank(bar, prof, skill, maxSkill, c)
     local frac = (skill and maxSkill and maxSkill > 0) and min(1, max(0, skill / maxSkill)) or 0
@@ -274,27 +276,29 @@ local function SetRank(bar, prof, skill, maxSkill, c)
     local name = "Skillbar_Fill_Flipbook_" .. (KitOf(prof) or "")
     if not HasAtlas(name) then name = "Skillbar_Fill_Flipbook_DefaultBlue" end
     local info = HasAtlas(name) and GetAtlasInfo(name)
-    -- The atlas's place in its file: from its info, else read back after setting it.
-    local l, top, r, bottom
-    if info then
-        t:SetAtlas(name, false)
-        l, r, top, bottom = info.leftTexCoord, info.rightTexCoord, info.topTexCoord, info.bottomTexCoord
-        if type(l) ~= "number" or type(r) ~= "number" or type(top) ~= "number" or type(bottom) ~= "number" then
-            local _
-            l, top, _, bottom, r = t:GetTexCoord()
+    local anim = bar.anim
+    if info and anim then
+        if bar.fillAtlas ~= name then
+            bar.fillAtlas = name
+            t:SetAtlas(name, false)
+            local rows = max(1, floor((info.height or 34) / 34 + 0.5))
+            anim.flipbook:SetFlipBookRows(rows)
+            anim.flipbook:SetFlipBookColumns(2)
+            anim.flipbook:SetFlipBookFrames(rows * 2)
         end
-    end
-    if type(l) == "number" and type(top) == "number" and type(bottom) == "number" and type(r) == "number" then
-        -- The game plays the fill's flipbook once (2 columns, rows of 34) and rests on its last
-        -- frame (setToFinalAlpha); its first frame is nearly empty. So the last frame, bottom
-        -- right, cut to the skill.
-        local rows = max(1, floor((info.height or 34) / 34 + 0.5))
-        local half = (r - l) / 2
-        t:SetTexCoord(l + half, l + half + half * frac, top + (bottom - top) * (rows - 1) / rows, bottom)
+        t:SetWidth(BAR_W)
+        bar.mask:SetWidth(max(1, BAR_W * frac))
+        if bar.shownSkill ~= skill or bar.shownProf ~= prof then
+            bar.shownSkill, bar.shownProf = skill, prof
+            anim:Stop()
+            anim:Play()
+        end
     else
+        -- Without the art (or animations): a plain fill.
+        bar.fillAtlas = nil
         t:SetColorTexture(0.25, 0.5, 0.9, 0.9)
+        t:SetWidth(max(1, BAR_W * frac))
     end
-    t:SetWidth(max(1, BAR_W * frac))
     t:SetShown(frac > 0)
     local text = skill and maxSkill and (TRADESKILL_NAME_RANK or "%s (%d/%d)"):format(prof, skill, maxSkill) or prof
     bar.text:SetText(text)
@@ -323,6 +327,25 @@ local function MakeRankBar(f)
     bar.fill = bar:CreateTexture(nil, "ARTWORK")
     bar.fill:SetPoint("TOPLEFT", 5, -3)
     bar.fill:SetHeight(18)
+    -- The mask that shows the skill's share of the fill (the game's, else a plain one).
+    if type(bar.CreateMaskTexture) == "function" and type(bar.CreateAnimationGroup) == "function" then
+        local mask = bar:CreateMaskTexture()
+        if not Atlas(mask, "Professions-skillbar-mask", true) then
+            mask:SetTexture("Interface\\Buttons\\WHITE8X8", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+        end
+        mask:SetHeight(18)
+        mask:SetPoint("LEFT", bar.fill, "LEFT", 1, 0)
+        bar.fill:AddMaskTexture(mask)
+        bar.mask = mask
+        local anim = bar.fill:CreateAnimationGroup()
+        anim:SetToFinalAlpha(true)
+        local flipbook = anim:CreateAnimation("FlipBook")
+        flipbook:SetDuration(2)
+        flipbook:SetFlipBookFrameWidth(0)
+        flipbook:SetFlipBookFrameHeight(0)
+        anim.flipbook = flipbook
+        bar.anim = anim
+    end
     bar.border = bar:CreateTexture(nil, "OVERLAY")
     bar.border:SetPoint("TOPLEFT")
     bar.text = bar:CreateFontString(nil, "OVERLAY", "Number12FontOutline")

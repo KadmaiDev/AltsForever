@@ -306,16 +306,19 @@ test("professions whose icon wasn't recorded: icons and gathering told apart by 
     local f = AltsForeverRecipesFrame
     eq(f.tabs[2].icon.texture, "Interface\\Icons\\Trade_Mining")
     eq(f.tabs[1].icon.texture, 134400, "no name from the game for Blacksmithing here: the question mark")
-    -- The rank bar: the fill's last frame (2 columns, 2 rows of 34: bottom right), cut at 120/150.
-    local tc = f.rank.fill.texCoord
-    eq(tc[1], 0.5); eq(math.floor(tc[2] * 100 + 0.5), 90); eq(tc[3], 0.5); eq(tc[4], 1)
-    -- Placed in its file by the atlas info when it gives that.
-    wow.atlases["Skillbar_Fill_Flipbook_DefaultBlue"] = { width = 900, height = 68, leftTexCoord = 0.2,
-        rightTexCoord = 0.6, topTexCoord = 0.1, bottomTexCoord = 0.3 }
+    -- The rank bar: the fill played as the game's flipbook (2 columns, 2 rows of 34), shown
+    -- through a mask at 120/150; played again only when the skill or profession changes.
+    local bar = f.rank
+    eq(bar.fill.atlas, "Skillbar_Fill_Flipbook_DefaultBlue")
+    eq(bar.anim.flipbook.rows, 2); eq(bar.anim.flipbook.columns, 2); eq(bar.anim.flipbook.frames, 4)
+    eq(bar.mask.width, 441 * 120 / 150)
+    eq(bar.anim.plays, 1)
     ns.RecipesChanged()
-    tc = f.rank.fill.texCoord
-    eq(math.floor(tc[1] * 100 + 0.5), 40); eq(math.floor(tc[2] * 100 + 0.5), 56)
-    eq(math.floor(tc[3] * 100 + 0.5), 20); eq(math.floor(tc[4] * 100 + 0.5), 30)
+    eq(bar.anim.plays, 1, "nothing changed")
+    ns.db.chars["Vesp Ash"].profs.Blacksmithing = 121
+    ns.RecipesChanged()
+    eq(bar.anim.plays, 2)
+    eq(bar.mask.width, 441 * 121 / 150)
 end)
 
 test("the skill scan records each profession's icon and skill line, and sync carries them", function()
