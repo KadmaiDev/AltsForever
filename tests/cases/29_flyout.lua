@@ -335,6 +335,26 @@ test("inspecting a player: anvils beside their slots for what your characters co
     ns.CraftableUpgrades = function(...) runs = runs + 1 return real(...) end
     inspectReady("Player-1-OTHER")
     eq(runs, 0)
+    -- That inspect put the other player's talents in the game's one inspect config (theirs
+    -- are in the first tab: melee). A later pass must still judge this one by their own.
+    their.talents = { { 0, 12 }, { 3000, 0 }, { 6000, 0 } }
+    eq(ns.InspectSpec(), 1, "the config is the other player's now")
+    ns.CharacterSheetChanged()
+    assert(runs >= 1, "worked out again")
+    runs = 0
+    local function judged(g)
+        g.scripts.OnEnter(g)
+        for _, line in ipairs(GameTooltip.lines) do
+            local role = type(line[1]) == "string" and line[1]:match("^Judged as (.+)$")
+            if role then return role end
+        end
+    end
+    eq(judged(hands), "Tank", "still their own talents, from when they were inspected")
+    SlashCmdList.ALTSFOREVER("inspect")
+    SlashCmdList.ALTSFOREVER("inspect")
+    eq(judged(hands), "Tank", "after the setting is switched off and on too")
+    runs = 0
+    their.talents = { { 0, 0 }, { 3000, 0 }, { 6000, 12 } }
     -- They put on better gloves: no anvil for the hands any more.
     wow.item(6009, "Great Gloves", { sub = 3, loc = "INVTYPE_HAND", stats = { ITEM_MOD_STRENGTH_SHORT = 30, ITEM_MOD_STAMINA_SHORT = 30 } })
     links[10] = select(2, C_Item.GetItemInfo(6009))
@@ -398,28 +418,46 @@ test("inspecting a player: links or talents still on their way are tried again, 
     ids[10] = 6009
     their.valid = false
     inspectReady(their.guid)
-    local hands = ns.CraftGlyph(InspectHandsSlot)
+    eq(runs, 0, "not judged while a worn item's link is missing")
+    eq(ns.CraftGlyph(InspectHandsSlot), nil, "no anvil: their gloves aren't an empty slot")
+    eq(ns.CraftGlyph(InspectBackSlot), nil, "nor anywhere else: the whole gear score isn't known")
+    eq(#wow.timers, 1, "one retry waiting")
+    -- The link arrives, their talents not yet: judged now, by the class's default meanwhile.
+    links[10] = select(2, C_Item.GetItemInfo(6009))
+    runTimers()
     eq(runs, 1)
-    eq(hands:IsShown(), true, "shown meanwhile, against an empty slot")
-    hands.scripts.OnEnter(hands)
+    eq(ns.CraftGlyph(InspectHandsSlot), nil, "they already wear better")
+    local back = ns.CraftGlyph(InspectBackSlot)
+    eq(back:IsShown(), true)
+    back.scripts.OnEnter(back)
     local seen
     for _, line in ipairs(GameTooltip.lines) do if line[1] == "Judged as Melee" then seen = true end end
     eq(seen, true, "the class's default until their talents are in")
-    eq(#wow.timers, 1, "one retry waiting")
-    -- Both arrive: the retry settles it, and no timer is left.
-    links[10] = select(2, C_Item.GetItemInfo(6009))
+    eq(#wow.timers, 1, "still trying for the talents")
+    -- The talents arrive: the retry settles it, and no timer is left.
     their.valid = true
     runTimers()
     eq(runs, 2)
-    eq(hands:IsShown(), false, "they already wear better")
+    back.scripts.OnEnter(back)
+    seen = false
+    for _, line in ipairs(GameTooltip.lines) do if line[1] == "Judged as Tank" then seen = true end end
+    eq(seen, true)
     eq(#wow.timers, 0)
-    -- Never arriving: the first pass and 5 retries, then it stops.
+    -- A link that never arrives: 5 retries, then it stops, and still no anvil anywhere.
     links[10] = nil
     runs = 0
     inspectReady(their.guid)
-    for _ = 1, 20 do runTimers() end
-    eq(runs, 6)
+    eq(back:IsShown(), false, "the earlier anvils go while it's unknown")
+    local tries = 0
+    for _ = 1, 20 do
+        if #wow.timers > 0 then tries = tries + 1 end
+        runTimers()
+    end
+    eq(tries, 5)
     eq(#wow.timers, 0)
+    eq(runs, 0, "never judged with a slot unknown")
+    eq(ns.CraftGlyph(InspectHandsSlot), nil, "and never an empty-slot anvil for the gloves they wear")
+    eq(back:IsShown(), false)
 end)
 
 test("an inspected player's spec comes from the inspect config's points per tab", function()

@@ -334,10 +334,26 @@ local function Plain(v)
     if not issecretvalue(v) and v ~= nil then return v end
 end
 
+-- The inspected player's spec. The game keeps one inspect talent config, holding whoever
+-- was inspected last, by any addon: so it's read only while the last INSPECT_READY was for
+-- this player, and kept with their GUID. A later pass (a retry, item data arriving, a
+-- setting) uses what was kept, never the config as it is by then (peer review, 2026-11-11).
+local lastReady            -- the GUID of the last INSPECT_READY, whoever asked; false if unknown
+local specGuid, specValue, specRead = nil, nil, false
+
+local function TakeSpec(guid)
+    if not specRead and guid == specGuid and guid == lastReady then
+        local spec, read = ns.InspectSpec()
+        if read then specValue, specRead = spec, true end
+    end
+end
+
 -- Fills `them` from the unit: class, level, worn item links and the spec their talents
--- give. Returns whether they can be judged at all, and whether something is still to come
--- (a worn item without its link yet, talents not in yet). A player of the other faction
--- can't be handed anything, so isn't judged.
+-- give. Returns whether they can be judged now, and whether something is still to come
+-- (a worn item without its link yet, talents not in yet). While a worn item's link is
+-- missing they aren't judged at all: the slot would count as empty, and worse gear show as
+-- an upgrade for it (peer review). A player of the other faction can't be handed anything,
+-- so isn't judged.
 local function ReadThem(unit)
     local _, class = UnitClass(unit)
     class = Plain(class)
@@ -355,9 +371,16 @@ local function ReadThem(unit)
             pending = true -- the item is known, its link isn't yet (as right after login)
         end
     end
-    local spec, read = ns.InspectSpec()
+    if pending then return false, true end
+    local guid = Plain(UnitGUID(unit))
+    local spec, waiting = nil, false
+    if guid and guid == specGuid then
+        TakeSpec(guid)
+        spec = specValue
+        waiting = not specRead and guid == lastReady -- still theirs to read: try again
+    end
     them.class, them.level, them.spec = class, level, spec
-    return true, pending or not read
+    return true, waiting
 end
 
 -- Worked out when the game says an inspected player's data is in (INSPECT_READY for the
@@ -413,9 +436,15 @@ local function ReadyNow()
 end
 
 local function InspectReady(guid)
+    local secret = issecretvalue(guid)
+    lastReady = not secret and guid or false
     local f = InspectFrame
-    if issecretvalue(guid) or guid == nil or not f or readySoon then return end
+    if secret or guid == nil or not f then return end
     if Plain(UnitGUID(InspectUnit(f))) ~= guid then return end
+    -- Their talents now, while the config is certainly theirs (read again on a new inspect).
+    specGuid, specValue, specRead = guid, nil, false
+    TakeSpec(guid)
+    if readySoon then return end
     if not (C_Timer and C_Timer.After) then return RefreshInspect(true) end
     readySoon = true
     C_Timer.After(0, ReadyNow)
