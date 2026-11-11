@@ -303,6 +303,147 @@ test("shortcuts: Blizzard's bag menus get an entry; the bank, ElvUI and Ellesmer
     eq(s.ContainerFrameCombinedBags, nil, "never a button outside a window")
 end)
 
+test("shortcuts: ours follows EllesmereUI's header row when it is laid out again", function()
+    local ns = wow.load(FILES)
+    wow.ns = ns
+    -- EllesmereUI 9.8.4: SyncHeaderIcons chains the junk coin on, and Sell Junk at a merchant.
+    local eui = CreateFrame("Frame", "EUI_MainBagFrame")
+    local header = CreateFrame("Frame", nil, eui)
+    eui._searchBox = CreateFrame("EditBox", nil, header)
+    eui._searchBox:SetPoint("RIGHT", header, "RIGHT", -35, 0)
+    local bags = CreateFrame("Button", nil, header)
+    bags:SetPoint("RIGHT", eui._searchBox, "LEFT", -13, 0)
+    local coin, sell
+    local merchant = false
+    function eui:SyncHeaderIcons()
+        if not coin then
+            coin = CreateFrame("Button", nil, header)
+            sell = CreateFrame("Button", nil, header)
+            sell:SetPoint("RIGHT", coin, "LEFT", -6, 0)
+        end
+        coin:SetPoint("RIGHT", bags, "LEFT", -6, 0)
+        if merchant then sell:Show() else sell:Hide() end
+    end
+    wow.login(nil)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    local e = ns.BagShortcuts().EUI_MainBagFrame
+    eq(e.point[2], bags, "left of Show Bags to start with")
+    eui:SyncHeaderIcons()
+    eq(e.point[2], coin, "the coin came: ours moved left of it")
+    merchant = true
+    eui:SyncHeaderIcons()
+    eq(e.point[2], sell, "left of Sell Junk, not on top of it")
+    eq(e.point[1], "RIGHT"); eq(e.point[3], "LEFT"); eq(e.point[4], -6)
+    merchant = false
+    eui:SyncHeaderIcons()
+    eq(e.point[2], coin, "back beside the coin when the merchant closes")
+    -- A change that didn't run the layout is picked up when the window next opens.
+    coin:Hide()
+    eui:Hide(); eui:Show()
+    eq(e.point[2], bags)
+    eq(eui._searchBox.point[2], header, "the search box is left where it was")
+end)
+
+test("shortcuts: with no room beside EllesmereUI's slot count, ours moves to the footer's left end", function()
+    local ns = wow.load(FILES)
+    wow.ns = ns
+    EUI_BankFrame = nil
+    local eui = CreateFrame("Frame", "EUI_MainBagFrame")
+    local header = CreateFrame("Frame", nil, eui)
+    eui._searchBox = CreateFrame("EditBox", nil, header)
+    eui._searchBox:SetPoint("RIGHT", header, "RIGHT", -35, 0)
+    local bags = CreateFrame("Button", nil, header)
+    bags:SetPoint("RIGHT", eui._searchBox, "LEFT", -13, 0)
+    -- The flat look: title and count share the row with the icons.
+    local title, count = CreateFrame("Frame", nil, header), CreateFrame("Frame", nil, header)
+    title.rect, count.rect = { 8, 70 }, { 78, 150 }
+    eui.Header = { title = title, itemCount = count }
+    eui.Footer = CreateFrame("Frame", nil, eui)
+    function eui:SyncHeaderIcons() end
+    function eui:FitHeaderText() end
+    wow.login(nil)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    local e = ns.BagShortcuts().EUI_MainBagFrame
+    e.rect = { 200, 224 }
+    eui:SyncHeaderIcons()
+    eq(e.point[2], bags, "room: in the row")
+    -- Sell Junk pushed ours left, onto the count.
+    e.rect = { 140, 164 }
+    eui:SyncHeaderIcons()
+    eq(e.point[1], "LEFT"); eq(e.point[2], eui.Footer); eq(e.point[3], "LEFT")
+    eq(e:IsShown(), true)
+    eq(count.point, nil, "EllesmereUI's text is left alone")
+    -- The window was made wider: EllesmereUI fits its text again, and ours goes back.
+    e.rect = { 200, 224 }
+    eui:FitHeaderText()
+    eq(e.point[2], bags, "back in the row")
+    -- A count that EllesmereUI has hidden (alpha 0) takes no room: the title counts.
+    e.rect = { 140, 164 }
+    count:SetAlpha(0)
+    eui:FitHeaderText()
+    eq(e.point[2], bags)
+    count:SetAlpha(1)
+    -- Tracked currencies are listed from the footer's left: nowhere to go, so ours hides.
+    local currency = CreateFrame("Frame", nil, eui.Footer)
+    eui._currencyPool = { displays = { currency } }
+    eui:FitHeaderText()
+    eq(e:IsShown(), false, "hidden rather than on top of a currency")
+    currency:Hide()
+    eui:FitHeaderText()
+    eq(e:IsShown(), true)
+    eq(e.point[2], eui.Footer)
+end)
+
+test("shortcuts: in EllesmereUI's Forever look ours sits between the search box and the icons", function()
+    local ns = wow.load(FILES)
+    wow.ns = ns
+    EUI_BankFrame = nil -- an earlier test's, so ours isn't attached to it at login
+    -- There the icons hang from the header's right edge and the search box stretches up to them.
+    local eui = CreateFrame("Frame", "EUI_MainBagFrame")
+    local header = CreateFrame("Frame", nil, eui)
+    local sort = CreateFrame("Button", nil, header)
+    sort:SetPoint("RIGHT", header, "TOPRIGHT", -9, -39)
+    local bags = CreateFrame("Button", nil, header)
+    bags:SetPoint("RIGHT", sort, "LEFT", -6, 0)
+    local coin = CreateFrame("Button", nil, header)
+    coin:SetPoint("RIGHT", bags, "LEFT", -6, 0)
+    coin:Hide()
+    eui._searchBox = CreateFrame("EditBox", nil, header)
+    local edge = bags
+    function eui:SyncHeaderIcons() self._searchBox:SetPoint("RIGHT", edge, "LEFT", -6, 0) end
+    eui:SyncHeaderIcons()
+    wow.login(nil)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    local e = ns.BagShortcuts().EUI_MainBagFrame
+    eq(e.point[2], bags, "left of the leftmost icon")
+    eq(eui._searchBox.point[2], e, "and the search box ends at ours")
+    eui:Hide(); eui:Show()
+    eq(e.point[2], bags, "opening again changes nothing")
+    eq(eui._searchBox.point[2], e)
+    -- Its bank is restyled once at login and has no layout function: sort at the header's
+    -- right, Show Bags left of it, the search box up to Show Bags.
+    local bank = CreateFrame("Frame", "EUI_BankFrame")
+    local bankHeader = CreateFrame("Frame", nil, bank)
+    local bankSort = CreateFrame("Button", nil, bankHeader)
+    bankSort:SetPoint("RIGHT", bankHeader, "TOPRIGHT", -9, -39)
+    bank._bagsBtn = CreateFrame("Button", nil, bankHeader)
+    bank._bagsBtn:SetPoint("RIGHT", bankSort, "LEFT", -6, 0)
+    bank._searchBox = CreateFrame("EditBox", nil, bankHeader)
+    bank._searchBox:SetPoint("RIGHT", bank._bagsBtn, "LEFT", -6, 0)
+    ToggleAllBags()
+    local be = ns.BagShortcuts().EUI_BankFrame
+    eq(be.point[2], bank._bagsBtn, "the bank: left of Show Bags")
+    eq(bank._searchBox.point[2], be, "its search box ends at ours")
+    bank:Hide(); bank:Show()
+    eq(be.point[2], bank._bagsBtn)
+    eq(bank._searchBox.point[2], be)
+    coin:Show()
+    edge = coin
+    eui:SyncHeaderIcons()
+    eq(e.point[2], coin, "a new icon: ours moves left of it")
+    eq(eui._searchBox.point[2], e)
+end)
+
 test("the bags window resizes: width sets the columns, height how tall before it scrolls; both remembered", function()
     local ns = wow.load(FILES)
     wow.ns = ns

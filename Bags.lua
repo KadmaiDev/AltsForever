@@ -834,24 +834,95 @@ end
 -- sort, then Show Bags, then anything another addon chained on). Following the anchors
 -- rather than fixed offsets keeps working when EllesmereUI adds, hides or moves a button
 -- (its bank's Show Bags button, not stored anywhere, was covered on 2026-09-29).
-local function RowEnd(start)
-    local parent, current = start:GetParent(), start
-    for _ = 1, 20 do
-        local found
-        for _, child in ipairs({ parent:GetChildren() }) do
-            if child ~= current and child:IsShown() and child.GetPoint then
-                for i = 1, (child.GetNumPoints and child:GetNumPoints() or 1) do
-                    local point, rel, relPoint = child:GetPoint(i)
-                    if point == "RIGHT" and rel == current and relPoint == "LEFT" then found = child end
-                end
+-- `skip` is our own button, so it can be placed again without finding itself.
+local function Chained(current, skip, ...)
+    local found
+    for n = 1, select("#", ...) do
+        local child = select(n, ...)
+        if child ~= current and child ~= skip and child:IsShown() and child.GetPoint then
+            for i = 1, (child.GetNumPoints and child:GetNumPoints() or 1) do
+                local point, rel, relPoint = child:GetPoint(i)
+                if point == "RIGHT" and rel == current and relPoint == "LEFT" then found = child end
             end
         end
+    end
+    return found
+end
+
+local function RowEnd(start, skip)
+    local parent, current = start:GetParent(), start
+    for _ = 1, 20 do
+        local found = Chained(current, skip, parent:GetChildren())
         if not found then return current end
         current = found
     end
     return current
 end
 ns.HeaderRowEnd = RowEnd
+
+-- Puts our button at the left end of EllesmereUI's row. In its Forever look the search
+-- box is on the left instead, stretched up to the row's leftmost icon: ours then goes
+-- between the two, and the search box ends at ours.
+local function PlaceInRow(b, search)
+    local inner
+    for i = 1, (search.GetNumPoints and search:GetNumPoints() or 1) do
+        local point, rel, relPoint = search:GetPoint(i)
+        if point == "RIGHT" and relPoint == "LEFT" and type(rel) == "table" then inner = rel end
+    end
+    if inner == b then return true end -- still between them
+    b:ClearAllPoints()
+    if inner then
+        b:SetPoint("RIGHT", inner, "LEFT", -6, 0)
+        search:SetPoint("RIGHT", b, "LEFT", -6, 0)
+        return true
+    end
+    b:SetPoint("RIGHT", RowEnd(search, b), "LEFT", -6, 0)
+end
+
+-- Where a piece of header text ends, or nil if it isn't showing or can't be read.
+local function TextEnd(t)
+    if not (type(t) == "table" and t.GetRight and t:IsShown()) or t:GetAlpha() == 0 then return nil end
+    local right = t:GetRight()
+    if issecretvalue(right) then return nil end
+    return right
+end
+
+-- EllesmereUI's flat look has the title and slot count in the same row and fits them
+-- up to its own leftmost icon, so on a narrow window with Sell Junk showing ours would
+-- cover the count (owner's screenshot, 2026-11-11). Ours then moves to the footer's left
+-- end (owner's choice), or hides if tracked currencies are listed there. Read only.
+local function ClearOfText(f, b)
+    b:Show()
+    local hdr = f.Header
+    local left = b:GetLeft()
+    if not (type(hdr) == "table" and hdr.title and left) or issecretvalue(left) then return end
+    local last = TextEnd(hdr.title) or 0
+    local count = TextEnd(hdr.itemCount)
+    if count and count > last then last = count end
+    for i = 1, hdr.slotLines and 2 or 0 do -- the count on two lines
+        local line = TextEnd(hdr.slotLines[i])
+        if line and line > last then last = line end
+    end
+    if left >= last + 4 then return end
+    local footer, pool = f.Footer, f._currencyPool
+    local first = type(pool) == "table" and type(pool.displays) == "table" and pool.displays[1]
+    if type(footer) ~= "table" or first and first:IsShown() then b:Hide() return end
+    b:ClearAllPoints()
+    b:SetPoint("LEFT", footer, "LEFT", 6, 0)
+end
+
+-- EllesmereUI lays its row out again when a setting changes or a merchant opens (the
+-- junk coin, Sell Junk; 9.8.4 covered ours, 2026-11-11), so ours is placed again after
+-- each layout, each fitting of the header text (resizing) and whenever the window opens.
+local function FollowRow(f, b, search)
+    local function Again()
+        if not PlaceInRow(b, search) then ClearOfText(f, b) end
+    end
+    if f.HookScript then f:HookScript("OnShow", Again) end
+    if type(f.SyncHeaderIcons) == "function" then hooksecurefunc(f, "SyncHeaderIcons", Again) end
+    if type(f.FitHeaderText) == "function" then hooksecurefunc(f, "FitHeaderText", Again) end
+    Again()
+end
 
 -- Where each window gets its button. Each returns the button, or nil if the window
 -- (or the part it's placed beside) isn't there yet. EllesmereUI's fields are not its
@@ -888,7 +959,7 @@ local PLACES = {
         local search = f and f._searchBox
         if not (search and search.GetParent) then return end
         local b = Shortcut(search:GetParent(), "bags", 24, true)
-        b:SetPoint("RIGHT", RowEnd(search), "LEFT", -6, 0)
+        FollowRow(f, b, search)
         return b
     end,
     -- EllesmereUI's bank: the same, left of its sort and Show Bags buttons.
@@ -897,7 +968,7 @@ local PLACES = {
         local search = f and f._searchBox
         if not (search and search.GetParent) then return end
         local b = Shortcut(search:GetParent(), "bank", 24, true)
-        b:SetPoint("RIGHT", RowEnd(search), "LEFT", -6, 0)
+        FollowRow(f, b, search)
         return b
     end,
 }
