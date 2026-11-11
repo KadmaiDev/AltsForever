@@ -49,36 +49,64 @@ local STATS = {
     RESISTANCE0_NAME = "armor", ITEM_MOD_DAMAGE_PER_SECOND_SHORT = "dps",
 }
 
--- What a point of each stat is worth, per role, for levelling (Classic's rules: 1 crit or
--- hit = 1%). A weapon's dps counts as `dps`, or `rdps` in the ranged slot. The hunter
+-- Crit and hit come from GetItemStats as ratings, not percentages: Mugger's Belt says
+-- "critical strike by 1.0%" and reports ITEM_MOD_CRIT_RATING_SHORT = 14 (checked in game
+-- 2026-11-11, seen from a low-level character, so the tooltip's figure isn't scaled to the
+-- viewer). Until then 14 rating was scored as 14%. Hit is 10 per 1%: Observer's Shield, "chance
+-- to hit by 1.0%", ITEM_MOD_HIT_RATING_SHORT = 10 (same day). The avoidance ratings are
+-- unchecked and left as they were. A shield's own "38 Block" isn't in GetItemStats at all.
+local PER_PERCENT = { crit = 14, spellcrit = 14, hit = 10, spellhit = 10 }
+
+-- What a point of each stat is worth, per role, for levelling (crit and hit per 1%).
+-- Reviewed 2026-11-11 against Forever's reworked trees (talentsforever.com's data and
+-- Blizzard's class posts, all from the beta; none of it checked in game): crit and hit are
+-- one stat for melee, ranged and spells, so casters and healers weigh the plain ones as
+-- their spell ones; healing power counts as spell damage at a third; druid forms hit with
+-- the weapon's dps; Enhancement gets attack power and spell damage from Intellect. A weapon's dps counts as `dps`, or `rdps` in the ranged slot. The hunter
 -- weights are the ones Upgrade Trail checked against real items.
 local WEIGHTS = {
     hunter = { agi = 2.4, ap = 1, rap = 1, sta = 0.4, int = 0.3, spi = 0.05, crit = 22, hit = 16,
-        armor = 0.02, dps = 2, rdps = 14 },
+        armor = 0.02, dps = 0.5, rdps = 14 },
     rogue = { agi = 2, str = 1, ap = 1, sta = 0.4, crit = 20, hit = 18, armor = 0.02, dps = 10, rdps = 1 },
     warrior = { str = 2, agi = 1.4, ap = 1, sta = 0.5, crit = 20, hit = 18, armor = 0.02, dps = 12, rdps = 1 },
-    paladin = { str = 2, agi = 1, ap = 1, sta = 0.5, int = 0.4, sp = 0.3, crit = 18, hit = 16,
+    -- Retribution's Champion of the Light turns Intellect into spell damage for its Holy hits.
+    paladin = { str = 2, agi = 1, ap = 1, sta = 0.5, int = 0.6, sp = 0.4, crit = 18, hit = 16,
         armor = 0.02, dps = 12 },
-    enhancement = { str = 2, agi = 1.2, ap = 1, sta = 0.5, int = 0.4, crit = 18, hit = 16, armor = 0.02, dps = 12 },
-    feral = { str = 2, agi = 1.6, ap = 1, sta = 0.8, crit = 18, hit = 16, armor = 0.05, def = 0.5, dodge = 6 },
+    enhancement = { str = 2, agi = 1.2, ap = 1, sta = 0.5, int = 1, sp = 0.3, crit = 18, hit = 16, armor = 0.02, dps = 12 },
+    feral = { str = 2, agi = 1.6, ap = 1, sta = 0.8, crit = 18, hit = 16, armor = 0.05, def = 0.5, dodge = 6,
+        dps = 10 },
     tank = { sta = 1.5, str = 1, agi = 1, armor = 0.1, def = 1.5, dodge = 12, parry = 10, block = 6,
         blockvalue = 0.5, ap = 0.3, hit = 8, dps = 4, rdps = 0.5 },
-    caster = { sp = 1, int = 0.5, spi = 0.3, sta = 0.4, mp5 = 1.5, spellcrit = 10, spellhit = 12, rdps = 3 },
-    healer = { heal = 1, sp = 0.9, int = 0.6, spi = 0.5, sta = 0.3, mp5 = 2, spellcrit = 8, rdps = 1 },
+    caster = { sp = 1, heal = 0.33, int = 0.5, spi = 0.3, sta = 0.4, mp5 = 1.5, spellcrit = 10, spellhit = 12,
+        crit = 10, hit = 12, rdps = 3 },
+    healer = { heal = 1, sp = 0.9, int = 0.6, spi = 0.5, sta = 0.3, mp5 = 2, spellcrit = 8, crit = 8, rdps = 1 },
 }
 -- A protection paladin tanks as a tank, but most of their threat is holy damage (seals,
 -- Consecration, Retribution Aura), so spell damage counts as much as Stamina or Defense.
-WEIGHTS.paladintank = { sp = 1.5 }
+WEIGHTS.paladintank = { sp = 1.5, heal = 0.5 }
 for stat, weight in pairs(WEIGHTS.tank) do WEIGHTS.paladintank[stat] = weight end
+-- Beast Mastery and Marksmanship hunters carry melee weapons for their stats, so a point
+-- of melee dps is worth little (0.5: enough to split two equal weapons, not to make an
+-- upgrade of one). Survival is the melee tree (owner, 2026-11-11), though Blizzard describes
+-- it as supporting melee builds beside the bow, with an off-hand damage talent: its melee
+-- weapons count for three times what every hunter's did, and its bow for less than the
+-- ranged trees', without leaving it behind. Third tab, as talentsforever.com lists them.
+WEIGHTS.survival = { dps = 6, rdps = 8 }
+-- Marksmanship turns Intellect into attack power (Careful Aim, up to 100%).
+WEIGHTS.marksman = { int = 1 }
+for stat, weight in pairs(WEIGHTS.hunter) do
+    WEIGHTS.survival[stat] = WEIGHTS.survival[stat] or weight
+    WEIGHTS.marksman[stat] = WEIGHTS.marksman[stat] or weight
+end
 
 -- The word for each role, in menus and in /af role.
 local ROLE_NAMES = {
-    hunter = L["Ranged"], rogue = L["Melee"], warrior = L["Melee"], paladin = L["Melee"],
+    hunter = L["Ranged"], marksman = L["Marksman"], survival = L["Melee"], rogue = L["Melee"], warrior = L["Melee"], paladin = L["Melee"],
     enhancement = L["Melee"], feral = L["Feral"], tank = L["Tank"], paladintank = L["Tank"],
     caster = L["Caster"], healer = L["Healer"],
 }
 local ROLE_WORDS = {
-    hunter = "ranged", rogue = "melee", warrior = "melee", paladin = "melee", enhancement = "melee",
+    hunter = "ranged", marksman = "marksman", survival = "melee", rogue = "melee", warrior = "melee", paladin = "melee", enhancement = "melee",
     feral = "feral", tank = "tank", paladintank = "tank", caster = "caster", healer = "healer",
 }
 
@@ -93,12 +121,12 @@ local CLASSES = {
         aliases = { tank = "paladintank" }, -- a paladin's role saved before they had their own
         armor = { [1] = 1, [2] = 1, [3] = 1, [4] = 40, [6] = 1, [7] = 1 },
         weapons = { 0, 1, 4, 5, 6, 7, 8 } },
-    HUNTER = { tabs = { "hunter", "hunter", "hunter" }, default = "hunter", dualWield = 20,
+    HUNTER = { tabs = { "hunter", "marksman", "survival" }, default = "hunter", dualWield = 20,
         armor = { [1] = 1, [2] = 1, [3] = 40 },
         weapons = { 0, 1, 2, 3, 6, 7, 8, 10, 13, 15, 16, 18 } },
     ROGUE = { tabs = { "rogue", "rogue", "rogue" }, default = "rogue", dualWield = 10,
         armor = { [1] = 1, [2] = 1 },
-        weapons = { 2, 3, 4, 7, 13, 15, 16, 18 } },
+        weapons = { 0, 2, 3, 4, 7, 13, 15, 16, 18 } }, -- one-handed axes too on Forever
     PRIEST = { tabs = { "healer", "healer", "caster" }, default = "caster",
         armor = { [1] = 1 }, weapons = { 4, 10, 15, 19 } },
     SHAMAN = { tabs = { "caster", "enhancement", "healer" }, default = "enhancement",
@@ -253,7 +281,9 @@ function ns.ItemScore(link, role)
         local key = STATS[name]
         if key == "dps" then key = dps end
         local weight = key and w[key]
-        if weight and type(value) == "number" and not issecretvalue(value) then score = score + value * weight end
+        if weight and type(value) == "number" and not issecretvalue(value) then
+            score = score + value * weight / (PER_PERCENT[key] or 1)
+        end
     end
     if scoreCount >= MAX_SCORES then
         for _, t in pairs(scores) do wipe(t) end
@@ -628,11 +658,13 @@ end
 -- Fills `out` with { id, link, gain, empty, at, slot (where it does best), boe, key (who
 -- crafts it), prof }, best gain first, and returns it and whether some item data is still
 -- loading (ask again shortly). slot nil: every slot. Runs when the flyout or character
--- sheet opens, never per frame.
-function ns.CraftableUpgrades(slot, out)
+-- sheet opens, never per frame. With `who` ({ class, level, gear, spec }: a player being
+-- inspected, Flyout.lua) it's judged for them: only what binds when equipped, as nothing
+-- else can be handed over, and nothing that needs a profession (theirs aren't known).
+function ns.CraftableUpgrades(slot, out, who)
     out = out or {}
     wipe(out)
-    local me, myKey = ns.char, ns.charKey
+    local me, myKey = who or ns.char, ns.charKey
     local cls = me and CLASSES[me.class]
     if not (cls and me.level and me.gear) then return out, false end
     local heaviest = Heaviest(cls, me.level)
@@ -664,7 +696,7 @@ function ns.CraftableUpgrades(slot, out)
                         local info = Describe(link, data, false)
                         if info == nil then
                             pending = true
-                        elseif info and (info.bind == BIND_ON_EQUIP or key == myKey) then
+                        elseif info and (info.bind == BIND_ON_EQUIP or (key == myKey and not who)) then
                             done[id] = true
                             local gain, empty, at, best = Compare(me, info, link)
                             if gain == false then

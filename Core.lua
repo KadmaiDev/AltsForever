@@ -159,6 +159,7 @@ local DB_FIELDS = {
     bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
     account = "string", tooltipsOff = "boolean", countsOff = "boolean", craftTipsOff = "boolean",
     cratesOff = "boolean", goldTipOff = "boolean", barsOff = "boolean", recipeCategories = "table", profArt = "table",
+    inspectAnvilsOff = "boolean",
 }
 
 -- Keeps only entries whose key and value are of these types (value nil = any).
@@ -667,6 +668,11 @@ function commands.itemnames()
         or L["Item names are no longer saved."])
 end
 
+function commands.inspect()
+    ns.SetInspectAnvils(not ns.InspectAnvilsOn())
+    Print(ns.InspectAnvilsOn() and L["Craftable upgrades in the inspect window on."] or L["Craftable upgrades in the inspect window off."])
+end
+
 function commands.anvils()
     ns.SetAnvils(not ns.AnvilsOn())
     Print(ns.AnvilsOn() and L["Craftable upgrades on the character sheet on."] or L["Craftable upgrades on the character sheet off."])
@@ -712,7 +718,7 @@ end
 function commands.role(arg)
     local name, word = arg:match("^(.-)%s+(%S+)$")
     local key = name and FindChar(name)
-    if not key then return Print(L["Type /af role, a character's name and a role: melee, ranged, caster, healer, tank, feral, or auto to follow their talents."]) end
+    if not key then return Print(L["Type /af role, a character's name and a role: melee, ranged, marksman, caster, healer, tank, feral, or auto to follow their talents."]) end
     local c = ns.db.chars[key]
     local choices = ns.RoleChoices(c)
     if not choices then return Print(L["%s has only one role, so there's nothing to choose."]:format(key)) end
@@ -807,9 +813,10 @@ function commands.help()
     Print(L["/af bags or /af bank, with a name for another character, shows their bags or bank slot by slot."])
     Print(L["/af prof, with a name for another character, shows their professions and recipes."])
     Print(L["/af icons picks the icons item tooltips use for bags, bank, mail and worn items."])
-    Print(L["/af upgrades turns upgrade hints in item tooltips on or off. /af role Name role sets what a character's upgrades are judged by (melee, ranged, caster, healer, tank, feral or auto)."])
+    Print(L["/af upgrades turns upgrade hints in item tooltips on or off. /af role Name role sets what a character's upgrades are judged by (melee, ranged, marksman, caster, healer, tank, feral or auto)."])
     Print(L["/af itemnames turns saving item names in Alts Forever's saved file on or off (only for reading it outside the game)."])
     Print(L["/af anvils shows or hides the anvils on your character sheet that mark upgrades you or your alts can craft."])
+    Print(L["/af inspect shows or hides the anvils in the inspect window that mark upgrades you or your alts can craft for that player."])
     Print(L["/af scale 150 makes Alts Forever's windows one and a half times their size (any size from 50 to 300), on top of the game's UI scale."])
     if ns.HasEllesmereScale() then Print(L["/af scale eui makes them follow EllesmereUI's Window Scale again (the default)."]) end
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
