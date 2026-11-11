@@ -7,6 +7,8 @@
 -- all of them as item buttons beside it. Upgrades.lua picks them (ns.CraftableUpgrades).
 -- (Before, the list sat under the game's Alt-hover equipment flyout; the owner preferred
 -- a button to click.)
+-- The same anvils sit beside the inspect window's slots for what your characters could
+-- craft for the player you're inspecting (a player's suggestion, 2026-11-11).
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
@@ -32,6 +34,11 @@ local SIDES = {
 local glyphs = {}  -- slot button -> our anvil button
 local bySlot = {}  -- slot -> wearable, bind-on-equip craftable upgrades, best first
 local all = {}
+-- The player being inspected, shaped like a saved character so the same scoring applies,
+-- and their slots' lists. Nothing of theirs is stored.
+local them = { gear = {} }
+local theirSlots, theirAll = {}, {}
+local inspectRetry, inspectTries, inspectHooked = false, 0, false
 local dollKey, dollRetry = nil, false
 -- Retries while item data loads, in a row; reset when a pass has everything or the sheet
 -- opens again, so an item that never loads can't keep a timer going (as Bags.lua's).
@@ -118,7 +125,7 @@ end
 
 -- Shows the panel beside a glyph, outwards from the sheet; false if there's nothing.
 local function ShowPanel(glyph)
-    local list = bySlot[glyph.slot]
+    local list = glyph.lists and glyph.lists[glyph.slot]
     local n = list and min(#list, MAX) or 0
     if n == 0 then return HidePanel() end
     if not panel then BuildPanel() end
@@ -149,12 +156,15 @@ local function ShowPanel(glyph)
     panel:SetSize(max(PAD * 2 + cols * (SIZE + GAP) - GAP, titleWidth + PAD * 2),
         PAD * 2 + TITLE + rows * (SIZE + GAP) - GAP)
     panel:ClearAllPoints()
+    -- An inside anvil (the inspect window) has its slot between it and the edge: the panel
+    -- goes beyond the slot, not over it.
+    local from = glyph.inside and glyph:GetParent() or glyph
     if glyph.side == "left" then
-        panel:SetPoint("TOPRIGHT", glyph, "TOPLEFT", -2, 0)
+        panel:SetPoint("TOPRIGHT", from, "TOPLEFT", -2, 0)
     elseif glyph.side == "right" then
-        panel:SetPoint("TOPLEFT", glyph, "TOPRIGHT", 2, 0)
+        panel:SetPoint("TOPLEFT", from, "TOPRIGHT", 2, 0)
     else
-        panel:SetPoint("TOP", glyph, "BOTTOM", 0, -2)
+        panel:SetPoint("TOP", from, "BOTTOM", 0, -2)
     end
     panel:Show()
 end
@@ -163,7 +173,7 @@ end
 -- The anvil buttons
 ---------------------------------------------------------------------------
 local function GlyphEnter(g)
-    local list = bySlot[g.slot]
+    local list = g.lists and g.lists[g.slot]
     if not list then return end
     GameTooltip:SetOwner(g, g.side == "left" and "ANCHOR_LEFT" or "ANCHOR_RIGHT")
     GameTooltip:AddLine(L["Your characters can craft"], 1, 0.82, 0)
@@ -171,6 +181,9 @@ local function GlyphEnter(g)
         local e = list[i]
         GameTooltip:AddDoubleLine(e.link, GainText(e) .. " · " .. Crafter(e), 1, 1, 1, 1, 1, 1)
     end
+    -- For an inspected player: what they were judged as, since it's read from their talents.
+    local role = g.who and ns.RoleOf(g.who)
+    if role then GameTooltip:AddLine(L["Judged as %s"]:format(ns.RoleName(role)), 0.6, 0.6, 0.6) end
     GameTooltip:AddLine(L["Click: show them"], 1, 1, 1)
     GameTooltip:Show()
 end
@@ -181,15 +194,29 @@ local function GlyphClick(g)
     ShowPanel(g)
 end
 
-local function Glyph(b, side)
+-- `inside`: on the slot's inner side, for the inspect window, whose slots sit against its
+-- edges (the outside anvils fell off the window or under its side tabs: owner's screenshot,
+-- 2026-11-11). EllesmereUI writes each item's level there, so with it the anvil goes past
+-- that number; weapons get theirs above the slot.
+local function Glyph(b, side, inside)
     local g = glyphs[b]
     if g then return g end
     g = CreateFrame("Button", nil, b)
     g:SetSize(GLYPH, GLYPH)
     g:SetFrameLevel((b:GetFrameLevel() or 1) + 5)
+    g.inside = inside
     -- Beside a side column the anvil sits at the slot's top, with its chevrons under it:
     -- there's only an anvil's width between the left column and the window's edge.
-    if side == "left" then
+    if inside then
+        local gap = _G.EllesmereUI and 24 or 5
+        if side == "left" then
+            g:SetPoint("TOPLEFT", b, "TOPRIGHT", gap, 1)
+        elseif side == "right" then
+            g:SetPoint("TOPRIGHT", b, "TOPLEFT", -gap, 1)
+        else
+            g:SetPoint("BOTTOM", b, "TOP", 0, 6) -- clear of the slot's frame
+        end
+    elseif side == "left" then
         g:SetPoint("TOPRIGHT", b, "TOPLEFT", -2, 1)
     elseif side == "right" then
         g:SetPoint("TOPLEFT", b, "TOPRIGHT", 2, 1)
@@ -204,8 +231,12 @@ local function Glyph(b, side)
     g.tier:SetSize(18, 18)
     -- Under the anvil beside the side columns (on its corner they covered the item icon;
     -- beside it, they went past the window's edge); beside it under the weapons.
-    if side == "bottom" then
+    -- Inside (the inspect window) always beside it, on the row of the item level: EllesmereUI
+    -- writes the item's enchant on the row below (owner's screenshot, 2026-11-11).
+    if side == "bottom" or (inside and side == "left") then
         g.tier:SetPoint("LEFT", g, "RIGHT", -3, -2)
+    elseif inside then
+        g.tier:SetPoint("RIGHT", g, "LEFT", 3, -2)
     else
         g.tier:SetPoint("TOP", g, "BOTTOM", 0, 3)
     end
@@ -228,39 +259,36 @@ end
 -- /af anvils; owner, 2026-10-16), apart from Show upgrades (the tooltips).
 function ns.AnvilsOn() return not ns.db.anvilsOff end
 
-local function RefreshDoll()
-    if not (ns.char and PaperDollFrame and PaperDollFrame:IsVisible()) then return end
-    local on = ns.AnvilsOn()
-    local key = ns.UpgradesVersion() .. ":" .. (ns.craftVersion or 0) .. ":" .. (ns.char.level or 0) .. ":" .. tostring(on)
-    if key == dollKey then return end
-    local pending = false
-    wipe(bySlot)
-    if on then
-        all, pending = ns.CraftableUpgrades(nil, all)
-        for _, e in ipairs(all) do
-            if e.boe and not e.at and e.slot then
-                local t = bySlot[e.slot]
-                if not t then
-                    t = {}
-                    bySlot[e.slot] = t
-                end
-                t[#t + 1] = e
+-- Sorts a list from ns.CraftableUpgrades into `into` by slot: only what can be worn now
+-- and binds when equipped.
+local function Group(list, into)
+    for _, e in ipairs(list) do
+        if e.boe and not e.at and e.slot then
+            local t = into[e.slot]
+            if not t then
+                t = {}
+                into[e.slot] = t
             end
+            t[#t + 1] = e
         end
     end
-    dollKey = not pending and key or nil
-    if not pending then dollTries = 0 end
+end
+
+-- Shows or hides the anvil beside each slot button of a window ("Character" or "Inspect"
+-- .. name .. "Slot"), then lets the open panel follow.
+local function Mark(prefix, lists, who)
+    local inside = prefix == "Inspect"
     for side, names in pairs(SIDES) do
         for _, name in ipairs(names) do
-            local b = _G["Character" .. name .. "Slot"]
+            local b = _G[prefix .. name .. "Slot"]
             local slot = b and b.GetID and b:GetID()
             if type(slot) == "number" and not issecretvalue(slot) then
-                local has = bySlot[slot] ~= nil
-                local g = glyphs[b] or (has and Glyph(b, side))
+                local has = lists[slot] ~= nil
+                local g = glyphs[b] or (has and Glyph(b, side, inside))
                 if g then
-                    g.slot = slot
+                    g.slot, g.lists, g.who = slot, lists, who
                     g:SetShown(has)
-                    if has then g.tier:SetTexture(ns.GainTexture(bySlot[slot][1].gain)) end -- best first
+                    if has then g.tier:SetTexture(ns.GainTexture(lists[slot][1].gain)) end -- best first
                 end
             end
         end
@@ -270,6 +298,22 @@ local function RefreshDoll()
         local g = panel.glyph
         if g and g:IsShown() then ShowPanel(g) else HidePanel() end
     end
+end
+
+local function RefreshDoll()
+    if not (ns.char and PaperDollFrame and PaperDollFrame:IsVisible()) then return end
+    local on = ns.AnvilsOn()
+    local key = ns.UpgradesVersion() .. ":" .. (ns.craftVersion or 0) .. ":" .. (ns.char.level or 0) .. ":" .. tostring(on)
+    if key == dollKey then return end
+    local pending = false
+    wipe(bySlot)
+    if on then
+        all, pending = ns.CraftableUpgrades(nil, all)
+        Group(all, bySlot)
+    end
+    dollKey = not pending and key or nil
+    if not pending then dollTries = 0 end
+    Mark("Character", bySlot)
     if pending and not dollRetry and dollTries < MAX_RETRIES and C_Timer and C_Timer.After then
         -- Item data on its way: once more in a second.
         dollRetry, dollTries = true, dollTries + 1
@@ -279,11 +323,117 @@ local function RefreshDoll()
         end)
     end
 end
-ns.CharacterSheetChanged = RefreshDoll
+
+---------------------------------------------------------------------------
+-- The inspect window
+---------------------------------------------------------------------------
+-- Its own setting ("Show craftable upgrades when inspecting a player", /af inspect).
+function ns.InspectAnvilsOn() return not ns.db.inspectAnvilsOff end
+
+local function Plain(v)
+    if not issecretvalue(v) and v ~= nil then return v end
+end
+
+-- Fills `them` from the unit: class, level, worn item links and the spec their talents
+-- give. Returns whether they can be judged at all, and whether something is still to come
+-- (a worn item without its link yet, talents not in yet). A player of the other faction
+-- can't be handed anything, so isn't judged.
+local function ReadThem(unit)
+    local _, class = UnitClass(unit)
+    class = Plain(class)
+    local level = Plain(UnitLevel(unit))
+    if type(class) ~= "string" or type(level) ~= "number" or level < 1 then return false, false end
+    local faction = UnitFactionGroup and Plain((UnitFactionGroup(unit)))
+    if faction and ns.char.faction and faction ~= ns.char.faction then return false, false end
+    local gear, pending = them.gear, false
+    wipe(gear)
+    for slot = 1, 19 do
+        local link = Plain(GetInventoryItemLink(unit, slot))
+        if type(link) == "string" then
+            gear[slot] = link
+        elseif Plain(GetInventoryItemID(unit, slot)) then
+            pending = true -- the item is known, its link isn't yet (as right after login)
+        end
+    end
+    local spec, read = ns.InspectSpec()
+    them.class, them.level, them.spec = class, level, spec
+    return true, pending or not read
+end
+
+-- Worked out when the game says an inspected player's data is in (INSPECT_READY for the
+-- player the window shows), when item data arrives, and on retries: never otherwise.
+-- With the Gamepad UI on there are none: an anvil made in an open window would have the
+-- controller's navigator rebuild it from our code (see ns.PrebuildAnvils), and the inspect
+-- window doesn't exist until it's first opened.
+local function InspectUnit(f)
+    local unit = Plain(f.unit)
+    return type(unit) == "string" and unit or "target"
+end
+
+local function RefreshInspect(fresh)
+    local f = InspectFrame
+    if not (f and f.IsVisible and f:IsVisible() and ns.char) then return end
+    if not inspectHooked then
+        inspectHooked = true
+        f:HookScript("OnHide", HidePanel)
+    end
+    local unit = InspectUnit(f)
+    if fresh then inspectTries = 0 end
+    local pending = false
+    wipe(theirSlots)
+    if ns.InspectAnvilsOn() and not ns.GamepadUI() then
+        local ok
+        ok, pending = ReadThem(unit)
+        if ok then
+            local more
+            theirAll, more = ns.CraftableUpgrades(nil, theirAll, them)
+            pending = pending or more
+            Group(theirAll, theirSlots)
+        end
+    end
+    if not pending then inspectTries = 0 end
+    Mark("Inspect", theirSlots, them)
+    if pending and not inspectRetry and inspectTries < MAX_RETRIES and C_Timer and C_Timer.After then
+        inspectRetry, inspectTries = true, inspectTries + 1
+        C_Timer.After(1, function()
+            inspectRetry = false
+            RefreshInspect()
+        end)
+    end
+end
+
+-- INSPECT_READY for the player the inspect window is on. The game's own window shows
+-- itself from the same event, and ours can be handled first (anvils were missing on the
+-- first inspect after a reload: owner, 2026-11-11), so the work waits a frame. Another
+-- addon inspecting someone else raises the event too: those stop here, costing nothing.
+local readySoon = false
+local function ReadyNow()
+    readySoon = false
+    RefreshInspect(true)
+end
+
+local function InspectReady(guid)
+    local f = InspectFrame
+    if issecretvalue(guid) or guid == nil or not f or readySoon then return end
+    if Plain(UnitGUID(InspectUnit(f))) ~= guid then return end
+    if not (C_Timer and C_Timer.After) then return RefreshInspect(true) end
+    readySoon = true
+    C_Timer.After(0, ReadyNow)
+end
+
+function ns.CharacterSheetChanged()
+    RefreshDoll()
+    RefreshInspect()
+end
 
 function ns.SetAnvils(on)
     ns.db.anvilsOff = not on or nil
     RefreshDoll()
+end
+
+function ns.SetInspectAnvils(on)
+    ns.db.inspectAnvilsOff = not on or nil
+    RefreshInspect()
 end
 
 -- With the Gamepad UI on (Gamepad.lua): every anvil and the panel made while the character
@@ -301,6 +451,7 @@ function ns.PrebuildAnvils()
 end
 
 function ns.StartFlyout()
+    ns.On("INSPECT_READY", InspectReady)
     if not PaperDollFrame then return end
     PaperDollFrame:HookScript("OnShow", function()
         dollTries = 0 -- opened afresh: retries start again

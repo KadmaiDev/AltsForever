@@ -210,18 +210,19 @@ end)
 
 test("talents pick the role, a choice from the menu or /af role overrides it", function()
     local items = upItems()
-    local healRing = upItem(5080, "Healing Ring", { loc = "INVTYPE_FINGER", stats = { ITEM_MOD_SPELL_HEALING_DONE_SHORT = 10 } })
+    -- Spell hit: something for a caster, nothing for a healer (heals don't miss).
+    local healRing = upItem(5080, "Sure Ring", { loc = "INVTYPE_FINGER", stats = { ITEM_MOD_HIT_SPELL_RATING_SHORT = 10 } })
     local ns = upStart({ ["Pria"] = alt("Pria", "PRIEST", { level = 25, gear = {} }) })
     local c = ns.db.chars.Pria
     eq(ns.RoleOf(c), "caster", "class default")
-    eq(upHover(5080, healRing), "", "healing only: nothing for a caster")
+    assert(upHover(5080, healRing):find("Pria", 1, true), "spell hit: an upgrade for a caster")
     c.spec = 2
     ns.UpgradesChanged()
     eq(ns.RoleOf(c), "healer", "Holy tab")
-    eq(upHover(5080, healRing), "[PRIEST]Pria = Finger · ^^^ · empty slot")
+    assert(not upHover(5080, healRing):find("Pria", 1, true), "nothing for a healer")
     SlashCmdList.ALTSFOREVER("role pria caster")
     eq(c.role, "caster")
-    eq(upHover(5080, healRing), "", "the choice wins over talents")
+    assert(upHover(5080, healRing):find("Pria", 1, true), "the choice wins over talents")
     SlashCmdList.ALTSFOREVER("role Pria auto")
     eq(c.role, nil)
     assert(wow.printed[#wow.printed]:find("follow their talents (Healer)", 1, true), wow.printed[#wow.printed])
@@ -236,10 +237,86 @@ test("talents pick the role, a choice from the menu or /af role overrides it", f
     roles.items[3].setSelected()
     eq(c.role, "caster")
     eq(roles.items[3].isSelected(), true)
-    -- A hunter has nothing to choose.
+    -- A hunter chooses between ranged and melee (Survival).
     ns.db.chars["Tarn Moon"] = upHunter(items)
     ns.ShowCharacterMenu(UIParent, "Tarn Moon")
+    texts = {}
+    for _, item in ipairs(wow.menuItem("Upgrade role").items) do texts[#texts + 1] = item.text end
+    eq(table.concat(texts, " | "), "Automatic (Ranged) | Ranged | Marksman | Melee")
+    -- A mage has nothing to choose.
+    ns.db.chars["Mira Vale"] = alt("Mira Vale", "MAGE", { level = 20, gear = {} })
+    ns.ShowCharacterMenu(UIParent, "Mira Vale")
     eq(wow.menuItem("Upgrade role"), nil)
+end)
+
+test("crit and hit on items are ratings: 14 crit rating is 1% crit, 10 hit rating 1% hit", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    -- Mugger's Belt: "critical strike by 1.0%", reported as 14 (checked in game 2026-11-11).
+    wow.item(9311, "Mugger's Belt", { sub = 2, loc = "INVTYPE_WAIST", stats = { ITEM_MOD_CRIT_RATING_SHORT = 14 } })
+    wow.item(9312, "Hit Ring", { sub = 0, loc = "INVTYPE_FINGER", stats = { ITEM_MOD_HIT_RATING_SHORT = 10 } })
+    wow.item(9313, "Agile Belt", { sub = 2, loc = "INVTYPE_WAIST", stats = { ITEM_MOD_AGILITY_SHORT = 10 } })
+    local function link(id) return select(2, C_Item.GetItemInfo(id)) end
+    eq(ns.ItemScore(link(9311), "rogue"), 20, "1% crit, not 14%")
+    eq(ns.ItemScore(link(9312), "rogue"), 18, "1% hit")
+    eq(ns.ItemScore(link(9313), "rogue"), 20, "about what 10 Agility is worth")
+end)
+
+test("weights follow Forever's trees: feral weapons, casters' crit and hit, healing as damage, rogue axes", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    local function link(id) return select(2, C_Item.GetItemInfo(id)) end
+    wow.item(9321, "Plain Staff", { class = 2, sub = 10, loc = "INVTYPE_2HWEAPON", stats = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 10 } })
+    eq(ns.ItemScore(link(9321), "feral"), 100, "forms hit with the weapon's dps")
+    eq(ns.ItemScore(link(9321), "caster"), 0)
+    -- One crit and hit stat for everyone: a caster's gear carries the plain ones.
+    wow.item(9322, "Crit Ring", { sub = 0, loc = "INVTYPE_FINGER", stats = { ITEM_MOD_CRIT_RATING_SHORT = 14, ITEM_MOD_HIT_RATING_SHORT = 10 } })
+    eq(ns.ItemScore(link(9322), "caster"), 22, "1% crit and 1% hit")
+    eq(ns.ItemScore(link(9322), "healer"), 8, "crit only: heals don't miss")
+    -- Healing power is spell damage at a third.
+    wow.item(9323, "Healing Ring", { sub = 0, loc = "INVTYPE_FINGER", stats = { ITEM_MOD_SPELL_HEALING_DONE_SHORT = 30 } })
+    eq(math.floor(ns.ItemScore(link(9323), "caster") + 0.5), 10)
+    eq(ns.ItemScore(link(9323), "healer"), 30)
+    eq(ns.ItemScore(link(9323), "paladintank"), 15)
+    eq(ns.ItemScore(link(9323), "tank"), 0, "a warrior tank gets nothing from it")
+    -- Enhancement: Intellect is attack power and spell damage.
+    wow.item(9324, "Wise Band", { sub = 0, loc = "INVTYPE_FINGER", stats = { ITEM_MOD_INTELLECT_SHORT = 10 } })
+    eq(ns.ItemScore(link(9324), "enhancement"), 10)
+end)
+
+test("a rogue can be suggested a one-handed axe, never a two-handed one", function()
+    local items = upItems()
+    local hand = upItem(9325, "Hand Axe", { class = 2, sub = 0, loc = "INVTYPE_WEAPON", stats = { ITEM_MOD_AGILITY_SHORT = 9 } })
+    local great = upItem(9326, "Great Axe", { class = 2, sub = 1, loc = "INVTYPE_2HWEAPON", stats = { ITEM_MOD_AGILITY_SHORT = 30 } })
+    upStart({ ["Sly Fox"] = alt("Sly Fox", "ROGUE", { level = 20, gear = {} }) })
+    assert(upHover(9325, hand):find("Sly Fox", 1, true), "the hand axe is an upgrade for the rogue")
+    assert(not upHover(9326, great):find("Sly Fox", 1, true), "the two-hander isn't")
+end)
+
+test("a hunter's melee weapon is a stat stick, except for Survival, the melee tree", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    wow.item(9301, "Plain Axe", { class = 2, sub = 0, loc = "INVTYPE_WEAPON", stats = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 10 } })
+    wow.item(9302, "Fine Bow", { class = 2, sub = 2, loc = "INVTYPE_RANGED", stats = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 10 } })
+    local axe, bow = select(2, C_Item.GetItemInfo(9301)), select(2, C_Item.GetItemInfo(9302))
+    eq(ns.ItemScore(axe, "hunter"), 5, "10 dps: worth about 2 Agility")
+    eq(ns.ItemScore(axe, "survival"), 60, "a melee weapon matters to Survival")
+    eq(ns.ItemScore(bow, "hunter"), 140, "the bow is judged on its damage")
+    eq(ns.ItemScore(bow, "survival"), 80, "its bow still counts, less than for the ranged trees")
+    -- Talents decide: the third tab is Survival.
+    eq(ns.RoleOf({ class = "HUNTER", spec = 1 }), "hunter")
+    eq(ns.RoleOf({ class = "HUNTER", spec = 2 }), "marksman")
+    -- Marksmanship turns Intellect into attack power; otherwise it's judged as Beast Mastery.
+    wow.item(9303, "Wise Ring", { sub = 0, loc = "INVTYPE_FINGER", stats = { ITEM_MOD_INTELLECT_SHORT = 10 } })
+    local ring = select(2, C_Item.GetItemInfo(9303))
+    eq(ns.ItemScore(ring, "marksman"), 10)
+    eq(ns.ItemScore(ring, "hunter"), 3)
+    eq(ns.ItemScore(axe, "marksman"), 5)
+    eq(ns.ItemScore(bow, "marksman"), 140)
+    eq(ns.RoleFromWord({ class = "HUNTER" }, "marksman"), "marksman")
+    eq(ns.RoleOf({ class = "HUNTER", spec = 3 }), "survival")
+    eq(ns.RoleOf({ class = "HUNTER" }), "hunter", "no spec yet: ranged")
+    eq(ns.RoleName("survival"), "Melee")
 end)
 
 test("a protection paladin counts spell damage as threat; a warrior tank doesn't", function()

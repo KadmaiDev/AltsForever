@@ -85,22 +85,45 @@ function ns.SpecFromPoints(points)
     return best
 end
 
--- c.spec = the tab with most points (1-3), or nil. Left alone if talents can't be read.
-function ns.ScanTalents(c)
+-- The spec a talent config's points give (1-3, or nil for none yet), and whether the
+-- talents could be read at all.
+local function SpecOf(config)
     local T = C_Traits
-    local config = Config(ConfigType("CamelotCombat", CLASS_CONFIG))
-    if not config then return end
-    local info = T.GetConfigInfo(config)
-    local tree = info and type(info.treeIDs) == "table" and Plain(info.treeIDs[1])
-    if not tree then return end
+    local ok, info = pcall(T.GetConfigInfo, config)
+    local tree = ok and type(info) == "table" and type(info.treeIDs) == "table" and Plain(info.treeIDs[1])
+    if not tree then return nil, false end
     local nodes = {}
     for _, id in ipairs(T.GetTreeNodes(tree) or {}) do
         local node = T.GetNodeInfo(config, id)
         local x, rank = node and Plain(node.posX), node and Plain(node.currentRank)
+        -- The inspect probe counted ranksPurchased; whichever is filled in.
+        local bought = node and Plain(node.ranksPurchased)
+        if type(bought) == "number" and (type(rank) ~= "number" or bought > rank) then rank = bought end
         if x and rank then nodes[#nodes + 1] = { x, rank } end
     end
-    if #nodes == 0 then return end
-    local spec = ns.SpecFromPoints(ns.TabPoints(nodes))
+    if #nodes == 0 then return nil, false end
+    return ns.SpecFromPoints(ns.TabPoints(nodes)), true
+end
+
+-- The spec of the player being inspected, once the game has their talents: the same
+-- trait calls under the inspect config (checked in game 2026-11-11 on another class: config
+-- -1, type 4, its own tree 1100 with 51 nodes, 12 points read). Second value false if
+-- their talents can't be read (yet).
+function ns.InspectSpec()
+    local T = C_Traits
+    if not (T and T.GetConfigInfo and T.HasValidInspectData) then return nil, false end
+    local ok, valid = pcall(T.HasValidInspectData)
+    if not ok or issecretvalue(valid) or not valid then return nil, false end
+    local consts = Constants and Constants.TraitConsts
+    return SpecOf(consts and Plain(consts.INSPECT_TRAIT_CONFIG_ID) or -1)
+end
+
+-- c.spec = the tab with most points (1-3), or nil. Left alone if talents can't be read.
+function ns.ScanTalents(c)
+    local config = Config(ConfigType("CamelotCombat", CLASS_CONFIG))
+    if not config then return end
+    local spec, read = SpecOf(config)
+    if not read then return end
     if spec ~= c.spec then
         c.spec = spec
         if ns.UpgradesChanged then ns.UpgradesChanged() end

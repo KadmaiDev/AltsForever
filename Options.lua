@@ -165,6 +165,7 @@ local function BarsSelected() return ns.BarsOn() end
 local function SkillupsSelected() return ns.SkillupsOn() end
 local function UpgradesSelected() return ns.UpgradesOn() end
 local function AnvilsSelected() return ns.AnvilsOn() end
+local function InspectAnvilsSelected() return ns.InspectAnvilsOn() end
 local function SendToAltSelected() return ns.SendToAltOn() end
 local function StatsSelected() return ns.StatsOn() end
 local function LegacySelected() return ns.LegacyRemindersOn() end
@@ -226,6 +227,8 @@ local SETTINGS = {
         L["Hovering your XP bar lists your characters still levelling, and the reputation bar their standing with the faction you're watching. Same as /af bars."], section = "tooltips", sub = true },
     { L["Show craftable upgrades on the character sheet"], AnvilsSelected, function(on) ns.SetAnvils(on) end,
         L["An anvil beside a slot on your character sheet means you or an alt can craft an upgrade for it that you can wear now and that binds when equipped. Hover or click it to see which. Same as /af anvils."], section = "extras" },
+    { L["Show craftable upgrades when inspecting a player"], InspectAnvilsSelected, function(on) ns.SetInspectAnvils(on) end,
+        L["An anvil beside a slot in the inspect window means you or an alt can craft an upgrade for that player that they can wear now and that binds when equipped. Hover or click it to see which. Same as /af inspect."], section = "extras" },
     { L["Send mail to alts"], SendToAltSelected, function(on) ns.SetSendToAlt(on) end,
         L["An arrow next to the To box at the mailbox to pick one of your characters. Same as /af sendmail."], section = "extras" },
     { L["Show session stats"], StatsSelected, function(on) ns.SetStats(on) end,

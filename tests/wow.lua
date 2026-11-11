@@ -10,7 +10,7 @@ M.SECRET = SECRET
 local KNOWN_EVENTS = {
     ADDON_LOADED = true, PLAYER_LOGIN = true, PLAYER_LOGOUT = true,
     BAG_UPDATE = true, BAG_UPDATE_DELAYED = true, BAG_CONTAINER_UPDATE = true,
-    PLAYER_EQUIPMENT_CHANGED = true,
+    PLAYER_EQUIPMENT_CHANGED = true, INSPECT_READY = true,
     BANKFRAME_OPENED = true, BANKFRAME_CLOSED = true, INPUT_DEVICE_INTERFACE_TRANSITION = true,
     MAIL_SHOW = true, MAIL_CLOSED = true, MAIL_INBOX_UPDATE = true,
     MAIL_SEND_SUCCESS = true, MAIL_FAILED = true,
@@ -767,6 +767,8 @@ function M.load(files)
     ElvUI_ExperienceBarHolder, EllesmereEAB_XPBar = nil, nil
     ElvUI_ReputationBarHolder, EllesmereEAB_RepBar = nil, nil
     EUI_Bags, EUI_BagMoneyFrame, ElvUI_ContainerFrame = nil, nil, nil
+    -- The inspect window is made by the game when first opened; tests that need it make it.
+    InspectFrame, Constants, UnitGUID = nil, nil, nil
     local betaEnded = M.betaEnded
     M.betaEnded = nil -- for this load only
     local ns = {}

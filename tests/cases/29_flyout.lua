@@ -232,3 +232,207 @@ test("forgetting a crafter with the character sheet open: their anvil goes, and 
     local ok, err = pcall(g.scripts.OnEnter, g)
     assert(ok, err)
 end)
+
+-- The inspect window on another player: a level 24 warrior with 12 points in their third
+-- talent tab (Protection), wearing nothing, on your faction. Returns ns and the tables the
+-- test changes: links[slot], ids[slot] (worn items), and `their` (class, level, faction, guid,
+-- talents as { posX, rank }, valid).
+function inspectStart()
+    local ns = flyStart()
+    local links, ids = {}, {}
+    local their = { class = "WARRIOR", level = 24, faction = "Alliance", guid = "Player-1-THEM", valid = true,
+        talents = { { 0, 0 }, { 3000, 0 }, { 6000, 12 } } }
+    InspectFrame = CreateFrame("Frame")
+    InspectFrame.unit = "target"
+    for name, id in pairs({ Head = 1, Back = 15, Hands = 10 }) do
+        local b = CreateFrame("Button", "Inspect" .. name .. "Slot")
+        b.GetID = function() return id end
+    end
+    local class, level, faction = UnitClass, UnitLevel, UnitFactionGroup
+    local link, item = GetInventoryItemLink, GetInventoryItemID
+    UnitClass = function(unit) if unit == "target" then return "Warrior", their.class end return class(unit) end
+    UnitLevel = function(unit) if unit == "target" then return their.level end return level(unit) end
+    UnitFactionGroup = function(unit) if unit == "target" then return their.faction end return faction(unit) end
+    UnitGUID = function(unit) return unit == "target" and their.guid or "Player-1-ME" end
+    GetInventoryItemLink = function(unit, slot) if unit == "target" then return links[slot] end return link(unit, slot) end
+    GetInventoryItemID = function(unit, slot) if unit == "target" then return ids[slot] end return item(unit, slot) end
+    -- The inspect config, as the game gave it (2026-11-11): -1, with its own tree.
+    Constants = { TraitConsts = { INSPECT_TRAIT_CONFIG_ID = -1 } }
+    local T = C_Traits
+    local info, nodes, node = T.GetConfigInfo, T.GetTreeNodes, T.GetNodeInfo
+    T.HasValidInspectData = function() return their.valid end
+    T.GetConfigInfo = function(config) if config == -1 then return { ID = -1, type = 4, treeIDs = { 1100 } } end return info(config) end
+    T.GetTreeNodes = function(tree)
+        if tree ~= 1100 then return nodes(tree) end
+        local list = {}
+        for i in ipairs(their.talents) do list[i] = i end
+        return list
+    end
+    T.GetNodeInfo = function(config, id)
+        if config ~= -1 then return node(config, id) end
+        local n = their.talents[id]
+        return { ID = id, posX = n[1], currentRank = 0, ranksPurchased = n[2] }
+    end
+    return ns, links, ids, their
+end
+
+-- The game says an inspected player's data is in; our work follows a frame later.
+function inspectReady(guid)
+    wow.fire("INSPECT_READY", guid)
+    local fns = wow.timers
+    wow.timers = {}
+    for i, fn in ipairs(fns) do
+        if i == #fns then fn() else wow.timers[#wow.timers + 1] = fn end -- only ours: the last queued
+    end
+end
+
+test("inspecting a player: anvils beside their slots for what your characters could craft for them", function()
+    local ns, links, _, their = inspectStart()
+    inspectReady(their.guid)
+    local hands, back, head = ns.CraftGlyph(InspectHandsSlot), ns.CraftGlyph(InspectBackSlot), ns.CraftGlyph(InspectHeadSlot)
+    eq(hands and hands:IsShown(), true, "the mail gloves Smith makes")
+    eq(back and back:IsShown(), true, "the cape")
+    eq(head, nil, "the helm needs level 28")
+    eq(ns.CraftGlyph(CharacterHandsSlot), nil, "your own sheet isn't open: nothing there")
+    -- Inside the columns: the inspect window's slots sit against its edges.
+    eq(hands.point[1], "TOPRIGHT"); eq(hands.point[2], InspectHandsSlot); eq(hands.point[3], "TOPLEFT")
+    eq(back.point[1], "TOPLEFT"); eq(back.point[3], "TOPRIGHT")
+    eq(back.point[4], 5, "close by without EllesmereUI's item levels there")
+    -- The chevrons beside the anvil, further in: the row below can hold an enchant's text.
+    eq(back.tier.point[1], "LEFT"); eq(back.tier.point[3], "RIGHT")
+    eq(hands.tier.point[1], "RIGHT"); eq(hands.tier.point[3], "LEFT")
+    -- Only what can be handed over: your own bind-on-pickup gauntlets are for you alone.
+    local got = {}
+    for _, e in ipairs(hands.lists[10]) do got[#got + 1] = e.id .. " " .. e.key end
+    eq(table.concat(got, ", "), "6001 Smith")
+    local forThem = ns.CraftableUpgrades(10, nil, { class = "WARRIOR", level = 24, gear = {} })
+    eq(#forThem, 1, "not listed for them at all")
+    eq(forThem[1].id, 6001)
+    eq(#ns.CraftableUpgrades(10), 2, "while yours still lists your own")
+    -- The hover says what they were judged as: 12 points in the third tab, a tank.
+    hands.scripts.OnEnter(hands)
+    local seen = false
+    for _, line in ipairs(GameTooltip.lines) do if line[1] == "Judged as Tank" then seen = true end end
+    eq(seen, true, "judged by their talents")
+    -- Clicking lists them, and closing the inspect window closes the list.
+    hands.scripts.OnClick(hands)
+    eq(AltsForeverCraftPanel:IsShown(), true)
+    eq(AltsForeverCraftPanel.point[2], InspectHandsSlot, "the list opens beyond the slot, not over it")
+    InspectFrame:Hide()
+    eq(AltsForeverCraftPanel:IsShown(), false)
+    InspectFrame:Show()
+    -- The game's window shows itself from the same event, which can reach us first: still
+    -- hidden when the event comes, open a frame later.
+    hands:Hide()
+    InspectFrame:Hide()
+    wow.fire("INSPECT_READY", their.guid)
+    eq(hands:IsShown(), false)
+    InspectFrame:Show()
+    runTimers()
+    eq(hands:IsShown(), true, "worked out once the window is up")
+    -- Another addon inspecting someone else raises the event too: nothing is worked out.
+    local runs, real = 0, ns.CraftableUpgrades
+    ns.CraftableUpgrades = function(...) runs = runs + 1 return real(...) end
+    inspectReady("Player-1-OTHER")
+    eq(runs, 0)
+    -- They put on better gloves: no anvil for the hands any more.
+    wow.item(6009, "Great Gloves", { sub = 3, loc = "INVTYPE_HAND", stats = { ITEM_MOD_STRENGTH_SHORT = 30, ITEM_MOD_STAMINA_SHORT = 30 } })
+    links[10] = select(2, C_Item.GetItemInfo(6009))
+    inspectReady(their.guid)
+    eq(runs, 1)
+    eq(hands:IsShown(), false)
+    eq(back:IsShown(), true)
+    -- Nothing about them is saved.
+    for key in pairs(AltsForeverDB.chars) do assert(key == "Aldric" or key == "Smith" or key == "Far Away", key) end
+end)
+
+test("inspecting a player: their class, faction and the setting decide; a closed window does nothing", function()
+    local ns, _, _, their = inspectStart()
+    -- A rogue wears leather: Smith's leather gloves, not the mail ones.
+    their.class, their.talents = "ROGUE", { { 0, 0 } }
+    inspectReady(their.guid)
+    local hands = ns.CraftGlyph(InspectHandsSlot)
+    eq(hands.lists[10][1].id, 6002)
+    eq(#hands.lists[10], 1)
+    -- The other faction can't be handed anything.
+    their.faction = "Horde"
+    inspectReady(their.guid)
+    eq(hands:IsShown(), false)
+    their.faction = "Alliance"
+    inspectReady(their.guid)
+    eq(hands:IsShown(), true)
+    -- Its own setting, apart from the character sheet's.
+    SlashCmdList.ALTSFOREVER("inspect")
+    eq(AltsForeverDB.inspectAnvilsOff, true)
+    eq(hands:IsShown(), false)
+    eq(ns.AnvilsOn(), true, "the character sheet's is untouched")
+    SlashCmdList.ALTSFOREVER("inspect")
+    eq(AltsForeverDB.inspectAnvilsOff, nil)
+    eq(hands:IsShown(), true)
+    -- With the Gamepad UI on there are none (a frame made in an open window).
+    wow.gamepadUI = true
+    inspectReady(their.guid)
+    eq(hands:IsShown(), false)
+    wow.gamepadUI = false
+    -- The window closed: the event (other addons inspect too) works nothing out.
+    InspectFrame:Hide()
+    local runs, real = 0, ns.CraftableUpgrades
+    ns.CraftableUpgrades = function(...) runs = runs + 1 return real(...) end
+    inspectReady(their.guid)
+    eq(runs, 0)
+    -- A level or class the game won't say (secret, or not there yet): no error, no anvils.
+    InspectFrame:Show()
+    their.class = nil
+    inspectReady(their.guid)
+    eq(hands:IsShown(), false)
+end)
+
+test("inspecting a player: links or talents still on their way are tried again, at most 5 times", function()
+    local ns, links, ids, their = inspectStart()
+    for _ = 1, 5 do runTimers() end
+    wow.timers = {}
+    local runs, real = 0, ns.CraftableUpgrades
+    ns.CraftableUpgrades = function(...) runs = runs + 1 return real(...) end
+    -- Their gloves are known by ID, the link not yet; their talents aren't in either.
+    wow.item(6009, "Great Gloves", { sub = 3, loc = "INVTYPE_HAND", stats = { ITEM_MOD_STRENGTH_SHORT = 30 } })
+    ids[10] = 6009
+    their.valid = false
+    inspectReady(their.guid)
+    local hands = ns.CraftGlyph(InspectHandsSlot)
+    eq(runs, 1)
+    eq(hands:IsShown(), true, "shown meanwhile, against an empty slot")
+    hands.scripts.OnEnter(hands)
+    local seen
+    for _, line in ipairs(GameTooltip.lines) do if line[1] == "Judged as Melee" then seen = true end end
+    eq(seen, true, "the class's default until their talents are in")
+    eq(#wow.timers, 1, "one retry waiting")
+    -- Both arrive: the retry settles it, and no timer is left.
+    links[10] = select(2, C_Item.GetItemInfo(6009))
+    their.valid = true
+    runTimers()
+    eq(runs, 2)
+    eq(hands:IsShown(), false, "they already wear better")
+    eq(#wow.timers, 0)
+    -- Never arriving: the first pass and 5 retries, then it stops.
+    links[10] = nil
+    runs = 0
+    inspectReady(their.guid)
+    for _ = 1, 20 do runTimers() end
+    eq(runs, 6)
+    eq(#wow.timers, 0)
+end)
+
+test("an inspected player's spec comes from the inspect config's points per tab", function()
+    local ns, _, _, their = inspectStart()
+    eq(select(2, ns.InspectSpec()), true)
+    eq(ns.InspectSpec(), 3)
+    their.talents = { { 0, 7 }, { 3000, 2 }, { 6000, 0 } }
+    eq(ns.InspectSpec(), nil, "under 10 points: no spec yet")
+    eq(select(2, ns.InspectSpec()), true, "but read")
+    their.talents = { { 0, 11 }, { 3000, 2 }, { 6000, 0 } }
+    eq(ns.InspectSpec(), 1)
+    their.valid = false
+    eq(select(2, ns.InspectSpec()), false, "not in yet")
+    C_Traits.HasValidInspectData = nil
+    eq(select(2, ns.InspectSpec()), false, "a client without it")
+end)
