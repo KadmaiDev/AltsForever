@@ -71,6 +71,44 @@ test("crate totals follow your bags, and names that load later", function()
     assert(text:find("Total = " .. crateCells(CG .. "26|r", CD .. "0|r", CG .. "7|r", CG .. "3|r"), 1, true), text)
 end)
 
+test("a material's name that never loads: the crate stops looking it up after 5 more hovers", function()
+    crateStart()
+    wow.itemNames[9003] = nil -- never loads; Greater Astral Essence is owned by nobody
+    local function asked()
+        local n = 0
+        for _, id in ipairs(wow.itemLoads or {}) do if id == 9003 then n = n + 1 end end
+        return n
+    end
+    wow.itemLoads = {}
+    for _ = 1, 6 do wow.hover(GameTooltip, CRATE, CRATE_TEXT) end
+    -- Asked once per character holding it (three) on each index pass.
+    eq(asked(), 18, "the first hover and 5 more")
+    for _ = 1, 10 do wow.hover(GameTooltip, CRATE, CRATE_TEXT) end
+    eq(asked(), 18, "then no more index passes or rebuilds")
+    -- Your bags change: it tries again.
+    wow.setBag(0, 16, { { 9003, 5 } })
+    wow.fire("BAG_UPDATE", 0)
+    wow.fire("BAG_UPDATE_DELAYED")
+    wow.hover(GameTooltip, CRATE, CRATE_TEXT)
+    eq(asked(), 21)
+    for _ = 1, 10 do wow.hover(GameTooltip, CRATE, CRATE_TEXT) end
+    eq(asked(), 36, "five more, then none")
+    -- A failed load brings no name: no pass for it.
+    wow.fire("GET_ITEM_INFO_RECEIVED", 9003, false)
+    wow.hover(GameTooltip, CRATE, CRATE_TEXT)
+    eq(asked(), 36)
+    -- The name comes after the tries are spent: the next hover shows it, no bag change needed.
+    wow.itemNames[9003] = "Small Glowing Shard"
+    wow.fire("GET_ITEM_INFO_RECEIVED", 9003, true)
+    local text = textOf(wow.hover(GameTooltip, CRATE, CRATE_TEXT))
+    assert(text:find("Total = " .. crateCells(CG .. "26|r", CD .. "0|r", CG .. "8|r", CD .. "0|r"), 1, true), text)
+    assert(text:find(crateIcon(333), 1, true), "its icon too\n" .. text)
+    -- And repeat hovers are back to reusing the grid.
+    wow.itemLoads = {}
+    for _ = 1, 5 do wow.hover(GameTooltip, CRATE, CRATE_TEXT) end
+    eq(#wow.itemLoads, 0)
+end)
+
 test("a crate first seen half-loaded (auction house) gets its lines once the tooltip fills in", function()
     crateStart()
     wow.uncached[CRATE] = true

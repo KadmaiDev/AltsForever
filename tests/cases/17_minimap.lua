@@ -59,7 +59,7 @@ test("with EllesmereUI, the overview's icon buttons get its square style", funct
     SlashCmdList.ALTSFOREVER("")
     local squared = 0
     for _, call in ipairs(wow.skinned) do if call[1] == "SquareIcon" then squared = squared + 1 end end
-    eq(squared, 2, "reputation and options buttons")
+    eq(squared, 8, "every icon button in its title bar")
 end)
 
 test("the minimap button and addon list use our logo, shipped with the addon", function()

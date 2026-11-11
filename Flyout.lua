@@ -33,6 +33,9 @@ local glyphs = {}  -- slot button -> our anvil button
 local bySlot = {}  -- slot -> wearable, bind-on-equip craftable upgrades, best first
 local all = {}
 local dollKey, dollRetry = nil, false
+-- Retries while item data loads, in a row; reset when a pass has everything or the sheet
+-- opens again, so an item that never loads can't keep a timer going (as Bags.lua's).
+local dollTries, MAX_RETRIES = 0, 5
 local panel
 local buttons = {}
 
@@ -246,6 +249,7 @@ local function RefreshDoll()
         end
     end
     dollKey = not pending and key or nil
+    if not pending then dollTries = 0 end
     for side, names in pairs(SIDES) do
         for _, name in ipairs(names) do
             local b = _G["Character" .. name .. "Slot"]
@@ -266,9 +270,9 @@ local function RefreshDoll()
         local g = panel.glyph
         if g and g:IsShown() then ShowPanel(g) else HidePanel() end
     end
-    if pending and not dollRetry and C_Timer and C_Timer.After then
+    if pending and not dollRetry and dollTries < MAX_RETRIES and C_Timer and C_Timer.After then
         -- Item data on its way: once more in a second.
-        dollRetry = true
+        dollRetry, dollTries = true, dollTries + 1
         C_Timer.After(1, function()
             dollRetry = false
             RefreshDoll()
@@ -298,7 +302,10 @@ end
 
 function ns.StartFlyout()
     if not PaperDollFrame then return end
-    PaperDollFrame:HookScript("OnShow", RefreshDoll)
+    PaperDollFrame:HookScript("OnShow", function()
+        dollTries = 0 -- opened afresh: retries start again
+        RefreshDoll()
+    end)
     PaperDollFrame:HookScript("OnHide", HidePanel)
 end
 

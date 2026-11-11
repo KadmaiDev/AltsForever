@@ -18,7 +18,7 @@ end)
 
 test("with EllesmereUI, every window takes its look when first created", function()
     wow.withEllesmere = true
-    wow.load(FILES)
+    local ns = wow.load(FILES)
     wow.now = NOW
     eq(wow.skinName, "AltsForever", "registered under the addon's folder name")
     wow.login(overviewAlts())
@@ -32,6 +32,13 @@ test("with EllesmereUI, every window takes its look when first created", functio
     assert(skinnedWith("Shell", AltsForeverGearFrame), "gear panel")
     AltsForeverFrame.repButton.scripts.OnClick(AltsForeverFrame.repButton)
     assert(skinnedWith("Shell", AltsForeverRepFrame), "reputation panel")
+    -- Every icon button in the overview's title bar: square, with EllesmereUI's border.
+    for _, name in ipairs(OVERVIEW_ICONS) do
+        assert(skinnedWith("SquareIcon", f[name]:GetNormalTexture()), "icon button " .. name)
+    end
+    -- Not the bags window's own search button (only the overview's were asked for).
+    ns.ShowBags(ns.charKey, "bags")
+    eq(skinnedWith("SquareIcon", AltsForeverBagsFrame.searchButton:GetNormalTexture()), false)
 end)
 
 test("with EllesmereUI, the bags window's slots look like its bags: square icons, a quality edge, faded empty slots", function()
@@ -220,6 +227,9 @@ end)
 
 ---------------------------------------------------------------------------
 -- ElvUI look (its Skins module)
+-- The overview's title-bar icon buttons, right to left.
+OVERVIEW_ICONS = { "cog", "repButton", "lockoutsButton", "profsButton", "bagsButton", "searchButton", "exportButton", "syncButton" }
+
 test("with ElvUI, every window takes its look when first created", function()
     wow.withElvUI = true
     wow.load(FILES)
@@ -228,16 +238,19 @@ test("with ElvUI, every window takes its look when first created", function()
     SlashCmdList.ALTSFOREVER("")
     local f = AltsForeverFrame
     assert(skinnedWith("HandleFrame", f), "overview: backdrop, inset, close button")
-    assert(skinnedWith("CreateBackdrop", f.cog) and skinnedWith("CreateBackdrop", f.repButton), "icon buttons")
-    assert(skinnedWith("SetTexCoords", f.cog:GetNormalTexture()), "icon edges cropped")
+    for _, name in ipairs(OVERVIEW_ICONS) do
+        assert(skinnedWith("CreateBackdrop", f[name]), "icon button " .. name)
+        assert(skinnedWith("SetTexCoords", f[name]:GetNormalTexture()), "icon edges cropped: " .. name)
+    end
     assert(skinnedWith("FontTemplate", overviewRows()[1].cells[1]), "row text in ElvUI's font")
     assert(skinnedWith("FontTemplate", f.credit), "text the window already had")
     local row = overviewRows()[1]
     row.scripts.OnClick(row)
     assert(skinnedWith("HandleFrame", AltsForeverGearFrame), "gear panel")
-    local slots = 0
+    local icons, slots = {}, 0
+    for _, name in ipairs(OVERVIEW_ICONS) do icons[f[name]] = true end
     for _, call in ipairs(wow.skinned) do
-        if call[1] == "CreateBackdrop" and call[2] ~= f.cog and call[2] ~= f.repButton then slots = slots + 1 end
+        if call[1] == "CreateBackdrop" and not icons[call[2]] then slots = slots + 1 end
     end
     eq(slots, 19, "every gear slot")
     f.repButton.scripts.OnClick(f.repButton)

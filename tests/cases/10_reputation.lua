@@ -87,3 +87,55 @@ test("reputation panel: factions down, characters across, you first", function()
     AltsForeverFrame:Hide()
     eq(f:IsShown(), false, "closing the overview closes it")
 end)
+
+-- The open panel's row for a faction, and its cells' text.
+local function repRow(id)
+    for _, row in ipairs(wow.frames) do
+        if row.faction == id and row.shown then return row end
+    end
+end
+
+test("forgetting or syncing a character while the Reputation panel is open refills it", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    repWindow()
+    wow.login({ v = 2, factions = { [530] = "Darkspear Trolls" }, chars = {
+        ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { level = 30, updated = NOW - DAY, reps = { [530] = 9000 } }),
+        ["Far Away"] = alt("Far Away", "MAGE", { level = 20, updated = NOW - DAY, reps = { [530] = 3000 } }),
+    } })
+    runTimers()
+    SlashCmdList.ALTSFOREVER("rep")
+    local f = AltsForeverRepFrame
+    eq(f:IsShown(), true)
+    local row = repRow(530)
+    eq(row.cells[3].text, "|cff00ff00Friendly 0%|r", "Far Away, third")
+    eq(ns.ForgetCharacter("Far Away"), true)
+    eq(row.cells[3].shown, false, "their column is gone")
+    row.scripts.OnEnter(row)
+    assert(not textOf(GameTooltip.lines):find("Far Away", 1, true), textOf(GameTooltip.lines))
+    -- A character gone without a refill doesn't break the row's tooltip.
+    ns.db.chars["Tarn Moon"] = nil
+    row.scripts.OnEnter(row)
+    assert(textOf(GameTooltip.lines):find("Darkspear Trolls", 1, true), textOf(GameTooltip.lines))
+end)
+
+test("a sync bringing in newer standings refills an open Reputation panel", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    repWindow()
+    wow.login({ v = 2, factions = { [530] = "Darkspear Trolls" }, chars = {
+        ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { level = 30, updated = NOW - DAY, reps = { [530] = 9000 } }),
+    } })
+    runTimers()
+    wow.printed, wow.sent = {}, {}
+    SlashCmdList.ALTSFOREVER("rep")
+    local row = repRow(530)
+    eq(row.cells[2].text, "|cff00ff88Honored 0%|r")
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, reply = true, have = { ["Tarn Moon"] = NOW } })
+    syncPump()
+    syncFrom(ns, "Bob Smith", { k = "char", key = "Tarn Moon",
+        c = alt("Tarn Moon", "DRUID", { level = 30, updated = NOW, reps = { [530] = 21000 } }) })
+    eq(ns.db.chars["Tarn Moon"].reps[530], 21000, "merged")
+    eq(row.cells[2].text, "|cff00ffccRevered 0%|r", "shown at once")
+end)

@@ -61,13 +61,22 @@ local function ElvIconButton(b, icon)
     if b.StyleButton then b:StyleButton(nil, true, true) end
 end
 
+-- The overview's title-bar icon buttons (Overview.lua), by field name: ipairs over a table
+-- of the buttons themselves would stop at the first one missing. Only the overview's: the
+-- bags window has a searchButton of its own, left as it was.
+local ICON_BUTTONS = { "cog", "repButton", "lockoutsButton", "profsButton", "bagsButton",
+    "searchButton", "exportButton", "syncButton" }
+
 local function ElvWindow(f)
     local _, S = Elv()
     -- Strips the template's art, hides the inset's border, skins the close button and
     -- gives the window ElvUI's transparent backdrop.
     S:HandleFrame(f)
-    for _, b in ipairs({ f.cog, f.repButton }) do
-        if b and b.GetNormalTexture then ElvIconButton(b, b:GetNormalTexture()) end
+    if f == AltsForeverFrame then
+        for _, name in ipairs(ICON_BUTTONS) do
+            local b = f[name]
+            if b and b.GetNormalTexture then ElvIconButton(b, b:GetNormalTexture()) end
+        end
     end
     SkinRegions(f, ElvFont)
 end
@@ -90,10 +99,13 @@ function ns.SkinWindow(f, opts)
             f.TitleText:ClearAllPoints()
             f.TitleText:SetPoint("CENTER", f, "TOP", 0, TITLE_Y)
         end
-        -- Icon buttons (the overview's reputation and options buttons): EllesmereUI's flat
-        -- square icons with its thin border.
-        for _, b in ipairs({ f.cog, f.repButton }) do
-            if b and b.GetNormalTexture then skin.SquareIcon(b:GetNormalTexture(), b) end
+        -- Icon buttons (the overview's title bar): EllesmereUI's flat square icons with its
+        -- thin border.
+        if f == AltsForeverFrame then
+            for _, name in ipairs(ICON_BUTTONS) do
+                local b = f[name]
+                if b and b.GetNormalTexture then skin.SquareIcon(b:GetNormalTexture(), b) end
+            end
         end
         SkinRegions(f, skin.Font)
     elseif Elv() then

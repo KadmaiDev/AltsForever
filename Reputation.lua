@@ -136,8 +136,8 @@ local function RowTooltip(row)
     GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
     GameTooltip:AddLine(ns.db.factions[id])
     for _, key in ipairs(keys) do
-        local c = ns.db.chars[key]
-        local value = c.reps and c.reps[id]
+        local c = ns.db.chars[key] -- nil if forgotten or replaced since the panel filled
+        local value = c and c.reps and c.reps[id]
         if value then
             local level, low, high = ns.Standing(value)
             local detail = level < 8 and (GREY .. "  " .. (value - low) .. " / " .. (high - low) .. "|r") or ""
@@ -263,6 +263,11 @@ local function CreatePanel()
     f:Hide()
     ns.GamepadWindow(f)
     ns.ScaleWindow(f)
+end
+
+-- For changes made elsewhere: a character forgotten (Options.lua), a sync (Sync.lua).
+function ns.ReputationChanged()
+    if panel and panel:IsShown() then Fill() end
 end
 
 -- Opens the panel beside the overview if it's open (ns.DockToOverview); again closes it.

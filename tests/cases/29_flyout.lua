@@ -178,6 +178,48 @@ test("items arriving while the character sheet is open: its anvils are worked ou
     eq(ns.CraftGlyph(b):IsShown(), true, "the anvil is there once the items have come")
 end)
 
+test("an item that never loads: the open character sheet tries again at most 5 times in a row", function()
+    local ns = wow.load(FILES)
+    wow.item(7101, "Lost Gloves", { sub = 3, loc = "INVTYPE_HAND", stats = { ITEM_MOD_STRENGTH_SHORT = 3 } })
+    wow.uncached[7101] = true
+    wow.player.class = "WARRIOR"
+    PaperDollFrame = CreateFrame("Frame")
+    PaperDollFrame:Hide()
+    local b = CreateFrame("Button", "CharacterHandsSlot")
+    b.GetID = function() return 10 end
+    wow.login({ v = 2, chars = {
+        ["Aldric"] = alt("Aldric", "WARRIOR", { level = 24, gear = {}, realm = "Realm" }),
+        ["Smith"] = alt("Smith", "PALADIN", { realm = "Realm", crafts = { Blacksmithing = { [7101] = "lost gloves" } } }),
+    } })
+    for _ = 1, 5 do runTimers() end -- the login's own, with the sheet closed
+    local runs, real = 0, ns.CraftableUpgrades
+    ns.CraftableUpgrades = function(...) runs = runs + 1 return real(...) end
+    -- The game answers every request for it, and the load fails each time.
+    local answered = 0
+    local function step()
+        local loads = wow.itemLoads or {}
+        for i = answered + 1, #loads do wow.fire("GET_ITEM_INFO_RECEIVED", loads[i], false) end
+        answered = #loads
+        runTimers()
+    end
+    PaperDollFrame:Show()
+    eq(runs, 1)
+    for _ = 1, 20 do step() end
+    eq(runs, 6, "the first pass and 5 retries, failed loads or not")
+    eq(#wow.timers, 0, "then no more timers")
+    -- Opened afresh: it tries again, as many times.
+    PaperDollFrame:Hide()
+    PaperDollFrame:Show()
+    for _ = 1, 20 do step() end
+    eq(runs, 12)
+    eq(#wow.timers, 0)
+    -- Once the item comes, the anvil shows.
+    wow.uncached[7101] = nil
+    wow.fire("GET_ITEM_INFO_RECEIVED", 7101, true)
+    runTimers()
+    eq(ns.CraftGlyph(b):IsShown(), true)
+end)
+
 test("forgetting a crafter with the character sheet open: their anvil goes, and hovering never errors", function()
     local ns = flyStart()
     PaperDollFrame:Show()

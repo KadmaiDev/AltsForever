@@ -47,8 +47,11 @@ end
 -- `live`: a skill change while playing (SKILL_LINES_CHANGED). A profession gone then was
 -- abandoned, and the game took its recipes with it, so they're forgotten here too:
 -- relearned, it reads "Not scanned" until its window is opened. A read that may be
--- incomplete changes nothing: one with a profession that couldn't be read, or, at login,
--- one that finds none while some were known. Returns true if a profession was dropped.
+-- incomplete changes nothing: one with a profession that couldn't be read, or one that
+-- finds none at all while some were known, at login or live (a live read that finds even
+-- one still drops the others). Returns true if a profession was dropped. The price: a
+-- character who really unlearns their only profession keeps it listed until a read finds
+-- another, the safer side of wiping every recipe on one empty read.
 local read, readMax = {}, {} -- reused
 -- Each profession's icon and skill line, account-wide, for showing another character's
 -- profession (Recipes.lua): db.profArt[name] = "skillLine;icon". The game only tells the
@@ -66,7 +69,7 @@ function ns.ScanSkills(c, live)
     local a, b, c3, d, e, f = GetProfessions()
     local profs, maxes = c.profs or {}, c.profMax or {}
     c.profs, c.profMax = profs, maxes
-    if not live and not (a or b or c3 or d or e or f) and next(profs) then return false end
+    if not (a or b or c3 or d or e or f) and next(profs) then return false end
     wipe(read)
     wipe(readMax)
     local unread = false
@@ -473,6 +476,20 @@ local function LineText(tt, data, i)
     end
 end
 
+-- The recipe's name: the item name after "Pattern: ", "Schematic: " etc., cut at the first
+-- colon, ASCII or full-width ("：", bytes EF BC 9A, which Chinese clients are believed to
+-- use; unverified in game). Lua patterns work on bytes, so the full-width colon is matched
+-- as its three bytes in a row, never in a character class.
+local FULL_COLON = "\239\188\154"
+local ASCII_PREFIX = "^(.-):%s*(.+)$"
+local FULL_PREFIX = "^(.-)" .. FULL_COLON .. "%s*(.+)$"
+local function RecipeName(name)
+    local before, after = name:match(ASCII_PREFIX)
+    local beforeFull, afterFull = name:match(FULL_PREFIX)
+    if afterFull and (not before or #beforeFull < #before) then return afterFull end
+    return after or name
+end
+
 local function ParseRecipe(tt, id, data)
     local p = parsed[id]
     if p ~= nil then return p end
@@ -492,7 +509,7 @@ local function ParseRecipe(tt, id, data)
     -- ("Retrieving item information", or lines still arriving, as in the auction house):
     -- nothing is remembered, and the next hover reads it again.
     if issecretvalue(name) or not (prof and name) then return false end
-    p = { prof = prof, req = req, name = (name:match("^.-:%s*(.+)$") or name):lower() }
+    p = { prof = prof, req = req, name = RecipeName(name):lower() }
     if parsedCount >= 200 then
         wipe(parsed)
         parsedCount = 0

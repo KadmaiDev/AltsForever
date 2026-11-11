@@ -412,13 +412,31 @@ test("abandoning a profession while playing forgets its recipes; relearned, it r
     wow.fire("SKILL_LINES_CHANGED")
     eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)), nil)
     eq(wow.hover(GameTooltip, SQUIRREL, text)[3][2], "|cff9d9d9dNot scanned|r")
-    -- The last profession dropped.
+    -- One dropped while another is still read.
     wow.profs = { { "Engineering", 1 } }
     wow.fire("SKILL_LINES_CHANGED")
+    eq(ns.char.profs.Mining, nil)
+    eq(ns.char.crafts.Mining, nil)
+    -- A read that finds none at all may be incomplete: nothing changes (so a character who
+    -- really drops their last profession keeps it listed until a read finds another).
     wow.profs = {}
     wow.fire("SKILL_LINES_CHANGED")
-    eq(next(ns.char.profs), nil)
-    eq(ns.char.crafts.Mining, nil)
+    eq(ns.char.profs.Engineering, 1)
+end)
+
+test("a skill change that reads no professions at all keeps them and their recipes", function()
+    local ns = wow.load(FILES)
+    wow.profs = { { "Engineering", 55 }, { "Mining", 50 } }
+    wow.login({ v = 2, chars = { ["Aldric"] = alt("Aldric", "MAGE", {
+        recipes = { Engineering = { ["mechanical squirrel"] = 1 } },
+        crafts = { Engineering = { [SQUIRREL_ITEM] = "mechanical squirrel" } } }) } })
+    eq(ns.char.profs.Engineering, 55)
+    wow.profs = {}
+    wow.fire("SKILL_LINES_CHANGED")
+    eq(ns.char.profs.Engineering, 55); eq(ns.char.profs.Mining, 50)
+    eq(ns.char.recipes.Engineering["mechanical squirrel"], 1)
+    eq(ns.char.crafts.Engineering[SQUIRREL_ITEM], "mechanical squirrel")
+    eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)), "[MAGE]Aldric")
 end)
 
 test("a login that reads no professions keeps the ones known", function()
