@@ -592,3 +592,18 @@ test("pinned characters head their own group, and move only among that group's p
     eq(overviewNames(), "Aldric, Tarn Moon, Grim Tusk, Old Timer")
     eq(table.concat(AltsForeverDB.pinned, ", "), "Grim Tusk, Aldric, Tarn Moon")
 end)
+
+test("group headings follow the columns: no gold total with Gold hidden, the name gets the room", function()
+    local ns = rulesetStart()
+    SlashCmdList.ALTSFOREVER("")
+    local head = overviewHeads()[1]
+    local before = head.label.width
+    eq(head.gold.shown, true)
+    ns.SetColumnShown("gold", false)
+    eq(head.gold.shown, false)
+    assert(head.label.width > before, "the name may run to the window's edge")
+    ns.SetColumnShown("legacy", false)
+    ns.ShowAllColumns()
+    eq(head.gold.shown, true)
+    eq(head.label.width, before)
+end)

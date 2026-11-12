@@ -16,29 +16,39 @@ local ATTENTION = "|cffff8000"
 local MAX_PROFESSION = 300 -- the last rank's maximum on Forever (Classic ruleset)
 local ROW_HEIGHT = 20
 local COLUMNS = {
-    -- `sort`: clicking the title orders the characters by it (SORTS, below).
+    -- `sort`: clicking the title orders the characters by it (SORTS, below). `id`: what the
+    -- column is hidden by (db.hiddenColumns; the four profession cells go together, and
+    -- the Character column, without one, always shows).
     { title = L["Character"], width = 180, sort = "name" },
-    { title = L["Level"], width = 80, sort = "level" },
-    { title = L["Rested"], width = 70, sort = "rested" },
+    { title = L["Level"], width = 80, sort = "level", id = "level" },
+    { title = L["Rested"], width = 70, sort = "rested", id = "rested" },
     -- Well Rested's rank beside Rested, then Legacy points spent of the total: short
     -- values under wider titles, so both are centred.
-    { title = L["Well Rested"], width = 84, center = true, sort = "wellRested" },
-    { title = L["Legacy"], width = 60, center = true, sort = "legacy" },
-    { title = L["Gold"], width = 120, right = true, sort = "gold" },
+    { title = L["Well Rested"], width = 84, center = true, sort = "wellRested", id = "wellrested" },
+    { title = L["Legacy"], width = 60, center = true, sort = "legacy", id = "legacy" },
+    { title = L["Gold"], width = 120, right = true, sort = "gold", id = "gold" },
     -- Each main profession gets a name column and a right-aligned skill column, so
     -- the skill numbers line up. The gap separates it from the right-aligned gold.
-    { title = L["Professions"], width = 104, gap = 16 },
-    { title = "", width = 34, right = true },
-    { title = "", width = 104, gap = 16 },
-    { title = "", width = 34, right = true },
-    { title = L["Mail"], width = 60, gap = 16, sort = "mail" },
+    { title = L["Professions"], width = 104, gap = 16, id = "professions" },
+    { title = "", width = 34, right = true, id = "professions" },
+    { title = "", width = 104, gap = 16, id = "professions" },
+    { title = "", width = 34, right = true, id = "professions" },
+    { title = L["Mail"], width = 60, gap = 16, sort = "mail", id = "mail" },
     -- The account's instances this hour, then raid and dungeon saves running (the row
     -- tooltip lists both): "2/10 <key>1".
-    { title = L["Lockouts"], width = 76, center = true },
-    { title = L["Zone"], width = 140, sort = "zone" },
-    { title = L["Played"], width = 70, right = true, sort = "played" },
-    { title = L["Last seen"], width = 80, right = true, sort = "seen" },
+    { title = L["Lockouts"], width = 76, center = true, id = "lockouts" },
+    { title = L["Zone"], width = 140, sort = "zone", id = "zone" },
+    { title = L["Played"], width = 70, right = true, sort = "played", id = "played" },
+    { title = L["Last seen"], width = 80, right = true, sort = "seen", id = "lastseen" },
 }
+-- The columns that can be hidden, in order, each once: { id, title }.
+local HIDEABLE = {}
+for _, col in ipairs(COLUMNS) do
+    if col.id and col.title ~= "" then HIDEABLE[#HIDEABLE + 1] = { col.id, col.title } end
+end
+-- Never narrower than this, however many columns are hidden: the title bar's buttons and
+-- the footer need the room.
+local MIN_WIDTH = 560
 local LIGHT = "|cffc0c0c0"
 -- After a pinned character's name: the game's gold star.
 local PIN = " |TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:0|t"
@@ -451,20 +461,58 @@ local function RowTooltip(row)
     end
 end
 
-local function CreateCells(parent, font)
-    local cells, x = {}, 12
+-- Which columns show (db.hiddenColumns[id] = true hides one; a player's request,
+-- 2026-11-12) and where each starts: worked out when the window is made and when a column
+-- is hidden or shown, never per refresh. Returns the window's width.
+local colX, colShown = {}, {}
+
+local function Measure()
+    local hidden = ns.db.hiddenColumns
+    if type(hidden) ~= "table" then hidden = nil end
+    local x = 12
     for i, col in ipairs(COLUMNS) do
-        x = x + (col.gap or 0)
+        local shown = not (hidden and col.id and hidden[col.id] == true)
+        colShown[i] = shown
+        if shown then
+            x = x + (col.gap or 0)
+            colX[i] = x
+            x = x + col.width
+        end
+    end
+    return max(x + 20, MIN_WIDTH)
+end
+
+local function PlaceCells(cells, parent)
+    for i, fs in ipairs(cells) do
+        if colShown[i] then
+            fs:ClearAllPoints()
+            fs:SetPoint("LEFT", parent, "LEFT", colX[i], 0)
+            fs:Show()
+        else
+            fs:Hide()
+        end
+    end
+end
+
+local function CreateCells(parent, font)
+    local cells = {}
+    for i, col in ipairs(COLUMNS) do
         local fs = parent:CreateFontString(nil, "OVERLAY", font)
         ns.SkinText(fs)
-        fs:SetPoint("LEFT", parent, "LEFT", x, 0)
         fs:SetWidth(col.width - 8)
         fs:SetJustifyH(col.right and "RIGHT" or col.center and "CENTER" or "LEFT")
         fs:SetWordWrap(false)
         cells[i] = fs
-        x = x + col.width
     end
+    PlaceCells(cells, parent)
     return cells
+end
+
+-- A group heading's name may run on past the columns before Gold (empty in a heading), or
+-- to the window's edge when Gold is hidden.
+local function HeadWidth(width)
+    if colShown[6] then return colX[6] - colX[1] - 8 end
+    return width - colX[1] - 28
 end
 
 local function CreateRow(i)
@@ -487,6 +535,7 @@ local function CreateRow(i)
     row.pct:SetWidth(COLUMNS[2].width - 32)
     row.pct:SetJustifyH("LEFT")
     row.pct:SetWordWrap(false)
+    row.pct:SetShown(colShown[2])
     row:SetScript("OnEnter", RowTooltip)
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     -- Left: gear. Right: the character's menu (Forget...).
@@ -544,11 +593,8 @@ local function CreateHead(i)
     line:SetPoint("TOPRIGHT", head, "TOPRIGHT", -8, 0)
     head.line = line
     local texts = CreateCells(head, "GameFontNormalSmall")
-    -- The name may run on past the narrow columns before Gold (empty in a heading).
-    local width = -8
-    for c = 1, 5 do width = width + COLUMNS[c].width + (COLUMNS[c + 1].gap or 0) end
-    texts[1]:SetWidth(width)
-    head.label, head.gold = texts[1], texts[6]
+    texts[1]:SetWidth(HeadWidth(frame:GetWidth()))
+    head.texts, head.label, head.gold = texts, texts[1], texts[6]
     heads[i] = head
     return head
 end
@@ -588,6 +634,8 @@ local UP, DOWN = "Interface\\Buttons\\Arrow-Up-Up", "Interface\\Buttons\\Arrow-D
 local function MarkSort()
     local name, rev = ns.OverviewSort()
     local b, arrow = frame.sorts[name], frame.sortArrow
+    -- Ordered by a hidden column: still so, with nothing to point at.
+    arrow:SetShown(b:IsShown())
     arrow:SetTexture(((SORTS[name].up == true) ~= rev) and UP or DOWN)
     local fs, col = b.title, b.col
     local w = fs:GetStringWidth()
@@ -602,12 +650,36 @@ local function MarkSort()
     end
 end
 
-local function SortClick(b) ns.SortOverview(b.sort) end
+-- The columns to show: a tick each, and one entry to bring them all back. Filled into a
+-- menu of its own (right-click on the column titles) or the cog menu's Columns entry.
+function ns.FillColumnsMenu(menu)
+    local all = menu:CreateButton(L["Show all columns"], function() ns.ShowAllColumns() end)
+    if ns.db.hiddenColumns == nil then all:SetEnabled(false) end
+    for _, col in ipairs(HIDEABLE) do
+        local id = col[1]
+        menu:CreateCheckbox(col[2], function() return ns.ColumnShown(id) end,
+            function() ns.SetColumnShown(id, not ns.ColumnShown(id)) end)
+    end
+end
+
+local function ColumnsMenu(owner)
+    if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+    MenuUtil.CreateContextMenu(owner, function(_, root)
+        root:CreateTitle(L["Columns"])
+        ns.FillColumnsMenu(root)
+    end)
+end
+
+local function SortClick(b, button)
+    if button == "RightButton" then return ColumnsMenu(b) end
+    ns.SortOverview(b.sort)
+end
 
 local function SortTooltip(b)
     GameTooltip:SetOwner(b, "ANCHOR_TOPLEFT")
     GameTooltip:AddLine(b.col.title)
     GameTooltip:AddLine(L["Click to sort by this column, and again to reverse it."], 1, 1, 1)
+    GameTooltip:AddLine(L["Right-click to choose which columns are shown."], 1, 1, 1)
     GameTooltip:Show()
 end
 
@@ -916,9 +988,8 @@ function ns.DockIfOverview(f)
 end
 
 local function CreateWindow()
-    -- Room for the left inset, every column, and the right border.
-    local width = 12 + 20
-    for _, col in ipairs(COLUMNS) do width = width + col.width + (col.gap or 0) end
+    -- Room for the left inset, every column shown, and the right border.
+    local width = Measure()
 
     local f = ns.NewWindow("AltsForeverFrame")
     if f.plainFrame then
@@ -958,7 +1029,14 @@ local function CreateWindow()
     local arrow = header:CreateTexture(nil, "OVERLAY")
     arrow:SetSize(12, 12)
     f.sortArrow = arrow
-    for i, fs in ipairs(CreateCells(header, "GameFontNormalSmall")) do
+    -- Right-click anywhere on the titles: which columns to show.
+    header:EnableMouse(true)
+    header:SetScript("OnMouseUp", function(self, button)
+        if button == "RightButton" then ColumnsMenu(self) end
+    end)
+    f.header = header
+    f.titles = CreateCells(header, "GameFontNormalSmall")
+    for i, fs in ipairs(f.titles) do
         local col = COLUMNS[i]
         fs:SetText(col.title)
         if col.sort then
@@ -969,7 +1047,9 @@ local function CreateWindow()
             local hl = b:CreateTexture(nil, "HIGHLIGHT")
             hl:SetAllPoints()
             hl:SetColorTexture(1, 1, 1, 0.08)
-            b.sort, b.title, b.col = col.sort, fs, col
+            b.sort, b.title, b.col, b.index = col.sort, fs, col, i
+            b:SetShown(colShown[i])
+            b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
             b:SetScript("OnClick", SortClick)
             b:SetScript("OnEnter", SortTooltip)
             b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1123,6 +1203,54 @@ local function CreateWindow()
     -- Where it was left, now that its size is set; else the middle, as above.
     ns.TrackWindow(f, "overview")
     ns.PlaceWindow(f)
+end
+
+-- Lays the open window out again after a column is hidden or shown: its width, the
+-- titles, every row and group heading made so far. No frame is created.
+local function ApplyColumns()
+    if not frame then return end
+    local width = Measure()
+    frame:SetWidth(width)
+    PlaceCells(frame.titles, frame.header)
+    for _, b in pairs(frame.sorts) do b:SetShown(colShown[b.index]) end
+    for _, row in ipairs(rows) do
+        PlaceCells(row.cells, row)
+        row.pct:SetShown(colShown[2])
+    end
+    for _, head in ipairs(heads) do
+        PlaceCells(head.texts, head)
+        head.label:SetWidth(HeadWidth(width))
+    end
+    MarkSort()
+    ns.RefreshOverview()
+end
+
+function ns.ColumnShown(id)
+    local hidden = ns.db.hiddenColumns
+    return not (type(hidden) == "table" and hidden[id] == true)
+end
+
+-- The id of a column that can be hidden, from the word a player types; nil if none.
+function ns.ColumnId(word)
+    word = (word or ""):lower()
+    for _, col in ipairs(HIDEABLE) do
+        if col[1] == word then return col[1], col[2] end
+    end
+    return nil
+end
+
+function ns.SetColumnShown(id, on)
+    if not ns.ColumnId(id) then return end
+    local db = ns.db
+    local hidden = type(db.hiddenColumns) == "table" and db.hiddenColumns or {}
+    hidden[id] = not on or nil
+    db.hiddenColumns = next(hidden) ~= nil and hidden or nil
+    ApplyColumns()
+end
+
+function ns.ShowAllColumns()
+    ns.db.hiddenColumns = nil
+    ApplyColumns()
 end
 
 -- Opens or closes the overview; `open` only ever opens it (menus, settings page).

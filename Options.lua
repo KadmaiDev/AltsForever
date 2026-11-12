@@ -567,6 +567,7 @@ function ns.ShowOptionsMenu(owner, fromOverview)
         root:CreateCheckbox(L["Show other rulesets and factions"], RulesetsSelected, ToggleRulesets)
         -- From the overview's cog only: it's about the windows, and the other menus stay short.
         if fromOverview then
+            ns.FillColumnsMenu(root:CreateButton(L["Columns"]))
             root:CreateButton(L["Reset window positions"], function() ns.ResetWindows() end)
         end
         if ns.HasSettings() then

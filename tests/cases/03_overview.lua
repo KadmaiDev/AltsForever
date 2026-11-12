@@ -640,3 +640,120 @@ test("a damaged pin list is ignored: unknown names, repeats and junk", function(
     eq(overviewNames(), "Aldric, Far, High, Low")
     eq(AltsForeverDB.pinned, nil)
 end)
+
+---------------------------------------------------------------------------
+-- Hiding overview columns
+
+-- The entry with this text in the menu last opened, looking inside submenus too.
+function menuEntry(text, items)
+    for _, item in ipairs(items or wow.menu.items) do
+        if item.text == text then return item end
+        local found = menuEntry(text, item.items)
+        if found then return found end
+    end
+end
+
+-- Right-clicks the overview's column titles and returns the menu entry with this text.
+function columnsMenu(text)
+    local header = AltsForeverFrame.header
+    header.scripts.OnMouseUp(header, "RightButton")
+    return menuEntry(text)
+end
+
+test("columns can be hidden from the titles' right-click menu, and brought back", function()
+    sortStart()
+    local f = AltsForeverFrame
+    local full = f.width
+    local row = overviewRows()[2]
+    local goldX, profX = row.cells[6].point[4], row.cells[7].point[4]
+    eq(columnsMenu("Character"), nil, "the names can't be hidden")
+    eq(columnsMenu("Show all columns").enabled, false, "nothing hidden yet")
+    local gold = columnsMenu("Gold")
+    eq(gold.kind, "checkbox"); eq(gold.isSelected(), true)
+    gold.setSelected()
+    eq(gold.isSelected(), false)
+    eq(AltsForeverDB.hiddenColumns.gold, true)
+    eq(row.cells[6].shown, false, "the cell")
+    eq(f.titles[6].shown, false, "its title")
+    eq(f.sorts.gold.shown, false, "and the button on it")
+    eq(row.cells[7].point[4], profX - 120, "the columns after it close up")
+    eq(row.cells[5].point[4], goldX - 60, "those before stay")
+    eq(f.width, full - 120, "and the window is that much narrower")
+
+    -- Professions is four cells; Level takes its percentage with it.
+    columnsMenu("Professions").setSelected()
+    for i = 7, 10 do eq(row.cells[i].shown, false, "profession cell " .. i) end
+    columnsMenu("Level").setSelected()
+    eq(row.cells[2].shown, false); eq(row.pct.shown, false)
+    eq(f.sortArrow.shown, false, "sorted by a hidden column: no arrow")
+
+    -- Any way back: the entry at the top of the list, or ticking the column again.
+    local all = columnsMenu("Show all columns")
+    eq(all.enabled, true)
+    columnsMenu("Level").setSelected()
+    eq(row.cells[2].shown, true); eq(row.pct.shown, true); eq(f.sortArrow.shown, true)
+    all.fn()
+    eq(AltsForeverDB.hiddenColumns, nil)
+    eq(f.width, full)
+    eq(row.cells[6].shown, true); eq(row.cells[7].point[4], profX)
+    eq(f.sorts.gold.shown, true)
+
+    -- A title that sorts opens the same menu on a right-click, and doesn't sort.
+    local b = f.sorts.gold
+    b.scripts.OnClick(b, "RightButton")
+    assert(menuEntry("Show all columns"), "the columns menu")
+    eq(AltsForeverDB.overviewSort, nil)
+    b.scripts.OnEnter(b)
+    local text = {}
+    for _, l in ipairs(GameTooltip.lines) do text[#text + 1] = table.concat(l, " = ") end
+    assert(table.concat(text, " "):find("Right-click to choose which columns are shown.", 1, true))
+end)
+
+test("hidden columns are kept between sessions; the window never gets too narrow", function()
+    sortStart()
+    for _, name in ipairs({ "Level", "Rested", "Well Rested", "Legacy", "Gold", "Professions", "Mail", "Lockouts", "Zone", "Played", "Last seen" }) do
+        columnsMenu(name).setSelected()
+    end
+    local f = AltsForeverFrame
+    eq(f.width, 560, "room for the title bar's buttons and the footer")
+    local saved = AltsForeverDB
+    local _, ns = sortStart(saved)
+    f = AltsForeverFrame
+    eq(f.width, 560)
+    for _, row in ipairs(overviewRows()) do
+        eq(row.cells[1].shown, true)
+        for i = 2, 15 do eq(row.cells[i].shown, false, "cell " .. i) end
+    end
+    eq(ns.ColumnShown("gold"), false)
+    -- The cog menu has the list too; the minimap's menu doesn't.
+    ns.ShowOptionsMenu(f.cog, true)
+    local columns = wow.menuItem("Columns")
+    eq(columns.items[1].text, "Show all columns")
+    eq(#columns.items, 12, "the eleven columns and Show all")
+    ns.ShowOptionsMenu(UIParent)
+    eq(wow.menuItem("Columns"), nil)
+    -- /af columns: one column, or all of them back.
+    SlashCmdList.ALTSFOREVER("columns Gold")
+    eq(ns.ColumnShown("gold"), true)
+    assert(table.concat(wow.printed, " "):find("The Gold column is shown.", 1, true))
+    SlashCmdList.ALTSFOREVER("columns gold")
+    assert(table.concat(wow.printed, " "):find("The Gold column is hidden. /af columns brings every column back.", 1, true))
+    SlashCmdList.ALTSFOREVER("columns nothing")
+    assert(table.concat(wow.printed, " "):find("/af columns shows every overview column again", 1, true))
+    eq(ns.ColumnShown("gold"), false)
+    SlashCmdList.ALTSFOREVER("columns")
+    eq(AltsForeverDB.hiddenColumns, nil)
+    for i = 1, 15 do eq(overviewRows()[1].cells[i].shown, true, "cell " .. i) end
+end)
+
+test("damaged hidden columns hide nothing; the Character column can't be hidden", function()
+    for _, bad in ipairs({ "gold", { gold = "yes", name = true, [3] = true } }) do
+        local saved = overviewAlts()
+        saved.hiddenColumns = bad
+        local _, ns = sortStart(saved)
+        for i = 1, 15 do eq(overviewRows()[1].cells[i].shown, true, "cell " .. i) end
+        ns.SetColumnShown("name", false)
+        ns.SetColumnShown("character", false)
+        eq(overviewRows()[1].cells[1].shown, true)
+    end
+end)
