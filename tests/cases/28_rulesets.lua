@@ -561,3 +561,14 @@ test("the richest group counts a ruleset's realms together", function()
     ns.char.money = 0
     eq(ns.RichestGroup(ns.char), true, "RP 600 across two realms beats Normal's 500")
 end)
+
+test("a chosen order sorts inside each group; the groups stay where they were", function()
+    rulesetStart()
+    SlashCmdList.ALTSFOREVER("")
+    eq(overviewNames(), "Aldric, Tarn Moon, Grim Tusk, Old Timer")
+    local heads = #overviewHeads()
+    local b = AltsForeverFrame.sorts.gold
+    b.scripts.OnClick(b)
+    eq(overviewNames(), "Tarn Moon, Aldric, Grim Tusk, Old Timer", "Tarn has more gold than you")
+    eq(#overviewHeads(), heads)
+end)
