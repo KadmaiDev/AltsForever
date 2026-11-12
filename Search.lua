@@ -499,7 +499,12 @@ local function CreateWindow()
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    ns.TrackWindow(f, "search", true, function(self)
+        -- Beside the overview if it's open, else where it always opened.
+        if ns.OverviewShown() then return ns.DockToOverview(self) end
+        self:ClearAllPoints()
+        self:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
+    end)
     f:SetClampedToScreen(true)
     f.title = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     if not f.TitleText then f.title:SetPoint("TOP", 0, -6) end
@@ -685,8 +690,9 @@ PickCharacters = function(owner)
 end
 
 -- Beside the bags window when it's open (right of it if there's room, else left), so
--- neither covers the other; otherwise where it always opens.
-Dock = function()
+-- neither covers the other; otherwise where it was left, else its default (ns.PlaceWindow).
+-- `opening`: the search is being opened, so it's placed even if it wasn't beside the bags.
+Dock = function(opening)
     local bags = ns.BagsWindow()
     if bags and bags:IsShown() then
         frame:ClearAllPoints()
@@ -699,9 +705,8 @@ Dock = function()
         end
         docked = true
         ns.BagsHold(true)
-    elseif docked then
-        frame:ClearAllPoints()
-        frame:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
+    elseif docked or opening then
+        ns.PlaceWindow(frame)
         docked = false
     end
 end
@@ -719,7 +724,7 @@ function ns.ToggleSearch(text)
         savedLit, savedView = ns.BagsState()
         previewed = savedLit
         ApplyScope()
-        Dock()
+        Dock(true)
         if text == "" then text = lastText end
     end
     box:SetText(text)

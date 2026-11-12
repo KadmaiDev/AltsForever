@@ -667,6 +667,161 @@ function ns.DockToOverview(panel)
     panel:SetPoint("TOPLEFT", overview, "BOTTOMLEFT", 0, -GAP)
 end
 
+---------------------------------------------------------------------------
+-- Where our windows are (a player's request, 2026-11-12): db.windows[key] is where the
+-- player left each one, account-wide, and it opens there again:
+--   { x, y }      dropped freely: its top left corner from the screen's bottom left, in
+--                 the screen's units (so it holds whatever the window size setting)
+--   { dock, off } dropped against an edge of the overview ("below", "above", "right",
+--                 "left"; within SNAP): it sits against that edge, `off` along it, and
+--                 follows the overview. With the overview closed it opens as by default.
+-- Nothing saved: the window's own default (`fallback`: ns.DockToOverview for the panels
+-- opened from the overview). Worked out only when a drag ends: nothing runs while dragging.
+---------------------------------------------------------------------------
+local SNAP = 12
+local SIDES = { below = true, above = true, right = true, left = true }
+local tracked = {}
+
+local function Saved(key)
+    local all = ns.db.windows
+    local p = type(all) == "table" and all[key]
+    return type(p) == "table" and p or nil
+end
+
+local function Store(key, p)
+    local db = ns.db
+    if p then
+        if type(db.windows) ~= "table" then db.windows = {} end
+        db.windows[key] = p
+    elseif type(db.windows) == "table" then
+        db.windows[key] = nil
+        if next(db.windows) == nil then db.windows = nil end
+    end
+end
+
+local function OwnScale(f)
+    local s = f:GetScale()
+    if issecretvalue(s) or type(s) ~= "number" or s <= 0 then return 1 end
+    return s
+end
+
+local function Against(f, side, off)
+    local overview = AltsForeverFrame
+    local down = off == 0 and 0 or -off
+    f:ClearAllPoints()
+    if side == "below" then
+        f:SetPoint("TOPLEFT", overview, "BOTTOMLEFT", off, -GAP)
+    elseif side == "above" then
+        f:SetPoint("BOTTOMLEFT", overview, "TOPLEFT", off, GAP)
+    elseif side == "right" then
+        f:SetPoint("TOPLEFT", overview, "TOPRIGHT", GAP, down)
+    else
+        f:SetPoint("TOPRIGHT", overview, "TOPLEFT", -GAP, down)
+    end
+end
+
+-- The overview's edge a dropped window is against, and how far along it; nil if none.
+-- Its near corners line up with the overview's when they're within SNAP too.
+local function Near(e, o)
+    local l, r, t, b = e[2], e[3], e[4], e[5]
+    local ol, orr, ot, ob = o[2], o[3], o[4], o[5]
+    local function Along(start, finish, from, to)
+        local off = start - from
+        if math.abs(off) <= SNAP then return 0 end
+        if math.abs(finish - to) <= SNAP then return to - (finish - start) - from end
+        return off
+    end
+    if l < orr and r > ol then
+        if math.abs(t - (ob - GAP)) <= SNAP then return "below", Along(l, r, ol, orr) end
+        if math.abs(b - (ot + GAP)) <= SNAP then return "above", Along(l, r, ol, orr) end
+    end
+    if t > ob and b < ot then
+        -- Down the side: measured from the overview's top.
+        local off = ot - t
+        if math.abs(off) <= SNAP then off = 0 elseif math.abs(b - ob) <= SNAP then off = ot - ob - (t - b) end
+        if math.abs(l - (orr + GAP)) <= SNAP then return "right", off end
+        if math.abs(r - (ol - GAP)) <= SNAP then return "left", off end
+    end
+    return nil
+end
+
+local function Dropped(f)
+    f:StopMovingOrSizing()
+    local info = tracked[f]
+    local e = info and Edges(f)
+    if not e then return end
+    local overview = AltsForeverFrame
+    if info.dock and overview and overview ~= f and overview:IsShown() then
+        local o = Edges(overview)
+        local side, off
+        if o then side, off = Near(e, o) end
+        if side then
+            Against(f, side, off)
+            return Store(info.key, { dock = side, off = off })
+        end
+    end
+    local s = OwnScale(f)
+    Store(info.key, { x = e[2] * s, y = e[4] * s })
+end
+
+-- A window whose place is remembered under `key`; `dock`: it can be dropped against the
+-- overview. Called once, when the window is made (it sets the window's OnDragStop).
+function ns.TrackWindow(f, key, dock, fallback)
+    tracked[f] = { key = key, dock = dock, fallback = fallback }
+    f:SetScript("OnDragStop", Dropped)
+end
+
+-- Puts a window where the player left it, else where it goes by default (its `fallback`,
+-- if it has one; otherwise it stays where it is). Called as it opens, once it's sized.
+function ns.PlaceWindow(f)
+    local info = tracked[f]
+    if not info then return false end
+    local p = Saved(info.key)
+    if p then
+        if type(p.x) == "number" and type(p.y) == "number" then
+            local s = OwnScale(f)
+            f:ClearAllPoints()
+            f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", p.x / s, p.y / s)
+            return true
+        end
+        local overview = AltsForeverFrame
+        if info.dock and SIDES[p.dock] and type(p.off) == "number" and overview and overview:IsShown() then
+            Against(f, p.dock, p.off)
+            return true
+        end
+    end
+    if info.fallback then info.fallback(f) end
+    return false
+end
+
+-- Every window back to where it opens by default (the options menu, /af resetwindows).
+function ns.ResetWindows()
+    ns.db.windows = nil
+    for f, info in pairs(tracked) do
+        if info.key == "overview" then
+            f:ClearAllPoints()
+            f:SetPoint("CENTER")
+        end
+    end
+    for f, info in pairs(tracked) do
+        if info.key ~= "overview" and f:IsShown() then
+            if info.fallback then
+                info.fallback(f)
+            else
+                f:ClearAllPoints()
+                f:SetPoint("CENTER")
+            end
+        end
+    end
+end
+
+-- Beside the overview if it's open, else left where it is: the default for windows that
+-- have a place of their own without it (bags, search).
+function ns.DockIfOverview(f)
+    local overview = AltsForeverFrame
+    if overview and overview:IsShown() then ns.DockToOverview(f) end
+end
+
 local function CreateWindow()
     -- Room for the left inset, every column, and the right border.
     local width = 12 + 20
@@ -872,6 +1027,9 @@ local function CreateWindow()
     f:Hide()
     ns.GamepadWindow(f)
     ns.ScaleWindow(f)
+    -- Where it was left, now that its size is set; else the middle, as above.
+    ns.TrackWindow(f, "overview")
+    ns.PlaceWindow(f)
 end
 
 -- Opens or closes the overview; `open` only ever opens it (menus, settings page).

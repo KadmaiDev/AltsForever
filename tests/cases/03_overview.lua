@@ -390,3 +390,165 @@ test("hovering a column title says it can be clicked", function()
     assert(text:find("Gold", 1, true), text)
     assert(text:find("Click to sort by this column, and again to reverse it.", 1, true), text)
 end)
+
+---------------------------------------------------------------------------
+-- Where the windows are left
+
+-- A window's anchor as "POINT relative RELPOINT x y" (the overview and the screen by name).
+function placed(f)
+    local p, rel, relPoint, x, y = unpack(f.point)
+    local name = rel ~= nil and rel == AltsForeverFrame and "overview" or rel == UIParent and "screen" or tostring(rel)
+    return ("%s %s %s %s %s"):format(p, name, tostring(relPoint), tostring(x), tostring(y))
+end
+
+-- Drops a window with its edges at left, right, top, bottom (as a drag ending there).
+function drop(f, left, right, top, bottom)
+    f.rect = { left, right, top, bottom }
+    f.scripts.OnDragStop(f)
+end
+
+test("the overview opens where it was left, at any window size", function()
+    wow.load(FILES)
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("")
+    local f = AltsForeverFrame
+    eq(placed(f), "CENTER nil nil nil nil", "the middle until it's moved")
+    eq(AltsForeverDB.windows, nil)
+    drop(f, 100, 1100, 900, 700)
+    eq(AltsForeverDB.windows.overview.x, 100); eq(AltsForeverDB.windows.overview.y, 900)
+    local saved = AltsForeverDB
+    wow.load(FILES)
+    wow.login(saved)
+    SlashCmdList.ALTSFOREVER("")
+    eq(placed(AltsForeverFrame), "TOPLEFT screen BOTTOMLEFT 100 900")
+    -- Twice the window size: the same spot on the screen, in the window's own units.
+    saved = AltsForeverDB
+    saved.scale = 2
+    wow.load(FILES)
+    wow.login(saved)
+    SlashCmdList.ALTSFOREVER("")
+    eq(placed(AltsForeverFrame), "TOPLEFT screen BOTTOMLEFT 50 450")
+    drop(AltsForeverFrame, 60, 560, 400, 300)
+    eq(AltsForeverDB.windows.overview.x, 120, "saved in the screen's units")
+end)
+
+test("a window dropped against the overview docks there; dropped elsewhere it stays", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("")
+    local ov = AltsForeverFrame
+    ov.rect = { 100, 1100, 900, 700 }
+    SlashCmdList.ALTSFOREVER("lockouts")
+    local lock = AltsForeverLockoutsFrame
+    eq(lock.point[2], ov, "beside the overview by default")
+    eq(AltsForeverDB.windows, nil, "nothing saved until it's dragged")
+
+    -- Just under the overview, its left edge a little off: below, lined up.
+    drop(lock, 108, 408, 690, 500)
+    eq(placed(lock), "TOPLEFT overview BOTTOMLEFT 0 -4")
+    eq(AltsForeverDB.windows.lockouts.dock, "below"); eq(AltsForeverDB.windows.lockouts.off, 0)
+    -- Further along the bottom edge: kept where it was dropped.
+    drop(lock, 400, 700, 700, 510)
+    eq(placed(lock), "TOPLEFT overview BOTTOMLEFT 300 -4")
+    -- Its right edge near the overview's: lined up on the right.
+    drop(lock, 795, 1095, 700, 510)
+    eq(placed(lock), "TOPLEFT overview BOTTOMLEFT 700 -4")
+    -- Above, right and left of it.
+    drop(lock, 100, 400, 1100, 910)
+    eq(placed(lock), "BOTTOMLEFT overview TOPLEFT 0 4")
+    drop(lock, 1110, 1410, 895, 705)
+    eq(placed(lock), "TOPLEFT overview TOPRIGHT 4 0")
+    eq(AltsForeverDB.windows.lockouts.dock, "right")
+    drop(lock, 1100, 1400, 800, 610)
+    eq(placed(lock), "TOPLEFT overview TOPRIGHT 4 -100")
+    drop(lock, -210, 90, 800, 610)
+    eq(placed(lock), "TOPRIGHT overview TOPLEFT -4 -100")
+    eq(AltsForeverDB.windows.lockouts.dock, "left")
+
+    -- Closed and opened again: against the same edge.
+    SlashCmdList.ALTSFOREVER("lockouts")
+    lock.point = nil
+    SlashCmdList.ALTSFOREVER("lockouts")
+    eq(placed(lock), "TOPRIGHT overview TOPLEFT -4 -100")
+
+    -- Well away from the overview: free, and it opens there again.
+    drop(lock, 1300, 1600, 400, 210)
+    eq(AltsForeverDB.windows.lockouts.dock, nil)
+    eq(AltsForeverDB.windows.lockouts.x, 1300); eq(AltsForeverDB.windows.lockouts.y, 400)
+    SlashCmdList.ALTSFOREVER("lockouts")
+    lock.point = nil
+    SlashCmdList.ALTSFOREVER("lockouts")
+    eq(placed(lock), "TOPLEFT screen BOTTOMLEFT 1300 400")
+    -- Near the overview's corner but not against an edge it shares: still free.
+    drop(lock, 1110, 1410, 690, 500)
+    eq(AltsForeverDB.windows.lockouts.dock, nil)
+
+    -- The overview itself never docks; with it closed a docked window opens as by default.
+    drop(lock, 108, 408, 690, 500)
+    eq(AltsForeverDB.windows.lockouts.dock, "below")
+    SlashCmdList.ALTSFOREVER("lockouts")
+    ns.ToggleOverview()
+    SlashCmdList.ALTSFOREVER("lockouts")
+    eq(placed(lock), "CENTER nil nil nil nil")
+    eq(AltsForeverDB.windows.lockouts.dock, "below", "still docked next time")
+end)
+
+test("the bags window and the search go beside an open overview, or where they were left", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    ns.ShowBags(ns.charKey, "bags")
+    local bags = AltsForeverBagsFrame
+    eq(placed(bags), "CENTER nil nil nil nil", "no overview: where it always opened")
+    ns.ShowBags(ns.charKey, "bags")
+    SlashCmdList.ALTSFOREVER("")
+    AltsForeverFrame.rect = { 100, 1100, 900, 700 }
+    ns.ShowBags(ns.charKey, "bags")
+    eq(bags.point[2], AltsForeverFrame, "beside the overview")
+    drop(bags, 1300, 1700, 500, 100)
+    ns.ShowBags(ns.charKey, "bags")
+    bags.point = nil
+    ns.ShowBags(ns.charKey, "bags")
+    eq(placed(bags), "TOPLEFT screen BOTTOMLEFT 1300 500")
+    ns.ShowBags(ns.charKey, "bags")
+    -- The search: beside the overview, and beside the bags window when that's open.
+    ns.ToggleSearch()
+    local search = AltsForeverSearchFrame
+    eq(search.point[2], AltsForeverFrame)
+    ns.ToggleSearch()
+    ns.ShowBags(ns.charKey, "bags")
+    ns.ToggleSearch()
+    eq(search.point[2], bags, "the bags window comes first")
+    ns.ToggleSearch()
+    ns.ShowBags(ns.charKey, "bags")
+    ns.ToggleOverview()
+    ns.ToggleSearch()
+    eq(placed(search), "CENTER screen CENTER 0 120", "neither open: where it always opened")
+end)
+
+test("window positions can be reset, and a damaged one is ignored", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("")
+    local ov = AltsForeverFrame
+    drop(ov, 100, 1100, 900, 700)
+    SlashCmdList.ALTSFOREVER("lockouts")
+    local lock = AltsForeverLockoutsFrame
+    drop(lock, 1300, 1600, 400, 210)
+    SlashCmdList.ALTSFOREVER("resetwindows")
+    eq(AltsForeverDB.windows, nil)
+    eq(placed(ov), "CENTER nil nil nil nil")
+    eq(lock.point[2], ov, "an open window goes back beside the overview")
+    assert(table.concat(wow.printed, " "):find("back where they open by default", 1, true))
+    -- The cog menu has it too.
+    drop(ov, 100, 1100, 900, 700)
+    ns.ShowOptionsMenu(ov.cog, true)
+    wow.menuItem("Reset window positions").fn()
+    eq(AltsForeverDB.windows, nil)
+    -- Damaged saves.
+    for _, bad in ipairs({ "x", { overview = 5 }, { overview = { x = "a", y = 3 } }, { overview = { dock = "below", off = 0 } } }) do
+        wow.load(FILES)
+        wow.login({ v = 2, chars = {}, windows = bad })
+        SlashCmdList.ALTSFOREVER("")
+        eq(placed(AltsForeverFrame), "CENTER nil nil nil nil")
+    end
+end)

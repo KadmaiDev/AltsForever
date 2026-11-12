@@ -1048,7 +1048,7 @@ local function CreateWindow()
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    ns.TrackWindow(f, "professions", true, ns.DockToOverview)
     f:SetClampedToScreen(true)
     if not f.TitleText then
         f.TitleText = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -1123,7 +1123,7 @@ function ns.ShowRecipes(key, prof, keep)
     nameTries = 0
     Fill()
     if not frame:IsShown() then
-        ns.DockToOverview(frame)
+        ns.PlaceWindow(frame)
         frame:Show()
     end
 end

@@ -564,6 +564,10 @@ function ns.ShowOptionsMenu(owner, fromOverview)
         -- the Options page (the owner's call, 2026-10-16: the menu had grown to 15 entries).
         -- Without a page (its registration failed), the menu has them all instead.
         root:CreateCheckbox(L["Show other rulesets and factions"], RulesetsSelected, ToggleRulesets)
+        -- From the overview's cog only: it's about the windows, and the other menus stay short.
+        if fromOverview then
+            root:CreateButton(L["Reset window positions"], function() ns.ResetWindows() end)
+        end
         if ns.HasSettings() then
             -- Wrapped: a menu button's return value is read as a MenuResponse, and
             -- OpenSettings' true kept the menu open.

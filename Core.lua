@@ -160,6 +160,7 @@ local DB_FIELDS = {
     account = "string", tooltipsOff = "boolean", countsOff = "boolean", craftTipsOff = "boolean",
     cratesOff = "boolean", goldTipOff = "boolean", barsOff = "boolean", recipeCategories = "table", profArt = "table",
     inspectAnvilsOff = "boolean", overviewSort = "string", overviewSortRev = "boolean",
+    windows = "table",
 }
 
 -- Keeps only entries whose key and value are of these types (value nil = any).
@@ -673,6 +674,11 @@ function commands.inspect()
     Print(ns.InspectAnvilsOn() and L["Craftable upgrades in the inspect window on."] or L["Craftable upgrades in the inspect window off."])
 end
 
+function commands.resetwindows()
+    ns.ResetWindows()
+    Print(L["Alts Forever's windows are back where they open by default."])
+end
+
 function commands.anvils()
     ns.SetAnvils(not ns.AnvilsOn())
     Print(ns.AnvilsOn() and L["Craftable upgrades on the character sheet on."] or L["Craftable upgrades on the character sheet off."])
@@ -818,6 +824,7 @@ function commands.help()
     Print(L["/af anvils shows or hides the anvils on your character sheet that mark upgrades you or your alts can craft."])
     Print(L["/af inspect shows or hides the anvils in the inspect window that mark upgrades you or your alts can craft for that player."])
     Print(L["/af scale 150 makes Alts Forever's windows one and a half times their size (any size from 50 to 300), on top of the game's UI scale."])
+    Print(L["/af resetwindows puts Alts Forever's windows back where they open by default."])
     if ns.HasEllesmereScale() then Print(L["/af scale eui makes them follow EllesmereUI's Window Scale again (the default)."]) end
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
     Print(L["/af lockouts opens your characters' raid lockouts and the instances each game account has entered this hour."])

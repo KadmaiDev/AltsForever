@@ -227,7 +227,7 @@ local function CreatePanel()
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    ns.TrackWindow(f, "reputation", true, ns.DockToOverview)
     f:SetClampedToScreen(true)
     f:EnableMouseWheel(true)
     f:SetScript("OnMouseWheel", function(_, delta)
@@ -275,7 +275,7 @@ function ns.ToggleReputation()
     if panel:IsShown() then return panel:Hide() end
     offset = 0
     Fill()
-    ns.DockToOverview(panel)
+    ns.PlaceWindow(panel)
     panel:Show()
 end
 

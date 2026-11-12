@@ -1046,7 +1046,7 @@ local function CreateWindow()
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    ns.TrackWindow(f, "sync", true)
     f:SetClampedToScreen(true)
     f.title = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     if not f.TitleText then f.title:SetPoint("TOP", 0, -6) end
@@ -1154,6 +1154,7 @@ end
 function ns.ToggleSync(open)
     if not frame then CreateWindow() end
     if frame:IsShown() and not open then return frame:Hide() end
+    if not frame:IsShown() then ns.PlaceWindow(frame) end
     frame:Show()
     frame:Raise()
 end

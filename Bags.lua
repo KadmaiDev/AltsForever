@@ -525,7 +525,7 @@ local function CreateWindow()
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    ns.TrackWindow(f, "bags", true, ns.DockIfOverview)
     f:SetClampedToScreen(true)
     local title = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     if not f.TitleText then title:SetPoint("TOP", 0, -6) end
@@ -727,6 +727,8 @@ function ns.ShowBags(key, which, highlight)
     shownKey, view, lit = key, which, highlight
     Fill()
     if highlight then ScrollToLit() end
+    -- Where it was left, else beside the overview if that's open (once it's sized).
+    if not frame:IsShown() then ns.PlaceWindow(frame) end
     frame:Show()
 end
 

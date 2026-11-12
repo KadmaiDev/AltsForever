@@ -281,7 +281,7 @@ local function CreateWindow()
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    ns.TrackWindow(f, "export", true)
     f:SetClampedToScreen(true)
     f.title = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     if not f.TitleText then f.title:SetPoint("TOP", 0, -6) end
@@ -356,6 +356,7 @@ end
 function ns.ToggleExport()
     if not frame then CreateWindow() end
     if frame:IsShown() then return frame:Hide() end
+    ns.PlaceWindow(frame)
     frame:Show()
 end
 
