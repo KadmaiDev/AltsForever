@@ -84,7 +84,7 @@ test("A on an overview row opens that character's menu: Gear, Bags, Bank, Profes
     row:OnSmartNavClick()
     local texts = {}
     for _, item in ipairs(wow.menu.items) do texts[#texts + 1] = item.text end
-    eq(table.concat(texts, " | "), "[DRUID]Tarn Moon | Gear | Bags | Bank | Professions | Upgrade role | Forget Tarn Moon...")
+    eq(table.concat(texts, " | "), "[DRUID]Tarn Moon | Gear | Bags | Bank | Professions | Upgrade role | Pin to top | Forget Tarn Moon...")
     wow.menuItem("Gear").fn()
     eq(AltsForeverGearFrame:IsShown(), true)
 end)

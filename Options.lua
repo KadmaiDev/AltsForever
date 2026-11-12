@@ -171,6 +171,7 @@ function ns.ForgetCharacter(key)
     ns.db.forgotten = ns.db.forgotten or {}
     ns.db.forgotten[key] = time()
     if ns.db.syncWith then ns.db.syncWith[key] = nil end
+    if ns.db.pinned then ns.SetPinned(key, false) end
     ns.PruneRecipeInfo()
     ns.InvalidateCache()
     if ns.LockoutsChanged then ns.LockoutsChanged() end -- an open Lockouts window may list them
@@ -604,6 +605,16 @@ function ns.ShowCharacterMenu(owner, key)
                 roles:CreateRadio(ns.RoleName(role), function() return ns.ChosenRole(c) == role end,
                     function() ns.SetRole(key, role) end)
             end
+        end
+        -- Pinned characters head the overview in the player's own order (Overview.lua).
+        if ns.IsPinned(key) then
+            root:CreateButton(L["Unpin"], function() ns.SetPinned(key, false) end)
+            local up = root:CreateButton(L["Move up"], function() ns.MovePin(key, -1) end)
+            if not ns.CanMovePin(key, -1) then up:SetEnabled(false) end
+            local down = root:CreateButton(L["Move down"], function() ns.MovePin(key, 1) end)
+            if not ns.CanMovePin(key, 1) then down:SetEnabled(false) end
+        else
+            root:CreateButton(L["Pin to top"], function() ns.SetPinned(key, true) end)
         end
         local forget = root:CreateButton(L["Forget %s..."]:format(c.name or key), function()
             ForgetDialog()

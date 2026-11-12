@@ -40,6 +40,8 @@ local COLUMNS = {
     { title = L["Last seen"], width = 80, right = true, sort = "seen" },
 }
 local LIGHT = "|cffc0c0c0"
+-- After a pinned character's name: the game's gold star.
+local PIN = " |TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:0|t"
 
 ---------------------------------------------------------------------------
 -- Text helpers (no UI, so they can be tested)
@@ -190,6 +192,91 @@ local parts = {}
 local values = {}
 local function Group(c) return ns.GroupKey(c, parts[1], parts[2]) end
 
+-- Pinned characters (a player's request, 2026-11-12): db.pinned lists full names in the
+-- player's own order. They head their group in that order whatever the overview is sorted
+-- by (the character you're on still comes first in the default order); sorting orders
+-- only the rest. Names of characters no longer known are skipped, and dropped on the next
+-- change. `pinRank` is each pinned character's place, read again for every ordering.
+local pinRank = {}
+
+local function ReadPins()
+    for key in pairs(pinRank) do pinRank[key] = nil end
+    local list, chars = ns.db.pinned, ns.db.chars
+    if type(list) ~= "table" then return end
+    local n = 0
+    for _, key in ipairs(list) do
+        if type(key) == "string" and chars[key] and not pinRank[key] then
+            n = n + 1
+            pinRank[key] = n
+        end
+    end
+end
+
+-- The saved list, tidied in place: known characters only, each once.
+local function Pins()
+    ReadPins()
+    local list = type(ns.db.pinned) == "table" and ns.db.pinned or {}
+    local n = 0
+    for i = 1, #list do
+        local key = list[i]
+        if pinRank[key] == n + 1 then
+            n = n + 1
+            list[n] = key
+        end
+    end
+    for i = #list, n + 1, -1 do list[i] = nil end
+    return list
+end
+
+function ns.IsPinned(key)
+    ReadPins()
+    return pinRank[key] ~= nil
+end
+
+function ns.SetPinned(key, on)
+    local list = Pins()
+    for i, k in ipairs(list) do
+        if k == key then
+            table.remove(list, i)
+            break
+        end
+    end
+    if on and ns.db.chars[key] then list[#list + 1] = key end
+    ns.db.pinned = #list > 0 and list or nil
+    ns.RefreshOverview()
+end
+
+-- The pinned character a move up (-1) or down (1) would swap places with: the next one
+-- that way in the same group (others' pins lie between them in the list); nil at the end.
+local function Neighbour(list, key, dir)
+    local chars = ns.db.chars
+    parts[1], parts[2] = ns.GroupParts()
+    local mine = Group(chars[key])
+    local at
+    for i, k in ipairs(list) do
+        if k == key then at = i end
+    end
+    if not at then return nil end
+    local i = at + dir
+    while list[i] do
+        if Group(chars[list[i]]) == mine then return at, i end
+        i = i + dir
+    end
+    return nil
+end
+
+function ns.CanMovePin(key, dir)
+    return Neighbour(Pins(), key, dir) ~= nil
+end
+
+function ns.MovePin(key, dir)
+    local list = Pins()
+    local at, other = Neighbour(list, key, dir)
+    if not at then return end
+    list[at], list[other] = list[other], list[at]
+    ns.RefreshOverview()
+end
+
 -- The comparison reads these, set by ns.OverviewOrder for each sort: nothing is created
 -- per call.
 local sChars, sSplit, sMine, sBy, sAsc
@@ -208,6 +295,11 @@ local function Before(a, b)
             if ra ~= rb then return ra < rb end
             return ga < gb
         end
+    end
+    local pa, pb = pinRank[a], pinRank[b]
+    if pa or pb then
+        if pa and pb then return pa < pb end
+        return pa ~= nil
     end
     if sBy then
         local va, vb = values[a], values[b]
@@ -239,6 +331,7 @@ function ns.OverviewOrder()
     parts[1], parts[2] = ns.GroupParts()
     local split = parts[1] or parts[2]
     ns.overviewSplit = split
+    ReadPins()
     sChars, sSplit, sMine, sBy = chars, split, Group(ns.char), by
     sAsc = by and (by.up == true) ~= rev
     table.sort(order, Before)
@@ -565,7 +658,7 @@ function Refresh()
         end
         local cells = row.cells
         row.key = key
-        cells[1]:SetText(ns.ColoredName(key, c))
+        cells[1]:SetText(pinRank[key] and (ns.ColoredName(key, c) .. PIN) or ns.ColoredName(key, c))
         local level, pct = ns.LevelParts(c)
         cells[2]:SetText(level)
         row.pct:SetText(pct)

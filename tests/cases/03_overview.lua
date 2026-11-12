@@ -277,7 +277,8 @@ end)
 -- The names down the overview, first to last.
 function overviewNames()
     local names = {}
-    for i, row in ipairs(overviewRows()) do names[i] = cell(row, 1):match("%](.+)$") end
+    -- Without a pinned character's star.
+    for i, row in ipairs(overviewRows()) do names[i] = cell(row, 1):match("%](.+)$"):gsub(" |T.-|t$", "") end
     return table.concat(names, ", ")
 end
 
@@ -551,4 +552,91 @@ test("window positions can be reset, and a damaged one is ignored", function()
         SlashCmdList.ALTSFOREVER("")
         eq(placed(AltsForeverFrame), "CENTER nil nil nil nil")
     end
+end)
+
+---------------------------------------------------------------------------
+-- Pinned characters
+
+-- Opens a character's menu from their overview row and returns the entry with this text.
+function rowMenu(name, text)
+    for _, row in ipairs(overviewRows()) do
+        if row.key == name then row.scripts.OnClick(row, "RightButton") end
+    end
+    return wow.menuItem(text)
+end
+
+test("pinned characters head the overview in your order, whatever it's sorted by", function()
+    local click, ns = sortStart()
+    eq(overviewNames(), "Aldric, Far, High, Low")
+    eq(rowMenu("Low", "Unpin"), nil)
+    rowMenu("Low", "Pin to top").fn()
+    eq(overviewNames(), "Aldric, Low, Far, High", "under the character you're on")
+    eq(AltsForeverDB.pinned[1], "Low")
+    local star = "|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:0|t"
+    assert(cell(overviewRows()[2], 1):find(star, 1, true), "marked with a star")
+    assert(not cell(overviewRows()[3], 1):find(star, 1, true))
+    rowMenu("High", "Pin to top").fn()
+    eq(overviewNames(), "Aldric, Low, High, Far", "in the order they were pinned")
+    eq(rowMenu("High", "Pin to top"), nil, "already pinned")
+
+    -- Moving a pinned character among the pinned ones.
+    eq(rowMenu("High", "Move down").enabled, false, "already the last")
+    eq(rowMenu("Low", "Move up").enabled, false, "already the first")
+    rowMenu("High", "Move up").fn()
+    eq(overviewNames(), "Aldric, High, Low, Far")
+    rowMenu("High", "Move down").fn()
+    eq(overviewNames(), "Aldric, Low, High, Far")
+
+    -- A chosen order sorts only the rest; you're sorted in with them.
+    click("gold")
+    eq(overviewNames(), "Low, High, Aldric, Far", "Low and High stay first, in pin order")
+    click("gold")
+    eq(overviewNames(), "Low, High, Far, Aldric")
+    eq(table.concat(ns.OverviewOrder(), ", "), "Low, High, Far, Aldric", "the other lists follow")
+    click("level")
+
+    -- Unpinning; the last one leaves nothing saved.
+    rowMenu("Low", "Unpin").fn()
+    eq(overviewNames(), "Aldric, High, Far, Low")
+    rowMenu("High", "Unpin").fn()
+    eq(overviewNames(), "Aldric, Far, High, Low")
+    eq(AltsForeverDB.pinned, nil)
+end)
+
+test("pins are kept between sessions; forgetting a character unpins them; /af pin", function()
+    local _, ns = sortStart()
+    SlashCmdList.ALTSFOREVER("pin Low")
+    SlashCmdList.ALTSFOREVER("pin Far")
+    assert(table.concat(wow.printed, " "):find("Low is pinned to the top of the overview.", 1, true))
+    eq(overviewNames(), "Aldric, Low, Far, High")
+    local saved = AltsForeverDB
+    _, ns = sortStart(saved)
+    eq(overviewNames(), "Aldric, Low, Far, High")
+    ns.ForgetCharacter("Low")
+    eq(#AltsForeverDB.pinned, 1); eq(AltsForeverDB.pinned[1], "Far")
+    SlashCmdList.ALTSFOREVER("pin Far")
+    assert(table.concat(wow.printed, " "):find("Far is no longer pinned.", 1, true))
+    eq(AltsForeverDB.pinned, nil)
+    SlashCmdList.ALTSFOREVER("pin Nobody")
+    assert(table.concat(wow.printed, " "):find("/af pin and a character's name", 1, true))
+    -- You can be pinned too: it shows once another order sorts you in.
+    SlashCmdList.ALTSFOREVER("pin Aldric")
+    eq(overviewNames(), "Aldric, Far, High")
+    local b = AltsForeverFrame.sorts.name
+    b.scripts.OnClick(b); b.scripts.OnClick(b)
+    eq(overviewNames(), "Aldric, High, Far", "pinned first, the rest Z to A")
+end)
+
+test("a damaged pin list is ignored: unknown names, repeats and junk", function()
+    local saved = overviewAlts()
+    saved.pinned = { "Gone", 7, "Low", "Low", false, "Far" }
+    local _, ns = sortStart(saved)
+    eq(overviewNames(), "Aldric, Low, Far, High")
+    ns.SetPinned("High", true)
+    eq(table.concat(AltsForeverDB.pinned, ", "), "Low, Far, High", "tidied on the next change")
+    saved = overviewAlts()
+    saved.pinned = "Low"
+    sortStart(saved)
+    eq(overviewNames(), "Aldric, Far, High, Low")
+    eq(AltsForeverDB.pinned, nil)
 end)

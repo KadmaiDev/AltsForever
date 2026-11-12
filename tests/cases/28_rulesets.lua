@@ -572,3 +572,23 @@ test("a chosen order sorts inside each group; the groups stay where they were", 
     eq(overviewNames(), "Tarn Moon, Aldric, Grim Tusk, Old Timer", "Tarn has more gold than you")
     eq(#overviewHeads(), heads)
 end)
+
+test("pinned characters head their own group, and move only among that group's pins", function()
+    local ns = rulesetStart()
+    SlashCmdList.ALTSFOREVER("")
+    eq(overviewNames(), "Aldric, Tarn Moon, Grim Tusk, Old Timer")
+    -- Pinned in this order: Grim (PvP), Tarn (Normal), Aldric (Normal).
+    ns.SetPinned("Grim Tusk", true)
+    ns.SetPinned("Tarn Moon", true)
+    ns.SetPinned("Aldric", true)
+    eq(overviewNames(), "Aldric, Tarn Moon, Grim Tusk, Old Timer", "each in its own group")
+    local b = AltsForeverFrame.sorts.level
+    b.scripts.OnClick(b)
+    eq(overviewNames(), "Tarn Moon, Aldric, Grim Tusk, Old Timer", "lowest first, but pins in pin order")
+    eq(ns.CanMovePin("Grim Tusk", -1), false, "the only pin in its group")
+    eq(ns.CanMovePin("Grim Tusk", 1), false)
+    eq(ns.CanMovePin("Aldric", -1), true)
+    ns.MovePin("Aldric", -1)
+    eq(overviewNames(), "Aldric, Tarn Moon, Grim Tusk, Old Timer")
+    eq(table.concat(AltsForeverDB.pinned, ", "), "Grim Tusk, Aldric, Tarn Moon")
+end)

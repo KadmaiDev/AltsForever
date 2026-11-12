@@ -160,7 +160,7 @@ local DB_FIELDS = {
     account = "string", tooltipsOff = "boolean", countsOff = "boolean", craftTipsOff = "boolean",
     cratesOff = "boolean", goldTipOff = "boolean", barsOff = "boolean", recipeCategories = "table", profArt = "table",
     inspectAnvilsOff = "boolean", overviewSort = "string", overviewSortRev = "boolean",
-    windows = "table",
+    windows = "table", pinned = "table",
 }
 
 -- Keeps only entries whose key and value are of these types (value nil = any).
@@ -674,6 +674,15 @@ function commands.inspect()
     Print(ns.InspectAnvilsOn() and L["Craftable upgrades in the inspect window on."] or L["Craftable upgrades in the inspect window off."])
 end
 
+-- /af pin First Last: pins a character to the top of the overview, or unpins them.
+function commands.pin(arg)
+    local key = FindChar(arg or "")
+    if not key then return Print(L["/af pin and a character's name pins them to the top of the overview, or unpins them."]) end
+    local on = not ns.IsPinned(key)
+    ns.SetPinned(key, on)
+    Print((on and L["%s is pinned to the top of the overview."] or L["%s is no longer pinned."]):format(key))
+end
+
 function commands.resetwindows()
     ns.ResetWindows()
     Print(L["Alts Forever's windows are back where they open by default."])
@@ -824,6 +833,7 @@ function commands.help()
     Print(L["/af anvils shows or hides the anvils on your character sheet that mark upgrades you or your alts can craft."])
     Print(L["/af inspect shows or hides the anvils in the inspect window that mark upgrades you or your alts can craft for that player."])
     Print(L["/af scale 150 makes Alts Forever's windows one and a half times their size (any size from 50 to 300), on top of the game's UI scale."])
+    Print(L["/af pin and a character's name pins them to the top of the overview, or unpins them."])
     Print(L["/af resetwindows puts Alts Forever's windows back where they open by default."])
     if ns.HasEllesmereScale() then Print(L["/af scale eui makes them follow EllesmereUI's Window Scale again (the default)."]) end
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
