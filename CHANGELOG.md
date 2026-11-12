@@ -1,3 +1,7 @@
+## Alts Forever 1.5.1
+
+- **Sort the overview:** click a column title to order your characters by it, and click again to reverse it. Character, Level, Rested, Well Rested, Legacy, Gold, Mail, Zone, Played and Last seen can all be sorted, and a small arrow shows which one is in use. Your choice is kept when you reload or log back in. Level, highest first with the character you're on at the top, is still how it starts; click Level to go back to it. With ruleset or faction headings, characters are sorted inside each group. The character lists in the bags window, the search, the professions window and the export follow the same order.
+
 ## Alts Forever 1.5.0
 
 - **Craftable upgrades for other players:** inspect a player and an anvil appears beside each of their slots that you or one of your characters could craft an upgrade for, as on your own character sheet. Hover it for the best few and who makes them, click it for the full list. They're judged by the role their talents give (the hover says which), and only items that bind when equipped and that they can wear now are shown, since nothing else can be handed over. Players of the other faction are left out. Turn it off with the new **Show craftable upgrades when inspecting a player** box on the Options page, or `/af inspect`. Thanks to the player who suggested it.
