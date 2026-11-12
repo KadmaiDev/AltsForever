@@ -228,3 +228,123 @@ test("the window still opens if the client lacks Blizzard's frame template", fun
     eq(AltsForeverFrame:IsShown(), true)
     eq(AltsForeverFrame.template, "BackdropTemplate")
 end)
+
+---------------------------------------------------------------------------
+-- Ordering the overview by a column
+
+-- The names down the overview, first to last.
+function overviewNames()
+    local names = {}
+    for i, row in ipairs(overviewRows()) do names[i] = cell(row, 1):match("%](.+)$") end
+    return table.concat(names, ", ")
+end
+
+-- Opens the overview on Aldric (24, 300c, Durotar) with Far (60, 7c), High (40, 1g,
+-- Orgrimmar) and Low (12, 5s); returns a function clicking a column's title.
+function sortStart(saved)
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.money = 300
+    wow.login(saved or overviewAlts())
+    SlashCmdList.ALTSFOREVER("")
+    return function(name)
+        local b = AltsForeverFrame.sorts[name]
+        b.scripts.OnClick(b)
+    end, ns
+end
+
+test("the overview starts by level with you first, the arrow on Level, nothing saved", function()
+    sortStart()
+    eq(overviewNames(), "Aldric, Far, High, Low")
+    local f = AltsForeverFrame
+    eq(f.sortArrow.texture, "Interface\\Buttons\\Arrow-Down-Up")
+    eq(f.sortArrow.point[2], f.sorts.level.title, "beside the Level title")
+    eq(AltsForeverDB.overviewSort, nil); eq(AltsForeverDB.overviewSortRev, nil)
+    for _, name in ipairs({ "name", "level", "rested", "wellRested", "legacy", "gold", "mail", "zone", "played", "seen" }) do
+        assert(f.sorts[name], name .. " can be clicked")
+    end
+    local n = 0
+    for _ in pairs(f.sorts) do n = n + 1 end
+    eq(n, 10, "professions and lockouts can't")
+end)
+
+test("clicking a column title orders by it, you among the rest; again turns it round", function()
+    local click = sortStart()
+    click("gold")
+    eq(overviewNames(), "High, Low, Aldric, Far", "most gold first")
+    eq(AltsForeverDB.overviewSort, "gold"); eq(AltsForeverDB.overviewSortRev, nil)
+    local f = AltsForeverFrame
+    eq(f.sortArrow.texture, "Interface\\Buttons\\Arrow-Down-Up")
+    eq(f.sortArrow.point[2], f.sorts.gold.title)
+    click("gold")
+    eq(overviewNames(), "Far, Aldric, Low, High")
+    eq(AltsForeverDB.overviewSortRev, true)
+    eq(f.sortArrow.texture, "Interface\\Buttons\\Arrow-Up-Up")
+    click("name")
+    eq(overviewNames(), "Aldric, Far, High, Low", "a new column starts in its own natural order")
+    eq(AltsForeverDB.overviewSort, "name"); eq(AltsForeverDB.overviewSortRev, nil)
+    eq(f.sortArrow.texture, "Interface\\Buttons\\Arrow-Up-Up", "A first")
+    click("name")
+    eq(overviewNames(), "Low, High, Far, Aldric")
+end)
+
+test("Level puts the default back, and saves nothing; again is lowest first", function()
+    local click = sortStart()
+    click("gold")
+    click("level")
+    eq(overviewNames(), "Aldric, Far, High, Low", "you first again")
+    eq(AltsForeverDB.overviewSort, nil); eq(AltsForeverDB.overviewSortRev, nil)
+    click("level")
+    eq(overviewNames(), "Low, Aldric, High, Far")
+    eq(AltsForeverDB.overviewSort, nil); eq(AltsForeverDB.overviewSortRev, true)
+    click("level")
+    eq(overviewNames(), "Aldric, Far, High, Low")
+    eq(AltsForeverDB.overviewSortRev, nil)
+end)
+
+test("characters without a value go last either way, by level", function()
+    local click = sortStart()
+    click("zone")
+    eq(overviewNames(), "Aldric, High, Far, Low", "Durotar, Orgrimmar, then the unknown")
+    click("zone")
+    eq(overviewNames(), "High, Aldric, Far, Low")
+    click("seen")
+    eq(overviewNames(), "Aldric, High, Low, Far", "online, 3 hours, 2 days, never")
+    click("rested")
+    eq(overviewNames(), "High, Low, Aldric, Far", "150%, 8%, none; max level has none")
+end)
+
+test("the order is kept between sessions, and the other lists follow it", function()
+    local click = sortStart()
+    click("gold")
+    click("gold")
+    local saved = AltsForeverDB
+    local _, ns = sortStart(saved)
+    eq(overviewNames(), "Far, Aldric, Low, High")
+    eq(AltsForeverFrame.sortArrow.texture, "Interface\\Buttons\\Arrow-Up-Up")
+    eq(table.concat(ns.OverviewOrder(), ", "), "Far, Aldric, Low, High")
+end)
+
+test("a saved order that isn't one of ours is the default", function()
+    local saved = overviewAlts()
+    saved.overviewSort, saved.overviewSortRev = "nonsense", "yes"
+    sortStart(saved)
+    eq(overviewNames(), "Aldric, Far, High, Low")
+    eq(AltsForeverDB.overviewSortRev, nil, "a damaged value is dropped at load")
+    saved = overviewAlts()
+    saved.overviewSort = 7
+    sortStart(saved)
+    eq(overviewNames(), "Aldric, Far, High, Low")
+    eq(AltsForeverDB.overviewSort, nil)
+end)
+
+test("hovering a column title says it can be clicked", function()
+    sortStart()
+    local b = AltsForeverFrame.sorts.gold
+    b.scripts.OnEnter(b)
+    local text = {}
+    for _, l in ipairs(GameTooltip.lines) do text[#text + 1] = table.concat(l, " = ") end
+    text = table.concat(text, "\n")
+    assert(text:find("Gold", 1, true), text)
+    assert(text:find("Click to sort by this column, and again to reverse it.", 1, true), text)
+end)

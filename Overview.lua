@@ -16,27 +16,28 @@ local ATTENTION = "|cffff8000"
 local MAX_PROFESSION = 300 -- the last rank's maximum on Forever (Classic ruleset)
 local ROW_HEIGHT = 20
 local COLUMNS = {
-    { title = L["Character"], width = 180 },
-    { title = L["Level"], width = 80 },
-    { title = L["Rested"], width = 70 },
+    -- `sort`: clicking the title orders the characters by it (SORTS, below).
+    { title = L["Character"], width = 180, sort = "name" },
+    { title = L["Level"], width = 80, sort = "level" },
+    { title = L["Rested"], width = 70, sort = "rested" },
     -- Well Rested's rank beside Rested, then Legacy points spent of the total: short
     -- values under wider titles, so both are centred.
-    { title = L["Well Rested"], width = 84, center = true },
-    { title = L["Legacy"], width = 60, center = true },
-    { title = L["Gold"], width = 120, right = true },
+    { title = L["Well Rested"], width = 84, center = true, sort = "wellRested" },
+    { title = L["Legacy"], width = 60, center = true, sort = "legacy" },
+    { title = L["Gold"], width = 120, right = true, sort = "gold" },
     -- Each main profession gets a name column and a right-aligned skill column, so
     -- the skill numbers line up. The gap separates it from the right-aligned gold.
     { title = L["Professions"], width = 104, gap = 16 },
     { title = "", width = 34, right = true },
     { title = "", width = 104, gap = 16 },
     { title = "", width = 34, right = true },
-    { title = L["Mail"], width = 60, gap = 16 },
+    { title = L["Mail"], width = 60, gap = 16, sort = "mail" },
     -- The account's instances this hour, then raid and dungeon saves running (the row
     -- tooltip lists both): "2/10 <key>1".
     { title = L["Lockouts"], width = 76, center = true },
-    { title = L["Zone"], width = 140 },
-    { title = L["Played"], width = 70, right = true },
-    { title = L["Last seen"], width = 80, right = true },
+    { title = L["Zone"], width = 140, sort = "zone" },
+    { title = L["Played"], width = 70, right = true, sort = "played" },
+    { title = L["Last seen"], width = 80, right = true, sort = "seen" },
 }
 local LIGHT = "|cffc0c0c0"
 
@@ -136,43 +137,113 @@ function ns.SeenText(key, c, now)
     return t and ns.FormatAgo(now - t) or (GREY .. "?|r")
 end
 
--- Character keys in display order: you first, then by level, then by name. Once two
--- rulesets or both factions are known, your group's characters come first, then each
--- other group's, then any whose ruleset isn't known yet; ns.overviewSplit says so (the
--- overview then heads each group).
+-- What the overview can be ordered by (a column's `sort`): the value compared, nil when
+-- it isn't known (those go last either way), and `up` when the natural order is smallest
+-- first (names, zones, the mail expiring soonest); the rest start with the most.
+local SORTS = {
+    name = { up = true, value = function(key) return key end },
+    level = { value = function(_, c)
+        if not c.level then return nil end
+        local into = (c.xp and c.xpMax and c.xpMax > 0) and c.xp / c.xpMax or 0
+        return c.level + (into < 1 and into or 0)
+    end },
+    rested = { value = function(_, c, now)
+        local rested = ns.RestedNow(c, now)
+        return rested and rested / c.xpMax or nil
+    end },
+    wellRested = { value = function(_, c) return c.wellRested end },
+    legacy = { value = function(_, c) return ns.LegacyUnspent(c) end }, -- points left to spend
+    gold = { value = function(_, c) return c.money end },
+    mail = { up = true, value = function(_, c) return c.mailExpires end },
+    zone = { up = true, value = function(_, c) return c.zone end },
+    played = { value = function(_, c, now) return ns.PlayedNow(c, now) end },
+    seen = { value = function(key, c, now) return key == ns.charKey and now or c.updated or c.seen end },
+}
+
+-- The order chosen by clicking a column title: db.overviewSort (a SORTS key; nil = Level)
+-- and db.overviewSortRev (true = the other way round). Level in its natural order is the
+-- default, which also keeps you first, and saves nothing.
+function ns.OverviewSort()
+    local db = ns.db
+    local name = SORTS[db.overviewSort] and db.overviewSort or "level"
+    return name, db.overviewSortRev == true
+end
+
+-- A click on a column title: that column in its natural order, or the other way round
+-- if it's already the one.
+function ns.SortOverview(name)
+    if not SORTS[name] then return end
+    local db = ns.db
+    local current, rev = ns.OverviewSort()
+    db.overviewSort = name ~= "level" and name or nil
+    db.overviewSortRev = (name == current and not rev) or nil
+    ns.RefreshOverview(true)
+end
+
+-- Character keys in display order: you first, then by level, then by name; or, with
+-- another order chosen (ns.OverviewSort), everyone by that, you among them, ties by level
+-- and name. Once two rulesets or both factions are known, your group's characters come
+-- first, then each other group's, then any whose ruleset isn't known yet, each group in
+-- that order; ns.overviewSplit says so (the overview then heads each group).
 local order = {}
 local parts = {}
+local values = {}
 local function Group(c) return ns.GroupKey(c, parts[1], parts[2]) end
+
+-- The comparison reads these, set by ns.OverviewOrder for each sort: nothing is created
+-- per call.
+local sChars, sSplit, sMine, sBy, sAsc
+
+local function Rank(g)
+    if g == sMine then return 0 end
+    return g:sub(1, 2) == "?|" and 2 or 1
+end
+
+local function Before(a, b)
+    local ca, cb = sChars[a], sChars[b]
+    if sSplit then
+        local ga, gb = Group(ca), Group(cb)
+        if ga ~= gb then
+            local ra, rb = Rank(ga), Rank(gb)
+            if ra ~= rb then return ra < rb end
+            return ga < gb
+        end
+    end
+    if sBy then
+        local va, vb = values[a], values[b]
+        if va ~= vb then
+            if va == nil then return false end
+            if vb == nil then return true end
+            if sAsc then return va < vb end
+            return va > vb
+        end
+    end
+    local la, lb = ca.level or 0, cb.level or 0
+    if la ~= lb then return la > lb end
+    return a < b
+end
 
 function ns.OverviewOrder()
     local chars = ns.db.chars
+    local name, rev = ns.OverviewSort()
+    local by = (name ~= "level" or rev) and SORTS[name] or nil
     for i = #order, 1, -1 do order[i] = nil end
     for key in pairs(chars) do
-        if key ~= ns.charKey then order[#order + 1] = key end
+        if by or key ~= ns.charKey then order[#order + 1] = key end
+    end
+    if by then
+        local now = time()
+        for key in pairs(values) do values[key] = nil end
+        for _, key in ipairs(order) do values[key] = by.value(key, chars[key], now) end
     end
     parts[1], parts[2] = ns.GroupParts()
     local split = parts[1] or parts[2]
     ns.overviewSplit = split
-    local mine = Group(ns.char)
-    local function Rank(g)
-        if g == mine then return 0 end
-        return g:sub(1, 2) == "?|" and 2 or 1
-    end
-    table.sort(order, function(a, b)
-        local ca, cb = chars[a], chars[b]
-        if split then
-            local ga, gb = Group(ca), Group(cb)
-            if ga ~= gb then
-                local ra, rb = Rank(ga), Rank(gb)
-                if ra ~= rb then return ra < rb end
-                return ga < gb
-            end
-        end
-        local la, lb = ca.level or 0, cb.level or 0
-        if la ~= lb then return la > lb end
-        return a < b
-    end)
-    table.insert(order, 1, ns.charKey)
+    sChars, sSplit, sMine, sBy = chars, split, Group(ns.char), by
+    sAsc = by and (by.up == true) ~= rev
+    table.sort(order, Before)
+    sChars = nil
+    if not by then table.insert(order, 1, ns.charKey) end
     return order
 end
 
@@ -416,6 +487,37 @@ local function Due(now)
     end)
 end
 
+-- The column titles: a small arrow beside the one the characters are ordered by, pointing
+-- up when the smallest is first; placed when the window opens and when the order changes. It sits just past the title's text, on the side the
+-- column isn't aligned to (the far end of the cell if the text's width can't be read).
+local UP, DOWN = "Interface\\Buttons\\Arrow-Up-Up", "Interface\\Buttons\\Arrow-Down-Up"
+
+local function MarkSort()
+    local name, rev = ns.OverviewSort()
+    local b, arrow = frame.sorts[name], frame.sortArrow
+    arrow:SetTexture(((SORTS[name].up == true) ~= rev) and UP or DOWN)
+    local fs, col = b.title, b.col
+    local w = fs:GetStringWidth()
+    if issecretvalue(w) or type(w) ~= "number" then w = nil end
+    arrow:ClearAllPoints()
+    if col.right then
+        if w then arrow:SetPoint("RIGHT", fs, "RIGHT", -w - 1, -1) else arrow:SetPoint("LEFT", fs, "LEFT", 0, -1) end
+    elseif col.center then
+        if w then arrow:SetPoint("LEFT", fs, "CENTER", w / 2 + 1, -1) else arrow:SetPoint("RIGHT", fs, "RIGHT", 0, -1) end
+    else
+        if w then arrow:SetPoint("LEFT", fs, "LEFT", w + 1, -1) else arrow:SetPoint("RIGHT", fs, "RIGHT", 0, -1) end
+    end
+end
+
+local function SortClick(b) ns.SortOverview(b.sort) end
+
+local function SortTooltip(b)
+    GameTooltip:SetOwner(b, "ANCHOR_TOPLEFT")
+    GameTooltip:AddLine(b.col.title)
+    GameTooltip:AddLine(L["Click to sort by this column, and again to reverse it."], 1, 1, 1)
+    GameTooltip:Show()
+end
+
 function Refresh()
     local now = time()
     local chars = ns.db.chars
@@ -605,7 +707,28 @@ local function CreateWindow()
     header:SetHeight(ROW_HEIGHT)
     header:SetPoint("TOPLEFT", f, "TOPLEFT", 4, -32)
     header:SetPoint("RIGHT", f, "RIGHT", -4, 0)
-    for i, fs in ipairs(CreateCells(header, "GameFontNormalSmall")) do fs:SetText(COLUMNS[i].title) end
+    f.sorts = {}
+    local arrow = header:CreateTexture(nil, "OVERLAY")
+    arrow:SetSize(12, 12)
+    f.sortArrow = arrow
+    for i, fs in ipairs(CreateCells(header, "GameFontNormalSmall")) do
+        local col = COLUMNS[i]
+        fs:SetText(col.title)
+        if col.sort then
+            -- The title is a button: click to order by this column, again to turn it round.
+            local b = CreateFrame("Button", nil, header)
+            b:SetPoint("LEFT", fs, "LEFT", -4, 0)
+            b:SetSize(col.width - 2, ROW_HEIGHT)
+            local hl = b:CreateTexture(nil, "HIGHLIGHT")
+            hl:SetAllPoints()
+            hl:SetColorTexture(1, 1, 1, 0.08)
+            b.sort, b.title, b.col = col.sort, fs, col
+            b:SetScript("OnClick", SortClick)
+            b:SetScript("OnEnter", SortTooltip)
+            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            f.sorts[col.sort] = b
+        end
+    end
 
     footer = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.footer = footer
@@ -737,6 +860,7 @@ local function CreateWindow()
     f:SetScript("OnShow", function(self)
         self:Raise()
         ns.PruneSaves(time())
+        MarkSort()
         Refresh()
     end)
     f:SetScript("OnHide", function()
@@ -762,8 +886,11 @@ function ns.OverviewShown()
     return frame and frame:IsShown() or false
 end
 
-function ns.RefreshOverview()
-    if frame and frame:IsShown() then Refresh() end
+-- `sorted`: the order was changed, so the arrow beside the column titles moves too.
+function ns.RefreshOverview(sorted)
+    if not (frame and frame:IsShown()) then return end
+    if sorted then MarkSort() end
+    Refresh()
 end
 
 function ns.StartOverview()

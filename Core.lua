@@ -159,7 +159,7 @@ local DB_FIELDS = {
     bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
     account = "string", tooltipsOff = "boolean", countsOff = "boolean", craftTipsOff = "boolean",
     cratesOff = "boolean", goldTipOff = "boolean", barsOff = "boolean", recipeCategories = "table", profArt = "table",
-    inspectAnvilsOff = "boolean",
+    inspectAnvilsOff = "boolean", overviewSort = "string", overviewSortRev = "boolean",
 }
 
 -- Keeps only entries whose key and value are of these types (value nil = any).
