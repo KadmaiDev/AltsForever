@@ -283,6 +283,7 @@ function M.load(files)
         if self.scripts.OnValueChanged then self.scripts.OnValueChanged(self, v, true) end
     end
     function frameMethods:SetHeight(h) self.height = h end
+    function frameMethods:SetSize(w, h) self.width, self.height = w, h end
     function frameMethods:SetWidth(w) self.width = w end
     function frameMethods:SetToplevel(on) self.toplevel = on end
     function frameMethods:Raise() self.raised = (self.raised or 0) + 1 end
@@ -354,6 +355,14 @@ function M.load(files)
         f.template = template
         f.parent = f.parent or parent
         M.frames[#M.frames + 1] = f
+        -- The game's current window frame: a title in its own container, and the border and
+        -- title bar drawn by a child frame at level 500.
+        if template == "DefaultPanelTemplate" then
+            f.TitleContainer = newObject("Frame")
+            f.TitleContainer.TitleText = newObject("FontString")
+            f.NineSlice = newObject("Frame")
+            f.NineSlice.level = 500
+        end
         return f
     end
     M.missingTemplates = {}
@@ -628,6 +637,7 @@ function M.load(files)
             -- A submenu: entries added to an item go in its own list.
             function item:CreateRadio(t, sel, set) return add("radio", t, sel, set, self.items) end
             function item:CreateButton(t, fn) return add("button", t, fn, nil, self.items) end
+            function item:CreateCheckbox(t, sel, set) return add("checkbox", t, sel, set, self.items) end
             list = list or root.items
             list[#list + 1] = item
             return item

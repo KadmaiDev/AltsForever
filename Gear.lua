@@ -137,8 +137,7 @@ local function CreateSlot(slot, x, y, nameSide)
 end
 
 local function CreatePanel()
-    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverGearFrame", UIParent, "BasicFrameTemplateWithInset")
-    if not ok then f = CreateFrame("Frame", "AltsForeverGearFrame", UIParent, "BackdropTemplate") end
+    local f = ns.NewWindow("AltsForeverGearFrame")
     panel = f
     buttons = {}
     f:SetSize(PANEL_WIDTH, 450)

@@ -83,6 +83,56 @@ local function HookEllesmere()
     end)
 end
 
+local issecretvalue = issecretvalue or function() return false end
+
+-- A new window of ours, in the frame the game's own windows use (DefaultPanelTemplate: a
+-- border and title bar drawn from the pieces Forever has its own art for, the bronze
+-- frame), to which we add the game's close button and inset. Until 1.5.1 they used the
+-- older BasicFrameTemplateWithInset, which draws the grey frame from before Forever; it is
+-- still the fallback if this client lacks the new one, and a bare frame after that
+-- (f.plainFrame: the caller gives it a backdrop if it wants one).
+function ns.NewWindow(name)
+    local ok, f = pcall(CreateFrame, "Frame", name, UIParent, "DefaultPanelTemplate")
+    if ok and type(f.TitleContainer) == "table" then
+        f.TitleText = f.TitleContainer.TitleText
+        local closed, close = pcall(CreateFrame, "Button", nil, f, "UIPanelCloseButtonDefaultAnchors")
+        if not closed then
+            close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+            close:SetPoint("TOPRIGHT", 0, 3)
+        end
+        f.CloseButton = close
+        local inset, box = pcall(CreateFrame, "Frame", nil, f, "InsetFrameTemplate")
+        if inset then
+            box:SetPoint("TOPLEFT", 4, -24)
+            box:SetPoint("BOTTOMRIGHT", -6, 4)
+            f.Inset = box
+        end
+        f.newFrame = true
+        ns.OverTitle(f, close)
+        return f
+    end
+    if ok then f:Hide() end
+    ok, f = pcall(CreateFrame, "Frame", name, UIParent, "BasicFrameTemplateWithInset")
+    if not ok then
+        f = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
+        f.plainFrame = true
+    end
+    return f
+end
+
+-- Buttons of ours on a window's title bar: the new frame draws its border and title bar
+-- from a child frame at level 500, so they go above it, as the game's close button (510).
+function ns.OverTitle(f, ...)
+    if not f.newFrame then return end
+    local level = type(f.NineSlice) == "table" and f.NineSlice:GetFrameLevel() or f:GetFrameLevel()
+    if issecretvalue(level) or type(level) ~= "number" then return end
+    level = math.max(level + 10, 510)
+    for i = 1, select("#", ...) do
+        local b = select(i, ...)
+        if b then b:SetFrameLevel(level) end
+    end
+end
+
 -- Each window, once, when it's created. Checked again each time it opens: EllesmereUI's
 -- Window Scale may have changed while it was closed.
 function ns.ScaleWindow(f)
@@ -121,6 +171,7 @@ function ns.ForgetCharacter(key)
     ns.db.forgotten = ns.db.forgotten or {}
     ns.db.forgotten[key] = time()
     if ns.db.syncWith then ns.db.syncWith[key] = nil end
+    if ns.db.pinned then ns.SetPinned(key, false) end
     ns.PruneRecipeInfo()
     ns.InvalidateCache()
     if ns.LockoutsChanged then ns.LockoutsChanged() end -- an open Lockouts window may list them
@@ -514,6 +565,11 @@ function ns.ShowOptionsMenu(owner, fromOverview)
         -- the Options page (the owner's call, 2026-10-16: the menu had grown to 15 entries).
         -- Without a page (its registration failed), the menu has them all instead.
         root:CreateCheckbox(L["Show other rulesets and factions"], RulesetsSelected, ToggleRulesets)
+        -- From the overview's cog only: it's about the windows, and the other menus stay short.
+        if fromOverview then
+            ns.FillColumnsMenu(root:CreateButton(L["Columns"]))
+            root:CreateButton(L["Reset window positions"], function() ns.ResetWindows() end)
+        end
         if ns.HasSettings() then
             -- Wrapped: a menu button's return value is read as a MenuResponse, and
             -- OpenSettings' true kept the menu open.
@@ -550,6 +606,16 @@ function ns.ShowCharacterMenu(owner, key)
                 roles:CreateRadio(ns.RoleName(role), function() return ns.ChosenRole(c) == role end,
                     function() ns.SetRole(key, role) end)
             end
+        end
+        -- Pinned characters head the overview in the player's own order (Overview.lua).
+        if ns.IsPinned(key) then
+            root:CreateButton(L["Unpin"], function() ns.SetPinned(key, false) end)
+            local up = root:CreateButton(L["Move up"], function() ns.MovePin(key, -1) end)
+            if not ns.CanMovePin(key, -1) then up:SetEnabled(false) end
+            local down = root:CreateButton(L["Move down"], function() ns.MovePin(key, 1) end)
+            if not ns.CanMovePin(key, 1) then down:SetEnabled(false) end
+        else
+            root:CreateButton(L["Pin to top"], function() ns.SetPinned(key, true) end)
         end
         local forget = root:CreateButton(L["Forget %s..."]:format(c.name or key), function()
             ForgetDialog()

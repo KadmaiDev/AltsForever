@@ -513,8 +513,7 @@ local function ViewButton(name, text, x)
 end
 
 local function CreateWindow()
-    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverBagsFrame", UIParent, "BasicFrameTemplateWithInset")
-    if not ok then f = CreateFrame("Frame", "AltsForeverBagsFrame", UIParent, "BackdropTemplate") end
+    local f = ns.NewWindow("AltsForeverBagsFrame")
     frame = f
     f.slots, f.headers = slots, headers
     f:SetWidth(WidthFor(cols))
@@ -526,7 +525,7 @@ local function CreateWindow()
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    ns.TrackWindow(f, "bags", true, ns.DockIfOverview)
     f:SetClampedToScreen(true)
     local title = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     if not f.TitleText then title:SetPoint("TOP", 0, -6) end
@@ -648,6 +647,7 @@ local function CreateWindow()
     local search = CreateFrame("Button", nil, f)
     search:SetSize(16, 16)
     search:SetPoint("TOPRIGHT", f, "TOPRIGHT", -28, -4)
+    ns.OverTitle(f, search)
     search:SetNormalTexture("Interface\\Icons\\INV_Misc_Spyglass_02")
     search:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
     search:SetScript("OnClick", function() ns.ToggleSearch() end)
@@ -727,6 +727,8 @@ function ns.ShowBags(key, which, highlight)
     shownKey, view, lit = key, which, highlight
     Fill()
     if highlight then ScrollToLit() end
+    -- Where it was left, else beside the overview if that's open (once it's sized).
+    if not frame:IsShown() then ns.PlaceWindow(frame) end
     frame:Show()
 end
 

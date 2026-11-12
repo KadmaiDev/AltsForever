@@ -1,3 +1,12 @@
+## Alts Forever 1.6.0
+
+- **WoW Forever's window frame:** Alts Forever's windows now use the same bronze frame as the game's own windows, in place of the older grey one. With EllesmereUI or ElvUI they keep those looks, as before.
+- **Windows stay where you put them:** the overview, bags, search, professions, reputation, lockouts, export and sync windows open where you last left them, on every character. Drop one against an edge of the overview and it docks there and follows the overview when you move it. The bags window and the search now open beside the overview when it's open. **Reset window positions** in the overview's cog menu, or `/af resetwindows`, puts them all back.
+- **Pin characters:** right-click a character in the overview and choose **Pin to top**. Pinned characters stay at the top of their group in the order you choose (**Move up** and **Move down** in the same menu), whatever column the overview is sorted by, and are marked with a star. `/af pin Name` does the same.
+- **Hide columns:** right-click the column titles in the overview, or open **Columns** in its cog menu, and untick the columns you don't want; the window narrows to fit. **Show all columns** at the top of that list, or `/af columns`, brings them all back.
+
+Thanks to Veltharen for these suggestions.
+
 ## Alts Forever 1.5.1
 
 - **Sort the overview:** click a column title to order your characters by it, and click again to reverse it. Character, Level, Rested, Well Rested, Legacy, Gold, Mail, Zone, Played and Last seen can all be sorted, and a small arrow shows which one is in use. Your choice is kept when you reload or log back in. Level, highest first with the character you're on at the top, is still how it starts; click Level to go back to it. With ruleset or faction headings, characters are sorted inside each group. The character lists in the bags window, the search, the professions window and the export follow the same order. Thanks to Han for the suggestion.

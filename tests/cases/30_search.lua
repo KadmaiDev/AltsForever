@@ -534,3 +534,28 @@ test("names slower than a second are still waited for, a few times, then no more
     eq(#wow.timers, 0, "stopped")
     assert(tries <= 3, tries)
 end)
+
+test("a search the player has put somewhere stays there when a result opens the bags", function()
+    local ns = searchStart()
+    SlashCmdList.ALTSFOREVER("")
+    SlashCmdList.ALTSFOREVERSEARCH("linen")
+    local search, box = AltsForeverSearchFrame, AltsForeverSearchBox
+    -- Dragged to the side of the screen.
+    search.rect = { 1500, 1900, 1000, 600 }
+    search.scripts.OnDragStop(search)
+    search.point = { "TOPLEFT", UIParent, "BOTTOMLEFT", 1500, 1000 } -- where the drag left it
+    box.scripts.OnEnterPressed(box)
+    eq(AltsForeverBagsFrame:IsShown(), true, "the bags window opens")
+    eq(search.point[2], UIParent, "the search hasn't moved")
+    eq(search.point[4], 1500)
+    -- Closed and opened again with the bags window still open: where it was left.
+    ns.ToggleSearch()
+    search.point = nil
+    ns.ToggleSearch()
+    eq(search.point[2], UIParent); eq(search.point[4], 1500)
+    -- Positions reset: beside the bags window again, as before it was moved.
+    ns.ToggleSearch()
+    SlashCmdList.ALTSFOREVER("resetwindows")
+    ns.ToggleSearch()
+    eq(search.point[2], AltsForeverBagsFrame)
+end)

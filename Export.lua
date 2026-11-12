@@ -271,8 +271,7 @@ local function PickFormat(owner)
 end
 
 local function CreateWindow()
-    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverExportFrame", UIParent, "BasicFrameTemplateWithInset")
-    if not ok then f = CreateFrame("Frame", "AltsForeverExportFrame", UIParent, "BackdropTemplate") end
+    local f = ns.NewWindow("AltsForeverExportFrame")
     frame = f
     f:SetSize(WIDTH, HEIGHT)
     f:SetPoint("CENTER")
@@ -282,7 +281,7 @@ local function CreateWindow()
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    ns.TrackWindow(f, "export", true)
     f:SetClampedToScreen(true)
     f.title = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     if not f.TitleText then f.title:SetPoint("TOP", 0, -6) end
@@ -357,6 +356,7 @@ end
 function ns.ToggleExport()
     if not frame then CreateWindow() end
     if frame:IsShown() then return frame:Hide() end
+    ns.PlaceWindow(frame)
     frame:Show()
 end
 

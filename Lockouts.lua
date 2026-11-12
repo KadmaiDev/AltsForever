@@ -685,8 +685,7 @@ local function Scroll(rows)
 end
 
 local function CreatePanel()
-    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverLockoutsFrame", UIParent, "BasicFrameTemplateWithInset")
-    if not ok then f = CreateFrame("Frame", "AltsForeverLockoutsFrame", UIParent, "BackdropTemplate") end
+    local f = ns.NewWindow("AltsForeverLockoutsFrame")
     panel = f
     f.lines = lines
     f:SetFrameStrata("HIGH")
@@ -697,7 +696,7 @@ local function CreatePanel()
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    ns.TrackWindow(f, "lockouts", true, ns.DockToOverview)
     f:SetClampedToScreen(true)
     f:EnableMouseWheel(true)
     f:SetScript("OnMouseWheel", function(_, delta) Scroll(-delta * 3) end)
@@ -725,7 +724,7 @@ function ns.ToggleLockouts()
     if panel:IsShown() then return panel:Hide() end
     offset = 0
     FillPanel()
-    ns.DockToOverview(panel)
+    ns.PlaceWindow(panel)
     panel:Show()
 end
 

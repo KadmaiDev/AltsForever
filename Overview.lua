@@ -16,30 +16,42 @@ local ATTENTION = "|cffff8000"
 local MAX_PROFESSION = 300 -- the last rank's maximum on Forever (Classic ruleset)
 local ROW_HEIGHT = 20
 local COLUMNS = {
-    -- `sort`: clicking the title orders the characters by it (SORTS, below).
+    -- `sort`: clicking the title orders the characters by it (SORTS, below). `id`: what the
+    -- column is hidden by (db.hiddenColumns; the four profession cells go together, and
+    -- the Character column, without one, always shows).
     { title = L["Character"], width = 180, sort = "name" },
-    { title = L["Level"], width = 80, sort = "level" },
-    { title = L["Rested"], width = 70, sort = "rested" },
+    { title = L["Level"], width = 80, sort = "level", id = "level" },
+    { title = L["Rested"], width = 70, sort = "rested", id = "rested" },
     -- Well Rested's rank beside Rested, then Legacy points spent of the total: short
     -- values under wider titles, so both are centred.
-    { title = L["Well Rested"], width = 84, center = true, sort = "wellRested" },
-    { title = L["Legacy"], width = 60, center = true, sort = "legacy" },
-    { title = L["Gold"], width = 120, right = true, sort = "gold" },
+    { title = L["Well Rested"], width = 84, center = true, sort = "wellRested", id = "wellrested" },
+    { title = L["Legacy"], width = 60, center = true, sort = "legacy", id = "legacy" },
+    { title = L["Gold"], width = 120, right = true, sort = "gold", id = "gold" },
     -- Each main profession gets a name column and a right-aligned skill column, so
     -- the skill numbers line up. The gap separates it from the right-aligned gold.
-    { title = L["Professions"], width = 104, gap = 16 },
-    { title = "", width = 34, right = true },
-    { title = "", width = 104, gap = 16 },
-    { title = "", width = 34, right = true },
-    { title = L["Mail"], width = 60, gap = 16, sort = "mail" },
+    { title = L["Professions"], width = 104, gap = 16, id = "professions" },
+    { title = "", width = 34, right = true, id = "professions" },
+    { title = "", width = 104, gap = 16, id = "professions" },
+    { title = "", width = 34, right = true, id = "professions" },
+    { title = L["Mail"], width = 60, gap = 16, sort = "mail", id = "mail" },
     -- The account's instances this hour, then raid and dungeon saves running (the row
     -- tooltip lists both): "2/10 <key>1".
-    { title = L["Lockouts"], width = 76, center = true },
-    { title = L["Zone"], width = 140, sort = "zone" },
-    { title = L["Played"], width = 70, right = true, sort = "played" },
-    { title = L["Last seen"], width = 80, right = true, sort = "seen" },
+    { title = L["Lockouts"], width = 76, center = true, id = "lockouts" },
+    { title = L["Zone"], width = 140, sort = "zone", id = "zone" },
+    { title = L["Played"], width = 70, right = true, sort = "played", id = "played" },
+    { title = L["Last seen"], width = 80, right = true, sort = "seen", id = "lastseen" },
 }
+-- The columns that can be hidden, in order, each once: { id, title }.
+local HIDEABLE = {}
+for _, col in ipairs(COLUMNS) do
+    if col.id and col.title ~= "" then HIDEABLE[#HIDEABLE + 1] = { col.id, col.title } end
+end
+-- Never narrower than this, however many columns are hidden: the title bar's buttons and
+-- the footer need the room.
+local MIN_WIDTH = 560
 local LIGHT = "|cffc0c0c0"
+-- After a pinned character's name: the game's gold star.
+local PIN = " |TInterface\\TargetingFrame\\UI-RaidTargetingIcon_1:0|t"
 
 ---------------------------------------------------------------------------
 -- Text helpers (no UI, so they can be tested)
@@ -190,6 +202,91 @@ local parts = {}
 local values = {}
 local function Group(c) return ns.GroupKey(c, parts[1], parts[2]) end
 
+-- Pinned characters (a player's request, 2026-11-12): db.pinned lists full names in the
+-- player's own order. They head their group in that order whatever the overview is sorted
+-- by (the character you're on still comes first in the default order); sorting orders
+-- only the rest. Names of characters no longer known are skipped, and dropped on the next
+-- change. `pinRank` is each pinned character's place, read again for every ordering.
+local pinRank = {}
+
+local function ReadPins()
+    for key in pairs(pinRank) do pinRank[key] = nil end
+    local list, chars = ns.db.pinned, ns.db.chars
+    if type(list) ~= "table" then return end
+    local n = 0
+    for _, key in ipairs(list) do
+        if type(key) == "string" and chars[key] and not pinRank[key] then
+            n = n + 1
+            pinRank[key] = n
+        end
+    end
+end
+
+-- The saved list, tidied in place: known characters only, each once.
+local function Pins()
+    ReadPins()
+    local list = type(ns.db.pinned) == "table" and ns.db.pinned or {}
+    local n = 0
+    for i = 1, #list do
+        local key = list[i]
+        if pinRank[key] == n + 1 then
+            n = n + 1
+            list[n] = key
+        end
+    end
+    for i = #list, n + 1, -1 do list[i] = nil end
+    return list
+end
+
+function ns.IsPinned(key)
+    ReadPins()
+    return pinRank[key] ~= nil
+end
+
+function ns.SetPinned(key, on)
+    local list = Pins()
+    for i, k in ipairs(list) do
+        if k == key then
+            table.remove(list, i)
+            break
+        end
+    end
+    if on and ns.db.chars[key] then list[#list + 1] = key end
+    ns.db.pinned = #list > 0 and list or nil
+    ns.RefreshOverview()
+end
+
+-- The pinned character a move up (-1) or down (1) would swap places with: the next one
+-- that way in the same group (others' pins lie between them in the list); nil at the end.
+local function Neighbour(list, key, dir)
+    local chars = ns.db.chars
+    parts[1], parts[2] = ns.GroupParts()
+    local mine = Group(chars[key])
+    local at
+    for i, k in ipairs(list) do
+        if k == key then at = i end
+    end
+    if not at then return nil end
+    local i = at + dir
+    while list[i] do
+        if Group(chars[list[i]]) == mine then return at, i end
+        i = i + dir
+    end
+    return nil
+end
+
+function ns.CanMovePin(key, dir)
+    return Neighbour(Pins(), key, dir) ~= nil
+end
+
+function ns.MovePin(key, dir)
+    local list = Pins()
+    local at, other = Neighbour(list, key, dir)
+    if not at then return end
+    list[at], list[other] = list[other], list[at]
+    ns.RefreshOverview()
+end
+
 -- The comparison reads these, set by ns.OverviewOrder for each sort: nothing is created
 -- per call.
 local sChars, sSplit, sMine, sBy, sAsc
@@ -208,6 +305,11 @@ local function Before(a, b)
             if ra ~= rb then return ra < rb end
             return ga < gb
         end
+    end
+    local pa, pb = pinRank[a], pinRank[b]
+    if pa or pb then
+        if pa and pb then return pa < pb end
+        return pa ~= nil
     end
     if sBy then
         local va, vb = values[a], values[b]
@@ -239,6 +341,7 @@ function ns.OverviewOrder()
     parts[1], parts[2] = ns.GroupParts()
     local split = parts[1] or parts[2]
     ns.overviewSplit = split
+    ReadPins()
     sChars, sSplit, sMine, sBy = chars, split, Group(ns.char), by
     sAsc = by and (by.up == true) ~= rev
     table.sort(order, Before)
@@ -358,20 +461,58 @@ local function RowTooltip(row)
     end
 end
 
-local function CreateCells(parent, font)
-    local cells, x = {}, 12
+-- Which columns show (db.hiddenColumns[id] = true hides one; a player's request,
+-- 2026-11-12) and where each starts: worked out when the window is made and when a column
+-- is hidden or shown, never per refresh. Returns the window's width.
+local colX, colShown = {}, {}
+
+local function Measure()
+    local hidden = ns.db.hiddenColumns
+    if type(hidden) ~= "table" then hidden = nil end
+    local x = 12
     for i, col in ipairs(COLUMNS) do
-        x = x + (col.gap or 0)
+        local shown = not (hidden and col.id and hidden[col.id] == true)
+        colShown[i] = shown
+        if shown then
+            x = x + (col.gap or 0)
+            colX[i] = x
+            x = x + col.width
+        end
+    end
+    return max(x + 20, MIN_WIDTH)
+end
+
+local function PlaceCells(cells, parent)
+    for i, fs in ipairs(cells) do
+        if colShown[i] then
+            fs:ClearAllPoints()
+            fs:SetPoint("LEFT", parent, "LEFT", colX[i], 0)
+            fs:Show()
+        else
+            fs:Hide()
+        end
+    end
+end
+
+local function CreateCells(parent, font)
+    local cells = {}
+    for i, col in ipairs(COLUMNS) do
         local fs = parent:CreateFontString(nil, "OVERLAY", font)
         ns.SkinText(fs)
-        fs:SetPoint("LEFT", parent, "LEFT", x, 0)
         fs:SetWidth(col.width - 8)
         fs:SetJustifyH(col.right and "RIGHT" or col.center and "CENTER" or "LEFT")
         fs:SetWordWrap(false)
         cells[i] = fs
-        x = x + col.width
     end
+    PlaceCells(cells, parent)
     return cells
+end
+
+-- A group heading's name may run on past the columns before Gold (empty in a heading), or
+-- to the window's edge when Gold is hidden.
+local function HeadWidth(width)
+    if colShown[6] then return colX[6] - colX[1] - 8 end
+    return width - colX[1] - 28
 end
 
 local function CreateRow(i)
@@ -394,6 +535,7 @@ local function CreateRow(i)
     row.pct:SetWidth(COLUMNS[2].width - 32)
     row.pct:SetJustifyH("LEFT")
     row.pct:SetWordWrap(false)
+    row.pct:SetShown(colShown[2])
     row:SetScript("OnEnter", RowTooltip)
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     -- Left: gear. Right: the character's menu (Forget...).
@@ -451,11 +593,8 @@ local function CreateHead(i)
     line:SetPoint("TOPRIGHT", head, "TOPRIGHT", -8, 0)
     head.line = line
     local texts = CreateCells(head, "GameFontNormalSmall")
-    -- The name may run on past the narrow columns before Gold (empty in a heading).
-    local width = -8
-    for c = 1, 5 do width = width + COLUMNS[c].width + (COLUMNS[c + 1].gap or 0) end
-    texts[1]:SetWidth(width)
-    head.label, head.gold = texts[1], texts[6]
+    texts[1]:SetWidth(HeadWidth(frame:GetWidth()))
+    head.texts, head.label, head.gold = texts, texts[1], texts[6]
     heads[i] = head
     return head
 end
@@ -495,6 +634,8 @@ local UP, DOWN = "Interface\\Buttons\\Arrow-Up-Up", "Interface\\Buttons\\Arrow-D
 local function MarkSort()
     local name, rev = ns.OverviewSort()
     local b, arrow = frame.sorts[name], frame.sortArrow
+    -- Ordered by a hidden column: still so, with nothing to point at.
+    arrow:SetShown(b:IsShown())
     arrow:SetTexture(((SORTS[name].up == true) ~= rev) and UP or DOWN)
     local fs, col = b.title, b.col
     local w = fs:GetStringWidth()
@@ -509,12 +650,36 @@ local function MarkSort()
     end
 end
 
-local function SortClick(b) ns.SortOverview(b.sort) end
+-- The columns to show: a tick each, and one entry to bring them all back. Filled into a
+-- menu of its own (right-click on the column titles) or the cog menu's Columns entry.
+function ns.FillColumnsMenu(menu)
+    local all = menu:CreateButton(L["Show all columns"], function() ns.ShowAllColumns() end)
+    if ns.db.hiddenColumns == nil then all:SetEnabled(false) end
+    for _, col in ipairs(HIDEABLE) do
+        local id = col[1]
+        menu:CreateCheckbox(col[2], function() return ns.ColumnShown(id) end,
+            function() ns.SetColumnShown(id, not ns.ColumnShown(id)) end)
+    end
+end
+
+local function ColumnsMenu(owner)
+    if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+    MenuUtil.CreateContextMenu(owner, function(_, root)
+        root:CreateTitle(L["Columns"])
+        ns.FillColumnsMenu(root)
+    end)
+end
+
+local function SortClick(b, button)
+    if button == "RightButton" then return ColumnsMenu(b) end
+    ns.SortOverview(b.sort)
+end
 
 local function SortTooltip(b)
     GameTooltip:SetOwner(b, "ANCHOR_TOPLEFT")
     GameTooltip:AddLine(b.col.title)
     GameTooltip:AddLine(L["Click to sort by this column, and again to reverse it."], 1, 1, 1)
+    GameTooltip:AddLine(L["Right-click to choose which columns are shown."], 1, 1, 1)
     GameTooltip:Show()
 end
 
@@ -565,7 +730,7 @@ function Refresh()
         end
         local cells = row.cells
         row.key = key
-        cells[1]:SetText(ns.ColoredName(key, c))
+        cells[1]:SetText(pinRank[key] and (ns.ColoredName(key, c) .. PIN) or ns.ColoredName(key, c))
         local level, pct = ns.LevelParts(c)
         cells[2]:SetText(level)
         row.pct:SetText(pct)
@@ -621,6 +786,23 @@ local function Edges(f)
     return { f, l, r, t, b }
 end
 
+-- Whether a window's place depends on `panel`: it is anchored to it, directly or through
+-- others of ours. Anchoring `panel` to such a window would make a circle of anchors.
+local function Follows(f, panel)
+    for _ = 1, 8 do
+        local _, rel = f:GetPoint()
+        if rel == panel then return true end
+        if type(rel) ~= "table" or rel == UIParent then return false end
+        f = rel
+    end
+    return true -- deeper than our windows ever chain: don't risk it
+end
+
+-- A window others are never placed against, though they still keep clear of it: the
+-- search, which itself moves beside the bags window whenever that opens.
+local floating = {}
+function ns.NeverDockTo(f) floating[f] = true end
+
 function ns.DockToOverview(panel)
     dockable[panel] = true
     panel:ClearAllPoints()
@@ -635,7 +817,10 @@ function ns.DockToOverview(panel)
         for other in pairs(dockable) do
             if other ~= panel and other:IsShown() then
                 local e = Edges(other)
-                if e then taken[#taken + 1], others[#others + 1] = e, e end
+                if e then
+                    taken[#taken + 1] = e
+                    if not floating[other] and not Follows(other, panel) then others[#others + 1] = e end
+                end
             end
         end
         local function Fits(x, top)
@@ -667,15 +852,188 @@ function ns.DockToOverview(panel)
     panel:SetPoint("TOPLEFT", overview, "BOTTOMLEFT", 0, -GAP)
 end
 
-local function CreateWindow()
-    -- Room for the left inset, every column, and the right border.
-    local width = 12 + 20
-    for _, col in ipairs(COLUMNS) do width = width + col.width + (col.gap or 0) end
+---------------------------------------------------------------------------
+-- Where our windows are (a player's request, 2026-11-12): db.windows[key] is where the
+-- player left each one, account-wide, and it opens there again:
+--   { x, y }      dropped freely: its top left corner from the screen's bottom left, in
+--                 the screen's units (so it holds whatever the window size setting)
+--   { dock, off } dropped against an edge of the overview ("below", "above", "right",
+--                 "left"; within SNAP): it sits against that edge, `off` along it (in the
+--                 screen's units too), and follows the overview. With the overview closed
+--                 it opens as by default.
+-- A window can be at a smaller scale than the overview (Lockouts, when it wouldn't fit),
+-- and each reports its edges in its own units, so they are compared in the screen's.
+-- Nothing saved: the window's own default (`fallback`: ns.DockToOverview for the panels
+-- opened from the overview). Worked out only when a drag ends: nothing runs while dragging.
+---------------------------------------------------------------------------
+local SNAP = 12
+local SIDES = { below = true, above = true, right = true, left = true }
+local tracked = {}
 
-    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverFrame", UIParent, "BasicFrameTemplateWithInset")
-    if not ok then
-        -- Plain fallback if this client lacks the template: a dialog backdrop and a close button.
-        f = CreateFrame("Frame", "AltsForeverFrame", UIParent, "BackdropTemplate")
+local function Saved(key)
+    local all = ns.db.windows
+    local p = type(all) == "table" and all[key]
+    return type(p) == "table" and p or nil
+end
+
+local function Store(key, p)
+    local db = ns.db
+    if p then
+        if type(db.windows) ~= "table" then db.windows = {} end
+        db.windows[key] = p
+    elseif type(db.windows) == "table" then
+        db.windows[key] = nil
+        if next(db.windows) == nil then db.windows = nil end
+    end
+end
+
+local function OwnScale(f)
+    local s = f:GetScale()
+    if issecretvalue(s) or type(s) ~= "number" or s <= 0 then return 1 end
+    return s
+end
+
+-- A window's edges in the screen's units, or nil if the game hasn't laid it out.
+local function ScreenEdges(f)
+    local e = Edges(f)
+    if not e then return nil end
+    local s = OwnScale(f)
+    e[2], e[3], e[4], e[5] = e[2] * s, e[3] * s, e[4] * s, e[5] * s
+    return e
+end
+
+-- `off` in the screen's units; anchor offsets are in the window's own.
+local function Against(f, side, off)
+    local overview = AltsForeverFrame
+    off = off / OwnScale(f)
+    local down = off == 0 and 0 or -off
+    f:ClearAllPoints()
+    if side == "below" then
+        f:SetPoint("TOPLEFT", overview, "BOTTOMLEFT", off, -GAP)
+    elseif side == "above" then
+        f:SetPoint("BOTTOMLEFT", overview, "TOPLEFT", off, GAP)
+    elseif side == "right" then
+        f:SetPoint("TOPLEFT", overview, "TOPRIGHT", GAP, down)
+    else
+        f:SetPoint("TOPRIGHT", overview, "TOPLEFT", -GAP, down)
+    end
+end
+
+-- The overview's edge a dropped window is against, and how far along it; nil if none.
+-- Its near corners line up with the overview's when they're within SNAP too.
+local function Near(e, o)
+    local l, r, t, b = e[2], e[3], e[4], e[5]
+    local ol, orr, ot, ob = o[2], o[3], o[4], o[5]
+    local function Along(start, finish, from, to)
+        local off = start - from
+        if math.abs(off) <= SNAP then return 0 end
+        if math.abs(finish - to) <= SNAP then return to - (finish - start) - from end
+        return off
+    end
+    if l < orr and r > ol then
+        if math.abs(t - (ob - GAP)) <= SNAP then return "below", Along(l, r, ol, orr) end
+        if math.abs(b - (ot + GAP)) <= SNAP then return "above", Along(l, r, ol, orr) end
+    end
+    if t > ob and b < ot then
+        -- Down the side: measured from the overview's top.
+        local off = ot - t
+        if math.abs(off) <= SNAP then off = 0 elseif math.abs(b - ob) <= SNAP then off = ot - ob - (t - b) end
+        if math.abs(l - (orr + GAP)) <= SNAP then return "right", off end
+        if math.abs(r - (ol - GAP)) <= SNAP then return "left", off end
+    end
+    return nil
+end
+
+local function Dropped(f)
+    f:StopMovingOrSizing()
+    local info = tracked[f]
+    local e = info and ScreenEdges(f)
+    if not e then return end
+    local overview = AltsForeverFrame
+    if info.dock and overview and overview ~= f and overview:IsShown() then
+        local o = ScreenEdges(overview)
+        local side, off
+        if o then side, off = Near(e, o) end
+        if side then
+            Against(f, side, off)
+            return Store(info.key, { dock = side, off = off })
+        end
+    end
+    Store(info.key, { x = e[2], y = e[4] })
+end
+
+-- The middle of the screen: where a window with no other default opens.
+local function Centre(f)
+    f:ClearAllPoints()
+    f:SetPoint("CENTER")
+end
+
+-- A window whose place is remembered under `key`; `dock`: it can be dropped against the
+-- overview; `fallback`: where it goes with nothing saved (the middle of the screen if not
+-- given), so a reset really moves it. Called once, when the window is made (it sets the
+-- window's OnDragStop).
+function ns.TrackWindow(f, key, dock, fallback)
+    tracked[f] = { key = key, dock = dock, fallback = fallback or Centre }
+    f:SetScript("OnDragStop", Dropped)
+end
+
+-- Whether the player has put this window somewhere (free or against the overview).
+function ns.WindowPlaced(f)
+    local info = tracked[f]
+    return info ~= nil and Saved(info.key) ~= nil
+end
+
+-- Puts a window where the player left it, else where it goes by default (its `fallback`).
+-- Called as it opens, once it's sized.
+function ns.PlaceWindow(f)
+    local info = tracked[f]
+    if not info then return false end
+    local p = Saved(info.key)
+    if p then
+        if type(p.x) == "number" and type(p.y) == "number" then
+            local s = OwnScale(f)
+            f:ClearAllPoints()
+            f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", p.x / s, p.y / s)
+            return true
+        end
+        local overview = AltsForeverFrame
+        if info.dock and SIDES[p.dock] and type(p.off) == "number" and overview and overview:IsShown() then
+            Against(f, p.dock, p.off)
+            return true
+        end
+    end
+    info.fallback(f)
+    return false
+end
+
+-- Every window back to where it opens by default (the overview's cog menu,
+-- /af resetwindows): the overview first, as the others may go beside it. A closed window
+-- goes to its default when it next opens (ns.PlaceWindow), as nothing is saved for it.
+function ns.ResetWindows()
+    ns.db.windows = nil
+    for f, info in pairs(tracked) do
+        if info.key == "overview" then info.fallback(f) end
+    end
+    for f, info in pairs(tracked) do
+        if info.key ~= "overview" and f:IsShown() then info.fallback(f) end
+    end
+end
+
+-- Beside the overview if it's open, else the middle of the screen: the default for the
+-- bags window.
+function ns.DockIfOverview(f)
+    local overview = AltsForeverFrame
+    if overview and overview:IsShown() then return ns.DockToOverview(f) end
+    Centre(f)
+end
+
+local function CreateWindow()
+    -- Room for the left inset, every column shown, and the right border.
+    local width = Measure()
+
+    local f = ns.NewWindow("AltsForeverFrame")
+    if f.plainFrame then
+        -- Plain fallback if this client lacks the templates: a dialog backdrop and a close button.
         f:SetBackdrop({
             bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
             edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
@@ -711,7 +1069,14 @@ local function CreateWindow()
     local arrow = header:CreateTexture(nil, "OVERLAY")
     arrow:SetSize(12, 12)
     f.sortArrow = arrow
-    for i, fs in ipairs(CreateCells(header, "GameFontNormalSmall")) do
+    -- Right-click anywhere on the titles: which columns to show.
+    header:EnableMouse(true)
+    header:SetScript("OnMouseUp", function(self, button)
+        if button == "RightButton" then ColumnsMenu(self) end
+    end)
+    f.header = header
+    f.titles = CreateCells(header, "GameFontNormalSmall")
+    for i, fs in ipairs(f.titles) do
         local col = COLUMNS[i]
         fs:SetText(col.title)
         if col.sort then
@@ -722,7 +1087,9 @@ local function CreateWindow()
             local hl = b:CreateTexture(nil, "HIGHLIGHT")
             hl:SetAllPoints()
             hl:SetColorTexture(1, 1, 1, 0.08)
-            b.sort, b.title, b.col = col.sort, fs, col
+            b.sort, b.title, b.col, b.index = col.sort, fs, col, i
+            b:SetShown(colShown[i])
+            b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
             b:SetScript("OnClick", SortClick)
             b:SetScript("OnEnter", SortTooltip)
             b:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -852,6 +1219,7 @@ local function CreateWindow()
     end)
     sync:SetScript("OnLeave", function() GameTooltip:Hide() end)
     f.syncButton = sync
+    ns.OverTitle(f, cog, rep, lockouts, profs, bags, search, export, sync)
     f.credit = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     f.credit:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 12)
     f.credit:SetText(L["Alts Forever by Kadmai"])
@@ -872,6 +1240,57 @@ local function CreateWindow()
     f:Hide()
     ns.GamepadWindow(f)
     ns.ScaleWindow(f)
+    -- Where it was left, now that its size is set; else the middle, as above.
+    ns.TrackWindow(f, "overview")
+    ns.PlaceWindow(f)
+end
+
+-- Lays the open window out again after a column is hidden or shown: its width, the
+-- titles, every row and group heading made so far. No frame is created.
+local function ApplyColumns()
+    if not frame then return end
+    local width = Measure()
+    frame:SetWidth(width)
+    PlaceCells(frame.titles, frame.header)
+    for _, b in pairs(frame.sorts) do b:SetShown(colShown[b.index]) end
+    for _, row in ipairs(rows) do
+        PlaceCells(row.cells, row)
+        row.pct:SetShown(colShown[2])
+    end
+    for _, head in ipairs(heads) do
+        PlaceCells(head.texts, head)
+        head.label:SetWidth(HeadWidth(width))
+    end
+    MarkSort()
+    ns.RefreshOverview()
+end
+
+function ns.ColumnShown(id)
+    local hidden = ns.db.hiddenColumns
+    return not (type(hidden) == "table" and hidden[id] == true)
+end
+
+-- The id of a column that can be hidden, from the word a player types; nil if none.
+function ns.ColumnId(word)
+    word = (word or ""):lower()
+    for _, col in ipairs(HIDEABLE) do
+        if col[1] == word then return col[1], col[2] end
+    end
+    return nil
+end
+
+function ns.SetColumnShown(id, on)
+    if not ns.ColumnId(id) then return end
+    local db = ns.db
+    local hidden = type(db.hiddenColumns) == "table" and db.hiddenColumns or {}
+    hidden[id] = not on or nil
+    db.hiddenColumns = next(hidden) ~= nil and hidden or nil
+    ApplyColumns()
+end
+
+function ns.ShowAllColumns()
+    ns.db.hiddenColumns = nil
+    ApplyColumns()
 end
 
 -- Opens or closes the overview; `open` only ever opens it (menus, settings page).

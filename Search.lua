@@ -489,8 +489,7 @@ local function Scroll(by)
 end
 
 local function CreateWindow()
-    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverSearchFrame", UIParent, "BasicFrameTemplateWithInset")
-    if not ok then f = CreateFrame("Frame", "AltsForeverSearchFrame", UIParent, "BackdropTemplate") end
+    local f = ns.NewWindow("AltsForeverSearchFrame")
     frame = f
     f:SetSize(WIDTH, 64 + ROWS * ROW + 34)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
@@ -500,7 +499,14 @@ local function CreateWindow()
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    -- It moves beside the bags window whenever that opens, so nothing is placed against it.
+    ns.NeverDockTo(f)
+    ns.TrackWindow(f, "search", true, function(self)
+        -- Beside the overview if it's open, else where it always opened.
+        if ns.OverviewShown() then return ns.DockToOverview(self) end
+        self:ClearAllPoints()
+        self:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
+    end)
     f:SetClampedToScreen(true)
     f.title = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     if not f.TitleText then f.title:SetPoint("TOP", 0, -6) end
@@ -685,11 +691,21 @@ PickCharacters = function(owner)
     end)
 end
 
--- Beside the bags window when it's open (right of it if there's room, else left), so
--- neither covers the other; otherwise where it always opens.
-Dock = function()
+-- Where the player left it, if they put it somewhere: it never moves from there by itself
+-- (owner, 2026-11-12: a search placed at the side jumped beside the bags window on picking
+-- a result). Otherwise beside the bags window when that's open (right of it if there's
+-- room, else left), so neither covers the other, else its default (ns.PlaceWindow).
+-- `opening`: the search is being opened, so it's placed even if it wasn't beside the bags.
+Dock = function(opening)
     local bags = ns.BagsWindow()
-    if bags and bags:IsShown() then
+    local open = bags and bags:IsShown()
+    -- The bags window keeps a steady height while the search is open with it, wherever
+    -- the search is.
+    if open then ns.BagsHold(true) end
+    if ns.WindowPlaced(frame) then
+        if opening then ns.PlaceWindow(frame) end
+        docked = false
+    elseif open then
         frame:ClearAllPoints()
         local right = bags:GetRight()
         if type(right) == "number" and not issecretvalue(right)
@@ -699,10 +715,8 @@ Dock = function()
             frame:SetPoint("TOPLEFT", bags, "TOPRIGHT", 4, 0)
         end
         docked = true
-        ns.BagsHold(true)
-    elseif docked then
-        frame:ClearAllPoints()
-        frame:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
+    elseif docked or opening then
+        ns.PlaceWindow(frame)
         docked = false
     end
 end
@@ -720,7 +734,7 @@ function ns.ToggleSearch(text)
         savedLit, savedView = ns.BagsState()
         previewed = savedLit
         ApplyScope()
-        Dock()
+        Dock(true)
         if text == "" then text = lastText end
     end
     box:SetText(text)
