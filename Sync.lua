@@ -1036,8 +1036,7 @@ local function PickPartner(owner)
 end
 
 local function CreateWindow()
-    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverSyncFrame", UIParent, "BasicFrameTemplateWithInset")
-    if not ok then f = CreateFrame("Frame", "AltsForeverSyncFrame", UIParent, "BackdropTemplate") end
+    local f = ns.NewWindow("AltsForeverSyncFrame")
     frame = f
     f:SetSize(WIDTH, HEIGHT)
     f:SetPoint("CENTER")

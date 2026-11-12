@@ -513,8 +513,7 @@ local function ViewButton(name, text, x)
 end
 
 local function CreateWindow()
-    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverBagsFrame", UIParent, "BasicFrameTemplateWithInset")
-    if not ok then f = CreateFrame("Frame", "AltsForeverBagsFrame", UIParent, "BackdropTemplate") end
+    local f = ns.NewWindow("AltsForeverBagsFrame")
     frame = f
     f.slots, f.headers = slots, headers
     f:SetWidth(WidthFor(cols))
@@ -648,6 +647,7 @@ local function CreateWindow()
     local search = CreateFrame("Button", nil, f)
     search:SetSize(16, 16)
     search:SetPoint("TOPRIGHT", f, "TOPRIGHT", -28, -4)
+    ns.OverTitle(f, search)
     search:SetNormalTexture("Interface\\Icons\\INV_Misc_Spyglass_02")
     search:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
     search:SetScript("OnClick", function() ns.ToggleSearch() end)

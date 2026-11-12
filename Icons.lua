@@ -256,8 +256,7 @@ local function PanelButton(parent, text, width)
 end
 
 local function CreatePicker()
-    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverIconPicker", UIParent, "BasicFrameTemplateWithInset")
-    if not ok then f = CreateFrame("Frame", "AltsForeverIconPicker", UIParent, "BackdropTemplate") end
+    local f = ns.NewWindow("AltsForeverIconPicker")
     picker = f
     local width = COLS * (SIZE + GAP) + 60
     f:SetSize(width, 190 + ROWS * (SIZE + GAP) + 50)

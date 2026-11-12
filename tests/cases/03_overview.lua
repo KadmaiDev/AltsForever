@@ -220,13 +220,55 @@ test("hovering a row shows rested details, hearthstone and item level", function
     assert(not table.concat(mine, "\n"):find("forget", 1, true), "not on your own row")
 end)
 
-test("the window still opens if the client lacks Blizzard's frame template", function()
+test("the window still opens if the client lacks Blizzard's frame templates", function()
     wow.load(FILES)
+    wow.missingTemplates.DefaultPanelTemplate = true
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("")
+    eq(AltsForeverFrame:IsShown(), true)
+    eq(AltsForeverFrame.template, "BasicFrameTemplateWithInset", "the older frame")
+    wow.load(FILES)
+    wow.missingTemplates.DefaultPanelTemplate = true
     wow.missingTemplates.BasicFrameTemplateWithInset = true
     wow.login(nil)
     SlashCmdList.ALTSFOREVER("")
     eq(AltsForeverFrame:IsShown(), true)
     eq(AltsForeverFrame.template, "BackdropTemplate")
+end)
+
+test("our windows use the game's current frame, with a close button, an inset and their title", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("")
+    local f = AltsForeverFrame
+    eq(f.template, "DefaultPanelTemplate")
+    eq(f.TitleText, f.TitleContainer.TitleText)
+    eq(f.TitleText.text, "Alts Forever")
+    eq(f.CloseButton.template, "UIPanelCloseButtonDefaultAnchors")
+    eq(f.Inset.template, "InsetFrameTemplate")
+    -- The border and title bar are drawn by a child frame at level 500: the buttons on the
+    -- title bar must be above it, or they can't be seen or clicked.
+    for _, name in ipairs({ "cog", "repButton", "lockoutsButton", "profsButton", "bagsButton", "searchButton", "exportButton", "syncButton" }) do
+        assert(f[name].level > 500, name .. " is over the title bar")
+    end
+    assert(f.CloseButton.level > 500, "the close button too")
+    -- Every other window is made the same way.
+    ns.ShowBags(ns.charKey, "bags")
+    eq(AltsForeverBagsFrame.template, "DefaultPanelTemplate")
+    assert(AltsForeverBagsFrame.searchButton.level > 500, "the bags window's search button")
+    for _, name in ipairs({ "Export", "Search", "Sync", "Lockouts", "Reputation" }) do
+        ns["Toggle" .. name]()
+        local frame = _G["AltsForever" .. (name == "Reputation" and "Rep" or name) .. "Frame"]
+        eq(frame.template, "DefaultPanelTemplate", name)
+    end
+    -- A client where the close button's template is missing still gets one.
+    wow.load(FILES)
+    wow.missingTemplates.UIPanelCloseButtonDefaultAnchors = true
+    wow.missingTemplates.InsetFrameTemplate = true
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("")
+    eq(AltsForeverFrame.CloseButton.template, "UIPanelCloseButton")
+    eq(rawget(AltsForeverFrame, "Inset"), nil)
 end)
 
 ---------------------------------------------------------------------------

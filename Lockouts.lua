@@ -685,8 +685,7 @@ local function Scroll(rows)
 end
 
 local function CreatePanel()
-    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverLockoutsFrame", UIParent, "BasicFrameTemplateWithInset")
-    if not ok then f = CreateFrame("Frame", "AltsForeverLockoutsFrame", UIParent, "BackdropTemplate") end
+    local f = ns.NewWindow("AltsForeverLockoutsFrame")
     panel = f
     f.lines = lines
     f:SetFrameStrata("HIGH")

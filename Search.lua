@@ -489,8 +489,7 @@ local function Scroll(by)
 end
 
 local function CreateWindow()
-    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverSearchFrame", UIParent, "BasicFrameTemplateWithInset")
-    if not ok then f = CreateFrame("Frame", "AltsForeverSearchFrame", UIParent, "BackdropTemplate") end
+    local f = ns.NewWindow("AltsForeverSearchFrame")
     frame = f
     f:SetSize(WIDTH, 64 + ROWS * ROW + 34)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 120)

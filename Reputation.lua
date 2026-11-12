@@ -217,8 +217,7 @@ local function Fill()
 end
 
 local function CreatePanel()
-    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverRepFrame", UIParent, "BasicFrameTemplateWithInset")
-    if not ok then f = CreateFrame("Frame", "AltsForeverRepFrame", UIParent, "BackdropTemplate") end
+    local f = ns.NewWindow("AltsForeverRepFrame")
     panel = f
     f:SetFrameStrata("HIGH")
     -- Comes to the front when clicked or opened, so our windows never draw through each other.

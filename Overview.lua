@@ -672,10 +672,9 @@ local function CreateWindow()
     local width = 12 + 20
     for _, col in ipairs(COLUMNS) do width = width + col.width + (col.gap or 0) end
 
-    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverFrame", UIParent, "BasicFrameTemplateWithInset")
-    if not ok then
-        -- Plain fallback if this client lacks the template: a dialog backdrop and a close button.
-        f = CreateFrame("Frame", "AltsForeverFrame", UIParent, "BackdropTemplate")
+    local f = ns.NewWindow("AltsForeverFrame")
+    if f.plainFrame then
+        -- Plain fallback if this client lacks the templates: a dialog backdrop and a close button.
         f:SetBackdrop({
             bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
             edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
@@ -852,6 +851,7 @@ local function CreateWindow()
     end)
     sync:SetScript("OnLeave", function() GameTooltip:Hide() end)
     f.syncButton = sync
+    ns.OverTitle(f, cog, rep, lockouts, profs, bags, search, export, sync)
     f.credit = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     f.credit:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 12)
     f.credit:SetText(L["Alts Forever by Kadmai"])

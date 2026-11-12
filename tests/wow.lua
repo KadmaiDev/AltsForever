@@ -354,6 +354,14 @@ function M.load(files)
         f.template = template
         f.parent = f.parent or parent
         M.frames[#M.frames + 1] = f
+        -- The game's current window frame: a title in its own container, and the border and
+        -- title bar drawn by a child frame at level 500.
+        if template == "DefaultPanelTemplate" then
+            f.TitleContainer = newObject("Frame")
+            f.TitleContainer.TitleText = newObject("FontString")
+            f.NineSlice = newObject("Frame")
+            f.NineSlice.level = 500
+        end
         return f
     end
     M.missingTemplates = {}

@@ -271,8 +271,7 @@ local function PickFormat(owner)
 end
 
 local function CreateWindow()
-    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverExportFrame", UIParent, "BasicFrameTemplateWithInset")
-    if not ok then f = CreateFrame("Frame", "AltsForeverExportFrame", UIParent, "BackdropTemplate") end
+    local f = ns.NewWindow("AltsForeverExportFrame")
     frame = f
     f:SetSize(WIDTH, HEIGHT)
     f:SetPoint("CENTER")
