@@ -977,6 +977,12 @@ function ns.TrackWindow(f, key, dock, fallback)
     f:SetScript("OnDragStop", Dropped)
 end
 
+-- Whether the player has put this window somewhere (free or against the overview).
+function ns.WindowPlaced(f)
+    local info = tracked[f]
+    return info ~= nil and Saved(info.key) ~= nil
+end
+
 -- Puts a window where the player left it, else where it goes by default (its `fallback`).
 -- Called as it opens, once it's sized.
 function ns.PlaceWindow(f)

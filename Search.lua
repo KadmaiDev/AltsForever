@@ -691,12 +691,21 @@ PickCharacters = function(owner)
     end)
 end
 
--- Beside the bags window when it's open (right of it if there's room, else left), so
--- neither covers the other; otherwise where it was left, else its default (ns.PlaceWindow).
+-- Where the player left it, if they put it somewhere: it never moves from there by itself
+-- (owner, 2026-11-12: a search placed at the side jumped beside the bags window on picking
+-- a result). Otherwise beside the bags window when that's open (right of it if there's
+-- room, else left), so neither covers the other, else its default (ns.PlaceWindow).
 -- `opening`: the search is being opened, so it's placed even if it wasn't beside the bags.
 Dock = function(opening)
     local bags = ns.BagsWindow()
-    if bags and bags:IsShown() then
+    local open = bags and bags:IsShown()
+    -- The bags window keeps a steady height while the search is open with it, wherever
+    -- the search is.
+    if open then ns.BagsHold(true) end
+    if ns.WindowPlaced(frame) then
+        if opening then ns.PlaceWindow(frame) end
+        docked = false
+    elseif open then
         frame:ClearAllPoints()
         local right = bags:GetRight()
         if type(right) == "number" and not issecretvalue(right)
@@ -706,7 +715,6 @@ Dock = function(opening)
             frame:SetPoint("TOPLEFT", bags, "TOPRIGHT", 4, 0)
         end
         docked = true
-        ns.BagsHold(true)
     elseif docked or opening then
         ns.PlaceWindow(frame)
         docked = false
