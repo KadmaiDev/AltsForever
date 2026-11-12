@@ -1,6 +1,6 @@
 ## Alts Forever 1.5.1
 
-- **Sort the overview:** click a column title to order your characters by it, and click again to reverse it. Character, Level, Rested, Well Rested, Legacy, Gold, Mail, Zone, Played and Last seen can all be sorted, and a small arrow shows which one is in use. Your choice is kept when you reload or log back in. Level, highest first with the character you're on at the top, is still how it starts; click Level to go back to it. With ruleset or faction headings, characters are sorted inside each group. The character lists in the bags window, the search, the professions window and the export follow the same order.
+- **Sort the overview:** click a column title to order your characters by it, and click again to reverse it. Character, Level, Rested, Well Rested, Legacy, Gold, Mail, Zone, Played and Last seen can all be sorted, and a small arrow shows which one is in use. Your choice is kept when you reload or log back in. Level, highest first with the character you're on at the top, is still how it starts; click Level to go back to it. With ruleset or faction headings, characters are sorted inside each group. The character lists in the bags window, the search, the professions window and the export follow the same order. Thanks to Han for the suggestion.
 
 ## Alts Forever 1.5.0
 
