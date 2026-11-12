@@ -757,3 +757,144 @@ test("damaged hidden columns hide nothing; the Character column can't be hidden"
         eq(overviewRows()[1].cells[1].shown, true)
     end
 end)
+
+-- Gives a window the edges its anchor implies (the fake lays nothing out): `w` by `h`
+-- against the window it's anchored to, which must have edges already.
+function layOut(f, w, h)
+    local p, rel, relPoint, dx, dy = unpack(f.point)
+    local r = rel.rect
+    local x = (relPoint:find("LEFT") and r[1] or r[2]) + (dx or 0)
+    local y = (relPoint:find("TOP") and r[3] or r[4]) + (dy or 0)
+    local left = p:find("LEFT") and x or x - w
+    local top = p:find("TOP") and y or y + h
+    f.rect = { left, left + w, top, top - h }
+end
+
+-- Whether following anchors from a window ever comes back to it.
+function anchorLoop(f)
+    local seen, at = {}, f
+    while type(at) == "table" and at.point do
+        if seen[at] then return true end
+        seen[at] = true
+        at = at.point[2]
+    end
+    return false
+end
+
+test("opening the bags from the search never anchors the two to each other", function()
+    local ns = wow.load(FILES)
+    wow.setBag(0, 16, { { 2589, 5 } })
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("")
+    UIParent.width, UIParent.height = 1920, 1080
+    local ov = AltsForeverFrame
+    -- The overview near the top: the search goes below it, where the bags would go too,
+    -- and there is room for the bags beside the search.
+    ov.rect = { 100, 1100, 1000, 800 }
+    ns.ToggleSearch()
+    local search = AltsForeverSearchFrame
+    eq(search.point[2], ov, "the search is beside the overview")
+    layOut(search, 400, 300)
+    -- The bags window opens (as picking a search result does), then the search moves
+    -- beside it.
+    ns.ShowBags(ns.charKey, "bags")
+    local bags = AltsForeverBagsFrame
+    assert(bags.point[2] ~= search, "the bags window isn't placed against the search")
+    eq(placed(bags), "TOPLEFT overview TOPRIGHT 4 0", "but clear of it: right of the overview")
+    ns.ToggleSearch(); ns.ToggleSearch()
+    eq(search.point[2], bags, "the search follows the bags window")
+    eq(anchorLoop(bags), false); eq(anchorLoop(search), false)
+end)
+
+test("a panel is never placed against one that follows it", function()
+    wow.load(FILES)
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("")
+    UIParent.width, UIParent.height = 1920, 1080
+    local ov = AltsForeverFrame
+    ov.rect = { 100, 1100, 1000, 600 }
+    SlashCmdList.ALTSFOREVER("lockouts")
+    local lock = AltsForeverLockoutsFrame
+    layOut(lock, 300, 200)
+    SlashCmdList.ALTSFOREVER("rep")
+    local rep = AltsForeverRepFrame
+    -- Reputation beside Lockouts, anchored to it (as it opens when there's room).
+    rep.width, rep.height = 300, 200
+    rep.point = { "TOPLEFT", lock, "TOPRIGHT", 4, 0 }
+    layOut(rep, 300, 200)
+    -- Lockouts closed and opened again with no room left under the overview: the only
+    -- other panel is Reputation, which is anchored to it.
+    SlashCmdList.ALTSFOREVER("lockouts")
+    ov.rect = { 100, 1100, 700, 50 }
+    rep.rect = { 1200, 1500, 500, 300 } -- with room under it
+    SlashCmdList.ALTSFOREVER("lockouts")
+    assert(lock.point[2] ~= rep, "not against the panel that follows it")
+    eq(lock.point[2], ov, "above the overview")
+    eq(anchorLoop(lock), false); eq(anchorLoop(rep), false)
+end)
+
+test("resetting window positions also moves closed windows, and the bags without the overview", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    -- Export and Sync: moved, closed, reset, opened again.
+    for _, name in ipairs({ "Export", "Sync" }) do
+        ns["Toggle" .. name]()
+        local f = _G["AltsForever" .. name .. "Frame"]
+        drop(f, 1300, 1700, 500, 100)
+        eq(placed(f), "CENTER nil nil nil nil", "the fake doesn't move it: it was dropped there")
+        f.point = { "TOPLEFT", UIParent, "BOTTOMLEFT", 1300, 500 } -- where the drag left it
+        ns["Toggle" .. name]()
+        SlashCmdList.ALTSFOREVER("resetwindows")
+        ns["Toggle" .. name]()
+        eq(placed(f), "CENTER nil nil nil nil", name .. " opens in the middle again")
+        ns["Toggle" .. name]()
+    end
+    -- The bags window, open, with the overview closed.
+    ns.ShowBags(ns.charKey, "bags")
+    local bags = AltsForeverBagsFrame
+    drop(bags, 1300, 1700, 500, 100)
+    bags.point = { "TOPLEFT", UIParent, "BOTTOMLEFT", 1300, 500 }
+    SlashCmdList.ALTSFOREVER("resetwindows")
+    eq(placed(bags), "CENTER nil nil nil nil", "back to the middle at once")
+    eq(AltsForeverDB.windows, nil)
+    -- The search, closed.
+    ns.ShowBags(ns.charKey, "bags")
+    ns.ToggleSearch()
+    local search = AltsForeverSearchFrame
+    drop(search, 1300, 1700, 500, 100)
+    search.point = { "TOPLEFT", UIParent, "BOTTOMLEFT", 1300, 500 }
+    ns.ToggleSearch()
+    SlashCmdList.ALTSFOREVER("resetwindows")
+    ns.ToggleSearch()
+    eq(placed(search), "CENTER screen CENTER 0 120")
+end)
+
+test("a window at a smaller scale than the overview docks by where it is on screen", function()
+    wow.load(FILES)
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("")
+    local ov = AltsForeverFrame
+    ov.rect = { 100, 1100, 900, 700 }
+    SlashCmdList.ALTSFOREVER("lockouts")
+    local lock = AltsForeverLockoutsFrame
+    -- Half size (as when it wouldn't fit on screen): its own edges read twice as far out.
+    lock.scale = 0.5
+    -- On screen: just under the overview, 300 along it.
+    drop(lock, 800, 1400, 1380, 1000)
+    eq(AltsForeverDB.windows.lockouts.dock, "below")
+    eq(AltsForeverDB.windows.lockouts.off, 300, "saved in the screen's units")
+    eq(placed(lock), "TOPLEFT overview BOTTOMLEFT 600 -4", "anchored in its own")
+    -- The same numbers at the overview's scale would be far from it: not docked.
+    lock.scale = 1
+    drop(lock, 800, 1400, 1380, 1000)
+    eq(AltsForeverDB.windows.lockouts.dock, nil)
+    -- On screen far from the overview, though its own numbers look docked: free.
+    lock.scale = 0.5
+    drop(lock, 108, 408, 690, 500)
+    eq(AltsForeverDB.windows.lockouts.dock, nil)
+    eq(AltsForeverDB.windows.lockouts.x, 54)
+    -- Down the side, and opened again at that scale.
+    drop(lock, 2208, 2808, 1600, 1200)
+    eq(AltsForeverDB.windows.lockouts.dock, "right"); eq(AltsForeverDB.windows.lockouts.off, 100)
+    eq(placed(lock), "TOPLEFT overview TOPRIGHT 4 -200")
+end)

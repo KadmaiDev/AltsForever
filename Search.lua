@@ -499,6 +499,8 @@ local function CreateWindow()
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
+    -- It moves beside the bags window whenever that opens, so nothing is placed against it.
+    ns.NeverDockTo(f)
     ns.TrackWindow(f, "search", true, function(self)
         -- Beside the overview if it's open, else where it always opened.
         if ns.OverviewShown() then return ns.DockToOverview(self) end
