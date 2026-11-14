@@ -306,19 +306,15 @@ local function UpdateNote(text, rule)
     if not note then return end
     local parts = {}
     note.undo = nil
-    if rule and filled and text == filled then
-        local label = ns.MailRuleName(rule)
-        parts[#parts + 1] = L["Filled in by your %s rule (click to undo)"]:format(label)
-        note.undo = true
+    -- Only about what a rule did: a name the player typed or picked is theirs, and mail to
+    -- anyone else says nothing (owner, 2026-11-15: "their actions should always prevail").
+    if not (rule and filled and text == filled) then return note:Hide() end
+    parts[#parts + 1] = L["Filled in by your %s rule (click to undo)"]:format(ns.MailRuleName(rule))
+    note.undo = true
+    local id, key = Conflict(ns.RecipientKey(text))
+    if id then
+        parts[#parts + 1] = L["%s has its own rule: %s"]:format(ItemName(id), ns.ShortName(key, ns.db.chars[key]) .. LIGHT)
     end
-    if text ~= "" then
-        local recipient = ns.RecipientKey(text)
-        local id, key = Conflict(recipient)
-        if id then
-            parts[#parts + 1] = L["%s has its own rule: %s"]:format(ItemName(id), ns.ShortName(key, ns.db.chars[key]) .. LIGHT)
-        end
-    end
-    if #parts == 0 then return note:Hide() end
     note.text:SetText(LIGHT .. table.concat(parts, " · ") .. "|r")
     note:Show()
 end
