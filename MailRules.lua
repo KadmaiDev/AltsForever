@@ -373,7 +373,7 @@ end
 
 -- Who the Pack button packs for, and how many stacks (nil if nothing to pack).
 function ns.MailPackPlan()
-    if not (ns.MailPackOn() and ns.db.mailRules) then return nil end
+    if not (ns.MailPackOn() and ns.SendToAltOn() and ns.db.mailRules) then return nil end
     local used = ReadAttachments()
     local free = MAX_SEND - used
     if free <= 0 then return nil end
@@ -410,6 +410,13 @@ end
 -- Re-reads the attachments; with `fill`, fills in or clears the To box by the rules.
 local function Refresh(fill)
     if busy or not SendMailNameEditBox then return end
+    -- "Send mail to alts" off (Mail.lua) turns the rules off too; they're kept (owner, 2026-11-15:
+    -- one setting for the mailbox, none of its own).
+    if not ns.SendToAltOn() then
+        filled = nil
+        if note then note:Hide() pack:Hide() end
+        return
+    end
     busy = true
     local used = ReadAttachments()
     if used == 0 then manual = nil end
