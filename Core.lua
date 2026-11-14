@@ -853,6 +853,7 @@ end
 
 function commands.help()
     Print(L["by Kadmai. /af opens the overview. Also: /af rep | export | mail | list | delete Name | skillups | sendmail | minimap | stats | mem"])
+    Print(L["/af settings opens the Options page; /af help lists every command."])
     Print(L["/af search (or /afs), with or without a name, finds an item on any of your characters, or who can craft it."])
     Print(L["/af tooltips turns everything Alts Forever adds to tooltips on or off. /af crafting, crates, gold and bars turn one part on or off."])
     Print(L["/af counts turns the item counts in tooltips on or off (if another addon, such as Baganator, already shows them)."])
@@ -877,6 +878,12 @@ function commands.help()
     Print(L["Or use the minimap button (right-click for options)."])
 end
 ns.ShowHelp = commands.help
+
+-- Opens the Options page (Options.lua); without one (it failed to register), the help.
+function commands.settings()
+    if not ns.OpenSettings() then commands.help() end
+end
+commands.options, commands.config = commands.settings, commands.settings
 
 -- For the menus: runs a slash command by name.
 function ns.RunCommand(name, arg)
