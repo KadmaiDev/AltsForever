@@ -213,6 +213,20 @@ test("mail rules: Pack fills only the free attachment slots, and can be turned o
     eq(AltsForeverDB.mailPackOff, true)
 end)
 
+test("mail rules: the note and Pack sit above the letter's text box, which overlaps them", function()
+    atMailbox({ ["c:7:5"] = { ["Tarn Moon"] = LINEN } })
+    SendMailScrollFrame = CreateFrame("ScrollFrame", "SendMailScrollFrame", SendMailFrame)
+    SendMailBodyEditBox = CreateFrame("EditBox", "SendMailBodyEditBox", SendMailScrollFrame)
+    SendMailScrollFrame:SetFrameLevel(8)
+    SendMailBodyEditBox:SetFrameLevel(9)
+    wow.fire("MAIL_SHOW")
+    local ok1 = packButton():GetFrameLevel() > 9
+    local ok2 = mailNote():GetFrameLevel() > 9
+    SendMailScrollFrame, SendMailBodyEditBox = nil, nil
+    eq(ok1, true)
+    eq(ok2, true)
+end)
+
 test("mail rules window: lists every rule, removes one, and holds the two settings", function()
     atMailbox({ ["c:7:5"] = { ["Tarn Moon"] = LINEN, ["Horde Guy"] = SILK }, ["i:2770"] = { ["Brak Stone"] = COPPER } })
     SlashCmdList.ALTSFOREVER("mailrules")

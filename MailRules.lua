@@ -501,6 +501,20 @@ local function PackTooltip(self)
     GameTooltip:Show()
 end
 
+-- The letter's scroll frame and its text box overlap the line above the attachments and,
+-- drawn above our parts, took their clicks (owner, 2026-11-14: Pack clicked only below the
+-- parchment). Put ours above both; run again at each MAIL_SHOW, as skins may restack them.
+local function RaiseMailParts()
+    if not note then return end
+    local level = SendMailFrame:GetFrameLevel() or 0
+    for _, f in ipairs({ SendMailScrollFrame or false, SendMailBodyEditBox or false }) do
+        local l = f and f:GetFrameLevel()
+        if l and l > level then level = l end
+    end
+    note:SetFrameLevel(level + 5)
+    pack:SetFrameLevel(level + 5)
+end
+
 local function CreateMailParts()
     if note or not (SendMailFrame and SendMailNameEditBox) then return end
     local bar = SendMailHorizontalBarLeft2 -- the line above the attachments (Blizzard_MailFrame)
@@ -806,6 +820,7 @@ function ns.StartMailRules()
         wipe(inOrder)
         filled, manual = nil, nil
         CreateMailParts()
+        RaiseMailParts()
         Refresh(true)
     end)
     ns.On("MAIL_SEND_INFO_UPDATE", function() Refresh(true) end)
