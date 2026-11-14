@@ -91,6 +91,15 @@ function ns.RecipientKey(recipient)
     return ns.FindChar(name)
 end
 
+-- Whether you can mail a character from this one: not you, and your own faction on your
+-- own ruleset (an unknown faction counts as yours).
+function ns.CanMailTo(key)
+    local c = key and ns.db.chars[key]
+    if not c or key == ns.charKey then return false end
+    local faction = ns.char.faction
+    return (not c.faction or not faction or c.faction == faction) and not ns.Elsewhere(c)
+end
+
 ---------------------------------------------------------------------------
 -- "Alts" button beside the To box on the send-mail screen: picking one of your characters
 -- fills in their name (nothing is sent). Characters who can still skill up with an
@@ -112,11 +121,10 @@ function ns.SendToAltEntries()
         if not issecretvalue(id) and id then attached[#attached + 1] = id end
     end
     wipe(entries)
-    local chars, faction = ns.db.chars, ns.char.faction
+    local chars = ns.db.chars
     for i, key in ipairs(ns.OverviewOrder()) do
         local c = chars[key]
-        -- Mail only goes to your own faction, on your own ruleset.
-        if key ~= ns.charKey and (not c.faction or not faction or c.faction == faction) and not ns.Elsewhere(c) then
+        if ns.CanMailTo(key) then
             local n = 0
             for _, id in ipairs(attached) do
                 if ns.CanSkillUpWith(c, id) then n = n + 1 end
@@ -142,6 +150,8 @@ local function AltsMenu(owner)
             end
             root:CreateButton(text, function() SendMailNameEditBox:SetText(c.name or e.key) end)
         end
+        -- Mail rules (MailRules.lua): suggestions, "Remember for ...", the rules window.
+        if ns.AddMailRuleMenu then ns.AddMailRuleMenu(root) end
     end)
 end
 

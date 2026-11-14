@@ -172,6 +172,7 @@ function ns.ForgetCharacter(key)
     ns.db.forgotten[key] = time()
     if ns.db.syncWith then ns.db.syncWith[key] = nil end
     if ns.db.pinned then ns.SetPinned(key, false) end
+    if ns.ForgetMailRules then ns.ForgetMailRules(key) end
     ns.PruneRecipeInfo()
     ns.InvalidateCache()
     if ns.LockoutsChanged then ns.LockoutsChanged() end -- an open Lockouts window may list them
