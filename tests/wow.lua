@@ -584,6 +584,7 @@ function M.load(files)
         s.locked = true
         M.cursor = nil
         M.attachClicks = (M.attachClicks or 0) + 1
+        M.fire("MAIL_SEND_INFO_UPDATE") -- assumed to come at once, inside the click
     end
     M.outboxMoney = 0
     GetSendMailMoney = function() return M.outboxMoney end

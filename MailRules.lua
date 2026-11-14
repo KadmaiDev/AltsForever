@@ -333,6 +333,7 @@ do
     if #BAGS == 0 then BAGS = { 0, 1, 2, 3, 4 } end
 end
 local matchBag, matchSlot, matchKey, matchN = {}, {}, {}, 0
+local packBag, packSlot = {}, {} -- Pack's own copy of one character's stacks
 local counts, ruleOf = {}, {}
 local location
 
@@ -462,21 +463,28 @@ local function Pack()
         if HasSendMailItem then has = HasSendMailItem(i) else has = GetSendMailItem(i) ~= nil end
         if not has then free[#free + 1] = i end
     end
-    local done = 0
-    if CursorHasItem and CursorHasItem() then ClearCursor() end
+    -- Copy the stacks first: each attach can fire MAIL_SEND_INFO_UPDATE at once, which
+    -- rebuilds the match lists under this loop (owner, 2026-11-14: "Pack 5" attached 3).
+    local n = 0
     for m = 1, matchN do
         if matchKey[m] == who then
-            local slot = free[done + 1]
-            if not slot then break end
-            C_Container.PickupContainerItem(matchBag[m], matchSlot[m])
-            if not CursorHasItem() then break end
-            ClickSendMailItemButton(slot)
-            if CursorHasItem() then
-                ClearCursor()
-                break
-            end
-            done = done + 1
+            n = n + 1
+            packBag[n], packSlot[n] = matchBag[m], matchSlot[m]
         end
+    end
+    local done = 0
+    if CursorHasItem and CursorHasItem() then ClearCursor() end
+    for m = 1, n do
+        local slot = free[done + 1]
+        if not slot then break end
+        C_Container.PickupContainerItem(packBag[m], packSlot[m])
+        if not CursorHasItem() then break end
+        ClickSendMailItemButton(slot)
+        if CursorHasItem() then
+            ClearCursor()
+            break
+        end
+        done = done + 1
     end
     Refresh(false)
 end
