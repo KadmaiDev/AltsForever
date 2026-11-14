@@ -9,7 +9,7 @@ function ruleItems()
     wow.itemNames[LINEN], wow.itemNames[SILK], wow.itemNames[COPPER], wow.itemNames[SHIRT] =
         "Linen Cloth", "Silk Cloth", "Copper Ore", "Squire's Shirt"
     wow.itemClass[LINEN], wow.itemClass[SILK], wow.itemClass[COPPER], wow.itemClass[SHIRT] = 7, 7, 7, 4
-    wow.items[LINEN], wow.items[SILK], wow.items[COPPER], wow.items[SHIRT] = { sub = 5 }, { sub = 5 }, { sub = 7 }, { sub = 1 }
+    wow.items[LINEN], wow.items[SILK], wow.items[COPPER], wow.items[SHIRT] = { sub = 5, stack = 20 }, { sub = 5, stack = 20 }, { sub = 7, stack = 20 }, { sub = 1, stack = 1 }
 end
 
 -- Logged in with the mailbox open on the send tab.
@@ -211,6 +211,34 @@ test("mail rules: Pack fills only the free attachment slots, and can be turned o
     mailNS.SetMailPack(false)
     eq(p:IsShown(), false)
     eq(AltsForeverDB.mailPackOff, true)
+end)
+
+test("mail rules: shift-click Pack attaches full stacks only, and says so when there are none", function()
+    atMailbox({ ["c:7:5"] = { ["Tarn Moon"] = LINEN } })
+    wow.setBag(0, 16, { { LINEN, 7 }, { LINEN, 20 }, { SILK, 3 } })
+    wow.fire("BAG_UPDATE_DELAYED")
+    local p = packButton()
+    eq(p:GetText(), "Pack 3 for [DRUID]Tarn")
+    wow.shift = true
+    p.scripts.OnClick(p)
+    eq(wow.attachClicks, 1)
+    eq(wow.outbox[1][1], LINEN) eq(wow.outbox[1][2], 20)
+    eq(wow.bags[0][1].locked, nil, "the part stack stays in the bag")
+    eq(SendMailNameEditBox:GetText(), "Tarn Moon")
+    -- Only part stacks left: nothing attached, the To box untouched, a line in chat.
+    wow.outbox = {}
+    SendMailNameEditBox:SetText("")
+    wow.setBag(0, 16, { { LINEN, 7 }, { SILK, 3 } })
+    wow.fire("BAG_UPDATE_DELAYED")
+    wow.printed = {}
+    p.scripts.OnClick(p)
+    wow.shift = false
+    eq(wow.attachClicks, 1)
+    eq(SendMailNameEditBox:GetText(), "")
+    assert(table.concat(wow.printed, "\n"):find("No full stacks to pack", 1, true))
+    -- A plain click still takes them all.
+    p.scripts.OnClick(p)
+    eq(wow.attachClicks, 3)
 end)
 
 test("mail rules: the note and Pack sit above the letter's text box, which overlaps them", function()

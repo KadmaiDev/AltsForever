@@ -520,6 +520,7 @@ function M.load(files)
             return ({ ["7:5"] = "Cloth", ["7:7"] = "Metal & Stone", ["7:9"] = "Herb", ["7:11"] = "Other", ["4:1"] = "Cloth" })[class .. ":" .. sub]
         end,
         GetItemQualityByID = function(id) return M.itemQuality[id] end,
+        GetItemMaxStackSizeByID = function(id) return (M.items[id] or {}).stack end,
         -- name, link, ..., required level (5th), ..., equip location (9th), ..., bind type (14th)
         GetItemInfo = function(item)
             local id = type(item) == "number" and item or tonumber(item:match("item:(%d+)"))

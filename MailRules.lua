@@ -446,13 +446,42 @@ local function Undo()
     Refresh(false)
 end
 
+-- A full stack: as many as the item stacks to (so any item that doesn't stack). Unknown = no.
+local function IsFull(bag, slot)
+    if not location then return false end
+    local id = C_Container.GetContainerItemID(bag, slot)
+    if issecretvalue(id) or not id then return false end
+    local most = C_Item.GetItemMaxStackSizeByID and C_Item.GetItemMaxStackSizeByID(id)
+    location:SetBagAndSlot(bag, slot)
+    local count = C_Item.GetStackCount(location)
+    if issecretvalue(most) or issecretvalue(count) or type(most) ~= "number" or type(count) ~= "number" then
+        return false
+    end
+    return count >= most
+end
+
 -- Attaches what the rules send to the Pack button's character, into empty slots, through
 -- the cursor (the game's own attach), never by using an item: an item is picked up and
 -- dropped on a free attachment slot, and anything left on the cursor is put back.
+-- Shift-click attaches full stacks only (owner, 2026-11-15: rather than a setting or a
+-- choice per rule, as it's wanted for some items now and then).
 local function Pack()
     if not (SendMailFrame and SendMailFrame:IsVisible()) then return end
     local who = ns.MailPackPlan()
     if not who then return end
+    local fullOnly = IsShiftKeyDown and IsShiftKeyDown()
+    -- Copy the stacks first: each attach can fire MAIL_SEND_INFO_UPDATE at once, which
+    -- rebuilds the match lists under this loop (owner, 2026-11-14: "Pack 5" attached 3).
+    local n = 0
+    for m = 1, matchN do
+        if matchKey[m] == who and (not fullOnly or IsFull(matchBag[m], matchSlot[m])) then
+            n = n + 1
+            packBag[n], packSlot[n] = matchBag[m], matchSlot[m]
+        end
+    end
+    if n == 0 then
+        return ns.Print(L["No full stacks to pack. The game doesn't join part stacks: stack your bags first."])
+    end
     if ToText() == "" then
         filled = ns.db.chars[who].name or who
         SendMailNameEditBox:SetText(filled)
@@ -462,15 +491,6 @@ local function Pack()
         local has
         if HasSendMailItem then has = HasSendMailItem(i) else has = GetSendMailItem(i) ~= nil end
         if not has then free[#free + 1] = i end
-    end
-    -- Copy the stacks first: each attach can fire MAIL_SEND_INFO_UPDATE at once, which
-    -- rebuilds the match lists under this loop (owner, 2026-11-14: "Pack 5" attached 3).
-    local n = 0
-    for m = 1, matchN do
-        if matchKey[m] == who then
-            n = n + 1
-            packBag[n], packSlot[n] = matchBag[m], matchSlot[m]
-        end
     end
     local done = 0
     if CursorHasItem and CursorHasItem() then ClearCursor() end
@@ -506,6 +526,7 @@ local function PackTooltip(self)
             end
         end
     end
+    GameTooltip:AddLine(L["Shift-click: full stacks only."], 0.5, 0.8, 1, true)
     GameTooltip:Show()
 end
 
