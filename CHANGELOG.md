@@ -1,3 +1,12 @@
+## Alts Forever 1.7.0
+
+- **Mail rules:** tell Alts Forever which of your characters always gets an item, or a whole kind of item, such as all your cloth to your tailor. At the mailbox, attach something, pick the character from the arrow beside the To box, then open the arrow again and tick **Always send Silk Cloth here** or **Always send all Cloth here**. The arrow also suggests rules from who uses the item in their known recipes.
+  - When the first item you attach has a rule, its character is filled in for you, and a line above the attachments says which rule did it (click it to undo). A name you type or pick yourself is never replaced.
+  - A **Pack** button above the attachments attaches everything in your bags that your rules send to that character, in one click. Shift-click it to send full stacks only. Soulbound items are left out.
+  - **Mail rules...** at the bottom of the arrow's menu, or `/af mailrules`, lists your rules, removes them, and turns the filling in or the Pack button off. Horde and Alliance characters can each have their own. Turning off **Send mail to alts** turns mail rules off too, and keeps them.
+- **Posty Forever:** the Alts Forever arrow now sits beside Posty's address book button instead of under it, and the Mail rules window opens past its Quick Attach buttons. With Posty's **Autofill last person mailed**, a mail rule takes over from the name Posty filled in (undo puts it back).
+- **`/af settings`** (or `/af options`) opens the Options page. `/af help` still lists every command in chat.
+
 ## Alts Forever 1.6.0
 
 - **WoW Forever's window frame:** Alts Forever's windows now use the same bronze frame as the game's own windows, in place of the older grey one. With EllesmereUI or ElvUI they keep those looks, as before.
