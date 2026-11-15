@@ -758,11 +758,17 @@ FillWindow = function()
     end
 end
 
--- Opens beside the mailbox when it's open, else in the middle (or where the player put it).
+-- Opens beside the mailbox when it's open, else in the middle (or where the player put it);
+-- past Posty Forever's Quick Attach buttons, a column against the mailbox's right edge.
 local function BesideMail(f)
     f:ClearAllPoints()
     if MailFrame and MailFrame:IsShown() then
-        f:SetPoint("TOPLEFT", MailFrame, "TOPRIGHT", 12, 0)
+        local qa, x = _G.Postal_QuickAttachButton1, 12
+        if qa and qa:IsVisible() then
+            local w = qa:GetWidth()
+            if type(w) == "number" and not issecretvalue(w) then x = x + w end
+        end
+        f:SetPoint("TOPLEFT", MailFrame, "TOPRIGHT", x, 0)
     else
         f:SetPoint("CENTER")
     end

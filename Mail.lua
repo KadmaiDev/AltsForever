@@ -167,6 +167,18 @@ function ns.SetSendToAlt(on)
     if ns.MailRulesChanged then ns.MailRulesChanged() end -- the mailbox and the Mail rules window
 end
 
+-- Just right of the To box, or right of Posty Forever's address book button (Postal's
+-- BlackBook, the same place: 25 px at the box's right edge, 2 px up), which would cover it.
+-- Placed at each MAIL_SHOW, as Posty's module can be turned off and on.
+local function PlaceAltsButton()
+    if not altsButton then return end
+    local posty = _G.Postal_BlackBookButton
+    local anchor, y = SendMailNameEditBox, 0
+    if posty and posty.IsShown and posty:IsShown() then anchor, y = posty, -2 end
+    altsButton:ClearAllPoints()
+    altsButton:SetPoint("LEFT", anchor, "RIGHT", altsButton.elvArrow and 3 or 0, y)
+end
+
 local function CreateAltsButton()
     if altsButton or not ns.SendToAltOn() or not (SendMailFrame and SendMailNameEditBox) then return end
     -- A small dropdown arrow just right of the To box. It fits the gap before "Postage"
@@ -207,6 +219,7 @@ function ns.StartMail()
     ns.On("MAIL_SHOW", function()
         mailOpen = true
         CreateAltsButton()
+        PlaceAltsButton()
     end)
     ns.On("MAIL_CLOSED", function() mailOpen = false end)
     ns.On("MAIL_INBOX_UPDATE", function()

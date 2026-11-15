@@ -263,6 +263,31 @@ test("mail rules: shift-click Pack attaches full stacks only, and says so when t
     eq(wow.attachClicks, 3)
 end)
 
+test("Posty Forever: our arrow moves right of its address book button, the rules window past Quick Attach", function()
+    mailNS = wow.load(FILES)
+    wow.login(mailAlts())
+    Postal_BlackBookButton = CreateFrame("Button", "Postal_BlackBookButton", SendMailFrame)
+    Postal_QuickAttachButton1 = CreateFrame("Button", "Postal_QuickAttachButton1", SendMailFrame)
+    Postal_QuickAttachButton1:SetWidth(37)
+    MailFrame = CreateFrame("Frame", "MailFrame")
+    MailFrame:Show()
+    SendMailFrame:Show()
+    wow.fire("MAIL_SHOW")
+    local _, rel, _, x, y = altsButton():GetPoint()
+    local besidePosty = rel == Postal_BlackBookButton and x == 0 and y == -2
+    mailNS.ToggleMailRules(true)
+    local _, rel2, _, x2 = AltsForeverMailRulesFrame:GetPoint()
+    rel2 = rel2 == MailFrame and "MailFrame" or rel2
+    -- Posty's module turned off: back beside the To box.
+    Postal_BlackBookButton:Hide()
+    wow.fire("MAIL_CLOSED") wow.fire("MAIL_SHOW")
+    local _, rel3 = altsButton():GetPoint()
+    Postal_BlackBookButton, Postal_QuickAttachButton1, MailFrame = nil, nil, nil
+    eq(besidePosty, true)
+    eq(rel2, "MailFrame") eq(x2, 12 + 37)
+    eq(rel3, SendMailNameEditBox)
+end)
+
 test("mail rules: the note and Pack sit above the letter's text box, which overlaps them", function()
     atMailbox({ ["c:7:5"] = { ["Tarn Moon"] = LINEN } })
     SendMailScrollFrame = CreateFrame("ScrollFrame", "SendMailScrollFrame", SendMailFrame)

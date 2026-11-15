@@ -305,8 +305,7 @@ function ns.SkinArrow(b, anchor)
     if skin or not Elv() then return end
     pcall(function()
         elvS:HandleNextPrevButton(b, "down")
-        b:ClearAllPoints()
-        b:SetPoint("LEFT", anchor, "RIGHT", 3, 0)
+        b.elvArrow = true -- placed 3 px clear of the To box's border (Mail.lua)
     end)
 end
 
