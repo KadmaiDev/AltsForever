@@ -823,6 +823,20 @@ test("the \"no such player\" line is hidden only for the character just tried, a
     eq(#(wow.filters.CHAT_MSG_SYSTEM or {}), 0, "the filter is gone")
 end)
 
+test("a ping held back by chat lockdown at login still has its \"no such player\" line hidden", function()
+    autoStart()
+    local line = "No player named '%s' is currently playing."
+    wow.chatLockdown = true
+    runTimers() -- the wait after login: the ping is queued, but chat is locked down
+    runTimers() -- more than a few seconds go by
+    runTimers()
+    wow.chatLockdown = nil
+    runTimers() -- now it goes
+    eq(wow.chatFilter("CHAT_MSG_SYSTEM", line:format("Bob Smith")), true)
+    syncPump()
+    eq(#(wow.filters.CHAT_MSG_SYSTEM or {}), 0, "and the filter goes after")
+end)
+
 test("the tick box and /af sync auto turn it off and on; on looks straight away", function()
     local ns = autoStart()
     syncPump()
