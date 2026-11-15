@@ -226,6 +226,13 @@ test("mail rules: turning off Send mail to alts turns the rules off too, and kee
     eq(SendMailNameEditBox:GetText(), "Tarn Moon", "back on, at once")
     eq(packButton():IsShown(), true)
     eq(AltsForeverDB.mailRules["c:7:5"]["Tarn Moon"], LINEN)
+    -- The Mail rules window says so while it's off.
+    mailNS.ToggleMailRules(true)
+    local win = AltsForeverMailRulesFrame
+    eq(win.off:IsShown(), false)
+    mailNS.SetSendToAlt(false)
+    eq(win.off:IsShown(), true, "updated while open")
+    mailNS.SetSendToAlt(true)
 end)
 
 test("mail rules: shift-click Pack attaches full stacks only, and says so when there are none", function()

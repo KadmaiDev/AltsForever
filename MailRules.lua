@@ -745,8 +745,10 @@ FillWindow = function()
     end
     win.fill:SetChecked(ns.MailFillOn())
     win.pack:SetChecked(ns.MailPackOn())
+    local off = not ns.SendToAltOn()
+    win.off:SetShown(off)
     local body = max(shown, 4) * ROW_H + (#list > MAX_ROWS and 18 or 0)
-    win:SetHeight(34 + body + 70)
+    win:SetHeight(34 + body + 70 + (off and 30 or 0))
     -- Item names still loading: look again shortly (a few times at most).
     if missing and tries < 5 and C_Timer then
         tries = tries + 1
@@ -821,6 +823,14 @@ local function CreateWindow()
         L["When the first item you attach has a rule, its character goes in the To box, unless you've typed or picked a name."], ns.SetMailFill)
     f.pack = Check(f, 10, L["Show the Pack button at the mailbox"],
         L["A button above the attachments that attaches from your bags what your rules send to that character."], ns.SetMailPack)
+    -- "Send mail to alts" off stops the rules at the mailbox (Refresh): say so, as the ticks stay.
+    f.off = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.off:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 18, 66)
+    f.off:SetWidth(WIDTH - 36)
+    f.off:SetJustifyH("LEFT")
+    f.off:SetTextColor(0.6, 0.6, 0.6)
+    f.off:SetText(L["Send mail to alts is off in the options, so these rules aren't used at the mailbox."])
+    ns.SkinText(f.off)
     if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverMailRulesFrame" end
     ns.SkinWindow(f)
     f:Hide()
@@ -845,6 +855,7 @@ Changed = function()
     if win and win:IsShown() then FillWindow() end
     if SendMailFrame and SendMailFrame:IsVisible() then Refresh(true) end
 end
+ns.MailRulesChanged = Changed
 
 function ns.StartMailRules()
     ns.On("MAIL_SHOW", function()

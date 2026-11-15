@@ -164,7 +164,7 @@ local altsButton
 function ns.SetSendToAlt(on)
     ns.db.sendToAltOff = not on or nil
     if altsButton then altsButton:SetShown(on) end
-    if ns.RefreshMailRules and SendMailFrame and SendMailFrame:IsVisible() then ns.RefreshMailRules(true) end
+    if ns.MailRulesChanged then ns.MailRulesChanged() end -- the mailbox and the Mail rules window
 end
 
 local function CreateAltsButton()
