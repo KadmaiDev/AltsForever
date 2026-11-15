@@ -41,7 +41,7 @@ test("send to alt: picking a character fills in the To box; own faction only", f
     b.scripts.OnClick(b)
     local texts = {}
     for _, item in ipairs(wow.menu.items) do texts[#texts + 1] = item.text end
-    eq(table.concat(texts, " | "), "Send to | [WARRIOR]Brak Stone | [DRUID]Tarn Moon", "no Horde, not you")
+    eq(table.concat(texts, " | "), "Send to | [WARRIOR]Brak Stone | [DRUID]Tarn Moon | Mail rules...", "no Horde, not you; then the rules window")
     wow.menuItem("[DRUID]Tarn Moon").fn()
     eq(SendMailNameEditBox:GetText(), "Tarn Moon")
 end)

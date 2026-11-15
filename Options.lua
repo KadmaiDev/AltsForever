@@ -172,6 +172,7 @@ function ns.ForgetCharacter(key)
     ns.db.forgotten[key] = time()
     if ns.db.syncWith then ns.db.syncWith[key] = nil end
     if ns.db.pinned then ns.SetPinned(key, false) end
+    if ns.ForgetMailRules then ns.ForgetMailRules(key) end
     ns.PruneRecipeInfo()
     ns.InvalidateCache()
     if ns.LockoutsChanged then ns.LockoutsChanged() end -- an open Lockouts window may list them
@@ -281,7 +282,7 @@ local SETTINGS = {
     { L["Show craftable upgrades when inspecting a player"], InspectAnvilsSelected, function(on) ns.SetInspectAnvils(on) end,
         L["An anvil beside a slot in the inspect window means you or an alt can craft an upgrade for that player that they can wear now and that binds when equipped. Hover or click it to see which. Same as /af inspect."], section = "extras" },
     { L["Send mail to alts"], SendToAltSelected, function(on) ns.SetSendToAlt(on) end,
-        L["An arrow next to the To box at the mailbox to pick one of your characters. Same as /af sendmail."], section = "extras" },
+        L["An arrow next to the To box at the mailbox to pick one of your characters, and your mail rules. Same as /af sendmail."], section = "extras" },
     { L["Show session stats"], StatsSelected, function(on) ns.SetStats(on) end,
         L["Off by default. Your XP bar shows this session's XP and time to level; your bag gold shows gold gained or lost this session, today and this week. Same as /af stats."], section = "extras" },
     { L["Legacy reminders"], LegacySelected, function(on) ns.SetLegacyReminders(on) end,

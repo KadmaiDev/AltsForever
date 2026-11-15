@@ -77,6 +77,21 @@ test("the options menu has Settings..., which opens the page", function()
     wow.inCombat = nil
 end)
 
+test("/af settings (or options, config) opens the Options page; /af help still lists the commands", function()
+    wow.load(FILES)
+    wow.login(nil)
+    for _, word in ipairs({ "settings", "Options", "config" }) do
+        wow.settingsOpened = nil
+        wow.printed = {}
+        SlashCmdList.ALTSFOREVER(word)
+        eq(wow.settingsOpened, 77, word)
+        eq(#wow.printed, 0, word .. ": no help text")
+    end
+    wow.printed = {}
+    SlashCmdList.ALTSFOREVER("help")
+    assert(table.concat(wow.printed, " "):find("/af settings opens the Options page", 1, true))
+end)
+
 test("without Blizzard's settings API the addon still works, with no Settings... entry", function()
     wow.load(FILES)
     Settings = nil

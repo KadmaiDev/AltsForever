@@ -113,6 +113,8 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | Command | What it does |
 |---|---|
 | `/af` | Open or close the overview window |
+| `/af settings` (or `options`, `config`) | Open the Options page |
+| `/af help` | List the commands in chat |
 | `/af rep` | Open or close the Reputation panel |
 | `/af export` | Show every character as text to copy: for a spreadsheet, notes or a Markdown table |
 | `/af sync [Full Name]` | Open the sync window, or swap characters with your character on another game account, e.g. `/af sync Thessa Oakenbrook` |
@@ -133,7 +135,8 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af rulesets` | Show or hide your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; hidden by default |
 | `/af legacy` | List each character's Legacy points to spend and Well Rested rank; `/af legacy on` or `off` turns the chat reminders on or off |
 | `/af role Full Name role` | Choose what a character's upgrades are judged by: `melee`, `ranged`, `caster`, `healer`, `tank` or `feral` (whichever their class has), or `auto` to follow their talents |
-| `/af sendmail` | Turn the send-to-alt arrow at the mailbox on or off |
+| `/af sendmail` | Turn the send-to-alt arrow and your mail rules at the mailbox on or off |
+| `/af mailrules` | Open the Mail rules window: which items always go to which character |
 | `/af scale 150` | Make Alts Forever's windows 150% of their size (any size from 50 to 300); on its own, shows the size; `/af scale eui` follows EllesmereUI's Window Scale |
 | `/af minimap` | Show or hide the minimap button (the data broker launcher stays) |
 | `/af stats` | Turn session stats on or off (off by default): XP this session and time to level on the XP bar, gold this session, today and this week on your bag gold |

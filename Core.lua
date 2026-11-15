@@ -161,6 +161,7 @@ local DB_FIELDS = {
     cratesOff = "boolean", goldTipOff = "boolean", barsOff = "boolean", recipeCategories = "table", profArt = "table",
     inspectAnvilsOff = "boolean", overviewSort = "string", overviewSortRev = "boolean",
     windows = "table", pinned = "table", hiddenColumns = "table",
+    mailRules = "table", mailFillOff = "boolean", mailPackOff = "boolean",
 }
 
 -- Keeps only entries whose key and value are of these types (value nil = any).
@@ -235,6 +236,13 @@ local function Repair(saved)
     end
     if saved.recipeCategories then KeepOnly(saved.recipeCategories, "number", "string") end
     if saved.profArt then KeepOnly(saved.profArt, "string", "string") end
+    if saved.mailRules then
+        KeepOnly(saved.mailRules, "string", "table")
+        for rule, names in pairs(saved.mailRules) do
+            KeepOnly(names, "string", "number")
+            if next(names) == nil then saved.mailRules[rule] = nil end
+        end
+    end
     local chars = saved.chars
     -- A character under a key that isn't a name moves to its own name if that's free.
     local moved = {}
@@ -523,6 +531,7 @@ ns.On("PLAYER_LOGIN", function()
     ns.charKey, ns.char = ns.InitChar(ns.db, name, class, UnitFactionGroup("player"), ns.PlayerRealm())
     ns.StartScanner()
     ns.StartMail()
+    ns.StartMailRules()
     ns.StartMoney()
     ns.StartProfessions()
     ns.StartCharacter()
@@ -774,6 +783,11 @@ function commands.minimap()
     Print(ns.MinimapButtonOn() and L["Minimap button shown."] or L["Minimap button hidden. /af minimap brings it back."])
 end
 
+-- /af mailrules: the Mail rules window (MailRules.lua).
+function commands.mailrules()
+    ns.ToggleMailRules()
+end
+
 function commands.sendmail()
     ns.SetSendToAlt(not ns.SendToAltOn())
     Print(ns.SendToAltOn() and L["Send to alt arrow at the mailbox on."] or L["Send to alt arrow at the mailbox off."])
@@ -839,6 +853,7 @@ end
 
 function commands.help()
     Print(L["by Kadmai. /af opens the overview. Also: /af rep | export | mail | list | delete Name | skillups | sendmail | minimap | stats | mem"])
+    Print(L["/af settings opens the Options page; /af help lists every command."])
     Print(L["/af search (or /afs), with or without a name, finds an item on any of your characters, or who can craft it."])
     Print(L["/af tooltips turns everything Alts Forever adds to tooltips on or off. /af crafting, crates, gold and bars turn one part on or off."])
     Print(L["/af counts turns the item counts in tooltips on or off (if another addon, such as Baganator, already shows them)."])
@@ -855,6 +870,7 @@ function commands.help()
     Print(L["/af resetwindows puts Alts Forever's windows back where they open by default."])
     if ns.HasEllesmereScale() then Print(L["/af scale eui makes them follow EllesmereUI's Window Scale again (the default)."]) end
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
+    Print(L["/af mailrules lists which items always go to which character by mail; make rules from the arrow beside the To box at the mailbox."])
     Print(L["/af lockouts opens your characters' raid lockouts and the instances each game account has entered this hour."])
     Print(L["/af sync and the name of your character on another game account swaps characters with it, so both accounts see all of them. Both need to be online at the same time, on the same ruleset and faction."])
     Print(L["/af sync auto turns syncing by itself on or off."])
@@ -862,6 +878,12 @@ function commands.help()
     Print(L["Or use the minimap button (right-click for options)."])
 end
 ns.ShowHelp = commands.help
+
+-- Opens the Options page (Options.lua); without one (it failed to register), the help.
+function commands.settings()
+    if not ns.OpenSettings() then commands.help() end
+end
+commands.options, commands.config = commands.settings, commands.settings
 
 -- For the menus: runs a slash command by name.
 function ns.RunCommand(name, arg)

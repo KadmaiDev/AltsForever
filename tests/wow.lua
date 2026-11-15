@@ -13,7 +13,7 @@ local KNOWN_EVENTS = {
     PLAYER_EQUIPMENT_CHANGED = true, INSPECT_READY = true,
     BANKFRAME_OPENED = true, BANKFRAME_CLOSED = true, INPUT_DEVICE_INTERFACE_TRANSITION = true,
     MAIL_SHOW = true, MAIL_CLOSED = true, MAIL_INBOX_UPDATE = true,
-    MAIL_SEND_SUCCESS = true, MAIL_FAILED = true,
+    MAIL_SEND_SUCCESS = true, MAIL_FAILED = true, MAIL_SEND_INFO_UPDATE = true,
     PLAYER_MONEY = true,
     PLAYER_XP_UPDATE = true, UPDATE_EXHAUSTION = true, PLAYER_LEVEL_UP = true, PLAYER_UPDATE_RESTING = true,
     ZONE_CHANGED_NEW_AREA = true, HEARTHSTONE_BOUND = true, PLAYER_AVG_ITEM_LEVEL_UPDATE = true,
@@ -480,6 +480,11 @@ function M.load(files)
             local s = slotData(bag, slot)
             return s and { itemID = s.id, stackCount = s.count }
         end,
+        -- Picking up a slot puts it on the cursor, unless it's locked (attached to a mail).
+        PickupContainerItem = function(bag, slot)
+            local s = slotData(bag, slot)
+            if s and not s.locked then M.cursor = { bag = bag, slot = slot } end
+        end,
         ContainerIDToInventoryID = function(bag)
             if bag >= 1 and bag <= 5 then return 30 + bag end
             error("invalid bag")
@@ -508,7 +513,14 @@ function M.load(files)
         IsItemDataCachedByID = function(id) return not M.uncached[id] end,
         GetItemSpell = function(id) if M.itemSpell[id] then return "Use", M.itemSpell[id] end end,
         GetItemNameByID = function(id) return M.itemNames[id] end,
+        IsLocked = function(loc) local s = slotData(loc.bag, loc.slot) return s and s.locked or false end,
+        IsBound = function(loc) local s = slotData(loc.bag, loc.slot) return s and s.bound or false end,
+        GetItemClassInfo = function(class) return ({ [4] = "Armor", [7] = "Trade Goods" })[class] end,
+        GetItemSubClassInfo = function(class, sub)
+            return ({ ["7:5"] = "Cloth", ["7:7"] = "Metal & Stone", ["7:9"] = "Herb", ["7:11"] = "Other", ["4:1"] = "Cloth" })[class .. ":" .. sub]
+        end,
         GetItemQualityByID = function(id) return M.itemQuality[id] end,
+        GetItemMaxStackSizeByID = function(id) return (M.items[id] or {}).stack end,
         -- name, link, ..., required level (5th), ..., equip location (9th), ..., bind type (14th)
         GetItemInfo = function(item)
             local id = type(item) == "number" and item or tonumber(item:match("item:(%d+)"))
@@ -546,10 +558,35 @@ function M.load(files)
         local item = M.outbox[i]
         if item then return "Item", item[1], nil, item[2] end
     end
+    HasSendMailItem = function(i) return M.outbox[i] ~= nil end
     SendMail = function() end
-    -- The send-mail screen: the To box keeps its text.
+    -- The send-mail screen: the To box keeps its text. Like the game, setting its text
+    -- runs OnTextChanged (userInput false); M.type(text) is the player typing.
     SendMailFrame = CreateFrame("Frame", "SendMailFrame")
     SendMailNameEditBox = CreateFrame("EditBox", "SendMailNameEditBox")
+    function SendMailNameEditBox:SetText(text)
+        self.text = text
+        if self.scripts.OnTextChanged then self.scripts.OnTextChanged(self, false) end
+    end
+    function M.type(text)
+        SendMailNameEditBox.text = text
+        if SendMailNameEditBox.scripts.OnTextChanged then SendMailNameEditBox.scripts.OnTextChanged(SendMailNameEditBox, true) end
+    end
+    -- The cursor (C_Container.PickupContainerItem) and dropping it on an attachment slot:
+    -- the item goes in the outbox and its bag slot locks, as the game does.
+    M.cursor, M.attachClicks = nil, nil
+    CursorHasItem = function() return M.cursor ~= nil end
+    ClearCursor = function() M.cursor = nil end
+    ClickSendMailItemButton = function(i)
+        local c = M.cursor
+        if not c or M.outbox[i] then return end
+        local s = M.bags[c.bag][c.slot]
+        M.outbox[i] = { s.id, s.count }
+        s.locked = true
+        M.cursor = nil
+        M.attachClicks = (M.attachClicks or 0) + 1
+        M.fire("MAIL_SEND_INFO_UPDATE") -- assumed to come at once, inside the click
+    end
     M.outboxMoney = 0
     GetSendMailMoney = function() return M.outboxMoney end
     M.timers = {}

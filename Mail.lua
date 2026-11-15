@@ -91,6 +91,15 @@ function ns.RecipientKey(recipient)
     return ns.FindChar(name)
 end
 
+-- Whether you can mail a character from this one: not you, and your own faction on your
+-- own ruleset (an unknown faction counts as yours).
+function ns.CanMailTo(key)
+    local c = key and ns.db.chars[key]
+    if not c or key == ns.charKey then return false end
+    local faction = ns.char.faction
+    return (not c.faction or not faction or c.faction == faction) and not ns.Elsewhere(c)
+end
+
 ---------------------------------------------------------------------------
 -- "Alts" button beside the To box on the send-mail screen: picking one of your characters
 -- fills in their name (nothing is sent). Characters who can still skill up with an
@@ -112,11 +121,10 @@ function ns.SendToAltEntries()
         if not issecretvalue(id) and id then attached[#attached + 1] = id end
     end
     wipe(entries)
-    local chars, faction = ns.db.chars, ns.char.faction
+    local chars = ns.db.chars
     for i, key in ipairs(ns.OverviewOrder()) do
         local c = chars[key]
-        -- Mail only goes to your own faction, on your own ruleset.
-        if key ~= ns.charKey and (not c.faction or not faction or c.faction == faction) and not ns.Elsewhere(c) then
+        if ns.CanMailTo(key) then
             local n = 0
             for _, id in ipairs(attached) do
                 if ns.CanSkillUpWith(c, id) then n = n + 1 end
@@ -140,8 +148,13 @@ local function AltsMenu(owner)
             if e.n > 0 then
                 text = text .. LIGHT .. " · " .. (e.n == 1 and L["skill-ups with %d item"] or L["skill-ups with %d items"]):format(e.n) .. "|r"
             end
-            root:CreateButton(text, function() SendMailNameEditBox:SetText(c.name or e.key) end)
+            root:CreateButton(text, function()
+                SendMailNameEditBox:SetText(c.name or e.key)
+                if ns.MailRecipientChosen then ns.MailRecipientChosen() end -- MailRules.lua
+            end)
         end
+        -- Mail rules (MailRules.lua): suggestions, "Remember for ...", the rules window.
+        if ns.AddMailRuleMenu then ns.AddMailRuleMenu(root) end
     end)
 end
 
@@ -154,6 +167,19 @@ local altsButton
 function ns.SetSendToAlt(on)
     ns.db.sendToAltOff = not on or nil
     if altsButton then altsButton:SetShown(on) end
+    if ns.MailRulesChanged then ns.MailRulesChanged() end -- the mailbox and the Mail rules window
+end
+
+-- Just right of the To box, or right of Posty Forever's address book button (Postal's
+-- BlackBook, the same place: 25 px at the box's right edge, 2 px up), which would cover it.
+-- Placed at each MAIL_SHOW, as Posty's module can be turned off and on.
+local function PlaceAltsButton()
+    if not altsButton then return end
+    local posty = _G.Postal_BlackBookButton
+    local anchor, y = SendMailNameEditBox, 0
+    if posty and posty.IsShown and posty:IsShown() then anchor, y = posty, -2 end
+    altsButton:ClearAllPoints()
+    altsButton:SetPoint("LEFT", anchor, "RIGHT", altsButton.elvArrow and 3 or 0, y)
 end
 
 local function CreateAltsButton()
@@ -196,6 +222,7 @@ function ns.StartMail()
     ns.On("MAIL_SHOW", function()
         mailOpen = true
         CreateAltsButton()
+        PlaceAltsButton()
     end)
     ns.On("MAIL_CLOSED", function() mailOpen = false end)
     ns.On("MAIL_INBOX_UPDATE", function()
