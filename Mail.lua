@@ -148,7 +148,10 @@ local function AltsMenu(owner)
             if e.n > 0 then
                 text = text .. LIGHT .. " · " .. (e.n == 1 and L["skill-ups with %d item"] or L["skill-ups with %d items"]):format(e.n) .. "|r"
             end
-            root:CreateButton(text, function() SendMailNameEditBox:SetText(c.name or e.key) end)
+            root:CreateButton(text, function()
+                SendMailNameEditBox:SetText(c.name or e.key)
+                if ns.MailRecipientChosen then ns.MailRecipientChosen() end -- MailRules.lua
+            end)
         end
         -- Mail rules (MailRules.lua): suggestions, "Remember for ...", the rules window.
         if ns.AddMailRuleMenu then ns.AddMailRuleMenu(root) end

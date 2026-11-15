@@ -218,8 +218,10 @@ end
 -- What a suggestion makes: a category rule for trade goods (all the cloth), else one item.
 function ns.SuggestedRule(id)
     local rule = CategoryRule(id)
-    local class, sub = rule and rule:match("^c:(%d+):(%d+)$")
-    if tonumber(class) == TRADE_GOODS and tonumber(sub) ~= OTHER_GOODS then return rule end
+    if rule then
+        local class, sub = rule:match("^c:(%d+):(%d+)$")
+        if tonumber(class) == TRADE_GOODS and tonumber(sub) ~= OTHER_GOODS then return rule end
+    end
     return ItemRule(id)
 end
 
@@ -482,6 +484,15 @@ local function Refresh(fill)
 end
 ns.RefreshMailRules = Refresh
 
+-- The player chose the name in the To box (the arrow's menu, Pack): it's theirs, even if
+-- a rule had filled in the same name, so no rule changes it until the attachments empty.
+-- Call it after setting the text (OnTextChanged clears `manual` while nothing is attached).
+function ns.MailRecipientChosen()
+    manual = true
+    filled, auto, restore = nil, nil, nil
+    Refresh(false)
+end
+
 -- Undo: the note's click empties the To box we filled in, and it stays empty.
 local function Undo()
     if not (note and note.undo) then return end
@@ -530,8 +541,9 @@ local function Pack()
         return ns.Print(L["No full stacks to pack. The game doesn't join part stacks: stack your bags first."])
     end
     if ToText() == "" then
-        filled = ns.db.chars[who].name or who
-        SendMailNameEditBox:SetText(filled)
+        -- Clicking Pack chose them: theirs now, kept whatever is attached first (peer review).
+        SendMailNameEditBox:SetText(ns.db.chars[who].name or who)
+        ns.MailRecipientChosen()
     end
     local free = {}
     for i = 1, MAX_SEND do

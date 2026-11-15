@@ -207,6 +207,8 @@ test("mail rules: Pack fills only the free attachment slots, and can be turned o
     p.scripts.OnClick(p)
     eq(wow.outbox[12][1], LINEN)
     eq(wow.attachClicks, 1)
+    wow.fire("MAIL_SEND_INFO_UPDATE")
+    eq(SendMailNameEditBox:GetText(), "Tarn Moon", "Pack chose Tarn: kept, though the first attachment has no rule")
     wow.outbox = {}
     mailNS.SetMailPack(false)
     eq(p:IsShown(), false)
@@ -337,6 +339,30 @@ test("Posty Forever: a rule replaces the name its autofill put in, and undo puts
     attach(1, LINEN, 20)
     eq(SendMailNameEditBox:GetText(), "Somebody Else")
     PostyForever, MailFrameTab_OnClick, OpenMail_Reply = nil, nil, nil
+end)
+
+test("mail rules: picking the name a rule filled in makes it yours", function()
+    atMailbox({ ["c:7:5"] = { ["Tarn Moon"] = LINEN }, ["c:7:7"] = { ["Brak Stone"] = COPPER } })
+    attach(1, LINEN, 20)
+    attach(2, COPPER, 10)
+    eq(SendMailNameEditBox:GetText(), "Tarn Moon", "filled in by the cloth rule")
+    openArrow()
+    local pick
+    for _, item in ipairs(wow.menu.items) do
+        if item.text and item.text:find("^%[DRUID%]Tarn Moon") then pick = item end
+    end
+    pick.fn()
+    eq(noteText(), nil, "no longer ours to explain")
+    attach(1, nil)
+    eq(SendMailNameEditBox:GetText(), "Tarn Moon", "the ore is first now, but the player chose Tarn")
+end)
+
+test("mail rules: suggestions make a category rule for trade goods, but not for Trade Goods: Other", function()
+    atMailbox()
+    wow.itemClass[4470], wow.items[4470] = 7, { sub = 11 }
+    eq(mailNS.SuggestedRule(4470), "i:4470", "Other is too vague for a rule of its own")
+    eq(mailNS.SuggestedRule(LINEN), "c:7:5", "all cloth")
+    eq(mailNS.SuggestedRule(SHIRT), "i:45", "not a trade good")
 end)
 
 test("mail rules: the note and Pack sit above the letter's text box, which overlaps them", function()
