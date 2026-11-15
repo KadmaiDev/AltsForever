@@ -242,6 +242,11 @@ local nowList, nowSet, names = {}, {}, {} -- scratch; names[itemID] = name from 
 local filled -- the name our rules put in the To box (nil once it says something else)
 local manual -- the player changed what we filled in; cleared when the attachments empty
 local note, pack, busy
+-- Posty Forever's "Autofill last person mailed" (on by default) puts the last name sent to
+-- in the To box after each send and on switching to Send Mail. That name is its guess, not
+-- the player's choice, so a rule may replace it (owner, 2026-11-15): `auto` = the name it
+-- filled in, `restore` = the one our fill replaced (put back by undo, or when its item goes).
+local auto, restore, replying
 
 local function ToText()
     local text = SendMailNameEditBox and SendMailNameEditBox:GetText()
@@ -292,6 +297,39 @@ local function ItemName(id)
     if issecretvalue(name) or not name then name = names[id] end
     if issecretvalue(name) or not name then return L["Item %d"]:format(id) end
     return name
+end
+
+-- The name Posty Forever's autofill would put in the To box now, or nil (BlackBook.lua:
+-- the first of its recent recipients, "name|realm|faction", on this realm and faction who
+-- isn't you). Its saved settings are read only, never changed.
+local function PostyAutoName()
+    local posty = _G.PostyForever
+    local db = type(posty) == "table" and type(posty.db) == "table" and type(posty.db.profile) == "table"
+        and posty.db.profile.BlackBook
+    if type(db) ~= "table" or not db.AutoFill or type(db.recent) ~= "table" then return nil end
+    local realm, faction = GetRealmName(), UnitFactionGroup("player")
+    if issecretvalue(realm) or issecretvalue(faction) then return nil end
+    local me = ns.char and ns.char.name
+    for _, entry in ipairs(db.recent) do
+        if type(entry) == "string" then
+            local p, r, f = entry:match("^([^|]*)|([^|]*)|([^|]*)$")
+            if p and r == realm and f == faction and p ~= me and p ~= ns.charKey then return p end
+        end
+    end
+end
+
+-- A frame after a send or switching to Send Mail (Posty fills the box inside both, after
+-- our hooks run), a name it put there is its guess. Never after Reply, which fills in the
+-- sender through the same tab switch.
+local function CatchAutoFill()
+    if not C_Timer then return end
+    C_Timer.After(0, function()
+        local reply = replying
+        replying = nil
+        if reply or not (SendMailFrame and SendMailFrame:IsVisible()) then return end
+        local text = ToText()
+        if text ~= "" and text == PostyAutoName() and ReadAttachments() == 0 then auto = text end
+    end)
 end
 
 -- An attachment whose rule sends it to someone other than `recipient`: its ID and who.
@@ -423,17 +461,21 @@ local function Refresh(fill)
     if fill and ns.MailFillOn() and not manual then
         if target then
             local name = ns.db.chars[target].name or target
-            if text ~= name and (text == "" or text == filled) then
+            if text ~= name and (text == "" or text == filled or (auto and text == auto)) then
+                if auto and text == auto then restore, auto = auto, nil end
                 filled = name
                 SendMailNameEditBox:SetText(name)
                 text = name
             end
         elseif filled and text == filled then
-            SendMailNameEditBox:SetText("")
-            text = ""
+            -- Its item is gone: back to what was there before (Posty's guess) or empty.
+            text, auto, restore = restore or "", restore, nil
+            filled = nil
+            SendMailNameEditBox:SetText(text)
         end
     end
-    if filled and text ~= filled then filled = nil end
+    if filled and text ~= filled then filled, restore = nil, nil end
+    if auto and text ~= auto then auto = nil end
     UpdateNote(text, target and rule)
     UpdatePack()
     busy = false
@@ -444,8 +486,10 @@ ns.RefreshMailRules = Refresh
 local function Undo()
     if not (note and note.undo) then return end
     manual = true
-    filled = nil
-    SendMailNameEditBox:SetText("")
+    filled, auto = nil, nil
+    local back = restore or ""
+    restore = nil
+    SendMailNameEditBox:SetText(back)
     Refresh(false)
 end
 
@@ -590,9 +634,12 @@ local function CreateMailParts()
 
     -- Typing in the To box (or picking from its autocomplete) is the player's choice.
     SendMailNameEditBox:HookScript("OnTextChanged", function(_, userInput)
-        if userInput then manual = true end
+        if userInput then manual, auto, restore = true, nil, nil end
         Refresh(false)
     end)
+    -- Switching to Send Mail, and Reply, which switches too (see CatchAutoFill).
+    if type(MailFrameTab_OnClick) == "function" then hooksecurefunc("MailFrameTab_OnClick", CatchAutoFill) end
+    if type(OpenMail_Reply) == "function" then hooksecurefunc("OpenMail_Reply", function() replying = true end) end
 end
 
 ---------------------------------------------------------------------------
@@ -867,14 +914,15 @@ function ns.StartMailRules()
     ns.On("MAIL_SHOW", function()
         wipe(order)
         wipe(inOrder)
-        filled, manual = nil, nil
+        filled, manual, auto, restore, replying = nil, nil, nil, nil, nil
         CreateMailParts()
         RaiseMailParts()
         Refresh(true)
     end)
     ns.On("MAIL_SEND_INFO_UPDATE", function() Refresh(true) end)
     ns.On("MAIL_SEND_SUCCESS", function()
-        filled, manual = nil, nil
+        filled, manual, auto, restore = nil, nil, nil, nil
+        CatchAutoFill()
     end)
     ns.On("BAG_UPDATE_DELAYED", function()
         if pack and SendMailFrame and SendMailFrame:IsVisible() then UpdatePack() end

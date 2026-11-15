@@ -288,6 +288,57 @@ test("Posty Forever: our arrow moves right of its address book button, the rules
     eq(rel3, SendMailNameEditBox)
 end)
 
+-- Posty Forever's BlackBook autofill, as its saved settings and hooks would leave things.
+function postyAutofill(recent)
+    PostyForever = { db = { profile = { BlackBook = { AutoFill = true, recent = recent } } } }
+end
+
+test("Posty Forever: a rule replaces the name its autofill put in, and undo puts it back", function()
+    MailFrameTab_OnClick = function() end
+    OpenMail_Reply = function() SendMailNameEditBox:SetText("Somebody Else") end
+    atMailbox({ ["c:7:5"] = { ["Tarn Moon"] = LINEN } })
+    postyAutofill({ "Brak Stone|" .. tostring(GetRealmName()) .. "|Alliance" })
+    -- Switching to Send Mail: Posty fills in Brak after Blizzard's tab code (and our hook).
+    MailFrameTab_OnClick(nil, 2)
+    SendMailNameEditBox:SetText("Brak Stone")
+    runTimers()
+    attach(1, LINEN, 20)
+    eq(SendMailNameEditBox:GetText(), "Tarn Moon", "the rule wins over Posty's guess")
+    eq(noteText(), "|cffc0c0c0Filled in by your Cloth rule (click to undo)|r")
+    mailNote().scripts.OnClick(mailNote())
+    eq(SendMailNameEditBox:GetText(), "Brak Stone", "undo: Posty's name back")
+    attach(1, nil) attach(1, LINEN, 20)
+    eq(SendMailNameEditBox:GetText(), "Brak Stone", "and now it's kept")
+    -- After a send: Posty fills in the last name again; taking the item off puts it back.
+    attach(1, nil)
+    wow.fire("MAIL_SEND_SUCCESS")
+    SendMailNameEditBox:SetText("Brak Stone")
+    runTimers()
+    attach(1, LINEN, 20)
+    eq(SendMailNameEditBox:GetText(), "Tarn Moon")
+    attach(1, nil)
+    eq(SendMailNameEditBox:GetText(), "Brak Stone", "the item gone: Posty's name back")
+    -- Reply fills in the sender through the same tab switch: never replaced.
+    attach(1, nil)
+    SendMailNameEditBox:SetText("")
+    postyAutofill({ "Somebody Else|" .. tostring(GetRealmName()) .. "|Alliance" })
+    OpenMail_Reply()
+    MailFrameTab_OnClick(nil, 2)
+    runTimers()
+    attach(1, LINEN, 20)
+    eq(SendMailNameEditBox:GetText(), "Somebody Else", "a reply's name is kept")
+    -- A name Posty didn't fill in (picked, typed) is kept as always.
+    attach(1, nil)
+    SendMailNameEditBox:SetText("")
+    postyAutofill({ "Brak Stone|" .. tostring(GetRealmName()) .. "|Alliance" })
+    MailFrameTab_OnClick(nil, 2)
+    SendMailNameEditBox:SetText("Somebody Else")
+    runTimers()
+    attach(1, LINEN, 20)
+    eq(SendMailNameEditBox:GetText(), "Somebody Else")
+    PostyForever, MailFrameTab_OnClick, OpenMail_Reply = nil, nil, nil
+end)
+
 test("mail rules: the note and Pack sit above the letter's text box, which overlaps them", function()
     atMailbox({ ["c:7:5"] = { ["Tarn Moon"] = LINEN } })
     SendMailScrollFrame = CreateFrame("ScrollFrame", "SendMailScrollFrame", SendMailFrame)
