@@ -1,4 +1,4 @@
-## Alts Forever (not yet released)
+## Alts Forever 1.8.0
 
 - **Mail in the bags window:** a new **Mail** button beside Bags and Bank (also in a character's right-click menu) shows what was in that character's mailbox when they last opened it, plus anything your characters have mailed them since. It can't know about mail that arrived after that, and says so, with when the mailbox was last opened at the bottom. Searching for an item that's only in someone's mail now opens it there. Thanks to the player who asked.
 - **Items keep their bonus:** weapons and armour with a random bonus or an enchant, such as a Curved Dagger of Intellect, now show as themselves in the bags window, with their full name and stats, and link as themselves. Each character's items are picked up the next time you log in on them or visit their bank. Thanks to the player who reported it.
