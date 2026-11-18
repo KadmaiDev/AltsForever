@@ -1,3 +1,9 @@
+## Alts Forever (not yet released)
+
+- **Upgrade suggestions weigh stats more like Pawn:** casters and healers now value Spirit and Intellect more and Stamina less, so a priest is no longer offered +2 Stamina over the +1 Spirit they wear. Rogues value Strength more; tanks value armour less and their weapon more; protection paladins value spell damage a little less and Intellect, crit and mana regeneration a little; Survival hunters value their melee weapon more. Hunters' other weights are unchanged. Some upgrade arrows and anvils will change. Thanks to the player who asked.
+- **Dodge, parry and block were badly overrated:** the game gives them as ratings (12 dodge, 15 parry or 5 block is 1%), and Alts Forever counted each point as a whole percent, so gear like the Boots of Avoidance or the Boar Signet looked like huge upgrades for tanks.
+- **New stats count:** haste, expertise and spell damage of one school ("+17 Arcane Damage") now count towards upgrades. School damage counts for the classes and talent trees that cast it: Arcane for an Arcane mage, Shadow for a warlock or Shadow priest, Holy for a Protection or Retribution paladin, Nature for a shaman, and so on.
+
 ## Alts Forever 1.8.0
 
 - **Mail in the bags window:** a new **Mail** button beside Bags and Bank (also in a character's right-click menu) shows what was in that character's mailbox when they last opened it, plus anything your characters have mailed them since. It can't know about mail that arrived after that, and says so, with when the mailbox was last opened at the bottom. Searching for an item that's only in someone's mail now opens it there. Thanks to the player who asked.

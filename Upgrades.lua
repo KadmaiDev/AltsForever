@@ -36,7 +36,9 @@ local STATS = {
     ITEM_MOD_STRENGTH_SHORT = "str", ITEM_MOD_AGILITY_SHORT = "agi", ITEM_MOD_STAMINA_SHORT = "sta",
     ITEM_MOD_INTELLECT_SHORT = "int", ITEM_MOD_SPIRIT_SHORT = "spi",
     ITEM_MOD_ATTACK_POWER_SHORT = "ap", ITEM_MOD_RANGED_ATTACK_POWER_SHORT = "rap",
-    ITEM_MOD_SPELL_POWER_SHORT = "sp", ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = "sp", -- the second unchecked
+    ITEM_MOD_SPELL_POWER_SHORT = "sp", ITEM_MOD_SPELL_DAMAGE_DONE_SHORT = "sp", -- the second unchecked;
+    -- "damage and healing ... by up to 11" is SPELL_POWER 11 alone, no healing entry (Crusader's
+    -- Silvered Chain Helm, owner's probe 2026-11-19)
     ITEM_MOD_SPELL_HEALING_DONE_SHORT = "heal",
     ITEM_MOD_POWER_REGEN0_SHORT = "mp5", ITEM_MOD_MANA_REGENERATION_SHORT = "mp5",
     ITEM_MOD_CRIT_RATING_SHORT = "crit", ITEM_MOD_CRIT_MELEE_RATING_SHORT = "crit",
@@ -46,6 +48,13 @@ local STATS = {
     ITEM_MOD_DEFENSE_SKILL_RATING_SHORT = "def", ITEM_MOD_DODGE_RATING_SHORT = "dodge",
     ITEM_MOD_PARRY_RATING_SHORT = "parry", ITEM_MOD_BLOCK_RATING_SHORT = "block",
     ITEM_MOD_BLOCK_VALUE_SHORT = "blockvalue",
+    -- Names listed in game by the owner, 2026-11-19 (every ITEM_MOD_*_SHORT global): haste,
+    -- expertise and one spell damage per school ("+17 Arcane Damage" is
+    -- ITEM_MOD_ARCANE_DAMAGE_DONE_SHORT 17, Arcane Remnant Leggings).
+    ITEM_MOD_HASTE_RATING_SHORT = "haste", ITEM_MOD_EXPERTISE_RATING_SHORT = "expertise",
+    ITEM_MOD_ARCANE_DAMAGE_DONE_SHORT = "arcane", ITEM_MOD_FIRE_DAMAGE_DONE_SHORT = "fire",
+    ITEM_MOD_FROST_DAMAGE_DONE_SHORT = "frost", ITEM_MOD_NATURE_DAMAGE_DONE_SHORT = "nature",
+    ITEM_MOD_SHADOW_DAMAGE_DONE_SHORT = "shadow", ITEM_MOD_HOLY_DAMAGE_DONE_SHORT = "holy",
     RESISTANCE0_NAME = "armor", ITEM_MOD_DAMAGE_PER_SECOND_SHORT = "dps",
 }
 
@@ -53,9 +62,23 @@ local STATS = {
 -- "critical strike by 1.0%" and reports ITEM_MOD_CRIT_RATING_SHORT = 14 (checked in game
 -- 2026-11-11, seen from a low-level character, so the tooltip's figure isn't scaled to the
 -- viewer). Until then 14 rating was scored as 14%. Hit is 10 per 1%: Observer's Shield, "chance
--- to hit by 1.0%", ITEM_MOD_HIT_RATING_SHORT = 10 (same day). The avoidance ratings are
--- unchecked and left as they were. A shield's own "38 Block" isn't in GetItemStats at all.
-local PER_PERCENT = { crit = 14, spellcrit = 14, hit = 10, spellhit = 10 }
+-- to hit by 1.0%", ITEM_MOD_HIT_RATING_SHORT = 10 (same day). Block is 5 per 1%: Boar
+-- Signet, "chance to Block attacks with a shield by 1.0%", ITEM_MOD_BLOCK_RATING_SHORT = 5
+-- (owner's probe 2026-11-19; read as 5% until then, so it showed as a big upgrade for
+-- Vespera). Dodge and parry are unchecked and left as they were. A shield's own "38 Block"
+-- isn't in GetItemStats at all; Block Value is ITEM_MOD_BLOCK_VALUE_SHORT (checked the same
+-- day on the Twilight Lord Girdle). Defense is skill points, 1 to 1 ("Increased Defense
+-- +9" = ITEM_MOD_DEFENSE_SKILL_RATING_SHORT 9, Unbridled Leggings, same day).
+-- The three measured (crit 14, hit 10, block 5) are exactly the Burning Crusade rating table
+-- at level 60, so haste (10 per 1%) is taken from the same table (inferred, not yet seen on
+-- an item). Expertise, dodge and parry were predicted from it and then checked (owner's
+-- probes, the same day): Defias Enforcer's Mask, "Dodged or Parried by 1.0%" =
+-- ITEM_MOD_EXPERTISE_RATING_SHORT 10; Boots of Avoidance, "dodge an attack by 1.5%" =
+-- ITEM_MOD_DODGE_RATING_SHORT 18; Krol'dok Warplate Gauntlets, "Parry an attack by 1.0%" =
+-- ITEM_MOD_PARRY_RATING_SHORT 15. Until 2026-11-19 dodge and parry were
+-- read as whole percents, twelve and fifteen times too much.
+local PER_PERCENT = { crit = 14, spellcrit = 14, hit = 10, spellhit = 10, block = 5,
+    dodge = 12, parry = 15, haste = 10, expertise = 10 }
 
 -- What a point of each stat is worth, per role, for levelling (crit and hit per 1%).
 -- Reviewed 2026-11-11 against Forever's reworked trees (talentsforever.com's data and
@@ -64,34 +87,47 @@ local PER_PERCENT = { crit = 14, spellcrit = 14, hit = 10, spellhit = 10 }
 -- their spell ones; healing power counts as spell damage at a third; druid forms hit with
 -- the weapon's dps; Enhancement gets attack power and spell damage from Intellect. A weapon's dps counts as `dps`, or `rdps` in the ranged slot. The hunter
 -- weights are the ones Upgrade Trail checked against real items.
+-- Moved partway towards Pawn 2.14's Forever weights (curated by HawsJon) on 2026-11-18,
+-- after a player's priest was offered +2 Stamina over +1 Spirit: casters and healers value
+-- Spirit and Intellect more and Stamina less, rogues Strength more, tanks armour less and
+-- their weapon more, protection paladins spell damage less (Pawn: 0.44 of Stamina) and
+-- Intellect and crit a little, Survival hunters their melee weapon more. Hunters' other
+-- weights are left as Upgrade Trail checked them; Pawn's are for level 60, ours for levelling.
 local WEIGHTS = {
+    -- Haste per 1% as about two thirds of crit for physical roles and nine tenths for spells,
+    -- expertise about four fifths of hit for melee, as in Pawn's Forever weights.
     hunter = { agi = 2.4, ap = 1, rap = 1, sta = 0.4, int = 0.3, spi = 0.05, crit = 22, hit = 16,
-        armor = 0.02, dps = 0.5, rdps = 14 },
-    rogue = { agi = 2, str = 1, ap = 1, sta = 0.4, crit = 20, hit = 18, armor = 0.02, dps = 10, rdps = 1 },
-    warrior = { str = 2, agi = 1.4, ap = 1, sta = 0.5, crit = 20, hit = 18, armor = 0.02, dps = 12, rdps = 1 },
+        haste = 13, armor = 0.02, dps = 0.5, rdps = 14 },
+    rogue = { agi = 2, str = 1.4, ap = 1, sta = 0.4, crit = 20, hit = 18, haste = 14, expertise = 14,
+        armor = 0.02, dps = 10, rdps = 1 },
+    warrior = { str = 2, agi = 1.4, ap = 1, sta = 0.5, crit = 20, hit = 18, haste = 13, expertise = 14,
+        armor = 0.02, dps = 12, rdps = 1 },
     -- Retribution's Champion of the Light turns Intellect into spell damage for its Holy hits.
-    paladin = { str = 2, agi = 1, ap = 1, sta = 0.5, int = 0.6, sp = 0.4, crit = 18, hit = 16,
-        armor = 0.02, dps = 12 },
-    enhancement = { str = 2, agi = 1.2, ap = 1, sta = 0.5, int = 1, sp = 0.3, crit = 18, hit = 16, armor = 0.02, dps = 12 },
-    feral = { str = 2, agi = 1.6, ap = 1, sta = 0.8, crit = 18, hit = 16, armor = 0.05, def = 0.5, dodge = 6,
-        dps = 10 },
-    tank = { sta = 1.5, str = 1, agi = 1, armor = 0.1, def = 1.5, dodge = 12, parry = 10, block = 6,
-        blockvalue = 0.5, ap = 0.3, hit = 8, dps = 4, rdps = 0.5 },
-    caster = { sp = 1, heal = 0.33, int = 0.5, spi = 0.3, sta = 0.4, mp5 = 1.5, spellcrit = 10, spellhit = 12,
-        crit = 10, hit = 12, rdps = 3 },
-    healer = { heal = 1, sp = 0.9, int = 0.6, spi = 0.5, sta = 0.3, mp5 = 2, spellcrit = 8, crit = 8, rdps = 1 },
+    paladin = { str = 2, agi = 1, ap = 1, sta = 0.5, int = 0.6, sp = 0.4, crit = 18, hit = 16, haste = 6,
+        expertise = 12, armor = 0.02, dps = 12 },
+    enhancement = { str = 2, agi = 1.2, ap = 1, sta = 0.5, int = 1, sp = 0.3, crit = 18, hit = 16, haste = 11,
+        expertise = 12, armor = 0.02, dps = 12 },
+    feral = { str = 2, agi = 1.6, ap = 1, sta = 0.8, crit = 18, hit = 16, haste = 12, expertise = 12,
+        armor = 0.05, def = 0.5, dodge = 6, dps = 10 },
+    tank = { sta = 1.5, str = 1, agi = 1, armor = 0.05, def = 1.5, dodge = 12, parry = 10, block = 6,
+        blockvalue = 0.5, ap = 0.3, hit = 8, haste = 2, expertise = 6, dps = 6, rdps = 0.5 },
+    caster = { sp = 1, heal = 0.33, int = 0.55, spi = 0.6, sta = 0.2, mp5 = 1.5, spellcrit = 10, spellhit = 12,
+        crit = 10, hit = 12, haste = 9, rdps = 3 },
+    healer = { heal = 1, sp = 0.9, int = 1, spi = 0.9, sta = 0.15, mp5 = 2, spellcrit = 8, crit = 8, haste = 7,
+        rdps = 1 },
 }
 -- A protection paladin tanks as a tank, but most of their threat is holy damage (seals,
--- Consecration, Retribution Aura), so spell damage counts as much as Stamina or Defense.
-WEIGHTS.paladintank = { sp = 1.5, heal = 0.5 }
+-- Consecration, Retribution Aura), so spell damage counts (two thirds of Stamina; Pawn has
+-- 0.44), and Intellect, crit and MP5 a little, as Pawn does.
+WEIGHTS.paladintank = { sp = 1, heal = 0.3, int = 0.4, crit = 4, mp5 = 0.5, haste = 6 }
 for stat, weight in pairs(WEIGHTS.tank) do WEIGHTS.paladintank[stat] = weight end
 -- Beast Mastery and Marksmanship hunters carry melee weapons for their stats, so a point
 -- of melee dps is worth little (0.5: enough to split two equal weapons, not to make an
 -- upgrade of one). Survival is the melee tree (owner, 2026-11-11), though Blizzard describes
 -- it as supporting melee builds beside the bow, with an off-hand damage talent: its melee
--- weapons count for three times what every hunter's did, and its bow for less than the
+-- weapons count for five times what every hunter's did (Pawn: as much as its bow), and its bow for less than the
 -- ranged trees', without leaving it behind. Third tab, as talentsforever.com lists them.
-WEIGHTS.survival = { dps = 6, rdps = 8 }
+WEIGHTS.survival = { dps = 10, rdps = 8, expertise = 6 }
 -- Marksmanship turns Intellect into attack power (Careful Aim, up to 100%).
 WEIGHTS.marksman = { int = 1 }
 for stat, weight in pairs(WEIGHTS.hunter) do
@@ -150,6 +186,41 @@ for _, cls in pairs(CLASSES) do
         if not seen then cls.choices[#cls.choices + 1] = role end
     end
 end
+
+-- Spell damage of one school, as a share of plain spell damage, by class and talent tree
+-- ([0] = under 10 talent points: about the trees' average). From Pawn 2.14's Forever
+-- weights (HawsJon), 2026-11-19. Applied as the role's spell damage weight times the share,
+-- so a role that doesn't value spell damage gets nothing, and healers never do (it doesn't
+-- heal). Priests under 10 points smite as much as they shadow bolt.
+local SCHOOLS = {
+    MAGE = { [0] = { arcane = 0.4, fire = 0.4, frost = 0.45 },
+        { arcane = 0.95, fire = 0.1, frost = 0.1 }, { fire = 0.95, frost = 0.3, arcane = 0.15 },
+        { frost = 0.95, fire = 0.1, arcane = 0.15 } },
+    WARLOCK = { [0] = { shadow = 0.85, fire = 0.6 },
+        { shadow = 0.9, fire = 0.35 }, { shadow = 0.8, fire = 0.8 }, { shadow = 0.8, fire = 0.6 } },
+    PRIEST = { [0] = { shadow = 0.7, holy = 0.3 }, [3] = { shadow = 1 } },
+    DRUID = { [0] = { arcane = 0.6, nature = 0.45 }, { arcane = 0.64, nature = 0.43 } },
+    SHAMAN = { [0] = { nature = 1 }, { nature = 1 }, { nature = 1 } },
+    PALADIN = { [0] = { holy = 1 }, [2] = { holy = 1 }, [3] = { holy = 1 } },
+}
+
+-- The weights an item is scored by for a character: their role's, plus spell damage of the
+-- schools their class and tree use. Made once per role, class and tree.
+local function ScoreRole(c, role)
+    local trees = SCHOOLS[c.class]
+    local shares = trees and role ~= "healer" and trees[c.spec or 0]
+    local sp = WEIGHTS[role] and WEIGHTS[role].sp
+    if not (shares and sp) then return role end
+    local key = role .. ":" .. c.class .. ":" .. (c.spec or 0)
+    if not WEIGHTS[key] then
+        local w = {}
+        for stat, weight in pairs(WEIGHTS[role]) do w[stat] = weight end
+        for school, share in pairs(shares) do w[school] = sp * share end
+        WEIGHTS[key] = w
+    end
+    return key
+end
+ns.ScoreRole = ScoreRole
 
 -- Inventory slots an item goes in, by its equip location.
 local SLOTS = {
@@ -396,6 +467,7 @@ local function Compare(c, info, link)
         if not (skill and skill >= r[2]) then return nil end
     end
     local role = ns.RoleOf(c)
+    role = role and ScoreRole(c, role)
     local new = role and ns.ItemScore(link, role)
     if new == nil then return false end
     if new <= 0 then return nil end
