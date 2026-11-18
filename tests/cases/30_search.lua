@@ -553,6 +553,69 @@ test("with the bags window open, every match is lit; hovering one shows it, clic
     eq(searchRowLit(), 2589, "the first row marked")
 end)
 
+test("the arrow keys take over from the row under the mouse; choosing from the right-click menu picks that result", function()
+    local ns = searchStart()
+    ns.ShowBags("Tarn Moon", "bags")
+    local bags = AltsForeverBagsFrame
+    bags.searchButton.scripts.OnClick(bags.searchButton)
+    local f, box = AltsForeverSearchFrame, AltsForeverSearchBox
+    searchType("linen")
+    local rows = {}
+    for _, r in ipairs({ f:GetChildren() }) do
+        if r.index then rows[r.index] = r end
+    end
+    eq(rows[1].entry.id, 2589); eq(rows[2].entry.id, 2996)
+    -- The mouse on the bolt, then Down: the keys pick the linen, and everything follows them.
+    rows[2].scripts.OnEnter(rows[2])
+    eq(ns.BagsHighlight(), 2996, "hovering the bolt")
+    box.scripts.OnArrowPressed(box, "DOWN")
+    eq(searchRowLit(), 2589, "Down picks the linen")
+    eq(GameTooltip.itemID, 2589, "the tooltip follows")
+    eq(ns.BagsHighlight(), 2589, "and so does the bags window, though the mouse is on the bolt")
+    eq(bags.bags.text, "Bags (20)")
+    rows[2].scripts.OnLeave(rows[2])
+    eq(ns.BagsHighlight(), 2589)
+    -- Right-click the bolt: the menu alone changes nothing.
+    rows[2].scripts.OnClick(rows[2], "RightButton")
+    eq(searchRowLit(), 2589, "a menu closed without a choice picks nothing")
+    -- Choosing Tarn's bags from it picks the bolt, so hovering and leaving comes back to it.
+    wow.menuItem("[DRUID]Tarn Moon: 3 in bags").fn()
+    eq(searchRowLit(), 2996, "chosen: the bolt picked")
+    eq(ns.BagsHighlight(), 2996)
+    rows[1].scripts.OnEnter(rows[1])
+    eq(ns.BagsHighlight(), 2589, "hovering the linen")
+    rows[1].scripts.OnLeave(rows[1])
+    eq(ns.BagsHighlight(), 2996, "off it: back to the bolt just chosen")
+    -- Link in chat from the menu picks nothing.
+    rows[1].scripts.OnClick(rows[1], "RightButton")
+    wow.menuItem("Link in chat").fn()
+    eq(searchRowLit(), 2996, "linking leaves the pick alone")
+end)
+
+test("every match is lit, not only the 50 listed", function()
+    local ns = searchStart()
+    -- 55 rags, all Tarn's: the last (one, so it sorts last) isn't among the 50 rows.
+    for i = 1, 55 do
+        local id = 8200 + i
+        wow.item(id, "Rag " .. (100 + i), {})
+        AltsForeverDB.chars["Tarn Moon"].bags[id] = i == 55 and 1 or 2
+    end
+    ns.ShowBags("Tarn Moon", "bags")
+    local bags = AltsForeverBagsFrame
+    bags.searchButton.scripts.OnClick(bags.searchButton)
+    searchType("rag")
+    eq(#ns.SearchMatches("rag"), 50, "50 rows listed")
+    searchType("rag")
+    local set = select(3, ns.BagsState())
+    eq(set[8255], true, "the 55th lit too")
+    eq(bags.bags.text, "Bags (" .. (54 * 2 + 1) .. ")", "and counted")
+    local alpha
+    for _, slot in ipairs({ bags.content:GetChildren() }) do
+        if slot.id == 8255 and slot:IsShown() then alpha = slot.icon:GetAlpha() end
+    end
+    eq(alpha, 1, "not dimmed")
+end)
+
 test("a worn item opens their gear on the far side of the search from the bags window, and the search stays open", function()
     local ns = searchStart()
     AltsForeverDB.chars["Smith"].equip = { [6001] = 1 }

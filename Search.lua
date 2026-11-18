@@ -29,6 +29,10 @@ local matches = {}
 -- there until one is picked; the owner's idea, 2026-11-18).
 local selected, offset = 0, 0
 local matchVer = 0 -- counts searches, so the lit matches follow a new list
+-- Every item the search matches (item ID -> true), not only the MAX_MATCHES rows listed:
+-- what the bags window lights with nothing picked (peer review, 2026-11-18). A new table per
+-- search, as the bags window keeps the one it's given.
+local matched = {}
 local opened = 0 -- counts openings, so a wait for names from an earlier one stops
 local NAME_TRIES = 5
 -- Whose items: `only` = the characters ticked in the menu beside the box (a set of keys), or
@@ -180,6 +184,7 @@ end
 
 function ns.SearchMatches(text)
     wipe(matches)
+    matched = {}
     selected, offset, hoverId = 0, 0, nil
     matchVer = matchVer + 1
     text = (text or ""):lower():match("^%s*(.-)%s*$")
@@ -203,6 +208,7 @@ function ns.SearchMatches(text)
             if (e.total > 0 or #e.crafters > 0) and (filter ~= "owned" or e.total > 0)
                 and (filter ~= "craft" or #e.crafters > 0) then
                 matches[#matches + 1] = e
+                matched[e.id] = true
             end
         end
     end
@@ -369,6 +375,17 @@ local function HolderMenu(row)
     local e = row.entry
     if not (e and MenuUtil and MenuUtil.CreateContextMenu) then return end
     local id, name = e.id, names[e.id] or ""
+    local index = offset + row.index
+    -- Choosing where to look picks this result, as a click would (only once chosen: a menu
+    -- closed without a choice changes nothing; peer review, 2026-11-18).
+    local function Chosen(fn)
+        return function()
+            if matches[index] == e then selected = index end
+            hoverId = nil
+            fn()
+            Render()
+        end
+    end
     MenuUtil.CreateContextMenu(row, function(_, root)
         root:CreateTitle(name)
         for _, h in ipairs(e.holders) do
@@ -377,16 +394,16 @@ local function HolderMenu(row)
             local inBags, inBank = c.bags and c.bags[id] or 0, c.bank and c.bank[id] or 0
             local inMail, worn = c.mail and c.mail[id] or 0, c.equip and c.equip[id] or 0
             if inBags > 0 then
-                root:CreateButton(L["%s: %d in bags"]:format(who, inBags), function() Open(key, "bags", id) end)
+                root:CreateButton(L["%s: %d in bags"]:format(who, inBags), Chosen(function() Open(key, "bags", id) end))
             end
             if inBank > 0 then
-                root:CreateButton(L["%s: %d in the bank"]:format(who, inBank), function() Open(key, "bank", id) end)
+                root:CreateButton(L["%s: %d in the bank"]:format(who, inBank), Chosen(function() Open(key, "bank", id) end))
             end
             if worn > 0 then
-                root:CreateButton(L["%s: wearing it"]:format(who), function() Gear(key) end)
+                root:CreateButton(L["%s: wearing it"]:format(who), Chosen(function() Gear(key) end))
             end
             if inMail > 0 then
-                root:CreateButton(L["%s: %d in the mail"]:format(who, inMail), function() Open(key, "mail", id) end)
+                root:CreateButton(L["%s: %d in the mail"]:format(who, inMail), Chosen(function() Open(key, "mail", id) end))
             end
         end
         root:CreateButton(L["Link in chat"], function() Link(e) end)
@@ -515,9 +532,7 @@ Render = function()
         elseif n > 0 and not empty then
             if previewedVer ~= matchVer then
                 previewed, previewedVer = nil, matchVer
-                local set = {}
-                for k = 1, n do set[matches[k].id] = true end
-                ns.BagsPreviewAll(set, SearchedText())
+                ns.BagsPreviewAll(matched, SearchedText())
             end
         elseif previewed ~= nil or previewedVer ~= nil then
             previewed, previewedVer = nil, nil
@@ -533,6 +548,9 @@ end
 
 local function Move(by)
     if #matches == 0 then return end
+    -- The keys take over from the mouse: the bags window follows them, not the row it's on
+    -- (peer review, 2026-11-18).
+    hoverId = nil
     -- From the row Enter would act on: with none (every match lit), Down starts at the top.
     local from = Target()
     if from == 0 then
