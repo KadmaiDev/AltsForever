@@ -145,11 +145,11 @@ local CHAR_FIELDS = {
     money = "number", level = "number", xp = "number", xpMax = "number", rested = "number",
     seen = "number", updated = "number", ilvl = "number", dura = "number", played = "number",
     playedAt = "number", mailExpires = "number", spec = "number", wellRested = "number",
-    legacySpent = "number", bankAt = "number", changed = "number",
+    legacySpent = "number", bankAt = "number", changed = "number", mailAt = "number",
     bags = "table", bank = "table", mail = "table", equip = "table", gear = "table",
     layout = "table", profs = "table", profMax = "table", recipes = "table", crafts = "table",
     reps = "table", duraSlots = "table", saves = "table", saveKills = "table",
-    account = "string", runs = "table", recipesAt = "table",
+    account = "string", runs = "table", recipesAt = "table", links = "table",
 }
 local DB_FIELDS = {
     icons = "table", goldDays = "table", goldDaysBy = "table", factions = "table",
@@ -200,6 +200,14 @@ local function RepairChar(c)
         end
         table.sort(kept, function(a, b) return a.at < b.at end)
         c.runs = kept[1] and kept or nil
+    end
+    if c.links then
+        KeepOnly(c.links, "number", "table")
+        for bag, slots in pairs(c.links) do
+            KeepOnly(slots, "number", "string")
+            if next(slots) == nil then c.links[bag] = nil end
+        end
+        if next(c.links) == nil then c.links = nil end
     end
     if c.layout then
         KeepOnly(c.layout, "number", "table")

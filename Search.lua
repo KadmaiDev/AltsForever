@@ -25,16 +25,27 @@ local frame, box
 local rows = {}
 local pool, names     -- every item's lower-case name, and its name, while the window is shown
 local matches = {}
-local selected, offset = 1, 0
+-- `selected` = the row picked (0 = none: with the bags window open, every match is lit
+-- there until one is picked; the owner's idea, 2026-11-18).
+local selected, offset = 0, 0
+local matchVer = 0 -- counts searches, so the lit matches follow a new list
+-- Every item the search matches (item ID -> true), not only the MAX_MATCHES rows listed:
+-- what the bags window lights with nothing picked (peer review, 2026-11-18). A new table per
+-- search, as the bags window keeps the one it's given.
+local matched = {}
 local opened = 0 -- counts openings, so a wait for names from an earlier one stops
 local NAME_TRIES = 5
 -- Whose items: `only` = the characters ticked in the menu beside the box (a set of keys), or
 -- nil for all of them (owner, 2026-10-16: always there, several at once). With the bags
 -- window open, the search starts on the character it shows, docked beside it, and the
--- selected item lit there as you go (previewed; with nothing selected, back to the last
--- pick: savedLit, savedView). Closing the search clears what's lit. The last search is kept
--- for the next opening (this session only).
-local only, savedLit, savedView, previewed, docked
+-- matches lit there as you type and the selected one alone once picked (previewed /
+-- previewedVer; with nothing to show, back to the last pick: savedLit, savedView, or the
+-- matches kept with Enter: savedSet, savedText). Hovering a row shows its item alone there
+-- while the mouse is on it (`hoverId`) without picking it (owner, 2026-11-18); off it, back
+-- to what was shown. Closing the search clears what's lit.
+-- The last search is kept for the next opening (this session only).
+local only, savedLit, savedView, savedSet, savedText, previewed, previewedVer, docked
+local hoverId
 local lastText = ""
 local ApplyScope, Dock, PickCharacters, Update
 
@@ -173,7 +184,9 @@ end
 
 function ns.SearchMatches(text)
     wipe(matches)
-    selected, offset = 1, 0
+    matched = {}
+    selected, offset, hoverId = 0, 0, nil
+    matchVer = matchVer + 1
     text = (text or ""):lower():match("^%s*(.-)%s*$")
     filter = nil
     local word, rest = text:match("^@(%S*)%s*(.*)$")
@@ -195,6 +208,7 @@ function ns.SearchMatches(text)
             if (e.total > 0 or #e.crafters > 0) and (filter ~= "owned" or e.total > 0)
                 and (filter ~= "craft" or #e.crafters > 0) then
                 matches[#matches + 1] = e
+                matched[e.id] = true
             end
         end
     end
@@ -246,14 +260,27 @@ local function Link(e)
     if not (ChatEdit_InsertLink and ChatEdit_InsertLink(link)) and ChatFrame_OpenChat then ChatFrame_OpenChat(link) end
 end
 
--- Enter or a click: the bags or bank of whoever has it (you first, else the most), with it
--- lit up; worn, their gear; only in the mail, said so. Nobody has it: link it.
+-- Enter or a click: the bags, bank or mail of whoever has it (you first, else the most),
+-- with it lit up; worn, their gear. Only Shift links it in chat: an item nobody has (one
+-- they can craft) was linked by a plain click until the owner found that confusing
+-- (2026-11-18); with the bags window open it's lit there as "not here", else nothing.
 -- The search stays open beside the bags window (owner, 2026-10-16), so the next one is a
 -- click away; what's lit now is what closing it goes back to.
 local function Kept()
-    savedLit, savedView = ns.BagsState()
-    previewed = savedLit
+    savedLit, savedView, savedSet, savedText = ns.BagsState()
+    previewed, previewedVer = savedLit, savedSet and matchVer or nil
     box:SetFocus()
+end
+
+-- The row Enter acts on: the one picked; with none, the first, unless the bags window is
+-- open (then every match is lit there, and Enter keeps them lit).
+local function Target()
+    if selected > 0 then return selected end
+    return ns.BagsShownKey() and 0 or (#matches > 0 and 1 or 0)
+end
+
+local function SearchedText()
+    return ((box and box:GetText()) or ""):match("^%s*(.-)%s*$")
 end
 
 local function Open(key, view, id)
@@ -290,7 +317,10 @@ local function Pick(e, link)
             break
         end
     end
-    if not h then return Link(e) end
+    if not h then
+        if ns.BagsShownKey() then Kept() end
+        return
+    end
     local c = h.c
     if c.bags and c.bags[e.id] then
         Open(h.key, "bags", e.id)
@@ -299,7 +329,7 @@ local function Pick(e, link)
     elseif c.equip and c.equip[e.id] then
         Gear(h.key)
     else
-        ns.Print(L["%s has it in the mail."]:format(ns.ListName(h.key, c)))
+        Open(h.key, "mail", e.id)
     end
 end
 
@@ -317,12 +347,19 @@ local function RowTip(row)
     GameTooltip:Show()
 end
 
--- The mouse on a row selects what it shows: its place in the list, not on screen (the
--- list may have scrolled with the arrow keys; the owner saw the wrong one selected).
+-- The mouse on a row shows its tooltip and its item alone in the bags window; only a click
+-- (or the arrow keys) picks it.
 local function RowEnter(row)
-    selected = offset + row.index
+    hoverId = row.entry and row.entry.id
     Render()
     RowTip(row)
+end
+
+local function RowLeave()
+    GameTooltip:Hide()
+    if hoverId == nil then return end
+    hoverId = nil
+    Render()
 end
 
 -- A tooltip open on one of the rows follows the selection when the keys move it.
@@ -338,6 +375,17 @@ local function HolderMenu(row)
     local e = row.entry
     if not (e and MenuUtil and MenuUtil.CreateContextMenu) then return end
     local id, name = e.id, names[e.id] or ""
+    local index = offset + row.index
+    -- Choosing where to look picks this result, as a click would (only once chosen: a menu
+    -- closed without a choice changes nothing; peer review, 2026-11-18).
+    local function Chosen(fn)
+        return function()
+            if matches[index] == e then selected = index end
+            hoverId = nil
+            fn()
+            Render()
+        end
+    end
     MenuUtil.CreateContextMenu(row, function(_, root)
         root:CreateTitle(name)
         for _, h in ipairs(e.holders) do
@@ -346,17 +394,16 @@ local function HolderMenu(row)
             local inBags, inBank = c.bags and c.bags[id] or 0, c.bank and c.bank[id] or 0
             local inMail, worn = c.mail and c.mail[id] or 0, c.equip and c.equip[id] or 0
             if inBags > 0 then
-                root:CreateButton(L["%s: %d in bags"]:format(who, inBags), function() Open(key, "bags", id) end)
+                root:CreateButton(L["%s: %d in bags"]:format(who, inBags), Chosen(function() Open(key, "bags", id) end))
             end
             if inBank > 0 then
-                root:CreateButton(L["%s: %d in the bank"]:format(who, inBank), function() Open(key, "bank", id) end)
+                root:CreateButton(L["%s: %d in the bank"]:format(who, inBank), Chosen(function() Open(key, "bank", id) end))
             end
             if worn > 0 then
-                root:CreateButton(L["%s: wearing it"]:format(who), function() Gear(key) end)
+                root:CreateButton(L["%s: wearing it"]:format(who), Chosen(function() Gear(key) end))
             end
             if inMail > 0 then
-                -- The bags window doesn't show mail: said, not opened.
-                root:CreateButton(L["%s: %d in the mail"]:format(who, inMail)):SetEnabled(false)
+                root:CreateButton(L["%s: %d in the mail"]:format(who, inMail), Chosen(function() Open(key, "mail", id) end))
             end
         end
         root:CreateButton(L["Link in chat"], function() Link(e) end)
@@ -365,7 +412,24 @@ end
 
 local function RowClick(row, button)
     if button == "RightButton" then return HolderMenu(row) end
-    Pick(row.entry, IsModifiedClick and IsModifiedClick())
+    local link = IsModifiedClick and IsModifiedClick()
+    -- Shift-click links it in chat and nothing else: what's picked and lit stays as it was
+    -- (owner, 2026-11-18).
+    if link then return Pick(row.entry, true) end
+    if not row.entry then return end
+    local index = offset + row.index
+    -- The picked one clicked again: unpicked, every match lit again (the mouse is still on
+    -- it, but showing it alone would look as if the click did nothing).
+    if selected == index then
+        selected, hoverId = 0, nil
+        Render()
+        return box:SetFocus()
+    end
+    -- Picked: its place in the list, not on screen (the list may have scrolled with the
+    -- arrow keys; the owner saw the wrong one selected).
+    selected = index
+    Pick(row.entry)
+    Render()
 end
 
 local function Row(i)
@@ -403,7 +467,7 @@ local function Row(i)
     row.index = i
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     row:SetScript("OnEnter", RowEnter)
-    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    row:SetScript("OnLeave", RowLeave)
     row:SetScript("OnClick", RowClick)
     rows[i] = row
     return row
@@ -417,10 +481,11 @@ end
 
 Render = function()
     local n = #matches
-    selected = max(1, min(selected, n))
-    if selected <= offset then offset = selected - 1 end
+    selected = max(0, min(selected, n))
+    if selected > 0 and selected <= offset then offset = selected - 1 end
     if selected > offset + ROWS then offset = selected - ROWS end
     offset = max(0, min(offset, n - ROWS))
+    local target = Target()
     for i = 1, ROWS do
         local row, e = rows[i], matches[offset + i]
         row.entry = e
@@ -430,7 +495,7 @@ Render = function()
             row.name:SetTextColor(QualityColor(e.id))
             row.total:SetText(e.count > 0 and e.count or "")
             row.detail:SetText(ns.SearchDetail(e))
-            row.lit:SetShown(offset + i == selected)
+            row.lit:SetShown(offset + i == target)
             row:Show()
         else
             row:Hide()
@@ -446,18 +511,32 @@ Render = function()
         frame.status:SetText("")
     elseif n == 0 then
         frame.status:SetText(GREY .. L["Nothing matching '%s'."]:format(text) .. "|r")
+    elseif ns.BagsShownKey() and selected == 0 then
+        frame.status:SetText(GREY .. L["Point at one to see it, click to keep it · Escape: close and show every slot"] .. "|r")
     elseif ns.BagsShownKey() then
         frame.status:SetText(GREY .. L["Enter: keep it lit · Escape: close and show every slot"] .. "|r")
     else
         frame.status:SetText(GREY .. L["Enter: open their bags · Right-click: choose whose · Shift+Enter: link in chat"] .. "|r")
     end
-    -- The selected item lit in the open bags window, in place ("not here" if the character it
-    -- shows hasn't got it); with nothing selected, the bags as they were.
+    -- In the open bags window, in place: the picked item ("not here" if the character it
+    -- shows hasn't got it); with none picked, every match; with nothing found, the bags as
+    -- they were.
     if ns.BagsShownKey() and frame:IsShown() then
-        local id = matches[selected] and matches[selected].id
-        if id ~= previewed then
-            previewed = id
-            if id then ns.BagsPreview(id) else ns.BagsRestore(savedLit, savedView) end
+        local e = selected > 0 and matches[selected]
+        local id = hoverId or (e and e.id)
+        if id then
+            if id ~= previewed or previewedVer then
+                previewed, previewedVer = id, nil
+                ns.BagsPreview(id)
+            end
+        elseif n > 0 and not empty then
+            if previewedVer ~= matchVer then
+                previewed, previewedVer = nil, matchVer
+                ns.BagsPreviewAll(matched, SearchedText())
+            end
+        elseif previewed ~= nil or previewedVer ~= nil then
+            previewed, previewedVer = nil, nil
+            ns.BagsRestore(savedLit, savedView, savedSet, savedText)
         end
     end
 end
@@ -469,23 +548,30 @@ end
 
 local function Move(by)
     if #matches == 0 then return end
-    selected = (selected - 1 + by) % #matches + 1
+    -- The keys take over from the mouse: the bags window follows them, not the row it's on
+    -- (peer review, 2026-11-18).
+    hoverId = nil
+    -- From the row Enter would act on: with none (every match lit), Down starts at the top.
+    local from = Target()
+    if from == 0 then
+        selected = by > 0 and 1 or #matches
+    else
+        selected = (from - 1 + by) % #matches + 1
+    end
     Render()
     FollowTip()
 end
 
 local function Scroll(by)
     offset = max(0, min(offset + by, #matches - ROWS))
-    selected = max(offset + 1, min(selected, offset + ROWS))
-    -- Scrolled under the mouse (the wheel): the row it's on now shows another item, so that
-    -- one is selected and its tooltip shown.
+    if selected > 0 then selected = max(offset + 1, min(selected, offset + ROWS)) end
+    -- Scrolled under the mouse (the wheel): the row it's on now shows another item, so its
+    -- tooltip and the bags window follow.
     local owner = GameTooltip:IsShown() and GameTooltip:GetOwner()
-    if owner and owner.index and rows[owner.index] == owner and matches[offset + owner.index] then
-        selected = offset + owner.index
-        Render()
-        return RowTip(owner)
-    end
+    local under = owner and owner.index and rows[owner.index] == owner and matches[offset + owner.index]
+    if under then hoverId = under.id end
     Render()
+    if under then RowTip(owner) end
 end
 
 local function CreateWindow()
@@ -522,7 +608,15 @@ local function CreateWindow()
     b:SetFontObject("GameFontHighlight")
     b:SetScript("OnTextChanged", Update)
     b:SetScript("OnEscapePressed", function() f:Hide() end)
-    b:SetScript("OnEnterPressed", function() Pick(matches[selected], IsShiftKeyDown and IsShiftKeyDown()) end)
+    b:SetScript("OnEnterPressed", function()
+        local link = IsShiftKeyDown and IsShiftKeyDown()
+        local i = Target()
+        if i > 0 then return Pick(matches[i], link) end
+        -- Only one found: picking it is the same, and a worn one opens their gear.
+        if link or #matches == 1 then return Pick(matches[1], link) end
+        -- Nothing picked, every match lit in the bags window: keep them lit.
+        if #matches > 0 then Kept() end
+    end)
     b:SetScript("OnArrowPressed", function(_, key)
         if key == "UP" then Move(-1) elseif key == "DOWN" then Move(1) end
     end)
@@ -617,8 +711,8 @@ local function CreateWindow()
         lastText = box:GetText() or ""
         -- Closing the search ends it in the bags window too: nothing lit, every slot back
         -- (owner, 2026-10-16), on the bags or bank of the last pick (not one only hovered).
-        if ns.BagsHighlight() then ns.BagsRestore(nil, savedView) end
-        previewed = nil
+        if ns.BagsLighting() then ns.BagsRestore(nil, savedView) end
+        previewed, previewedVer, hoverId = nil, nil, nil
         ns.BagsHold(false)
         box:ClearFocus()
         pool, names = nil, nil
@@ -731,8 +825,8 @@ function ns.ToggleSearch(text)
         -- The bags window open: the character it shows; otherwise all of them.
         local shown = ns.BagsShownKey()
         only = shown and { [shown] = true } or nil
-        savedLit, savedView = ns.BagsState()
-        previewed = savedLit
+        savedLit, savedView, savedSet, savedText = ns.BagsState()
+        previewed, previewedVer = savedLit, nil
         ApplyScope()
         Dock(true)
         if text == "" then text = lastText end
@@ -742,3 +836,13 @@ function ns.ToggleSearch(text)
 end
 
 function ns.SearchWindow() return frame end
+
+-- The bags window's "Showing" line was clicked: every slot shown there, so nothing is picked
+-- here either, and nothing lit again until the player hovers, picks or types.
+function ns.SearchUnpick()
+    if not (frame and frame:IsShown()) then return end
+    selected, hoverId = 0, nil
+    previewed, previewedVer = nil, matchVer
+    savedLit, savedSet, savedText = nil, nil, nil
+    Render()
+end

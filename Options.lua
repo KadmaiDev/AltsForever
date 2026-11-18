@@ -594,6 +594,7 @@ function ns.ShowCharacterMenu(owner, key)
         root:CreateButton(L["Gear"], function() ns.ShowGear(key) end)
         root:CreateButton(L["Bags"], function() ns.ShowBags(key, "bags") end)
         root:CreateButton(L["Bank"], function() ns.ShowBags(key, "bank") end)
+        root:CreateButton(L["Mail"], function() ns.ShowBags(key, "mail") end)
         -- Their professions, as the game's profession window shows them (Recipes.lua).
         local profs = root:CreateButton(L["Professions"], function() ns.ShowRecipes(key) end)
         if not (c.profs and next(c.profs)) then profs:SetEnabled(false) end

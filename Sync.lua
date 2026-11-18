@@ -655,9 +655,7 @@ end
 -- no answer just means they're not there.
 local function Begin(name, target, quiet)
     local s = NewSession(name, { target = target, ours = true, quiet = quiet })
-    if quiet then
-        HideOffline(name)
-    else
+    if not quiet then
         ns.Print(L["Asking %s to swap characters..."]:format(name))
         Notify()
     end
@@ -671,7 +669,10 @@ local function Begin(name, target, quiet)
         Over(name, L["No answer from %s. Both characters need this version of Alts Forever or later, online at the same time on the same ruleset and faction."]:format(name))
     end
     -- The wait starts when the hello really goes: it can sit behind a lockdown or another swap.
-    Send(name, target, Hello(nil, quiet), function() After(ANSWER_WITHIN, Check) end)
+    Send(name, target, Hello(nil, quiet), function()
+        if quiet then HideOffline(name) end -- from when it goes, as the pings
+        After(ANSWER_WITHIN, Check)
+    end)
 end
 
 -- A ping or a hello while a swap runs means they've started over (a reload, say), so the
@@ -936,8 +937,9 @@ local function FindOthers()
         local c = ns.db.chars[key]
         if key ~= ns.charKey and not (c and ns.Elsewhere(c)) and n < AUTO_MOST then
             n = n + 1
-            HideOffline(key)
-            Send(key, key, { k = "ping" })
+            -- Hidden from when the ping really goes: a chat lockdown at login can hold it in
+            -- the queue past HIDE_FOR (owner saw the line on 2026-11-15).
+            Send(key, key, { k = "ping" }, function() HideOffline(key) end)
         end
     end
 end

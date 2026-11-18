@@ -1,3 +1,13 @@
+## Alts Forever 1.8.0
+
+- **Mail in the bags window:** a new **Mail** button beside Bags and Bank (also in a character's right-click menu) shows what was in that character's mailbox when they last opened it, plus anything your characters have mailed them since. It can't know about mail that arrived after that, and says so, with when the mailbox was last opened at the bottom. Searching for an item that's only in someone's mail now opens it there. Thanks to the player who asked.
+- **Items keep their bonus:** weapons and armour with a random bonus or an enchant, such as a Curved Dagger of Intellect, now show as themselves in the bags window, with their full name and stats, and link as themselves. Each character's items are picked up the next time you log in on them or visit their bank. Thanks to the player who reported it.
+- **Search lights up every match:** with the bags window open, everything matching what you type is lit up, and the Bags, Bank and Mail buttons say how many are in each. Point at a result to see only that item, click it to keep it, and click it again to go back to every match. While one item is lit, the buttons show how many of it are in each place.
+- **Only Shift links:** clicking a result that nobody has (one your characters can only craft) no longer puts it in chat. Shift-click or Shift+Enter links an item and changes nothing else.
+- **Mail subject:** WoW Forever's mail window doesn't name a mail after what you attach, so the Send button stayed greyed out until you typed a subject. Alts Forever now fills an empty subject with the first item, e.g. "Linen Cloth (20)", when you attach something or use Pack. A subject you type is never changed.
+- **Tooltips:** if the per-character counts can't be lined up in columns (an unusual font, or another addon getting in the way), they now show as plain text instead of leaving only the names. Thanks to the player who reported it.
+- **Sync:** the game's "No player named ... is currently playing" line for an offline sync partner no longer slips through when the automatic check had to wait its turn.
+
 ## Alts Forever 1.7.0
 
 - **Mail rules:** tell Alts Forever which of your characters always gets an item, or a whole kind of item, such as all your cloth to your tailor. At the mailbox, attach something, pick the character from the arrow beside the To box, then open the arrow again and tick **Always send Silk Cloth here** or **Always send all Cloth here**. The arrow also suggests rules from who uses the item in their known recipes.
