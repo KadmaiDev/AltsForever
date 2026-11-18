@@ -334,6 +334,12 @@ test("school spell damage counts for the classes and trees that cast it", functi
     near(score(holy, { class = "PRIEST" }), 3, "levelling priests smite")
     -- A Shadow priest the player set to Healer: healing gets nothing from shadow damage.
     eq(ns.ScoreRole({ class = "PRIEST", spec = 3 }, "healer"), "healer")
+    -- A healing tree's character the player set to a damage or tank role gets the class's
+    -- schools (peer review, 2026-11-19).
+    local function chosen(link, c, role) return ns.ItemScore(link, ns.ScoreRole(c, role)) end
+    near(chosen(holy, { class = "PALADIN", spec = 1 }, "paladintank"), 10, "holy paladin set to Tank")
+    near(chosen(holy, { class = "PRIEST", spec = 1 }, "caster"), 3, "holy priest set to Caster")
+    near(chosen(legs, { class = "DRUID", spec = 3 }, "caster"), 12 * 0.55 + 17 * 0.6, "restoration druid set to Caster")
 end)
 
 test("an item with only school damage is an upgrade for those who cast it", function()
@@ -358,6 +364,7 @@ test("dodge, parry, haste and expertise come as ratings", function()
     eq(ns.ItemScore(band, "rogue"), 28, "1% haste (14) + 1% expertise (14)")
     eq(ns.ItemScore(band, "caster"), 9, "casters: haste only")
     eq(ns.ItemScore(band, "hunter"), 13)
+    eq(ns.ItemScore(band, "paladintank"), 6 + 6, "protection paladins keep their own haste (6) + expertise (6)")
 end)
 
 test("a rogue can be suggested a one-handed axe, never a two-handed one", function()

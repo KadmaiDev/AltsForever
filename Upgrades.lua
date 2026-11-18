@@ -120,7 +120,8 @@ local WEIGHTS = {
 -- Consecration, Retribution Aura), so spell damage counts (two thirds of Stamina; Pawn has
 -- 0.44), and Intellect, crit and MP5 a little, as Pawn does.
 WEIGHTS.paladintank = { sp = 1, heal = 0.3, int = 0.4, crit = 4, mp5 = 0.5, haste = 6 }
-for stat, weight in pairs(WEIGHTS.tank) do WEIGHTS.paladintank[stat] = weight end
+-- Their own weights first (haste), the tank's for the rest (peer review, 2026-11-19).
+for stat, weight in pairs(WEIGHTS.tank) do WEIGHTS.paladintank[stat] = WEIGHTS.paladintank[stat] or weight end
 -- Beast Mastery and Marksmanship hunters carry melee weapons for their stats, so a point
 -- of melee dps is worth little (0.5: enough to split two equal weapons, not to make an
 -- upgrade of one). Survival is the melee tree (owner, 2026-11-11), though Blizzard describes
@@ -188,7 +189,8 @@ for _, cls in pairs(CLASSES) do
 end
 
 -- Spell damage of one school, as a share of plain spell damage, by class and talent tree
--- ([0] = under 10 talent points: about the trees' average). From Pawn 2.14's Forever
+-- ([0] = under 10 talent points: about the trees' average; also a healing or feral tree's
+-- character the player set to a damage or tank role, peer review 2026-11-19). From Pawn 2.14's Forever
 -- weights (HawsJon), 2026-11-19. Applied as the role's spell damage weight times the share,
 -- so a role that doesn't value spell damage gets nothing, and healers never do (it doesn't
 -- heal). Priests under 10 points smite as much as they shadow bolt.
@@ -208,7 +210,7 @@ local SCHOOLS = {
 -- schools their class and tree use. Made once per role, class and tree.
 local function ScoreRole(c, role)
     local trees = SCHOOLS[c.class]
-    local shares = trees and role ~= "healer" and trees[c.spec or 0]
+    local shares = trees and role ~= "healer" and (trees[c.spec or 0] or trees[0])
     local sp = WEIGHTS[role] and WEIGHTS[role].sp
     if not (shares and sp) then return role end
     local key = role .. ":" .. c.class .. ":" .. (c.spec or 0)
