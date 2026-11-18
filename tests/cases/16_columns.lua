@@ -25,16 +25,34 @@ function columnTooltip()
     end
     tt.cells = {}
     wow.measured = 0
+    -- As in the game, a double line's right text is its TextRight font string's text.
+    tt.fakeAddDoubleLine = tt.fakeAddDoubleLine or tt.AddDoubleLine
+    tt.AddDoubleLine = function(self, l, r)
+        self.lines[#self.lines + 1] = { l, r }
+        local fs = _G["GameTooltipTextRight" .. #self.lines]
+        if fs then fs.text = r ~= nil and tostring(r) or nil end
+    end
     tt.CreateFontString = function(self)
         local fs = { shown = true, size = 12,
-            SetFont = function(f, _, s) f.size = s end,
-            SetText = function(f, t) f.text = t end,
+            SetFont = function(f, _, s)
+                if wow.badFont then return false end
+                f.size = s
+                return true
+            end,
+            SetText = function(f, t)
+                if wow.failCellAt and t ~= "" and f.point and f.point[1] == "RIGHT" then -- cells only
+                    wow.failCellAt = wow.failCellAt - 1
+                    if wow.failCellAt == 0 then error("cell failed") end
+                end
+                f.text = t
+            end,
             GetStringWidth = function(f)
                 wow.measured = wow.measured + 1
                 if wow.secretWidths then
                     wow.SECRET = 4242.5
                     return 4242.5
                 end
+                if wow.zeroWidths then return 0 end
                 return textWidth(f.text or "", f.size)
             end,
             SetPoint = function(f, p, rel, rp, x) f.point = { p, rel, rp, x } end,
@@ -63,6 +81,7 @@ end
 function clearTooltipLines()
     for i = 1, 20 do _G["GameTooltipTextLeft" .. i], _G["GameTooltipTextRight" .. i] = nil, nil end
     GameTooltip.CreateFontString, GameTooltip.GetName = nil, nil
+    GameTooltip.AddDoubleLine = GameTooltip.fakeAddDoubleLine or GameTooltip.AddDoubleLine
 end
 
 -- The visible cells on a line, nearest the right edge first: { x = distance of the
@@ -191,6 +210,69 @@ test("secret widths (while Blizzard builds a tooltip): the plain text stays, no 
     -- A secret font is left alone.
     _G["GameTooltipTextLeft3"].GetFont = function() return wow.SECRET, 12, "" end
     GameTooltip.hooks.OnShow(GameTooltip)
+    clearTooltipLines()
+end)
+
+-- A player saw names with no counts (2026-11-17): what a line looks like when its text is
+-- the spacer and its cells aren't drawn. Whatever goes wrong, the plain text must show.
+local function plainOrCells(rights, lines, what)
+    for i = 3, #lines do
+        local text = rights[i].text or ""
+        if text:find("blank.tga", 1, true) then
+            assert(#cellsOn(rights[i]) > 0, what .. ": line " .. i .. " is a spacer with no cells")
+        else
+            assert(text:find("%d"), what .. ": line " .. i .. " shows its count: " .. text)
+        end
+    end
+end
+
+test("a font that draws nothing (every cell measures 0): the plain text stays", function()
+    wow.load(FILES)
+    local rights = columnTooltip()
+    wow.zeroWidths = true
+    columnAlts()
+    local lines = wow.hover(GameTooltip, 100)
+    for i = 3, #lines do
+        eq(#cellsOn(rights[i]), 0, "no cells on line " .. i)
+        assert(not (rights[i].text or ""):find("blank.tga", 1, true), "no spacer on line " .. i)
+    end
+    plainOrCells(rights, lines, "zero widths")
+    -- The font loads later: the next hover lines them up.
+    wow.zeroWidths = nil
+    wow.hover(GameTooltip, 100)
+    eq(#cellsOn(rights[3]), 3)
+    clearTooltipLines()
+end)
+
+test("a font the game won't load (SetFont false): the plain text stays", function()
+    wow.load(FILES)
+    local rights = columnTooltip()
+    wow.badFont = true
+    columnAlts()
+    local lines = wow.hover(GameTooltip, 100)
+    for i = 3, #lines do eq(#cellsOn(rights[i]), 0, "no cells on line " .. i) end
+    plainOrCells(rights, lines, "bad font")
+    wow.badFont = nil
+    clearTooltipLines()
+end)
+
+test("an error while placing cells never leaves a line blank", function()
+    wow.load(FILES)
+    local rights = columnTooltip()
+    columnAlts()
+    -- The 5th cell fails: the first row's 3 are placed, the second row's fail part way.
+    wow.failCellAt = 5
+    local ok = pcall(wow.hover, GameTooltip, 100)
+    eq(ok, false, "the error reached the hover")
+    wow.failCellAt = nil
+    local lines = GameTooltip.lines
+    plainOrCells(rights, lines, "error part way")
+    assert(rights[3].text:find("blank.tga", 1, true), "the row placed before it is lined up")
+    assert(not rights[4].text:find("blank.tga", 1, true), "the row that failed kept its text")
+    -- Next hover: all lined up again, no stray cells.
+    wow.hover(GameTooltip, 100)
+    plainOrCells(rights, GameTooltip.lines, "after")
+    eq(#cellsOn(rights[3]), 3)
     clearTooltipLines()
 end)
 

@@ -28,7 +28,8 @@ local KNOWN_EVENTS = {
 
 -- Resets every global and loads the addon files fresh. Returns the addon namespace.
 function M.load(files)
-    M.bags = {}        -- [bagID] = { size = n, [slot] = { id = itemID, count = n } }
+    M.bags = {}        -- [bagID] = { size = n, [slot] = { id = itemID, count = n, link = full link|nil } }
+    M.linkReads = 0    -- C_Container.GetContainerItemLink calls (only weapons and armour are read)
     M.inventory = {}   -- [invSlot] = itemID
     M.inbox = {}       -- [mailIndex] = { { itemID, count }, ... } (attachments by slot)
     M.outbox = {}      -- [attachSlot] = { itemID, count }
@@ -476,6 +477,11 @@ function M.load(files)
     C_Container = {
         GetContainerNumSlots = function(bag) return M.bags[bag] and M.bags[bag].size or 0 end,
         GetContainerItemID = function(bag, slot) local s = slotData(bag, slot) return s and s.id end,
+        GetContainerItemLink = function(bag, slot)
+            local s = slotData(bag, slot)
+            if s then M.linkReads = M.linkReads + 1 end
+            return s and (s.link or ("|cffffffff|Hitem:" .. s.id .. "::::::::36:1486::::::::|h[Item " .. s.id .. "]|h|r"))
+        end,
         GetContainerItemInfo = function(bag, slot)
             local s = slotData(bag, slot)
             return s and { itemID = s.id, stackCount = s.count }
@@ -556,7 +562,7 @@ function M.load(files)
     end
     GetSendMailItem = function(i)
         local item = M.outbox[i]
-        if item then return "Item", item[1], nil, item[2] end
+        if item then return M.itemNames[item[1]] or "Item", item[1], nil, item[2] end
     end
     HasSendMailItem = function(i) return M.outbox[i] ~= nil end
     SendMail = function() end
@@ -564,6 +570,12 @@ function M.load(files)
     -- runs OnTextChanged (userInput false); M.type(text) is the player typing.
     SendMailFrame = CreateFrame("Frame", "SendMailFrame")
     SendMailNameEditBox = CreateFrame("EditBox", "SendMailNameEditBox")
+    -- The subject box; C.O.D. as on live (C_Mail.IsCODEnabled() false, 2026-11-18): the
+    -- game itself then never fills the subject. M.cod = true is a client where it does.
+    SendMailSubjectEditBox = CreateFrame("EditBox", "SendMailSubjectEditBox")
+    M.cod = false
+    C_Mail = C_Mail or {}
+    C_Mail.IsCODEnabled = function() return M.cod end
     function SendMailNameEditBox:SetText(text)
         self.text = text
         if self.scripts.OnTextChanged then self.scripts.OnTextChanged(self, false) end
@@ -918,7 +930,7 @@ end
 
 function M.setBag(bag, size, contents)
     local b = { size = size }
-    for slot, item in pairs(contents or {}) do b[slot] = { id = item[1], count = item[2] } end
+    for slot, item in pairs(contents or {}) do b[slot] = { id = item[1], count = item[2], link = item[3] } end
     M.bags[bag] = b
 end
 

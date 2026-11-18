@@ -548,3 +548,177 @@ test("a bag's name that loads late replaces 'Bag n'; an item that never loads st
     eq(AltsForeverBagsFrame:IsShown(), true)
     eq(#wow.timers, 1)
 end)
+
+local DAGGER = "|cff1eff00|Hitem:2632::::::::36:1486:::1:12754::::::|h[Curved Dagger of Intellect]|h|r"
+local ENCHANTED = "|cff1eff00|Hitem:9624:8486:::::::36:1486::11:::::::|h[Triprunner Dungarees]|h|r"
+local PLAIN = "|cffffffff|Hitem:2633::::::::36:1486::11:::::::|h[Plain Dagger]|h|r"
+
+test("weapons and armour with a random bonus or enchant keep their link; nothing else is read or stored", function()
+    local ns = wow.load(FILES)
+    wow.itemClass[2632], wow.itemClass[9624], wow.itemClass[2633] = 2, 4, 2
+    wow.setBag(0, 5, { [1] = { 2632, 1, DAGGER }, [2] = { 2589, 20 }, [4] = { 2633, 1, PLAIN } })
+    wow.login(nil)
+    eq(ns.char.links[0][1], DAGGER, "its bonus ID kept")
+    eq(ns.char.links[0][4], nil, "a plain weapon: its ID says it all")
+    eq(wow.linkReads, 2, "only the two weapons were read, not the cloth")
+    -- The bank: an enchanted item; its own table, kept apart from the bags'.
+    wow.setBag(6, 3, { [2] = { 9624, 1, ENCHANTED } })
+    wow.fire("BANKFRAME_OPENED")
+    eq(ns.char.links[6][2], ENCHANTED)
+    eq(ns.char.links[0][1], DAGGER, "the bags' links untouched by a bank scan")
+    -- Moved, then gone: the slot follows, and nothing is left behind.
+    wow.setBag(0, 5, { [3] = { 2632, 1, DAGGER } })
+    bagsChanged(0)
+    eq(ns.char.links[0][1], nil); eq(ns.char.links[0][3], DAGGER)
+    wow.setBag(0, 5, {})
+    bagsChanged(0)
+    eq(ns.char.links[0], nil, "no table for a bag without any")
+    wow.bankOpen = nil
+    wow.fire("BANKFRAME_CLOSED")
+    wow.setBag(6, 3, {})
+    wow.fire("BANKFRAME_OPENED")
+    eq(ns.char.links, nil, "none left: no field at all")
+    eq(ns.SpecialLink(PLAIN), nil)
+    eq(ns.SpecialLink("|Hitem:2632::::::1012::36:1486::::::::|h[x]|h"), "|Hitem:2632::::::1012::36:1486::::::::|h[x]|h", "an old-style suffix ID")
+end)
+
+test("the bags window shows an item with a bonus as itself: its tooltip and shift-click use its link", function()
+    local ns = wow.load(FILES)
+    wow.ns = ns
+    wow.itemClass[2632], wow.itemClass[2633] = 2, 2
+    wow.setBag(0, 3, { [1] = { 2632, 1, DAGGER }, [2] = { 2633, 1, PLAIN } })
+    wow.login(nil)
+    ns.ShowBags(nil, "bags")
+    local f = AltsForeverBagsFrame
+    local dagger, plain = f.slots[1], f.slots[2]
+    GameTooltip.itemID, GameTooltip.hyperlink = nil, nil
+    dagger.scripts.OnEnter(dagger)
+    eq(GameTooltip.hyperlink, DAGGER, "of Intellect, with its stats")
+    eq(GameTooltip.itemID, nil)
+    plain.scripts.OnEnter(plain)
+    eq(GameTooltip.itemID, 2633, "a plain one as before")
+    wow.modified = true
+    dagger.scripts.OnClick(dagger)
+    eq(wow.chatLinks[#wow.chatLinks], DAGGER)
+    wow.modified = nil
+    eq(select(6, ns.BagsShown())[1], DAGGER)
+    -- A slot reused for a plain item forgets the link.
+    wow.setBag(0, 3, { [1] = { 2633, 1 } })
+    bagsChanged(0)
+    dagger.scripts.OnEnter(dagger)
+    eq(GameTooltip.itemID, 2633)
+end)
+
+test("a damaged links table is repaired at load", function()
+    local ns = wow.load(FILES)
+    local c = alt("Tarn Moon", "DRUID", { links = { [0] = { [1] = DAGGER, [2] = 5, x = DAGGER }, [1] = "bad", y = {}, [6] = {} } })
+    wow.login({ v = 2, chars = { ["Tarn Moon"] = c } })
+    local links = AltsForeverDB.chars["Tarn Moon"].links
+    eq(links[0][1], DAGGER); eq(links[0][2], nil); eq(links[0].x, nil)
+    eq(links[1], nil); eq(links.y, nil); eq(links[6], nil, "an empty bag's table goes")
+end)
+
+test("the Mail view: what was in the mailbox when last opened, saying newer mail isn't shown", function()
+    local ns = wow.load(FILES)
+    wow.ns = ns
+    wow.now = 1000000
+    wow.login({ v = 2, chars = { ["Alt"] = alt("Alt", "WARRIOR", {}) } })
+    local f
+    ns.ShowBags(nil, "mail")
+    f = AltsForeverBagsFrame
+    eq(f.mail.highlightLocked, true); eq(f.bags.highlightLocked, false)
+    eq(f.split:IsEnabled(), false, "By bag means nothing for mail")
+    eq(f.empty:IsShown(), true)
+    assert(f.empty.text:find("Mailbox not seen yet", 1, true), f.empty.text)
+    eq(f.note:IsShown(), false)
+    eq(f.seen.text, "")
+    -- Open the mailbox: two letters, linen in both.
+    wow.fire("MAIL_SHOW")
+    wow.inbox = { { { 2589, 20 }, { 4306, 2 }, days = 20 }, { { 2589, 5 }, days = 3 } }
+    wow.fire("MAIL_INBOX_UPDATE")
+    eq(ns.char.mailAt, 1000000)
+    eq(bagsGrid(), "2589x25 4306x2", "one slot per item, with its total")
+    eq(f.empty:IsShown(), false)
+    eq(f.note:IsShown(), true)
+    assert(f.note.text:find("Newer mail isn't shown", 1, true), f.note.text)
+    eq(f.info.text, "", "no free slots in a mailbox")
+    wow.now = 1000000 + 3 * 86400
+    ns.ShowBags(nil, "bags"); ns.ShowBags(nil, "mail")
+    assert(f.seen.text:find("Mailbox last opened: 3d ago", 1, true), f.seen.text)
+    -- Emptied: says so, and still when.
+    wow.inbox = {}
+    wow.fire("MAIL_INBOX_UPDATE")
+    eq(f.empty:IsShown(), true)
+    assert(f.empty.text:find("empty when this character last opened it", 1, true), f.empty.text)
+    assert(f.seen.text:find("Mailbox last opened", 1, true), f.seen.text)
+    -- Mail you send another character is in theirs at once, though they haven't opened it.
+    wow.outbox = { { 2589, 5 } }
+    SendMail("Alt", "", "")
+    wow.fire("MAIL_SEND_SUCCESS")
+    ns.ShowBags("Alt", "mail")
+    eq(bagsGrid(), "2589x5")
+    eq(f.seen.text, "", "their mailbox itself never seen")
+    -- The character menu opens it too.
+    f:Hide()
+    ns.ShowCharacterMenu(UIParent, "Alt")
+    wow.menuItem("Mail").fn()
+    eq(f:IsShown(), true); eq(select(2, ns.BagsState()), "mail")
+    wow.now = nil
+end)
+
+test("with an item lit, Bags, Bank and Mail say how many the shown character has there; the row still fits", function()
+    local ns = wow.load(FILES)
+    wow.ns = ns
+    wow.login({ v = 2, chars = {
+        ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { bags = { [4306] = 12 }, bank = { [4306] = 40 }, mail = { [4306] = 3 } }),
+        ["Big Stack"] = alt("Big Stack", "PRIEST", { bags = { [4306] = 1200 }, bank = { [4306] = 4000 }, mail = { [4306] = 300 } }),
+    } })
+    ns.ShowBags("Tarn Moon", "bags")
+    local f = AltsForeverBagsFrame
+    -- Text widths as the columns tests' fake font: 6 per character.
+    for _, v in ipairs({ "bags", "bank", "mail" }) do
+        local b = f[v]
+        b.GetFontString = function() return { GetStringWidth = function() return textWidth(b.text or "") end } end
+    end
+    f.split.label.GetStringWidth = function(self) return textWidth(self.text or "") end
+    local name = { SetWidth = function(self, w) self.width = w end }
+    f.who.GetFontString = function() return name end
+    local function texts() return f.bags.text .. " | " .. f.bank.text .. " | " .. f.mail.text end
+    ns.ShowBags("Tarn Moon", "bags")
+    eq(texts(), "Bags | Bank | Mail", "nothing lit: just the words")
+    -- Lit from the search: how many of it, not how many slots.
+    ns.ShowBags("Tarn Moon", "bags", 4306)
+    eq(texts(), "Bags (12) | Bank (40) | Mail (3)")
+    eq(f.bags.width, 9 * 6 + 20, "sized to its text")
+    eq(f.split.label.shown, true, "room for 'By bag' at 14 columns")
+    -- Another character: their numbers; a place without it has none.
+    ns.char.bags[4306] = nil
+    ns.ShowBags(ns.charKey, "bags", 4306)
+    eq(texts(), "Bags | Bank | Mail")
+    -- The narrowest window: the row must fit inside it.
+    f.grip.scripts.OnMouseDown(f.grip)
+    f:SetWidth(12 * 2 + 10 * 39 - 3)
+    f.scripts.OnSizeChanged(f, f:GetWidth(), f:GetHeight())
+    f.grip.scripts.OnMouseUp(f.grip)
+    local room = f:GetWidth() - 12 * 2
+    local function row()
+        local w = f.who.width + 4 + f.bags.width + 4 + f.bank.width + 4 + f.mail.width + 4 + 24
+        if f.split.label.shown then w = w + 6 + textWidth(f.split.label.text) end
+        return w
+    end
+    eq(f.split.label.shown, true, "no numbers: 'By bag' fits at 10 columns")
+    eq(f.who.width, 140)
+    ns.ShowBags("Tarn Moon", "bags", 4306)
+    eq(f.split.label.shown, false, "numbers: 'By bag' gives up its words")
+    assert(row() <= room, "fits: " .. row() .. " of " .. room)
+    ns.ShowBags("Big Stack", "bags", 4306)
+    eq(texts(), "Bags (1200) | Bank (4000) | Mail (300)")
+    assert(f.who.width < 140 and f.who.width >= 80, "the character button gives up width: " .. f.who.width)
+    eq(name.width, f.who.width - 16, "its name is cut to fit inside it")
+    assert(row() <= room, "fits: " .. row() .. " of " .. room)
+    -- Cleared: back to the words, and room for 'By bag' again.
+    f.clear.scripts.OnClick(f.clear)
+    eq(texts(), "Bags | Bank | Mail")
+    eq(f.split.label.shown, true)
+    eq(f.who.width, 140)
+end)

@@ -19,7 +19,12 @@ local floor, ipairs, type = math.floor, ipairs, type
 --    agree with the tooltip's lines. The lines' own widths can read as secret values
 --    while Blizzard's secure code builds a tooltip, so they're never used.
 --  * Every width and font read is checked with issecretvalue first; if anything can't
---    be read, the plain text stays.
+--    be read, the plain text stays. So does a font the game won't load (SetFont returns
+--    false) or one that draws nothing (every cell measures 0): a player saw names with
+--    no counts (2026-11-17), which is what a spacer without its cells looks like.
+--  * A line's text becomes the spacer only once its cells are placed, so an error part
+--    way leaves the plain text, never a blank. Our font strings start from the game's
+--    tooltip font, so one is never without a font (SetText would throw).
 --  * Cells are made once per tooltip and reused, and hidden when the tooltip is cleared
 --    or hidden.
 local BLANK = "Interface\\AddOns\\" .. ADDON .. "\\media\\blank.tga"
@@ -76,12 +81,12 @@ function ns.MeasureColumns(tt, rows, spec, font, size, flags)
     if not (ns.UsableFont(font, size, flags) and tt.CreateFontString) then return nil end
     local m = measurers[tt]
     if not m then
-        m = tt:CreateFontString(nil, "BACKGROUND")
+        m = tt:CreateFontString(nil, "BACKGROUND", "GameTooltipText")
         m:SetPoint("TOPLEFT")
         m:SetAlpha(0)
         measurers[tt] = m
     end
-    m:SetFont(font, size, flags)
+    if m:SetFont(font, size, flags) == false then return nil end
     local columns, widths = #spec, {}
     for col = 1, columns do widths[col] = 0 end
     for _, cells in ipairs(rows) do
@@ -98,6 +103,11 @@ function ns.MeasureColumns(tt, rows, spec, font, size, flags)
         end
     end
     m:SetText("")
+    local drawn = false
+    for col = 1, columns do
+        if widths[col] > 0 then drawn = true break end
+    end
+    if not drawn then return nil end
     local right, x = {}, 0
     for col = columns, 1, -1 do
         right[col] = x
@@ -152,18 +162,13 @@ function ns.PlaceColumns(tt, first, rows, spec, layout, block)
     for i, cells in ipairs(rows) do
         local line = ns.LineText(tt, "TextRight", first + i - 1)
         if not line then break end
-        local current = line:GetText()
-        if issecretvalue(current) or current ~= layout.reserve then
-            line:SetText(layout.reserve)
-            changed = true
-        end
         for col = 1, #spec do
             local s = cells[col]
             if s and s ~= "" then
                 used = used + 1
                 local fs = pool[used]
                 if not fs then
-                    fs = tt:CreateFontString(nil, "ARTWORK")
+                    fs = tt:CreateFontString(nil, "ARTWORK", "GameTooltipText")
                     fs:SetWordWrap(false)
                     fs:SetTextColor(1, 1, 1)
                     pool[used] = fs
@@ -175,7 +180,13 @@ function ns.PlaceColumns(tt, first, rows, spec, layout, block)
                 fs:SetPoint("RIGHT", line, "RIGHT", -right[col], 0)
                 fs:SetText(s)
                 fs:Show()
+                pool.used = used -- hidden by the next Clear even if a later cell fails
             end
+        end
+        local current = line:GetText()
+        if issecretvalue(current) or current ~= layout.reserve then
+            line:SetText(layout.reserve)
+            changed = true
         end
     end
     pool.used = used

@@ -197,6 +197,46 @@ test("mail rules: Pack attaches what the rules send to that character, never bou
     eq(p:IsShown(), false, "not one of yours")
 end)
 
+test("the subject is filled from the first attachment, as the game does when C.O.D. is on (it's off on live)", function()
+    atMailbox({ ["c:7:5"] = { ["Tarn Moon"] = LINEN } })
+    local subject = SendMailSubjectEditBox
+    eq(subject:GetText(), nil, "nothing attached: nothing filled")
+    attach(1, LINEN, 20)
+    eq(subject:GetText(), "Linen Cloth (20)", "named after it, with the stack size")
+    attach(2, SILK, 1)
+    eq(subject:GetText(), "Linen Cloth (20)", "still the first")
+    attach(1, nil)
+    eq(subject:GetText(), "Silk Cloth", "the first went: the next one, no count for one")
+    attach(2, nil)
+    eq(subject:GetText(), "", "nothing attached: taken out again")
+    -- A subject the player typed is never touched.
+    subject:SetText("For the bandages")
+    attach(1, LINEN, 20)
+    eq(subject:GetText(), "For the bandages")
+    attach(1, nil)
+    eq(subject:GetText(), "For the bandages", "not cleared either")
+    -- Pack fills it too.
+    subject:SetText("")
+    wow.setBag(0, 16, { { LINEN, 20 }, { LINEN, 7 } })
+    wow.fire("BAG_UPDATE_DELAYED")
+    packButton().scripts.OnClick(packButton())
+    eq(subject:GetText(), "Linen Cloth (20)")
+    -- Where the game fills it itself (C.O.D. on), it's left to the game.
+    wow.outbox = {}
+    wow.fire("MAIL_SEND_INFO_UPDATE")
+    subject:SetText("")
+    wow.cod = true
+    attach(1, SILK, 2)
+    eq(subject:GetText(), "", "the game's job there")
+    -- "Send mail to alts" off: the mailbox is left as the game has it.
+    wow.cod = false
+    attach(1, nil)
+    SlashCmdList.ALTSFOREVER("sendmail")
+    eq(AltsForeverDB.sendToAltOff, true)
+    attach(1, SILK, 2)
+    eq(subject:GetText(), "", "off: untouched")
+end)
+
 test("mail rules: Pack fills only the free attachment slots, and can be turned off", function()
     atMailbox({ ["c:7:5"] = { ["Tarn Moon"] = LINEN } })
     for i = 1, 11 do wow.outbox[i] = { SHIRT, 1 } end

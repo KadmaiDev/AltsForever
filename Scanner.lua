@@ -80,10 +80,47 @@ function ns.SlotItem(value)
     return math.floor(value / STACK), value % STACK
 end
 
+-- Weapons and armour can carry what their item ID doesn't say: a random bonus ("Curved
+-- Dagger of Intellect" is the plain Curved Dagger's ID; Forever links it as a bonus ID) or an
+-- enchant. Their full link is kept for the bags window (a player's report, 2026-11-18: bank
+-- items showed without their bonus). Only weapons and armour are read, and only links with
+-- one of those are stored, so a scan of everything else costs what it did.
+local GetContainerItemLink = C_Container.GetContainerItemLink
+local GetItemInfoInstant = C_Item.GetItemInfoInstant
+local WEAPON, ARMOR = 2, 4
+local gear = {} -- itemID -> whether it's a weapon or armour (the answer never changes)
+local function IsGear(id)
+    local g = gear[id]
+    if g == nil then
+        local _, _, _, _, _, class = GetItemInfoInstant(id)
+        if class == nil then return false end -- not known yet: asked again next scan
+        g = class == WEAPON or class == ARMOR
+        gear[id] = g
+    end
+    return g
+end
+
+-- The fields after "item:": the enchant (1st), the random suffix (6th) and how many bonus
+-- IDs (12th). Seen in the owner's saves (2026-11-18): "item:6590::::::::36:1486:::1:12754"
+-- (Battleforge Boots of the Defender: no suffix, one bonus ID), "item:9624:8486:..."
+-- (enchanted), "item:6414::::::::37:1485::11:::" (plain).
+local LINK_FIELDS = "item:%-?%d+:(%-?%d*):[^:]*:[^:]*:[^:]*:[^:]*:(%-?%d*):[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:(%d*)"
+local function Set(v) return v ~= nil and v ~= "" and v ~= "0" end
+
+-- The link if it says more than the item ID (an enchant, a random bonus), else nil.
+function ns.SpecialLink(link)
+    if issecretvalue(link) or type(link) ~= "string" then return nil end
+    local enchant, suffix, bonuses = link:match(LINK_FIELDS)
+    if Set(enchant) or Set(suffix) or Set(bonuses) then return link end
+    return nil
+end
+
 -- Counts every item in the bags into out; with layout, also records each bag's slots
 -- in layout[bag] (an array as long as the bag; a bag with no slots is removed), and
--- at index 0 the bag item itself, for its name in the bags window.
-function ns.ScanContainers(bags, out, layout)
+-- at index 0 the bag item itself, for its name in the bags window. With links, the full
+-- link of each slot holding an item with a bonus or enchant: links[bag][slot] (a bag
+-- without any has no table).
+function ns.ScanContainers(bags, out, layout, links)
     wipe(out)
     for i = 1, #bags do
         local bag = bags[i]
@@ -98,6 +135,8 @@ function ns.ScanContainers(bags, out, layout)
                 layout[bag] = slots
             end
         end
+        local kept = links and links[bag]
+        if kept then wipe(kept) end
         for slot = 1, size do
             local id, count = ReadSlot(bag, slot)
             -- A secret value would break the whole SavedVariables write, and even
@@ -105,10 +144,19 @@ function ns.ScanContainers(bags, out, layout)
             if id and not issecretvalue(count) and count then
                 out[id] = (out[id] or 0) + count
                 if slots then slots[slot] = ns.SlotValue(id, count) end
+                if links and IsGear(id) then
+                    local link = ns.SpecialLink(GetContainerItemLink(bag, slot))
+                    if link then
+                        kept = kept or links[bag] or {}
+                        links[bag] = kept
+                        kept[slot] = link
+                    end
+                end
             elseif slots then
                 slots[slot] = 0
             end
         end
+        if links and kept and next(kept) == nil then links[bag] = nil end
         -- The bag got smaller (swapped for a smaller one).
         if slots then
             local inv = BAG_INV[bag]
@@ -133,10 +181,24 @@ function ns.StartScanner()
     local char = ns.char
     local bagsDirty, bankDirty, bankOpen = false, false, false
 
+    -- Scans into the character's links table (one is only kept while it has any): an empty
+    -- one waits here for the next scan, so scans with no links create nothing.
+    local spareLinks = {}
+    local function ScanInto(bags, out)
+        local links = char.links or spareLinks
+        ns.ScanContainers(bags, out, char.layout, links)
+        if next(links) == nil then
+            char.links, spareLinks = nil, links
+        else
+            char.links = links
+            if links == spareLinks then spareLinks = {} end
+        end
+    end
+
     local function ScanBags()
         bagsDirty = false
         char.layout = char.layout or {}
-        ns.ScanContainers(BAGS, char.bags, char.layout)
+        ScanInto(BAGS, char.bags)
         ns.version = ns.version + 1
         ns.BagsWindowChanged()
         if ns.RecipesChanged then ns.RecipesChanged() end -- how many they could make
@@ -148,7 +210,7 @@ function ns.StartScanner()
         bankDirty = false
         char.bank = char.bank or {}
         char.layout = char.layout or {}
-        ns.ScanContainers(BANK_BAGS, char.bank, char.layout)
+        ScanInto(BANK_BAGS, char.bank)
         char.bankAt = time()
         ns.version = ns.version + 1
         ns.BagsWindowChanged()

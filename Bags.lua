@@ -1,5 +1,7 @@
 -- Alts Forever bags window: any character's bags or bank, slot by slot, as last seen,
 -- either all in one grid or split by bag (bank: by tab), with their money at the bottom.
+-- Also their mail: what was in the mailbox when they last opened it (a player's request,
+-- 2026-11-18), one slot per item with its total, saying plainly that newer mail isn't known.
 -- Opened from the overview's title bar, a character's right-click menu, /af bags and
 -- /af bank. The slots come from the scanner (char.layout); for characters not scanned
 -- since this was added, the window falls back to one slot per item with its total.
@@ -20,6 +22,8 @@ local SIZE, GAP, PAD = 36, 3, 12
 local DEFAULT_COLS, MIN_COLS, MAX_COLS = 14, 10, 30
 local cols = DEFAULT_COLS
 local TOP, BOTTOM, HEADER, SECTION_GAP = 60, 34, 20, 8
+local NOTE = 30 -- the Mail view's note above its slots (two lines of small text)
+local VIEWS = { "bags", "bank", "mail" }
 local EMPTY_SLOT = "Interface\\PaperDoll\\UI-Backpack-EmptySlot"
 local BORDER = "Interface\\Common\\WhiteIconFrame"
 local BagIndex = Enum.BagIndex
@@ -31,7 +35,29 @@ local sizing = false
 local scroll, contentHeight = 0, 0
 -- An item the search (Search.lua) opened this window for: its slots lit, the rest dimmed,
 -- on every character and view you switch to, until you clear it or close the window.
+-- Or, while the search has nothing picked, every item it matches (`litSet`, a set of item
+-- IDs, with the text searched for in `litText`; the owner's idea, 2026-11-18): picking one
+-- narrows it to that.
 local lit
+local litSet, litText
+
+local function Lighting() return lit ~= nil or litSet ~= nil end
+
+local function IsLit(id)
+    if id == nil then return false end
+    return id == lit or (litSet ~= nil and litSet[id] == true)
+end
+
+-- How many of what's lit a counts table (c.bags, c.bank, c.mail) holds.
+local function LitIn(t)
+    if not t then return 0 end
+    if lit then return t[lit] or 0 end
+    local n = 0
+    if litSet then
+        for id in pairs(litSet) do n = n + (t[id] or 0) end
+    end
+    return n
+end
 local loadRetry = false
 -- Fills in a row from that timer: an item that never loads (one removed from the game)
 -- stops it after a few, rather than refilling every second while the window is open.
@@ -41,9 +67,10 @@ local MAX_RETRIES = 5
 ---------------------------------------------------------------------------
 -- What to show (no UI, so tests can check it)
 ---------------------------------------------------------------------------
--- The slots, reused between fills: item IDs (false for an empty slot) and counts, and
--- the sections they're grouped in: { bag = bag index or false, from, to, used }.
-local ids, counts, sections = {}, {}, {}
+-- The slots, reused between fills: item IDs (false for an empty slot), counts, full links
+-- (false unless the item has a random bonus or enchant, Scanner.lua), and the sections
+-- they're grouped in: { bag = bag index or false, from, to, used }.
+local ids, counts, links, sections = {}, {}, {}, {}
 local shown, nSections = 0, 0
 local keys = 0 -- of the slots shown, how many are the keyring's
 
@@ -55,14 +82,15 @@ local function NewSection(bag)
     return s
 end
 
-local function Add(section, id, count)
+local function Add(section, id, count, link)
     shown = shown + 1
-    ids[shown], counts[shown] = id or false, count or 0
+    ids[shown], counts[shown], links[shown] = id or false, count or 0, link or false
     section.to = shown
     if id then section.used = section.used + 1 end
 end
 
--- One slot per item, with its total: for bags or a bank seen before slots were recorded.
+-- One slot per item, with its total: for bags or a bank seen before slots were recorded,
+-- and for mail.
 local byId = {}
 local function AddCounts(totals)
     local n = 0
@@ -83,11 +111,22 @@ local function HasItem(values)
     return false
 end
 
--- Fills the slots for a character's bags or bank, one section per bag if split, else one
--- for all; returns how it was recorded: "slots", "counts" (no layout yet) or nil.
+local function Trim()
+    for i = #ids, shown + 1, -1 do ids[i], counts[i], links[i] = nil, nil, nil end
+end
+
+-- Fills the slots for a character's bags, bank or mail, one section per bag if split, else
+-- one for all; returns how it was recorded: "slots", "counts" (no layout yet), "mail" or nil
+-- (nothing: never seen, or an empty mailbox).
 function ns.BagsContents(c, which, split)
     shown, nSections, keys = 0, 0, 0
-    local layout = c.layout
+    if which == "mail" then
+        local how = c.mail and next(c.mail) and "mail" or nil
+        if how then AddCounts(c.mail) end
+        Trim()
+        return how
+    end
+    local layout, kept = c.layout, c.links
     local how
     local section
     for _, bag in ipairs(which == "bank" and ns.BANK_TABS or ns.CARRIED_BAGS) do
@@ -97,10 +136,11 @@ function ns.BagsContents(c, which, split)
         local ring = bag == BagIndex.Keyring
         if values and (not ring or HasItem(values)) then
             if split or not section then section = NewSection(split and bag or false) end
+            local bagLinks = kept and kept[bag]
             for i = 1, #values do
                 local id, count = ns.SlotItem(values[i])
                 if id or not ring then
-                    Add(section, id, count)
+                    Add(section, id, count, id and bagLinks and bagLinks[i])
                     if ring then keys = keys + 1 end
                 end
             end
@@ -115,17 +155,17 @@ function ns.BagsContents(c, which, split)
             how = "counts"
         end
     end
-    for i = #ids, shown + 1, -1 do ids[i], counts[i] = nil, nil end
+    Trim()
     return how
 end
 
-function ns.BagsShown() return ids, counts, shown, sections, nSections end
+function ns.BagsShown() return ids, counts, shown, sections, nSections, links end
 
 local RetryLater
 
 -- A section's title: the bag's name (or bank tab), or the whole place's.
 local function SectionName(c, bag)
-    if not bag then return view == "bank" and L["Bank"] or L["Bags"] end
+    if not bag then return view == "bank" and L["Bank"] or view == "mail" and L["Mail"] or L["Bags"] end
     if bag == BagIndex.Backpack then return BACKPACK_TOOLTIP or L["Backpack"] end
     if bag == BagIndex.Keyring then return KEYRING or L["Keyring"] end
     for i, tab in ipairs(ns.BANK_TABS) do
@@ -161,14 +201,17 @@ local function SlotEnter(b)
     end
     if not b.id then return end
     GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
-    GameTooltip:SetItemByID(b.id)
+    -- Its own link when it has a bonus or enchant ("of Intellect"); the item ID alone
+    -- would show the plain item.
+    if b.link then GameTooltip:SetHyperlink(b.link) else GameTooltip:SetItemByID(b.id) end
     GameTooltip:Show()
 end
 
 local function SlotClick(b)
     -- Shift-click links the item in chat, like the game's own bags.
     if not (b.id and IsModifiedClick()) then return end
-    local _, link = C_Item.GetItemInfo(b.id)
+    local link = b.link
+    if not link then link = select(2, C_Item.GetItemInfo(b.id)) end
     if link then HandleModifiedItemClick(link) end
 end
 
@@ -233,9 +276,9 @@ local function Quality(id)
     return q
 end
 
-local function ShowSlot(b, id, count)
-    b.id = id or nil
-    local dim = lit and id ~= lit and 0.25 or 1
+local function ShowSlot(b, id, count, link)
+    b.id, b.link = id or nil, id and link or nil
+    local dim = Lighting() and not IsLit(id) and 0.25 or 1
     b.icon:SetAlpha(dim)
     b.border:SetAlpha(dim)
     b.count:SetAlpha(dim)
@@ -259,8 +302,8 @@ local function ShowSlot(b, id, count)
     end
 end
 
--- Where the lit item is: each character's bags and bank holding it, the character with most
--- first. What the arrows beside "Showing: ..." step through.
+-- Where the lit item (or any lit item) is: each character's bags, bank and mail holding it,
+-- the character with most first. What the arrows beside "Showing: ..." step through.
 local stops = {}
 
 local function ByMost(a, b)
@@ -270,18 +313,20 @@ end
 
 local function Stops()
     wipe(stops)
-    if not lit then return stops end
+    if not Lighting() then return stops end
     local list = {}
     for key, c in pairs(ns.db.chars) do
         if not ns.Hidden(c) then
-            local inBags, inBank = c.bags and c.bags[lit] or 0, c.bank and c.bank[lit] or 0
-            if inBags + inBank > 0 then list[#list + 1] = { key = key, n = inBags + inBank, bags = inBags, bank = inBank } end
+            local inBags, inBank, inMail = LitIn(c.bags), LitIn(c.bank), LitIn(c.mail)
+            local n = inBags + inBank + inMail
+            if n > 0 then list[#list + 1] = { key = key, n = n, bags = inBags, bank = inBank, mail = inMail } end
         end
     end
     sort(list, ByMost)
     for _, h in ipairs(list) do
         if h.bags > 0 then stops[#stops + 1] = { key = h.key, view = "bags" } end
         if h.bank > 0 then stops[#stops + 1] = { key = h.key, view = "bank" } end
+        if h.mail > 0 then stops[#stops + 1] = { key = h.key, view = "mail" } end
     end
     return stops
 end
@@ -296,7 +341,7 @@ end
 
 local function ScrollToLit()
     for i = 1, shown do
-        if ids[i] == lit and slots[i] and slots[i].top then
+        if IsLit(ids[i]) and slots[i] and slots[i].top then
             scroll = max(0, slots[i].top - HEADER)
             Place()
             return
@@ -321,6 +366,9 @@ local function Seen(c, now)
     if view == "bank" then
         return c.bankAt and L["Bank last visited: %s"]:format(ns.FormatAgo(now - c.bankAt)) or ""
     end
+    if view == "mail" then
+        return c.mailAt and L["Mailbox last opened: %s"]:format(ns.FormatAgo(now - c.mailAt)) or ""
+    end
     return L["Last seen: %s"]:format(ns.SeenText(shownKey, c, now))
 end
 
@@ -328,6 +376,44 @@ local MIN_VIEW = 3 * (SIZE + GAP)
 local function WidthFor(n) return PAD * 2 + n * (SIZE + GAP) - GAP end
 local function ColsFor(width)
     return max(MIN_COLS, min(MAX_COLS, floor((width - PAD * 2 + GAP) / (SIZE + GAP) + 0.5)))
+end
+
+-- The top row: the character button, Bags, Bank, Mail, the "By bag" tick box and its words.
+local WHO_WIDTH, WHO_MIN, BUTTON_MIN, TICK = 140, 80, 48, 24
+local TICK_GAP = 6 -- between the tick box and "By bag" (2 looked snug, owner 2026-11-18)
+
+local function TextWidth(fs, fallback)
+    local w = fs and fs.GetStringWidth and fs:GetStringWidth()
+    if type(w) ~= "number" or issecretvalue(w) or w <= 0 then return fallback end
+    return w
+end
+
+-- The view buttons' words, with how many of the lit item the shown character has there
+-- ("Bank (40)", as the tooltip counts it; with every match lit, all of them together;
+-- the owner's idea, 2026-11-18), each button
+-- sized to its text. The row must fit the window at its narrowest in every language: if
+-- it wouldn't, "By bag" loses its words (the tick box and its tooltip stay), then the
+-- character button gives up width, down to WHO_MIN (its name cut short).
+local function Tabs(c)
+    local need = 0
+    for _, v in ipairs(VIEWS) do
+        local b = frame[v]
+        local n = LitIn(c[v])
+        local word = v == "bank" and L["Bank"] or v == "mail" and L["Mail"] or L["Bags"]
+        b:SetText(n > 0 and (word .. " (" .. n .. ")") or word)
+        local w = max(BUTTON_MIN, floor(TextWidth(b.GetFontString and b:GetFontString(), 36) + 20))
+        b:SetWidth(w)
+        need = need + 4 + w
+    end
+    need = need + 4 + TICK
+    local room = WidthFor(cols) - PAD * 2
+    local label = frame.split.label
+    local words = WHO_WIDTH + need + TICK_GAP + TextWidth(label, 40) <= room
+    label:SetShown(words)
+    local whoWidth = words and WHO_WIDTH or max(WHO_MIN, min(WHO_WIDTH, room - need))
+    frame.who:SetWidth(whoWidth)
+    local fs = frame.who.GetFontString and frame.who:GetFontString()
+    if fs and fs.SetWidth then fs:SetWidth(whoWidth - 16) end
 end
 
 -- The tallest the slot area gets before it scrolls: as the player sized it, or by
@@ -341,8 +427,8 @@ end
 -- The slot area's height for a character's bags or bank (fills the shared lists, so only
 -- before Fill reads them).
 local function ContentHeight(c, which, split)
-    ns.BagsContents(c, which, split)
-    local y = 0
+    local how = ns.BagsContents(c, which, split)
+    local y = how == "mail" and NOTE or 0
     for n = 1, nSections do
         local s = sections[n]
         y = y + HEADER + ceil((s.to - s.from + 1) / cols) * (SIZE + GAP) + SECTION_GAP
@@ -381,9 +467,9 @@ function Fill()
         frame:SetWidth(WidthFor(cols))
     end
     local split = ns.db.bagsSplit and true or false
-    if lit or searchDocked then
+    if Lighting() or searchDocked then
         local h = steady or 0
-        if lit then
+        if Lighting() then
             for _, s in ipairs(Stops()) do
                 local sc = ns.db.chars[s.key]
                 if sc then h = max(h, ContentHeight(sc, s.view, split)) end
@@ -396,12 +482,23 @@ function Fill()
     end
     local how = ns.BagsContents(c, view, split)
     frame.who:SetText(ns.ColoredName(shownKey, c))
-    for _, v in ipairs({ "bags", "bank" }) do
+    Tabs(c)
+    for _, v in ipairs(VIEWS) do
         if v == view then frame[v]:LockHighlight() else frame[v]:UnlockHighlight() end
     end
     frame.split:SetChecked(split)
+    -- Mail is a list, not slots: one grid whatever "By bag" says.
+    frame.split:SetEnabled(view ~= "mail")
 
+    -- Mail: say plainly that this is the mailbox as it was, not what's there now.
     local y, free = 0, 0
+    local mailNote = how == "mail"
+    frame.note:SetShown(mailNote)
+    if mailNote then
+        frame.note:SetWidth(cols * (SIZE + GAP) - GAP)
+        frame.note:SetText(GREY .. L["What was in the mailbox when this character last opened it, plus anything your characters have mailed them since. Newer mail isn't shown."] .. "|r")
+        y = NOTE
+    end
     for n = 1, nSections do
         local s = sections[n]
         local h = Header(n)
@@ -409,6 +506,8 @@ function Fill()
         if how == "slots" then
             local size = s.bag == BagIndex.Keyring and "" or (" / " .. (s.to - s.from + 1))
             h:SetText(title .. GREY .. "  (" .. s.used .. size .. ")|r")
+        elseif how == "mail" then
+            h:SetText(title .. GREY .. "  (" .. s.used .. ")|r")
         else
             -- Totals only: say so beside the heading (too long for the bottom row).
             h:SetText(title .. GREY .. "   " .. (view == "bank" and L["Totals only: visit the bank on this character to see its slots."]
@@ -417,7 +516,7 @@ function Fill()
         h:ClearAllPoints()
         h:SetPoint("TOPLEFT", frame.content, "TOPLEFT", 0, -y)
         h:Show()
-        h.line:SetShown(how == "slots")
+        h.line:SetShown(how == "slots" or how == "mail")
         y = y + HEADER
         for i = s.from, s.to do
             local k = i - s.from
@@ -425,7 +524,7 @@ function Fill()
             b.top = y + floor(k / cols) * (SIZE + GAP)
             b:ClearAllPoints()
             b:SetPoint("TOPLEFT", frame.content, "TOPLEFT", k % cols * (SIZE + GAP), -y - floor(k / cols) * (SIZE + GAP))
-            ShowSlot(b, ids[i], counts[i])
+            ShowSlot(b, ids[i], counts[i], links[i])
             if not ids[i] then free = free + 1 end
             b:Show()
         end
@@ -440,8 +539,16 @@ function Fill()
     Place()
 
     if not how then
-        frame.empty:SetText(GREY .. (view == "bank" and L["Bank not seen yet.\nVisit the bank on this character once."]
-            or L["No bags recorded yet.\nLog in on this character once."]) .. "|r")
+        local text
+        if view == "bank" then
+            text = L["Bank not seen yet.\nVisit the bank on this character once."]
+        elseif view == "mail" then
+            text = c.mail and L["The mailbox was empty when this character last opened it.\nNewer mail isn't shown."]
+                or L["Mailbox not seen yet.\nOpen the mailbox on this character once."]
+        else
+            text = L["No bags recorded yet.\nLog in on this character once."]
+        end
+        frame.empty:SetText(GREY .. text .. "|r")
     end
     frame.empty:SetShown(not how)
     if how == "slots" then
@@ -449,27 +556,34 @@ function Fill()
     else
         frame.info:SetText("")
     end
-    local name = lit and C_Item.GetItemNameByID(lit)
+    local lighting = Lighting()
     if lit then
+        local name = C_Item.GetItemNameByID(lit)
         if type(name) ~= "string" or issecretvalue(name) then name = "?" end
         -- White like the rest of the footer, the item in its quality colour.
         local qc = ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[Quality(lit) or 1]
         if qc and type(qc.hex) == "string" then name = qc.hex .. name .. "|r" end
         frame.clear.text:SetText(L["Showing: %s"]:format(name))
+    elseif litSet then
+        frame.clear.text:SetText(L["Showing everything matching '%s'"]:format(litText or ""))
+    end
+    if lighting then
         local w = frame.clear.text:GetStringWidth()
         if type(w) == "number" and not issecretvalue(w) then frame.clear:SetWidth(w + 20) end
     end
-    frame.clear:SetShown(lit ~= nil)
-    frame.info:SetShown(not lit)
+    frame.clear:SetShown(lighting)
+    frame.info:SetShown(not lighting)
     local n = #Stops()
     local i = StopIndex()
-    frame.stop:SetText(lit and (i > 0 and L["%d of %d"]:format(i, n) or L["not here"]) or "")
+    frame.stop:SetText(lighting and (i > 0 and L["%d of %d"]:format(i, n) or L["not here"]) or "")
     -- Arrows when there's somewhere else to go.
-    local arrows = lit ~= nil and (n > 1 or (n == 1 and i == 0))
+    local arrows = lighting and (n > 1 or (n == 1 and i == 0))
     frame.prev:SetShown(arrows)
     frame.next:SetShown(arrows)
-    frame.stop:SetShown(lit ~= nil)
-    frame.seen:SetText(how and (GREY .. Seen(c, time()) .. "|r") or "")
+    frame.stop:SetShown(lighting)
+    local seen = how or (view == "mail" and c.mail)
+    seen = seen and Seen(c, time()) or ""
+    frame.seen:SetText(seen ~= "" and (GREY .. seen .. "|r") or "")
     frame.money:SetText(c.money and GetCoinTextureString(c.money) or "")
 end
 
@@ -487,8 +601,8 @@ local function PickCharacter(owner)
                 group = ns.GroupKey(c, byRealm, byFaction)
                 root:CreateTitle(ns.GroupLabel(c, byRealm, byFaction))
             end
-            -- With an item lit: how many each character has of it (bags and bank).
-            local n = lit and ((c.bags and c.bags[lit] or 0) + (c.bank and c.bank[lit] or 0)) or 0
+            -- With an item lit: how many each character has of it (bags, bank and mail).
+            local n = Lighting() and (LitIn(c.bags) + LitIn(c.bank) + LitIn(c.mail)) or 0
             root:CreateRadio(ns.ColoredName(key, c) .. (n > 0 and " |cffffffff(" .. n .. ")|r" or ""),
                 function(k) return k == shownKey end,
                 function(k)
@@ -499,11 +613,12 @@ local function PickCharacter(owner)
     end)
 end
 
-local function ViewButton(name, text, x)
+-- Bags, Bank, Mail: one after another from `after`, each sized to its text by Tabs.
+local function ViewButton(name, text, after)
     local b = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    b:SetSize(70, 22)
-    b:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -30)
     b:SetText(text)
+    b:SetSize(BUTTON_MIN, 22)
+    b:SetPoint("LEFT", after, "RIGHT", 4, 0)
     b:SetScript("OnClick", function()
         view, scroll = name, 0
         Fill()
@@ -533,7 +648,7 @@ local function CreateWindow()
 
     -- The character dropdown.
     local who = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    who:SetSize(160, 22)
+    who:SetSize(WHO_WIDTH, 22)
     who:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -30)
     who:SetScript("OnClick", PickCharacter)
     who:SetScript("OnEnter", function(self)
@@ -544,15 +659,23 @@ local function CreateWindow()
     who:SetScript("OnLeave", function() GameTooltip:Hide() end)
     ns.SkinButton(who)
     f.who = who
-    ViewButton("bags", L["Bags"], PAD + 166)
-    ViewButton("bank", L["Bank"], PAD + 240)
+    ViewButton("bags", L["Bags"], who)
+    ViewButton("bank", L["Bank"], f.bags)
+    ViewButton("mail", L["Mail"], f.bank)
+    f.mail:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["Mail"])
+        GameTooltip:AddLine(L["What was in the mailbox when this character last opened it. Newer mail isn't shown."], 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    f.mail:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- All in one grid, or a section per bag (the choice is kept for every character).
     local split = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
-    split:SetSize(24, 24)
-    split:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + 316, -29)
+    split:SetSize(TICK, TICK)
+    split:SetPoint("LEFT", f.mail, "RIGHT", 4, 0)
     split.label = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    split.label:SetPoint("LEFT", split, "RIGHT", 2, 0)
+    split.label:SetPoint("LEFT", split, "RIGHT", TICK_GAP, 0)
     split.label:SetText(L["By bag"])
     split:SetScript("OnClick", function(self)
         ns.db.bagsSplit = self:GetChecked() and true or nil
@@ -585,6 +708,15 @@ local function CreateWindow()
 
     f.empty = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     f.empty:SetPoint("CENTER", holder, "CENTER")
+    -- The Mail view's note, above its slots (scrolls with them).
+    f.note = f.content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.note:SetPoint("TOPLEFT", f.content, "TOPLEFT", 0, 0)
+    f.note:SetJustifyH("LEFT")
+    f.note:SetJustifyV("TOP")
+    f.note:SetHeight(NOTE - 4)
+    f.note:SetWordWrap(true)
+    f.note:Hide()
+    ns.SkinText(f.note)
     f.info = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.info:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD + 2, 12)
     f.seen = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -605,8 +737,9 @@ local function CreateWindow()
     clear.x:SetPoint("LEFT", clear.text, "RIGHT", 4, 0)
     clear.x:SetTexture("Interface\\Buttons\\UI-StopButton")
     clear:SetScript("OnClick", function()
-        lit = nil
+        lit, litSet, litText = nil, nil, nil
         Fill()
+        if ns.SearchUnpick then ns.SearchUnpick() end
     end)
     clear:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -708,7 +841,7 @@ local function CreateWindow()
     local sounds = SOUNDKIT or {}
     f:HookScript("OnShow", function() if sounds.IG_BACKPACK_OPEN then PlaySound(sounds.IG_BACKPACK_OPEN) end end)
     f:HookScript("OnHide", function()
-        lit = nil
+        lit, litSet, litText = nil, nil, nil
         steady = nil
         if sounds.IG_BACKPACK_CLOSE then PlaySound(sounds.IG_BACKPACK_CLOSE) end
     end)
@@ -716,15 +849,14 @@ local function CreateWindow()
     ns.ScaleWindow(f)
 end
 
--- Opens the window on a character's bags or bank; the same again closes it.
--- Opens a character's bags or bank; the same again closes it. With `highlight` (an item ID,
--- from the search) it stays open, lights that item up and scrolls to it.
+-- Opens a character's bags, bank or mail; the same again closes it. With `highlight` (an item
+-- ID, from the search) it stays open, lights that item up and scrolls to it.
 function ns.ShowBags(key, which, highlight)
     if not frame then CreateWindow() end
     key, which = key or ns.charKey, which or "bags"
     if not highlight and frame:IsShown() and shownKey == key and view == which then return frame:Hide() end
     if shownKey ~= key or view ~= which then scroll = 0 end
-    shownKey, view, lit = key, which, highlight
+    shownKey, view, lit, litSet, litText = key, which, highlight, nil, nil
     Fill()
     if highlight then ScrollToLit() end
     -- Where it was left, else beside the overview if that's open (once it's sized).
@@ -737,31 +869,67 @@ function ns.BagsHighlight() return lit end
 -- For the search (Search.lua), while this window is open: whose bags it shows, and what's
 -- lit and in which view, to put back if the search is closed without picking.
 function ns.BagsShownKey() return frame and frame:IsShown() and shownKey or nil end
-function ns.BagsState() return lit, view end
+function ns.BagsState() return lit, view, litSet, litText end
 
--- Lights an item up on the character shown, in place: their bags or bank, wherever it is
--- (switching between the two, never to another character). If they haven't got it there it's
+-- Anything lit: one item, or the search's matches.
+function ns.BagsLighting() return frame ~= nil and Lighting() end
+
+-- The view on the shown character holding what's lit: the one shown if it does, else the
+-- first that does, else nil.
+local function ViewWithLit(c)
+    if LitIn(c[view]) > 0 then return view end
+    for _, v in ipairs(VIEWS) do
+        if LitIn(c[v]) > 0 then return v end
+    end
+end
+
+-- Lights an item up on the character shown, in place: their bags, bank or mail, wherever it
+-- is (switching between them, never to another character). If they haven't got it there it's
 -- lit all the same, "not here" with the arrows to whoever has (the owner saw an item in the
 -- mail bring back the one picked before, 2026-10-16), and it returns false.
 function ns.BagsPreview(id)
     local c = frame and frame:IsShown() and ns.db.chars[shownKey]
     if not c then return false end
-    local other = view == "bags" and "bank" or "bags"
-    local here, there = c[view] and c[view][id], c[other] and c[other][id]
+    local here = c[view] and c[view][id]
+    local there
+    if not here then
+        for _, v in ipairs(VIEWS) do
+            if c[v] and c[v][id] then
+                there = v
+                break
+            end
+        end
+    end
     local has = (here or there) and true or false
-    if lit == id and (here or not has) then return has end
-    if there and not here then view = other end
-    lit, scroll = id, 0
+    if lit == id and not litSet and (here or not has) then return has end
+    if there then view = there end
+    lit, litSet, litText, scroll = id, nil, nil, 0
     Fill()
     ScrollToLit()
     return has
 end
 
-function ns.BagsRestore(oldLit, oldView)
+-- Lights every item in `set` (item ID -> true) on the character shown, in place, as
+-- BagsPreview does one: the view switches to one holding some if this one holds none.
+-- `text` is what was searched for, for the footer. Returns whether they have any.
+function ns.BagsPreviewAll(set, text)
+    local c = frame and frame:IsShown() and ns.db.chars[shownKey]
+    if not c then return false end
+    lit, litSet, litText, scroll = nil, set, text, 0
+    local v = ViewWithLit(c)
+    if v then view = v end
+    Fill()
+    ScrollToLit()
+    return v ~= nil
+end
+
+function ns.BagsRestore(oldLit, oldView, oldSet, oldText)
     if not (frame and frame:IsShown()) then return end
     lit, view, scroll = oldLit, oldView or view, 0
+    litSet = not oldLit and oldSet or nil
+    litText = litSet and oldText or nil
     Fill()
-    if lit then ScrollToLit() end
+    if Lighting() then ScrollToLit() end
 end
 
 function ns.BagsWindow() return frame end

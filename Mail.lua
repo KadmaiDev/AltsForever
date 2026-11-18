@@ -9,6 +9,7 @@ local wipe, pairs, next, floor, time = wipe, pairs, next, math.floor, time
 local issecretvalue = issecretvalue or function() return false end
 local GetInboxNumItems, GetInboxHeaderInfo, GetInboxItem = GetInboxNumItems, GetInboxHeaderInfo, GetInboxItem
 local GetSendMailItem, GetSendMailMoney = GetSendMailItem, GetSendMailMoney
+local type = type
 
 local MAX_RECEIVE = ATTACHMENTS_MAX_RECEIVE or 16
 local MAX_SEND = ATTACHMENTS_MAX_SEND or 12
@@ -159,6 +160,45 @@ local function AltsMenu(owner)
 end
 
 -- The mailbox arrow can be turned off from the options menu ("Send mail to alts").
+-- The subject, as the game would fill it. Forever's mail window names a mail after its
+-- first attachment ("Linen Cloth (20)") only while C.O.D. can be used (Blizzard_MailFrame
+-- SendMailFrame_Update, forever branch), and on live C_Mail.IsCODEnabled() is false (owner's
+-- check, 2026-11-18), so attaching (by hand or with Pack) left it empty and Send greyed out
+-- until one was typed. Done here the same way while the game doesn't: only into an empty
+-- subject or one put there by us, and taken out again when the attachments go; a subject
+-- the player typed is never touched. Part of "Send mail to alts", like the rest of the
+-- mailbox help.
+local subjectFilled -- the subject we put in, while it's still there
+
+function ns.ResetMailSubject() subjectFilled = nil end
+
+function ns.FillMailSubject()
+    local box = SendMailSubjectEditBox
+    if not (box and C_Mail and C_Mail.IsCODEnabled) or not ns.SendToAltOn() then return end
+    local cod = C_Mail.IsCODEnabled()
+    if issecretvalue(cod) or cod ~= false then return end -- the game does it itself
+    local title
+    for i = 1, MAX_SEND do
+        local name, _, _, count = GetSendMailItem(i)
+        if not issecretvalue(name) and not issecretvalue(count) and name ~= nil then
+            title = type(count) == "number" and count > 1 and (name .. " (" .. count .. ")") or name
+            break
+        end
+    end
+    local text = box:GetText()
+    if issecretvalue(text) then return end
+    text = text or ""
+    if title then
+        if text == "" or text == subjectFilled then
+            if text ~= title then box:SetText(title) end
+            subjectFilled = title
+        end
+    elseif subjectFilled then
+        if text == subjectFilled then box:SetText("") end
+        subjectFilled = nil
+    end
+end
+
 function ns.SendToAltOn()
     return not ns.db.sendToAltOff
 end
@@ -213,18 +253,22 @@ function ns.StartMail()
     local function ScanInbox()
         char.mail = char.mail or {}
         char.mailExpires, char.mailDeletes = ns.ScanInbox(char.mail)
+        char.mailAt = time() -- the bags window's Mail view says how old its list is
         ns.version = ns.version + 1
         if ns.RefreshOverview then ns.RefreshOverview() end -- its Mail column, if open
+        if ns.BagsWindowChanged then ns.BagsWindowChanged() end -- its Mail view, if open
     end
 
     -- The inbox can only be read while the mailbox is open.
     local mailOpen = false
     ns.On("MAIL_SHOW", function()
         mailOpen = true
+        ns.ResetMailSubject()
         CreateAltsButton()
         PlaceAltsButton()
     end)
     ns.On("MAIL_CLOSED", function() mailOpen = false end)
+    ns.On("MAIL_SEND_INFO_UPDATE", function() ns.FillMailSubject() end)
     ns.On("MAIL_INBOX_UPDATE", function()
         if mailOpen then ScanInbox() end
     end)
