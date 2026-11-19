@@ -506,7 +506,7 @@ function M.load(files)
         GetItemInfoInstant = function(item)
             local id = type(item) == "number" and item or tonumber(item:match("item:(%d+)"))
             local it = M.items[id] or {}
-            return id, nil, nil, it.loc, "icon:" .. id, M.itemClass[id], it.sub
+            return id, nil, it.subName, it.loc, "icon:" .. id, M.itemClass[id], it.sub
         end,
         GetItemStats = function(link)
             local id = tonumber(link:match("item:(%d+)"))

@@ -174,17 +174,17 @@ test("overview rows: you first, then by level; totals gold", function()
     SlashCmdList.ALTSFOREVER("")
     local rows = overviewRows()
     eq(#rows, 4)
-    eq(cell(rows[1], 1), "[MAGE]Aldric"); eq(cell(rows[1], 15), "|cff20ff20Online|r")
+    eq(cell(rows[1], 1), "[MAGE]Aldric"); eq(cell(rows[1], 17), "|cff20ff20Online|r")
     eq(cell(rows[1], 7), "|cffc0c0c0Engineering|r"); eq(cell(rows[1], 8), "107")
     eq(cell(rows[1], 9), "|cffc0c0c0Mining|r"); eq(cell(rows[1], 10), "99")
     eq(cell(rows[2], 1), "[MAGE]Far"); eq(cell(rows[2], 2), "60"); eq(cell(rows[2], 3), G .. "-|r")
     eq(cell(rows[3], 1), "[PRIEST]High")
     eq(cell(rows[3], 3), "|cff4da6ff150%|r", "was already full")
-    eq(cell(rows[3], 13), "Orgrimmar"); eq(cell(rows[3], 15), "3h ago")
+    eq(cell(rows[3], 15), "Orgrimmar"); eq(cell(rows[3], 17), "3h ago")
     eq(cell(rows[4], 1), "[ROGUE]Low"); eq(cell(rows[4], 2), "12")
     eq(rows[4].pct.text, G .. "10%|r", "the percentage in its own cell, so they line up")
     eq(rows[2].pct.text, "", "none at max level")
-    eq(cell(rows[4], 15), "2d ago")
+    eq(cell(rows[4], 17), "2d ago")
 end)
 
 test("an open overview updates when your money changes", function()
@@ -303,12 +303,12 @@ test("the overview starts by level with you first, the arrow on Level, nothing s
     eq(f.sortArrow.texture, "Interface\\Buttons\\Arrow-Down-Up")
     eq(f.sortArrow.point[2], f.sorts.level.title, "beside the Level title")
     eq(AltsForeverDB.overviewSort, nil); eq(AltsForeverDB.overviewSortRev, nil)
-    for _, name in ipairs({ "name", "level", "rested", "wellRested", "legacy", "gold", "mail", "zone", "played", "seen" }) do
+    for _, name in ipairs({ "name", "level", "rested", "wellRested", "legacy", "gold", "mail", "bags", "bank", "zone", "played", "seen" }) do
         assert(f.sorts[name], name .. " can be clicked")
     end
     local n = 0
     for _ in pairs(f.sorts) do n = n + 1 end
-    eq(n, 10, "professions and lockouts can't")
+    eq(n, 12, "professions and lockouts can't")
 end)
 
 test("clicking a column title orders by it, you among the rest; again turns it round", function()
@@ -711,7 +711,7 @@ end)
 
 test("hidden columns are kept between sessions; the window never gets too narrow", function()
     sortStart()
-    for _, name in ipairs({ "Level", "Rested", "Well Rested", "Legacy", "Gold", "Professions", "Mail", "Lockouts", "Zone", "Played", "Last seen" }) do
+    for _, name in ipairs({ "Level", "Rested", "Well Rested", "Legacy", "Gold", "Professions", "Mail", "Bags", "Bank", "Lockouts", "Zone", "Played", "Last seen" }) do
         columnsMenu(name).setSelected()
     end
     local f = AltsForeverFrame
@@ -722,14 +722,14 @@ test("hidden columns are kept between sessions; the window never gets too narrow
     eq(f.width, 560)
     for _, row in ipairs(overviewRows()) do
         eq(row.cells[1].shown, true)
-        for i = 2, 15 do eq(row.cells[i].shown, false, "cell " .. i) end
+        for i = 2, 17 do eq(row.cells[i].shown, false, "cell " .. i) end
     end
     eq(ns.ColumnShown("gold"), false)
     -- The cog menu has the list too; the minimap's menu doesn't.
     ns.ShowOptionsMenu(f.cog, true)
     local columns = wow.menuItem("Columns")
     eq(columns.items[1].text, "Show all columns")
-    eq(#columns.items, 12, "the eleven columns and Show all")
+    eq(#columns.items, 14, "the thirteen columns and Show all")
     ns.ShowOptionsMenu(UIParent)
     eq(wow.menuItem("Columns"), nil)
     -- /af columns: one column, or all of them back.
@@ -743,7 +743,7 @@ test("hidden columns are kept between sessions; the window never gets too narrow
     eq(ns.ColumnShown("gold"), false)
     SlashCmdList.ALTSFOREVER("columns")
     eq(AltsForeverDB.hiddenColumns, nil)
-    for i = 1, 15 do eq(overviewRows()[1].cells[i].shown, true, "cell " .. i) end
+    for i = 1, 17 do eq(overviewRows()[1].cells[i].shown, true, "cell " .. i) end
 end)
 
 test("damaged hidden columns hide nothing; the Character column can't be hidden", function()
@@ -751,7 +751,7 @@ test("damaged hidden columns hide nothing; the Character column can't be hidden"
         local saved = overviewAlts()
         saved.hiddenColumns = bad
         local _, ns = sortStart(saved)
-        for i = 1, 15 do eq(overviewRows()[1].cells[i].shown, true, "cell " .. i) end
+        for i = 1, 17 do eq(overviewRows()[1].cells[i].shown, true, "cell " .. i) end
         ns.SetColumnShown("name", false)
         ns.SetColumnShown("character", false)
         eq(overviewRows()[1].cells[1].shown, true)

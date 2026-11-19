@@ -17,6 +17,12 @@
 -- mail from (ruleset and faction): setting one replaces only a name you could mail from
 -- here, so Horde and Alliance characters can each have their own. The example item gives a
 -- category its icon in the window. db.mailFillOff / db.mailPackOff turn the two parts off.
+-- Bind-on-equip rules (a player's request, 2026-11-19): "b:weapon" for BoE weapons, "b:armor"
+-- for BoE armour (rings, necks, trinkets, cloaks and shields are armour to the game), and
+-- "b:equip" for every BoE item; the owner split weapons out, as many players sell green
+-- weapons. The most specific wins: the item's own rule, its category's, BoE weapons or
+-- armour, then all BoE. Pack already leaves bound items, so an equipped-then-taken-off one
+-- stays in the bags.
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
@@ -61,6 +67,36 @@ local function CategoryRule(id)
 end
 ns.MailCategoryRule = CategoryRule
 
+-- Bind on equip: GetItemInfo's 14th value (Enum.ItemBind.OnEquip), as Upgrades.lua reads it;
+-- the 12th is the item class (2 weapon, 4 armour).
+local BOE_ALL, BIND_ON_EQUIP = "b:equip", 2
+local BOE_KIND = { [2] = "b:weapon", [4] = "b:armor" }
+local BOE_NAMES = { ["b:equip"] = L["bind-on-equip"], ["b:weapon"] = L["bind-on-equip weapons"],
+    ["b:armor"] = L["bind-on-equip armor"] }
+local BOE_LABELS = { ["b:equip"] = L["All bind-on-equip items"], ["b:weapon"] = L["All bind-on-equip weapons"],
+    ["b:armor"] = L["All bind-on-equip armor"] }
+local boeItems = {} -- [itemID] = its kind's rule ("b:weapon", "b:armor"), BOE_ALL for any other BoE item, or false; per session
+
+-- An item's bind-on-equip rule: weapons' or armour's, BOE_ALL for any other BoE item, or
+-- false. An item not loaded yet is asked for and not remembered, so the next look finds it.
+local function BoeRule(id)
+    local known = boeItems[id]
+    if known == nil then
+        local name, _, _, _, _, _, _, _, _, _, _, class, _, bind = C_Item.GetItemInfo(id)
+        if issecretvalue(name) or not name then
+            if C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(id) end
+            return false
+        end
+        known = false
+        if not issecretvalue(bind) and bind == BIND_ON_EQUIP then
+            known = not issecretvalue(class) and BOE_KIND[class] or BOE_ALL
+        end
+        boeItems[id] = known
+    end
+    return known
+end
+ns.MailBoeRule = BoeRule
+
 -- The character a rule sends to from here, or nil (none, or none you can mail from here).
 local function TargetOf(rule)
     local names = ns.db.mailRules and ns.db.mailRules[rule]
@@ -73,7 +109,8 @@ local function TargetOf(rule)
 end
 ns.MailRuleTarget = TargetOf
 
--- Who an item goes to, and by which rule: its own rule first, then its category's.
+-- Who an item goes to, and by which rule: its own rule first, then its category's, then
+-- BoE weapons' or armour's, then all BoE (looked up only while there's a BoE rule).
 function ns.MailRuleFor(id)
     local rule = ItemRule(id)
     local key = TargetOf(rule)
@@ -81,6 +118,15 @@ function ns.MailRuleFor(id)
     rule = CategoryRule(id)
     key = rule and TargetOf(rule)
     if key then return key, rule end
+    local rules = ns.db.mailRules
+    if rules and (rules["b:weapon"] or rules["b:armor"] or rules[BOE_ALL]) then
+        rule = BoeRule(id)
+        if not rule then return end
+        key = rule ~= BOE_ALL and TargetOf(rule)
+        if key then return key, rule end
+        key = TargetOf(BOE_ALL)
+        if key then return key, BOE_ALL end
+    end
 end
 
 -- What a category rule is called: "Cloth" for trade goods, else "Armor: Cloth".
@@ -100,6 +146,7 @@ end
 -- The item or category a rule is for, as words ("Silk Cloth", "Cloth"), and whether it's
 -- a category. An item whose name isn't loaded yet is asked for and reads "Item 4306".
 function ns.MailRuleName(rule)
+    if BOE_NAMES[rule] then return BOE_NAMES[rule], true end
     local id = tonumber(rule:match("^i:(%d+)$"))
     if not id then return CategoryName(rule), true end
     local name = C_Item.GetItemNameByID(id)
@@ -112,6 +159,7 @@ end
 
 -- The window's label: "All Cloth" or "Silk Cloth".
 function ns.MailRuleLabel(rule)
+    if BOE_LABELS[rule] then return BOE_LABELS[rule] end
     local name, category, missing = ns.MailRuleName(rule)
     return category and L["All %s"]:format(name) or name, missing
 end
@@ -697,7 +745,7 @@ function ns.AddMailRuleMenu(root)
     if first and recipient and ns.CanMailTo(recipient) then
         root:CreateDivider()
         root:CreateTitle(L["Remember for %s"]:format(ns.ShortName(recipient, chars[recipient])))
-        local seen = {}
+        local seen, boe = {}, nil
         for _, id in ipairs(order) do
             RuleCheckbox(root, L["Always send %s here"]:format(ItemName(id)), ItemRule(id), recipient, id)
             local rule = CategoryRule(id)
@@ -705,6 +753,23 @@ function ns.AddMailRuleMenu(root)
                 seen[rule] = true
                 RuleCheckbox(root, L["Always send all %s here"]:format((ns.MailRuleName(rule))), rule, recipient, id)
             end
+            local kind = BoeRule(id)
+            if kind then
+                boe = boe or id
+                if kind ~= BOE_ALL and not seen[kind] then
+                    seen[kind] = id
+                end
+            end
+        end
+        -- Offered once something bind-on-equip is attached, last: the widest rules there are.
+        if seen["b:weapon"] then
+            RuleCheckbox(root, L["Always send bind-on-equip weapons here"], "b:weapon", recipient, seen["b:weapon"])
+        end
+        if seen["b:armor"] then
+            RuleCheckbox(root, L["Always send bind-on-equip armor here"], "b:armor", recipient, seen["b:armor"])
+        end
+        if boe then
+            RuleCheckbox(root, L["Always send all bind-on-equip items here"], BOE_ALL, recipient, boe)
         end
     end
     root:CreateDivider()
@@ -759,6 +824,14 @@ local function MakeRow(i)
             GameTooltip:SetItemByID(id)
         else
             GameTooltip:AddLine(self.label:GetText() or "")
+            if BOE_NAMES[self.rule] then
+                GameTooltip:AddLine(L["Items that bind when equipped and aren't bound yet. A rule for the item itself or its category comes first."], 1, 1, 1, true)
+                if self.rule == "b:armor" then
+                    GameTooltip:AddLine(L["Armor includes rings, necks, trinkets, cloaks and shields."], 1, 1, 1, true)
+                elseif self.rule == BOE_ALL then
+                    GameTooltip:AddLine(L["A bind-on-equip weapons or armor rule comes before this one."], 1, 1, 1, true)
+                end
+            end
         end
         local c = ns.db.chars[self.key]
         GameTooltip:AddLine(L["Goes to %s"]:format(c and ns.ColoredName(self.key, c) or self.key), 1, 1, 1)

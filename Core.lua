@@ -161,7 +161,7 @@ local DB_FIELDS = {
     cratesOff = "boolean", goldTipOff = "boolean", barsOff = "boolean", recipeCategories = "table", profArt = "table",
     inspectAnvilsOff = "boolean", overviewSort = "string", overviewSortRev = "boolean",
     windows = "table", pinned = "table", hiddenColumns = "table",
-    mailRules = "table", mailFillOff = "boolean", mailPackOff = "boolean",
+    mailRules = "table", mailFillOff = "boolean", mailPackOff = "boolean", weights = "table",
 }
 
 -- Keeps only entries whose key and value are of these types (value nil = any).
@@ -250,6 +250,16 @@ local function Repair(saved)
             KeepOnly(names, "string", "number")
             if next(names) == nil then saved.mailRules[rule] = nil end
         end
+    end
+    -- Changed upgrade weights: { [role] = { [stat] = number } } (Upgrades.lua; values out of
+    -- range are skipped there).
+    if saved.weights then
+        KeepOnly(saved.weights, "string", "table")
+        for role, stats in pairs(saved.weights) do
+            KeepOnly(stats, "string", "number")
+            if next(stats) == nil then saved.weights[role] = nil end
+        end
+        if next(saved.weights) == nil then saved.weights = nil end
     end
     local chars = saved.chars
     -- A character under a key that isn't a name moves to its own name if that's free.
@@ -710,7 +720,7 @@ function commands.columns(arg)
     end
     local id, title = ns.ColumnId(word)
     if not id then
-        return Print(L["/af columns shows every overview column again; /af columns and one of level, rested, wellrested, legacy, gold, professions, mail, lockouts, zone, played or lastseen hides or shows that column."])
+        return Print(L["/af columns shows every overview column again; /af columns and one of level, rested, wellrested, legacy, gold, professions, mail, bags, bank, lockouts, zone, played or lastseen hides or shows that column."])
     end
     local on = not ns.ColumnShown(id)
     ns.SetColumnShown(id, on)
@@ -784,6 +794,18 @@ function commands.role(arg)
     end
     ns.SetRole(key, role)
     Print(L["Upgrades for %s are now judged as %s."]:format(key, ns.RoleName(role)))
+end
+
+-- /af weights [First Last]: the Upgrade weights window (Weights.lua), on that character's
+-- role, else yours.
+function commands.weights(arg)
+    local key = ns.charKey
+    if arg ~= "" then
+        key = FindChar(arg)
+        if not key then return Print(L["No character named '%s'. Use /af list."]:format(arg)) end
+    end
+    local c = ns.db.chars[key]
+    ns.ShowWeights(c and ns.RoleOf(c))
 end
 
 function commands.minimap()
@@ -869,12 +891,13 @@ function commands.help()
     Print(L["/af prof, with a name for another character, shows their professions and recipes."])
     Print(L["/af icons picks the icons item tooltips use for bags, bank, mail and worn items."])
     Print(L["/af upgrades turns upgrade hints in item tooltips on or off. /af role Name role sets what a character's upgrades are judged by (melee, ranged, marksman, caster, healer, tank, feral or auto)."])
+    Print(L["/af weights, with or without a name, opens the upgrade weights: what each stat is worth to each role, which you can change."])
     Print(L["/af itemnames turns saving item names in Alts Forever's saved file on or off (only for reading it outside the game)."])
     Print(L["/af anvils shows or hides the anvils on your character sheet that mark upgrades you or your alts can craft."])
     Print(L["/af inspect shows or hides the anvils in the inspect window that mark upgrades you or your alts can craft for that player."])
     Print(L["/af scale 150 makes Alts Forever's windows one and a half times their size (any size from 50 to 300), on top of the game's UI scale."])
     Print(L["/af pin and a character's name pins them to the top of the overview, or unpins them."])
-    Print(L["/af columns shows every overview column again; /af columns and one of level, rested, wellrested, legacy, gold, professions, mail, lockouts, zone, played or lastseen hides or shows that column."])
+    Print(L["/af columns shows every overview column again; /af columns and one of level, rested, wellrested, legacy, gold, professions, mail, bags, bank, lockouts, zone, played or lastseen hides or shows that column."])
     Print(L["/af resetwindows puts Alts Forever's windows back where they open by default."])
     if ns.HasEllesmereScale() then Print(L["/af scale eui makes them follow EllesmereUI's Window Scale again (the default)."]) end
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])

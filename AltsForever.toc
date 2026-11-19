@@ -44,6 +44,7 @@ Gear.lua
 Bags.lua
 Icons.lua
 Upgrades.lua
+Weights.lua
 Flyout.lua
 Search.lua
 Export.lua

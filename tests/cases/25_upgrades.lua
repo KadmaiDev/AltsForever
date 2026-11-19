@@ -564,3 +564,143 @@ test("the same item with a better random suffix is an upgrade over the one worn;
     wow.itemStats[better] = { ITEM_MOD_AGILITY_SHORT = 8 }
     eq(upHover(5051, better, { "Seal of the Monkey", "Unique", "Finger" }), "[HUNTER]Tarn Moon = Finger · ^^^", "better than the Owl")
 end)
+
+-- Upgrade weights the player changes (Weights.lua, db.weights; owner, 2026-11-19, after a
+-- player asked whether they can be configured like Pawn's).
+function weightItems()
+    return upItem(9331, "Spirit Mace", { class = 2, sub = 4, loc = "INVTYPE_WEAPON", level = 12,
+        stats = { ITEM_MOD_SPIRIT_SHORT = 1 } }),
+        upItem(9332, "Sturdy Dagger", { class = 2, sub = 15, loc = "INVTYPE_WEAPON", level = 14,
+        stats = { ITEM_MOD_STAMINA_SHORT = 2 } })
+end
+
+test("upgrade weights: a changed weight counts at once, for that role only; the default puts it back", function()
+    local mace, dagger = weightItems()
+    local ns = upStart({ ["Pia Lux"] = alt("Pia Lux", "PRIEST", { level = 14, gear = { [16] = mace } }) })
+    eq(ns.ItemScore(dagger, "caster"), 0.4)
+    assert(not upHover(9332, dagger):find("Pia Lux", 1, true), "not an upgrade with the shipped weights")
+    eq(ns.SetWeight("caster", "sta", 1), true)
+    eq(AltsForeverDB.weights.caster.sta, 1)
+    eq(ns.ItemScore(dagger, "caster"), 2, "scores made again")
+    assert(upHover(9332, dagger):find("Pia Lux", 1, true), "now it is")
+    eq(ns.ItemScore(dagger, "healer"), 0.3, "healers keep theirs")
+    eq(ns.WeightChanged("caster", "sta"), true)
+    eq(ns.SetWeight("caster", "sta", 0.2), true)
+    eq(AltsForeverDB.weights, nil, "set back to the default: nothing saved")
+    eq(ns.SetWeight("caster", "sta", -1), false, "negative")
+    eq(ns.SetWeight("caster", "sta", 1001), false, "too big")
+    eq(ns.SetWeight("caster", "sta", 0 / 0), false, "not a number")
+    eq(ns.SetWeight("caster", "fire", 1), false, "schools aren't offered")
+    eq(ns.SetWeight("wizard", "sta", 1), false, "no such role")
+    eq(ns.SetWeight("caster", "sta", 0), true, "nothing at all is fine")
+    eq(ns.ItemScore(dagger, "caster"), 0)
+    ns.SetWeight("caster", "crit", 20)
+    eq(ns.Weight("caster", "spellcrit"), 20, "spell crit follows crit")
+    ns.SetWeight("caster", "sp", 2)
+    eq(ns.Weight(ns.ScoreRole({ class = "MAGE", spec = 2 }, "caster"), "fire"), 1.9, "a fire mage's fire damage follows spell power")
+end)
+
+test("upgrade weights: protection paladins follow the tank's changes unless their own was changed", function()
+    local ns = upStart()
+    eq(ns.Weight("paladintank", "sta"), 1.5)
+    ns.SetWeight("tank", "sta", 3)
+    eq(ns.Weight("paladintank", "sta"), 3, "follows the tank")
+    eq(ns.DefaultWeight("paladintank", "sta"), 3)
+    eq(ns.WeightParent("paladintank"), "tank")
+    ns.SetWeight("paladintank", "sta", 2)
+    ns.SetWeight("tank", "sta", 4)
+    eq(ns.Weight("paladintank", "sta"), 2, "their own change stays")
+    ns.ResetWeights("paladintank")
+    eq(ns.Weight("paladintank", "sta"), 4, "reset: follows the tank again")
+    ns.SetWeight("tank", "haste", 1)
+    eq(ns.Weight("paladintank", "haste"), 6, "a stat they have their own weight for doesn't follow")
+    eq(ns.Weight("survival", "agi"), 2.4)
+    ns.SetWeight("hunter", "agi", 3)
+    eq(ns.Weight("survival", "agi"), 3, "Survival and Marksman follow the hunter")
+end)
+
+test("upgrade weights: changes load at login; damaged ones are dropped", function()
+    local ns = wow.load(FILES)
+    wow.login({ v = 2, chars = {}, weights = { caster = { sta = 1, spi = "x", [3] = 1 }, healer = "bad",
+        tank = { sta = -5 }, [4] = {}, rogue = {} } })
+    eq(ns.Weight("caster", "sta"), 1)
+    eq(ns.Weight("caster", "spi"), 0.6)
+    eq(AltsForeverDB.weights.caster.spi, nil)
+    eq(AltsForeverDB.weights.healer, nil)
+    eq(AltsForeverDB.weights.rogue, nil, "an empty role goes")
+    eq(ns.Weight("tank", "sta"), 1.5, "out of range: not used")
+end)
+
+test("upgrade weights window: shows a role's weights, takes a typed one, Reset puts them back", function()
+    local mace = weightItems()
+    local ns = upStart({ ["Pia Lux"] = alt("Pia Lux", "PRIEST", { level = 14, gear = { [16] = mace } }) })
+    SlashCmdList.ALTSFOREVER("weights Pia Lux")
+    local f = AltsForeverWeightsFrame
+    eq(f:IsShown(), true)
+    eq(f.roleButton:GetText(), "Caster · Priest, Shaman, Mage, Warlock, Druid")
+    local rows = {}
+    for _, row in ipairs(f.rows) do rows[row.stat] = row end
+    eq(#f.rows, 22)
+    eq(rows.crit.label:GetText(), "crit (per 1%)", "the game's word (missing in the fake) and per 1% for ratings")
+    eq(rows.rdps.label:GetText(), "Ranged weapon DPS")
+    local box = rows.sta.box
+    eq(box:GetText(), "0.2")
+    eq(rows.int.box:GetText(), "0.55")
+    eq(rows.agi.box:GetText(), "0")
+    box:SetText("1,5")
+    box.scripts.OnEnterPressed(box)
+    eq(AltsForeverDB.weights.caster.sta, 1.5, "a comma works as the decimal mark")
+    eq(box:GetText(), "1.5")
+    box:SetText("lots")
+    box.scripts.OnEditFocusLost(box)
+    eq(box:GetText(), "1.5", "not a number: put back")
+    box:SetText("9")
+    -- As in the game, losing focus runs OnEditFocusLost (the fake's ClearFocus doesn't).
+    box.ClearFocus = function(self) self.scripts.OnEditFocusLost(self) end
+    box.scripts.OnEscapePressed(box)
+    eq(AltsForeverDB.weights.caster.sta, 1.5, "Escape cancels")
+    eq(box:GetText(), "1.5")
+    box:SetText("")
+    box.scripts.OnEnterPressed(box)
+    eq(AltsForeverDB.weights, nil, "emptied: the default again")
+    eq(box:GetText(), "0.2")
+    rows.spi.box:SetText("2")
+    rows.spi.box.scripts.OnEnterPressed(rows.spi.box)
+    eq(ns.Weight("caster", "spi"), 2)
+    f.reset.scripts.OnClick(f.reset)
+    eq(ns.Weight("caster", "spi"), 0.6, "reset")
+    eq(rows.spi.box:GetText(), "0.6")
+    f.roleButton.scripts.OnClick(f.roleButton)
+    wow.menuItem("Tank · Paladin").setSelected()
+    eq(f.roleButton:GetText(), "Tank · Paladin")
+    eq(f.follows:IsShown(), true)
+    eq(f.follows:GetText(), "Weights you haven't changed here follow Tank · Warrior.")
+    eq(rows.sta.box:GetText(), "1.5")
+    SlashCmdList.ALTSFOREVER("weights")
+    eq(f.roleButton:GetText(), "Caster · Priest, Shaman, Mage, Warlock, Druid", "/af weights alone: your own role (a mage)")
+end)
+
+test("upgrade weights: a Weights... button beside Show upgrades on the Options page opens the window", function()
+    upStart()
+    pageBox("Show upgrades") -- builds the page
+    local f = AltsForeverOptionsPanel
+    local b = f.weights
+    local label
+    for _, check in ipairs(f.checks) do
+        if check.label.text == "Show upgrades" then label = check.label end
+    end
+    local _, rel = b:GetPoint()
+    eq(rel, label, "beside the Show upgrades label")
+    eq(b:GetText(), "Weights...")
+    b.scripts.OnEnter(b)
+    assert(GameTooltip.lines[2][1]:find("/af weights", 1, true))
+    pageBox("Show upgrades").setSelected()
+    eq(AltsForeverDB.upgradesOff, true)
+    wow.settingsShown = true
+    wow.timers = {}
+    b.scripts.OnClick(b)
+    eq(wow.settingsShown, false, "Options closed first")
+    for _, fn in ipairs(wow.timers) do fn() end
+    eq(AltsForeverWeightsFrame:IsShown(), true, "opens with upgrades off too: the anvils use the weights")
+    eq(AltsForeverWeightsFrame.roleButton:GetText(), "Caster · Priest, Shaman, Mage, Warlock, Druid", "your own role")
+end)

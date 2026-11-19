@@ -93,7 +93,9 @@ local PER_PERCENT = { crit = 14, spellcrit = 14, hit = 10, spellhit = 10, block 
 -- their weapon more, protection paladins spell damage less (Pawn: 0.44 of Stamina) and
 -- Intellect and crit a little, Survival hunters their melee weapon more. Hunters' other
 -- weights are left as Upgrade Trail checked them; Pawn's are for level 60, ours for levelling.
-local WEIGHTS = {
+-- These are the shipped weights; players can change any of them per role (the Upgrade
+-- weights window, db.weights; owner, 2026-11-19), so the ones in use are WEIGHTS, below.
+local BASE = {
     -- Haste per 1% as about two thirds of crit for physical roles and nine tenths for spells,
     -- expertise about four fifths of hit for melee, as in Pawn's Forever weights.
     hunter = { agi = 2.4, ap = 1, rap = 1, sta = 0.4, int = 0.3, spi = 0.05, crit = 22, hit = 16,
@@ -119,22 +121,60 @@ local WEIGHTS = {
 -- A protection paladin tanks as a tank, but most of their threat is holy damage (seals,
 -- Consecration, Retribution Aura), so spell damage counts (two thirds of Stamina; Pawn has
 -- 0.44), and Intellect, crit and MP5 a little, as Pawn does.
-WEIGHTS.paladintank = { sp = 1, heal = 0.3, int = 0.4, crit = 4, mp5 = 0.5, haste = 6 }
--- Their own weights first (haste), the tank's for the rest (peer review, 2026-11-19).
-for stat, weight in pairs(WEIGHTS.tank) do WEIGHTS.paladintank[stat] = WEIGHTS.paladintank[stat] or weight end
+-- Their own weights first (haste), the tank's for the rest (peer review, 2026-11-19): see PARENT.
+BASE.paladintank = { sp = 1, heal = 0.3, int = 0.4, crit = 4, mp5 = 0.5, haste = 6 }
 -- Beast Mastery and Marksmanship hunters carry melee weapons for their stats, so a point
 -- of melee dps is worth little (0.5: enough to split two equal weapons, not to make an
 -- upgrade of one). Survival is the melee tree (owner, 2026-11-11), though Blizzard describes
 -- it as supporting melee builds beside the bow, with an off-hand damage talent: its melee
 -- weapons count for five times what every hunter's did (Pawn: as much as its bow), and its bow for less than the
 -- ranged trees', without leaving it behind. Third tab, as talentsforever.com lists them.
-WEIGHTS.survival = { dps = 10, rdps = 8, expertise = 6 }
+BASE.survival = { dps = 10, rdps = 8, expertise = 6 }
 -- Marksmanship turns Intellect into attack power (Careful Aim, up to 100%).
-WEIGHTS.marksman = { int = 1 }
-for stat, weight in pairs(WEIGHTS.hunter) do
-    WEIGHTS.survival[stat] = WEIGHTS.survival[stat] or weight
-    WEIGHTS.marksman[stat] = WEIGHTS.marksman[stat] or weight
+BASE.marksman = { int = 1 }
+-- A role that takes every stat it doesn't set itself from another, as it is in use: a change
+-- to the tank's Stamina counts for protection paladins too, unless theirs was changed.
+local PARENT = { paladintank = "tank", survival = "hunter", marksman = "hunter" }
+
+-- The weights in use, by role: BASE with the player's changes (db.weights[role][stat]),
+-- filled from the PARENT. Spell crit and hit follow crit and hit wherever a role has them
+-- (casters and healers: one stat on Forever). ScoreRole adds keys "role:CLASS:spec" here,
+-- made again after a change. Rebuilt only at login and when a weight changes.
+local WEIGHTS = {}
+local MAX_WEIGHT = 1000
+
+-- A changed weight that can be used: a number from 0 to MAX_WEIGHT (not NaN).
+local function Usable(v)
+    return type(v) == "number" and v >= 0 and v <= MAX_WEIGHT
 end
+
+local function BuildWeights()
+    for key in pairs(WEIGHTS) do WEIGHTS[key] = nil end
+    local edits = ns.db and ns.db.weights
+    local function Make(role)
+        if WEIGHTS[role] then return WEIGHTS[role] end
+        local w = {}
+        for stat, weight in pairs(BASE[role]) do w[stat] = weight end
+        local mine = edits and edits[role]
+        if type(mine) == "table" then
+            for stat, weight in pairs(mine) do
+                if type(stat) == "string" and Usable(weight) then w[stat] = weight end
+            end
+        end
+        local parent = PARENT[role] and Make(PARENT[role])
+        if parent then
+            for stat, weight in pairs(parent) do
+                if w[stat] == nil then w[stat] = weight end
+            end
+        end
+        if w.spellcrit ~= nil then w.spellcrit = w.crit or 0 end
+        if w.spellhit ~= nil then w.spellhit = w.hit or 0 end
+        WEIGHTS[role] = w
+        return w
+    end
+    for role in pairs(BASE) do Make(role) end
+end
+BuildWeights()
 
 -- The word for each role, in menus and in /af role.
 local ROLE_NAMES = {
@@ -365,6 +405,138 @@ function ns.ItemScore(link, role)
     byRole[link] = score
     scoreCount = scoreCount + 1
     return score
+end
+
+---------------------------------------------------------------------------
+-- Changing the weights (the Upgrade weights window, Weights.lua; /af weights)
+---------------------------------------------------------------------------
+-- The roles and stats the window shows, in order. Spell crit and hit aren't listed (they
+-- follow crit and hit), nor the spell schools (a share of spell damage, by class and tree).
+local ROLE_ORDER = { "hunter", "marksman", "survival", "rogue", "warrior", "paladin", "enhancement",
+    "feral", "tank", "paladintank", "caster", "healer" }
+local STAT_ORDER = { "str", "agi", "sta", "int", "spi", "ap", "rap", "sp", "heal", "mp5", "crit", "hit",
+    "haste", "expertise", "armor", "def", "dodge", "parry", "block", "blockvalue", "dps", "rdps" }
+-- The game's own word for a stat (translated by the game), as GetItemStats names it.
+local STAT_WORDS = {
+    str = "ITEM_MOD_STRENGTH_SHORT", agi = "ITEM_MOD_AGILITY_SHORT", sta = "ITEM_MOD_STAMINA_SHORT",
+    int = "ITEM_MOD_INTELLECT_SHORT", spi = "ITEM_MOD_SPIRIT_SHORT", ap = "ITEM_MOD_ATTACK_POWER_SHORT",
+    rap = "ITEM_MOD_RANGED_ATTACK_POWER_SHORT", sp = "ITEM_MOD_SPELL_POWER_SHORT",
+    heal = "ITEM_MOD_SPELL_HEALING_DONE_SHORT", mp5 = "ITEM_MOD_MANA_REGENERATION_SHORT",
+    crit = "ITEM_MOD_CRIT_RATING_SHORT", hit = "ITEM_MOD_HIT_RATING_SHORT", haste = "ITEM_MOD_HASTE_RATING_SHORT",
+    expertise = "ITEM_MOD_EXPERTISE_RATING_SHORT", armor = "RESISTANCE0_NAME",
+    def = "ITEM_MOD_DEFENSE_SKILL_RATING_SHORT", dodge = "ITEM_MOD_DODGE_RATING_SHORT",
+    parry = "ITEM_MOD_PARRY_RATING_SHORT", block = "ITEM_MOD_BLOCK_RATING_SHORT",
+    blockvalue = "ITEM_MOD_BLOCK_VALUE_SHORT",
+}
+local CLASS_ORDER = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
+local weightsListeners = {}
+
+function ns.WeightRoles() return ROLE_ORDER end
+function ns.WeightStats() return STAT_ORDER end
+
+-- "Strength", "Critical Strike (per 1%)", "Melee weapon DPS".
+function ns.WeightStatLabel(stat)
+    local text
+    if stat == "dps" then
+        text = L["Melee weapon DPS"]
+    elseif stat == "rdps" then
+        text = L["Ranged weapon DPS"]
+    else
+        text = STAT_WORDS[stat] and _G[STAT_WORDS[stat]]
+        if issecretvalue(text) or type(text) ~= "string" or text == "" then text = stat end
+    end
+    if PER_PERCENT[stat] then text = L["%s (per 1%%)"]:format(text) end
+    return text
+end
+
+-- "Melee · Rogue", "Tank · Paladin", "Caster · Priest, Shaman, Mage, Warlock, Druid": the
+-- role's word and the classes that can be judged by it.
+function ns.WeightRoleLabel(role)
+    local names = {}
+    for _, class in ipairs(CLASS_ORDER) do
+        local cls = CLASSES[class]
+        local uses = cls.default == role
+        for _, r in ipairs(cls.choices) do if r == role then uses = true end end
+        if uses then
+            local name = LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[class]
+            names[#names + 1] = type(name) == "string" and name or class
+        end
+    end
+    return ns.RoleName(role) .. " · " .. table.concat(names, ", ")
+end
+
+-- A weight in use (0 for a stat the role doesn't count).
+function ns.Weight(role, stat)
+    local w = WEIGHTS[role]
+    return w and w[stat] or 0
+end
+
+-- What a weight goes back to on reset: the shipped one, else the parent role's in use.
+function ns.DefaultWeight(role, stat)
+    local base = BASE[role] and BASE[role][stat]
+    if base then return base end
+    return PARENT[role] and ns.Weight(PARENT[role], stat) or 0
+end
+
+-- The role whose weights this one follows for the stats it doesn't set (nil if none).
+function ns.WeightParent(role) return PARENT[role] end
+
+-- Whether the player changed this weight.
+function ns.WeightChanged(role, stat)
+    local edits = ns.db.weights
+    return edits ~= nil and edits[role] ~= nil and edits[role][stat] ~= nil
+end
+
+-- Whether any of a role's weights were changed.
+function ns.RoleWeightsChanged(role)
+    local edits = ns.db.weights
+    return edits ~= nil and edits[role] ~= nil
+end
+
+-- Called when the weights change (the window refreshes itself).
+function ns.OnWeightsChanged(fn) weightsListeners[#weightsListeners + 1] = fn end
+
+local function WeightsChanged()
+    BuildWeights()
+    for _, t in pairs(scores) do wipe(t) end
+    scoreCount = 0
+    ns.UpgradesChanged()
+    for _, fn in ipairs(weightsListeners) do fn() end
+end
+ns.ApplyWeights = WeightsChanged
+
+-- Sets one weight (nil, or the default, puts it back); false for a role or stat the window
+-- doesn't offer, or a value that isn't a number from 0 to 1000.
+function ns.SetWeight(role, stat, value)
+    if not BASE[role] then return false end
+    local known = false
+    for _, s in ipairs(STAT_ORDER) do if s == stat then known = true end end
+    if not known then return false end
+    if value ~= nil and not Usable(value) then return false end
+    local db = ns.db
+    if value == nil or value == ns.DefaultWeight(role, stat) then
+        local mine = db.weights and db.weights[role]
+        if mine then
+            mine[stat] = nil
+            if not next(mine) then db.weights[role] = nil end
+            if not next(db.weights) then db.weights = nil end
+        end
+    else
+        db.weights = db.weights or {}
+        db.weights[role] = db.weights[role] or {}
+        db.weights[role][stat] = value
+    end
+    WeightsChanged()
+    return true
+end
+
+-- Puts every weight of a role back.
+function ns.ResetWeights(role)
+    local db = ns.db
+    if not (db.weights and db.weights[role]) then return end
+    db.weights[role] = nil
+    if not next(db.weights) then db.weights = nil end
+    WeightsChanged()
 end
 
 ---------------------------------------------------------------------------
@@ -831,6 +1003,7 @@ local function Prewarm()
 end
 
 function ns.StartUpgrades()
+    BuildWeights() -- the player's changed weights, now the saved data has loaded
     ns.On("GET_ITEM_INFO_RECEIVED", ItemArrived)
     local spell = Enum.TooltipDataType and Enum.TooltipDataType.Spell
     if spell and TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall then

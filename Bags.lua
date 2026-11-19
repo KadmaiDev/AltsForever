@@ -182,6 +182,105 @@ end
 ns.BagsSectionName = SectionName
 
 ---------------------------------------------------------------------------
+-- Bag space (the overview's Bags and Bank columns; a player who'd used Altoholic's,
+-- 2026-11-19): free and all slots per character from the saved layout, and each bag or
+-- tab for the cell's tooltip. No UI here, so tests can check it.
+---------------------------------------------------------------------------
+
+-- Bags 1-4 can be empty (no bag bought yet): the tooltip says so. The backpack is always
+-- there; the reagent bag and keyring aren't listed when missing.
+local BAG_SLOTS = {}
+for _, name in ipairs({ "Bag_1", "Bag_2", "Bag_3", "Bag_4" }) do
+    if BagIndex[name] then BAG_SLOTS[BagIndex[name]] = true end
+end
+
+local function Places(which)
+    return which == "bank" and ns.BANK_TABS or ns.CARRIED_BAGS
+end
+
+-- Free and all slots in a character's bags (keyring left out: it holds only keys) or bank
+-- tabs; nil when not known (bags: no layout yet; bank: never visited, or visited before
+-- slot layouts were saved).
+function ns.BagSpace(c, which)
+    local layout = c and c.layout
+    if type(layout) ~= "table" then return nil end
+    local free, total = 0, 0
+    for _, bag in ipairs(Places(which)) do
+        local values = bag ~= BagIndex.Keyring and layout[bag]
+        if values then
+            local n = #values
+            total = total + n
+            for i = 1, n do
+                if values[i] == 0 then free = free + 1 end
+            end
+        end
+    end
+    if total == 0 then return nil end
+    return free, total
+end
+
+-- Bag slots 1-4 with no bag in them, for a character whose bags are known.
+function ns.EmptyBagSlots(c)
+    local layout = c and c.layout
+    if type(layout) ~= "table" then return 0 end
+    local n = 0
+    for bag in pairs(BAG_SLOTS) do
+        if not layout[bag] then n = n + 1 end
+    end
+    return n
+end
+
+-- What kind of bag an item is, in the game's words, when it holds only some things (Herb
+-- Bag, Soul Bag, Quiver, Ammo Pouch); nil for a plain bag.
+local function BagKind(item)
+    if not item or item == 0 or not C_Item.GetItemInfoInstant then return nil end
+    local _, _, sub, _, _, class, subclass = C_Item.GetItemInfoInstant(item)
+    if issecretvalue(sub) or issecretvalue(class) or issecretvalue(subclass) then return nil end
+    if type(sub) ~= "string" or sub == "" then return nil end
+    if (class == 1 and subclass ~= 0) or class == 11 then return sub end
+    return nil
+end
+
+-- Each bag (or bank tab) in order, for the tooltip: { name, icon, quality, kind, free,
+-- size }, size 0 for an empty bag slot. Names not loaded yet are requested and read as
+-- "Bag n" until they are.
+local spaceList = {}
+function ns.BagSpaceList(c, which)
+    wipe(spaceList)
+    local layout = c and c.layout
+    if type(layout) ~= "table" then return spaceList end
+    for _, bag in ipairs(Places(which)) do
+        local values = bag ~= BagIndex.Keyring and layout[bag]
+        if values or BAG_SLOTS[bag] then
+            local e = { free = 0, size = values and #values or 0 }
+            for i = 1, e.size do
+                if values[i] == 0 then e.free = e.free + 1 end
+            end
+            local item = values and values[0]
+            if not values then
+                e.name, e.icon = L["Empty bag slot"], "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"
+            elseif item and item ~= 0 then
+                local name = C_Item.GetItemNameByID(item)
+                if issecretvalue(name) or type(name) ~= "string" then
+                    name = nil
+                    if C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(item) end
+                end
+                e.name = name or L["Bag %d"]:format(bag)
+                e.icon = GetItemIconByID(item)
+                local q = C_Item.GetItemQualityByID and C_Item.GetItemQualityByID(item)
+                if not issecretvalue(q) then e.quality = q end
+                e.kind = BagKind(item)
+            else -- the backpack, a bank tab, or a bag whose item wasn't recorded
+                e.name = SectionName(c, bag)
+                e.icon = bag == BagIndex.Backpack and "Interface\\Buttons\\Button-Backpack-Up" or nil
+            end
+            spaceList[#spaceList + 1] = e
+        end
+    end
+    return spaceList
+end
+
+---------------------------------------------------------------------------
 -- Window
 ---------------------------------------------------------------------------
 local Fill, Place
