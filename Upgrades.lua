@@ -142,6 +142,7 @@ local PARENT = { paladintank = "tank", survival = "hunter", marksman = "hunter" 
 -- made again after a change. Rebuilt only at login and when a weight changes.
 local WEIGHTS = {}
 local MAX_WEIGHT = 1000
+local SPELL_ROLES = { caster = true, healer = true }
 
 -- A changed weight that can be used: a number from 0 to MAX_WEIGHT (not NaN).
 local function Usable(v)
@@ -167,8 +168,11 @@ local function BuildWeights()
                 if w[stat] == nil then w[stat] = weight end
             end
         end
-        if w.spellcrit ~= nil then w.spellcrit = w.crit or 0 end
-        if w.spellhit ~= nil then w.spellhit = w.hit or 0 end
+        -- Casters and healers: spell crit and hit are crit and hit, even where the shipped
+        -- weights had neither (a healer given a Hit weight values spell hit rating too).
+        local spells = SPELL_ROLES[role]
+        if w.spellcrit ~= nil or (spells and w.crit ~= nil) then w.spellcrit = w.crit or 0 end
+        if w.spellhit ~= nil or (spells and w.hit ~= nil) then w.spellhit = w.hit or 0 end
         WEIGHTS[role] = w
         return w
     end

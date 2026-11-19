@@ -76,6 +76,7 @@ local BOE_NAMES = { ["b:equip"] = L["bind-on-equip"], ["b:weapon"] = L["bind-on-
 local BOE_LABELS = { ["b:equip"] = L["All bind-on-equip items"], ["b:weapon"] = L["All bind-on-equip weapons"],
     ["b:armor"] = L["All bind-on-equip armor"] }
 local boeItems = {} -- [itemID] = its kind's rule ("b:weapon", "b:armor"), BOE_ALL for any other BoE item, or false; per session
+local boeAsked = {} -- [itemID] = true: asked for by BoeRule, the mailbox refreshed when it arrives
 
 -- An item's bind-on-equip rule: weapons' or armour's, BOE_ALL for any other BoE item, or
 -- false. An item not loaded yet is asked for and not remembered, so the next look finds it.
@@ -84,6 +85,7 @@ local function BoeRule(id)
     if known == nil then
         local name, _, _, _, _, _, _, _, _, _, _, class, _, bind = C_Item.GetItemInfo(id)
         if issecretvalue(name) or not name then
+            boeAsked[id] = true
             if C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(id) end
             return false
         end
@@ -1011,5 +1013,20 @@ function ns.StartMailRules()
     end)
     ns.On("BAG_UPDATE_DELAYED", function()
         if pack and SendMailFrame and SendMailFrame:IsVisible() then UpdatePack() end
+    end)
+    -- An item BoeRule asked for has loaded: the open mailbox looks again (the To box only as
+    -- MAIL_SEND_INFO_UPDATE would, so a name the player chose stays), once for a burst of
+    -- arrivals. One that failed to load is let go, not asked for again from here.
+    local due = false
+    ns.On("GET_ITEM_INFO_RECEIVED", function(id, ok)
+        if not boeAsked[id] then return end
+        boeAsked[id] = nil
+        if not ok or due or not (SendMailFrame and SendMailFrame:IsVisible()) then return end
+        if not C_Timer then Refresh(true) return end
+        due = true
+        C_Timer.After(0.2, function()
+            due = false
+            if SendMailFrame and SendMailFrame:IsVisible() then Refresh(true) end
+        end)
     end)
 end

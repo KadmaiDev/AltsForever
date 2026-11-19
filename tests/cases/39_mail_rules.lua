@@ -503,6 +503,46 @@ test("mail rules: the bind-on-equip rule sends every BoE item, after an item's o
     eq(noteText(), "|cffc0c0c0Filled in by your bind-on-equip rule (click to undo)|r")
 end)
 
+test("mail rules: a BoE item that loads after the mailbox opened is filled in and packed once it arrives", function()
+    atMailbox({ ["b:equip"] = { ["Brak Stone"] = BOE_HELM } })
+    boeItems()
+    wow.uncached[BOE_LATE] = true
+    wow.setBag(0, 16, { { BOE_LATE, 1 } })
+    wow.fire("BAG_UPDATE_DELAYED")
+    eq(packButton():IsShown(), false, "not loaded: no rule yet")
+    attach(1, BOE_LATE)
+    eq(SendMailNameEditBox:GetText() or "", "", "nor for the To box")
+    wow.timers = {}
+    wow.uncached[BOE_LATE] = nil
+    wow.fire("GET_ITEM_INFO_RECEIVED", 9999, true)
+    eq(#wow.timers, 0, "an item nobody asked about changes nothing")
+    wow.fire("GET_ITEM_INFO_RECEIVED", BOE_LATE, true)
+    wow.fire("GET_ITEM_INFO_RECEIVED", BOE_LATE, true)
+    eq(#wow.timers, 1, "one look for the arrival")
+    for _, fn in ipairs(wow.timers) do fn() end
+    eq(SendMailNameEditBox:GetText(), "Brak Stone", "filled in once it arrived, with no other event")
+    eq(packButton():IsShown(), true, "and Pack offers it")
+    eq(noteText(), "|cffc0c0c0Filled in by your bind-on-equip rule (click to undo)|r")
+end)
+
+test("mail rules: a late BoE item never replaces a name the player typed, and a failed load is let go", function()
+    atMailbox({ ["b:equip"] = { ["Brak Stone"] = BOE_HELM } })
+    boeItems()
+    wow.uncached[BOE_LATE] = true
+    attach(1, BOE_LATE)
+    wow.timers = {}
+    wow.fire("GET_ITEM_INFO_RECEIVED", BOE_LATE, false)
+    eq(#wow.timers, 0, "failed: nothing to look at")
+    wow.fire("GET_ITEM_INFO_RECEIVED", BOE_LATE, true)
+    eq(#wow.timers, 0, "and let go: not waited for any more")
+    wow.type("Tarn Moon") -- looks it up again: asked for again
+    wow.uncached[BOE_LATE] = nil
+    wow.fire("GET_ITEM_INFO_RECEIVED", BOE_LATE, true)
+    eq(#wow.timers, 1)
+    for _, fn in ipairs(wow.timers) do fn() end
+    eq(SendMailNameEditBox:GetText(), "Tarn Moon", "the player's name stays")
+end)
+
 test("mail rules: BoE weapons and BoE armor rules come before the all-BoE one", function()
     atMailbox({ ["b:equip"] = { ["Brak Stone"] = BOE_BAG }, ["b:weapon"] = { ["Tarn Moon"] = BOE_SWORD } })
     boeItems()
