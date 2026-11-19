@@ -277,11 +277,94 @@ test("weights follow Forever's trees: feral weapons, casters' crit and hit, heal
     wow.item(9323, "Healing Ring", { sub = 0, loc = "INVTYPE_FINGER", stats = { ITEM_MOD_SPELL_HEALING_DONE_SHORT = 30 } })
     eq(math.floor(ns.ItemScore(link(9323), "caster") + 0.5), 10)
     eq(ns.ItemScore(link(9323), "healer"), 30)
-    eq(ns.ItemScore(link(9323), "paladintank"), 15)
+    eq(ns.ItemScore(link(9323), "paladintank"), 9)
     eq(ns.ItemScore(link(9323), "tank"), 0, "a warrior tank gets nothing from it")
     -- Enhancement: Intellect is attack power and spell damage.
     wow.item(9324, "Wise Band", { sub = 0, loc = "INVTYPE_FINGER", stats = { ITEM_MOD_INTELLECT_SHORT = 10 } })
     eq(ns.ItemScore(link(9324), "enhancement"), 10)
+end)
+
+test("a levelling priest values Spirit over Stamina; a sword is never offered to one", function()
+    -- A player's report (2026-11-18): +2 Stamina was offered over the +1 Spirit mace worn.
+    local mace = upItem(9331, "Spirit Mace", { class = 2, sub = 4, loc = "INVTYPE_WEAPON", level = 12,
+        stats = { ITEM_MOD_SPIRIT_SHORT = 1 } })
+    local dagger = upItem(9332, "Sturdy Dagger", { class = 2, sub = 15, loc = "INVTYPE_WEAPON", level = 14,
+        stats = { ITEM_MOD_STAMINA_SHORT = 2 } })
+    local sword = upItem(9333, "Sturdy Sword", { class = 2, sub = 7, loc = "INVTYPE_WEAPON", level = 14,
+        stats = { ITEM_MOD_STAMINA_SHORT = 9 } })
+    local ns = upStart({ ["Pia Lux"] = alt("Pia Lux", "PRIEST", { level = 14, gear = { [16] = mace } }) })
+    eq(ns.RoleOf(ns.db.chars["Pia Lux"]), "caster", "no talents yet: caster")
+    assert(ns.ItemScore(mace, "caster") > ns.ItemScore(dagger, "caster"), "1 Spirit beats 2 Stamina")
+    assert(not upHover(9332, dagger):find("Pia Lux", 1, true), "the dagger isn't an upgrade")
+    assert(not upHover(9333, sword):find("Pia Lux", 1, true), "priests can't use swords")
+    assert(ns.ItemScore(mace, "healer") > ns.ItemScore(dagger, "healer"), "for a healing priest too")
+end)
+
+test("block comes as a rating, 5 to 1%", function()
+    -- Boar Signet (274078), as the game reports it: "+5 Stamina", "Increases your chance to
+    -- Block attacks with a shield by 1.0%" (owner's probe, 2026-11-19).
+    local ring = upItem(274078, "Boar Signet", { sub = 0, loc = "INVTYPE_FINGER",
+        stats = { ITEM_MOD_STAMINA_SHORT = 5, ITEM_MOD_BLOCK_RATING_SHORT = 5 } })
+    local ns = upStart()
+    -- 5 Stamina x 1.5 + 1% block x 6 = 13.5 (it was 37.5, as if 5%).
+    eq(ns.ItemScore(ring, "tank"), 13.5)
+    eq(ns.ItemScore(ring, "paladintank"), 13.5)
+end)
+
+test("school spell damage counts for the classes and trees that cast it", function()
+    -- Arcane Remnant Leggings, as the game reports them (owner's probe, 2026-11-19).
+    local legs = upItem(9341, "Arcane Remnant Leggings", { sub = 2, loc = "INVTYPE_LEGS",
+        stats = { ITEM_MOD_INTELLECT_SHORT = 12, ITEM_MOD_ARCANE_DAMAGE_DONE_SHORT = 17 } })
+    local holy = upItem(9342, "Holy Band", { sub = 0, loc = "INVTYPE_FINGER",
+        stats = { ITEM_MOD_HOLY_DAMAGE_DONE_SHORT = 10 } })
+    local ns = upStart()
+    local function score(link, c) return ns.ItemScore(link, ns.ScoreRole(c, ns.RoleOf(c))) end
+    local function near(a, b, what) assert(math.abs(a - b) < 0.001, (what or "") .. ": " .. a .. " ~= " .. b) end
+    near(score(legs, { class = "MAGE", spec = 1 }), 12 * 0.55 + 17 * 0.95, "arcane mage")
+    near(score(legs, { class = "MAGE", spec = 2 }), 12 * 0.55 + 17 * 0.15, "fire mage")
+    near(score(legs, { class = "MAGE" }), 12 * 0.55 + 17 * 0.4, "no tree yet")
+    near(score(legs, { class = "WARLOCK", spec = 1 }), 12 * 0.55, "warlocks cast no arcane")
+    near(score(legs, { class = "PRIEST", spec = 1 }), 12 * 1, "healers: Intellect only")
+    near(score(legs, { class = "ROGUE" }), 0)
+    -- Holy for paladins, at their spell damage weight; a warrior tank gets nothing.
+    near(score(holy, { class = "PALADIN", spec = 2 }), 10, "protection: as spell damage")
+    near(score(holy, { class = "PALADIN", spec = 3 }), 4, "retribution: 0.4")
+    near(score(holy, { class = "PALADIN", spec = 1 }), 0, "holy: a healer")
+    near(score(holy, { class = "WARRIOR", spec = 3 }), 0)
+    near(score(holy, { class = "PRIEST" }), 3, "levelling priests smite")
+    -- A Shadow priest the player set to Healer: healing gets nothing from shadow damage.
+    eq(ns.ScoreRole({ class = "PRIEST", spec = 3 }, "healer"), "healer")
+    -- A healing tree's character the player set to a damage or tank role gets the class's
+    -- schools (peer review, 2026-11-19).
+    local function chosen(link, c, role) return ns.ItemScore(link, ns.ScoreRole(c, role)) end
+    near(chosen(holy, { class = "PALADIN", spec = 1 }, "paladintank"), 10, "holy paladin set to Tank")
+    near(chosen(holy, { class = "PRIEST", spec = 1 }, "caster"), 3, "holy priest set to Caster")
+    near(chosen(legs, { class = "DRUID", spec = 3 }, "caster"), 12 * 0.55 + 17 * 0.6, "restoration druid set to Caster")
+end)
+
+test("an item with only school damage is an upgrade for those who cast it", function()
+    local wand = upItem(9345, "Arcane Focus", { sub = 0, loc = "INVTYPE_HOLDABLE",
+        stats = { ITEM_MOD_ARCANE_DAMAGE_DONE_SHORT = 8 } })
+    upStart({
+        ["Ari Cane"] = alt("Ari Cane", "MAGE", { level = 30, spec = 1, gear = {} }),
+        ["Lock Fell"] = alt("Lock Fell", "WARLOCK", { level = 30, spec = 1, gear = {} }),
+    })
+    local rows = upHover(9345, wand)
+    assert(rows:find("Ari Cane", 1, true), "the arcane mage: " .. rows)
+    assert(not rows:find("Lock Fell", 1, true), "warlocks cast no arcane")
+end)
+
+test("dodge, parry, haste and expertise come as ratings", function()
+    local cloak = upItem(9343, "Dodgy Cloak", { sub = 1, loc = "INVTYPE_CLOAK",
+        stats = { ITEM_MOD_DODGE_RATING_SHORT = 12, ITEM_MOD_PARRY_RATING_SHORT = 15 } })
+    local band = upItem(9344, "Quick Band", { sub = 0, loc = "INVTYPE_FINGER",
+        stats = { ITEM_MOD_HASTE_RATING_SHORT = 10, ITEM_MOD_EXPERTISE_RATING_SHORT = 10 } })
+    local ns = upStart()
+    eq(ns.ItemScore(cloak, "tank"), 22, "1% dodge (12) + 1% parry (10)")
+    eq(ns.ItemScore(band, "rogue"), 28, "1% haste (14) + 1% expertise (14)")
+    eq(ns.ItemScore(band, "caster"), 9, "casters: haste only")
+    eq(ns.ItemScore(band, "hunter"), 13)
+    eq(ns.ItemScore(band, "paladintank"), 6 + 6, "protection paladins keep their own haste (6) + expertise (6)")
 end)
 
 test("a rogue can be suggested a one-handed axe, never a two-handed one", function()
@@ -300,7 +383,7 @@ test("a hunter's melee weapon is a stat stick, except for Survival, the melee tr
     wow.item(9302, "Fine Bow", { class = 2, sub = 2, loc = "INVTYPE_RANGED", stats = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 10 } })
     local axe, bow = select(2, C_Item.GetItemInfo(9301)), select(2, C_Item.GetItemInfo(9302))
     eq(ns.ItemScore(axe, "hunter"), 5, "10 dps: worth about 2 Agility")
-    eq(ns.ItemScore(axe, "survival"), 60, "a melee weapon matters to Survival")
+    eq(ns.ItemScore(axe, "survival"), 100, "a melee weapon matters to Survival")
     eq(ns.ItemScore(bow, "hunter"), 140, "the bow is judged on its damage")
     eq(ns.ItemScore(bow, "survival"), 80, "its bow still counts, less than for the ranged trees")
     -- Talents decide: the third tab is Survival.
@@ -332,8 +415,8 @@ test("a protection paladin counts spell damage as threat; a warrior tank doesn't
     local pala, warrior = ns.db.chars["Vesp Ash"], ns.db.chars["Brak Horn"]
     eq(ns.RoleOf(pala), "paladintank", "Protection tab")
     eq(ns.RoleName(ns.RoleOf(pala)), "Tank")
-    -- 9 x 1.5 + 11 x 1.5 = 30 against 9 x 1.5 + 7 x 1.5 = 24.
-    eq(ns.ItemScore(crusader, ns.RoleOf(pala)), 30)
+    -- 9 x 1.5 + 11 x 1 = 24.5 against 9 x 1.5 + 7 x 1.5 = 24.
+    eq(ns.ItemScore(crusader, ns.RoleOf(pala)), 24.5)
     eq(ns.ItemScore(protector, ns.RoleOf(pala)), 24)
     eq(ns.RoleOf(warrior), "tank")
     eq(ns.ItemScore(crusader, "tank"), 13.5, "spell damage is nothing to a warrior")
