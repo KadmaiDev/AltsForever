@@ -1,4 +1,4 @@
-## Alts Forever (not yet released)
+## Alts Forever 1.8.1
 
 - **Upgrade suggestions weigh stats more like Pawn:** casters and healers now value Spirit and Intellect more and Stamina less, so a priest is no longer offered +2 Stamina over the +1 Spirit they wear. Rogues value Strength more; tanks value armour less and their weapon more; protection paladins value spell damage a little less and Intellect, crit and mana regeneration a little; Survival hunters value their melee weapon more. Hunters' other weights are unchanged. Some upgrade arrows and anvils will change. Thanks to the player who asked.
 - **Dodge, parry and block were badly overrated:** the game gives them as ratings (12 dodge, 15 parry or 5 block is 1%), and Alts Forever counted each point as a whole percent, so gear like the Boots of Avoidance or the Boar Signet looked like huge upgrades for tanks.
