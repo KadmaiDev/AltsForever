@@ -223,6 +223,20 @@ function openBlizzardMenu(tag)
     return MenuUtil.CreateContextMenu(nil, function(owner, root) wow.menuMods[tag](owner, root) end)
 end
 
+test("shortcuts: with the Gamepad UI on, Blizzard's bag menus get no entry (it tainted the navigator)", function()
+    wow.load(FILES)
+    wow.login(nil)
+    wow.gamepadUI = true
+    for _, tag in ipairs({ "MENU_CONTAINER_FRAME_COMBINED", "MENU_CONTAINER_FRAME" }) do
+        local menu = openBlizzardMenu(tag)
+        eq(wow.menuItem("Alts Forever: every character's bags"), nil, tag)
+        eq(#menu.items, 0, "nothing added at all, not even the divider")
+    end
+    wow.gamepadUI = false
+    openBlizzardMenu("MENU_CONTAINER_FRAME_COMBINED")
+    assert(wow.menuItem("Alts Forever: every character's bags"), "switched off again: back")
+end)
+
 test("shortcuts: Blizzard's bag menus get an entry; the bank, ElvUI and EllesmereUI a button in their header", function()
     local ns = wow.load(FILES)
     wow.ns = ns

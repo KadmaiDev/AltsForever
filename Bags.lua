@@ -1263,8 +1263,14 @@ end
 function ns.BagShortcuts() return shortcuts end
 
 -- Blizzard's bags: an entry at the bottom of the portrait button's menu (combined and
--- separate bags; tags checked in game 2026-09-28).
+-- separate bags; tags checked in game 2026-09-28). None with the Gamepad UI on: the
+-- navigator takes the menu in as a window, and our entry left its bindings tainted, so
+-- closing the bags afterwards raised ADDON_ACTION_FORBIDDEN on
+-- SetPreferredGamepadInteractTarget() (a player's report; reproduced by the owner,
+-- 2026-11-20: only after opening ours from this menu, never from /af bags). Asked each time
+-- the menu opens, as the Gamepad UI can be switched on and off while playing.
 local function AddMenuEntry(_, root)
+    if ns.GamepadUI() then return end
     root:CreateDivider()
     root:CreateButton(L["Alts Forever: every character's bags"], function() OpenFromShortcut("bags") end)
 end
