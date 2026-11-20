@@ -182,6 +182,105 @@ end
 ns.BagsSectionName = SectionName
 
 ---------------------------------------------------------------------------
+-- Bag space (the overview's Bags and Bank columns; a player who'd used Altoholic's,
+-- 2026-11-19): free and all slots per character from the saved layout, and each bag or
+-- tab for the cell's tooltip. No UI here, so tests can check it.
+---------------------------------------------------------------------------
+
+-- Bags 1-4 can be empty (no bag bought yet): the tooltip says so. The backpack is always
+-- there; the reagent bag and keyring aren't listed when missing.
+local BAG_SLOTS = {}
+for _, name in ipairs({ "Bag_1", "Bag_2", "Bag_3", "Bag_4" }) do
+    if BagIndex[name] then BAG_SLOTS[BagIndex[name]] = true end
+end
+
+local function Places(which)
+    return which == "bank" and ns.BANK_TABS or ns.CARRIED_BAGS
+end
+
+-- Free and all slots in a character's bags (keyring left out: it holds only keys) or bank
+-- tabs; nil when not known (bags: no layout yet; bank: never visited, or visited before
+-- slot layouts were saved).
+function ns.BagSpace(c, which)
+    local layout = c and c.layout
+    if type(layout) ~= "table" then return nil end
+    local free, total = 0, 0
+    for _, bag in ipairs(Places(which)) do
+        local values = bag ~= BagIndex.Keyring and layout[bag]
+        if values then
+            local n = #values
+            total = total + n
+            for i = 1, n do
+                if values[i] == 0 then free = free + 1 end
+            end
+        end
+    end
+    if total == 0 then return nil end
+    return free, total
+end
+
+-- Bag slots 1-4 with no bag in them, for a character whose bags are known.
+function ns.EmptyBagSlots(c)
+    local layout = c and c.layout
+    if type(layout) ~= "table" then return 0 end
+    local n = 0
+    for bag in pairs(BAG_SLOTS) do
+        if not layout[bag] then n = n + 1 end
+    end
+    return n
+end
+
+-- What kind of bag an item is, in the game's words, when it holds only some things (Herb
+-- Bag, Soul Bag, Quiver, Ammo Pouch); nil for a plain bag.
+local function BagKind(item)
+    if not item or item == 0 or not C_Item.GetItemInfoInstant then return nil end
+    local _, _, sub, _, _, class, subclass = C_Item.GetItemInfoInstant(item)
+    if issecretvalue(sub) or issecretvalue(class) or issecretvalue(subclass) then return nil end
+    if type(sub) ~= "string" or sub == "" then return nil end
+    if (class == 1 and subclass ~= 0) or class == 11 then return sub end
+    return nil
+end
+
+-- Each bag (or bank tab) in order, for the tooltip: { name, icon, quality, kind, free,
+-- size }, size 0 for an empty bag slot. Names not loaded yet are requested and read as
+-- "Bag n" until they are.
+local spaceList = {}
+function ns.BagSpaceList(c, which)
+    wipe(spaceList)
+    local layout = c and c.layout
+    if type(layout) ~= "table" then return spaceList end
+    for _, bag in ipairs(Places(which)) do
+        local values = bag ~= BagIndex.Keyring and layout[bag]
+        if values or BAG_SLOTS[bag] then
+            local e = { free = 0, size = values and #values or 0 }
+            for i = 1, e.size do
+                if values[i] == 0 then e.free = e.free + 1 end
+            end
+            local item = values and values[0]
+            if not values then
+                e.name, e.icon = L["Empty bag slot"], "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"
+            elseif item and item ~= 0 then
+                local name = C_Item.GetItemNameByID(item)
+                if issecretvalue(name) or type(name) ~= "string" then
+                    name = nil
+                    if C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(item) end
+                end
+                e.name = name or L["Bag %d"]:format(bag)
+                e.icon = GetItemIconByID(item)
+                local q = C_Item.GetItemQualityByID and C_Item.GetItemQualityByID(item)
+                if not issecretvalue(q) then e.quality = q end
+                e.kind = BagKind(item)
+            else -- the backpack, a bank tab, or a bag whose item wasn't recorded
+                e.name = SectionName(c, bag)
+                e.icon = bag == BagIndex.Backpack and "Interface\\Buttons\\Button-Backpack-Up" or nil
+            end
+            spaceList[#spaceList + 1] = e
+        end
+    end
+    return spaceList
+end
+
+---------------------------------------------------------------------------
 -- Window
 ---------------------------------------------------------------------------
 local Fill, Place
@@ -590,7 +689,7 @@ end
 -- Every character, in the overview's order and, as there, headed by ruleset and faction
 -- when you have more than one group.
 local function PickCharacter(owner)
-    MenuUtil.CreateContextMenu(owner, function(_, root)
+    ns.OpenMenu(owner, function(_, root)
         local chars, keys = ns.db.chars, ns.OverviewOrder()
         local byRealm, byFaction = ns.GroupParts()
         local group
@@ -831,7 +930,7 @@ local function CreateWindow()
         end
     end)
 
-    if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverBagsFrame" end
+    ns.EscapeCloses(f)
     ns.SkinWindow(f, ns.BagsShellOpts())
     ns.SkinBagsWindow(f)
     f:Hide()
@@ -1094,14 +1193,38 @@ local function FollowRow(f, b, search)
     Again()
 end
 
+-- Blizzard's bags (combined, or the backpack when separate) get a button only with the
+-- Gamepad UI on, in place of the portrait menu's entry (AddMenuEntry says why). With the
+-- Gamepad UI on the game stretches the search box across the header and hides its sort
+-- button (ContainerFrame.lua, forever branch), so it goes in the title bar, left of the close
+-- button. Made at login or a bag toggle, never inside the open bags with the Gamepad UI on
+-- (as the bank's); shown and hidden as the Gamepad UI is switched.
+local padButtons = {}
+local function BlizzardBags(f)
+    local close = f and f.CloseButton
+    if not (close and close.GetFrameLevel) then return end
+    if ns.GamepadUI() and f:IsVisible() then return end
+    local b = Shortcut(f, "bags", 18)
+    b:SetPoint("RIGHT", close, "LEFT", -2, 0)
+    b:SetFrameLevel(close:GetFrameLevel())
+    b:SetShown(ns.GamepadUI())
+    padButtons[#padButtons + 1] = b
+    return b
+end
+
 -- Where each window gets its button. Each returns the button, or nil if the window
 -- (or the part it's placed beside) isn't there yet. EllesmereUI's fields are not its
 -- official API: they're checked before use.
 local PLACES = {
+    ContainerFrameCombinedBags = function() return BlizzardBags(_G.ContainerFrameCombinedBags) end,
+    ContainerFrame1 = function() return BlizzardBags(_G.ContainerFrame1) end,
     -- Blizzard's bank: in the title area, left of the search box.
     BankFrame = function()
         local search = _G.BankItemSearchBox
         if not (_G.BankFrame and search) then return end
+        -- Not made inside the open bank with the Gamepad UI on: Blizzard's navigator would
+        -- rebuild it from our code (see ns.PrebuildMail); the next login or bag toggle does it.
+        if ns.GamepadUI() and _G.BankFrame:IsVisible() then return end
         local b = Shortcut(_G.BankFrame, "bank", 22)
         b:SetPoint("RIGHT", search, "LEFT", -10, 0)
         return b
@@ -1161,8 +1284,14 @@ end
 function ns.BagShortcuts() return shortcuts end
 
 -- Blizzard's bags: an entry at the bottom of the portrait button's menu (combined and
--- separate bags; tags checked in game 2026-09-28).
+-- separate bags; tags checked in game 2026-09-28). None with the Gamepad UI on: the
+-- navigator takes the menu in as a window, and our entry left its bindings tainted, so
+-- closing the bags afterwards raised ADDON_ACTION_FORBIDDEN on
+-- SetPreferredGamepadInteractTarget() (a player's report; reproduced by the owner,
+-- 2026-11-20: only after opening ours from this menu, never from /af bags). Asked each time
+-- the menu opens, as the Gamepad UI can be switched on and off while playing.
 local function AddMenuEntry(_, root)
+    if ns.GamepadUI() then return end
     root:CreateDivider()
     root:CreateButton(L["Alts Forever: every character's bags"], function() OpenFromShortcut("bags") end)
 end
@@ -1173,6 +1302,10 @@ function ns.StartBags()
         Menu.ModifyMenu("MENU_CONTAINER_FRAME", AddMenuEntry)
     end
     ns.On("PLAYER_ENTERING_WORLD", AttachShortcuts)
+    ns.On("INPUT_DEVICE_INTERFACE_TRANSITION", function()
+        local on = ns.GamepadUI()
+        for _, b in ipairs(padButtons) do b:SetShown(on) end
+    end)
     -- The bank windows may be made on the first visit.
     ns.On("BANKFRAME_OPENED", function()
         AttachShortcuts()

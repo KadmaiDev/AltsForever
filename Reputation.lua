@@ -257,7 +257,7 @@ local function CreatePanel()
         Fill()
     end)
     f.up:SetPoint("RIGHT", f.down, "LEFT", -2, 0)
-    if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverRepFrame" end
+    ns.EscapeCloses(f)
     ns.SkinWindow(f)
     f:Hide()
     ns.GamepadWindow(f)

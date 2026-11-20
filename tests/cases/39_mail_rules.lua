@@ -237,6 +237,59 @@ test("the subject is filled from the first attachment, as the game does when C.O
     eq(subject:GetText(), "", "off: untouched")
 end)
 
+test("an attachment whose name hasn't loaded yet: the subject is filled once it arrives, so Send isn't left greyed out", function()
+    atMailbox({})
+    local subject = SendMailSubjectEditBox
+    -- The mail API has no name yet, but the game has the item cached: that name, nothing asked.
+    wow.unloaded = { [SILK] = true, [LINEN] = true }
+    wow.itemLoads = nil
+    attach(1, LINEN, 20)
+    eq(subject:GetText(), "Linen Cloth (20)", "the cached name")
+    eq(wow.itemLoads, nil, "nothing to ask for")
+    attach(1, nil)
+    -- Not cached either: asked for once, filled when it arrives (still no name from the mail
+    -- API, so this is the cached-name lookup at work).
+    local silk = wow.itemNames[SILK]
+    wow.itemNames[SILK] = nil
+    attach(1, SILK, 4)
+    eq(subject:GetText(), "", "no name yet: nothing to fill")
+    attach(2, SILK, 1)
+    eq(wow.itemLoads and #wow.itemLoads, 1, "asked for once")
+    eq(wow.itemLoads[1], SILK)
+    attach(2, nil)
+    wow.itemNames[SILK] = silk
+    wow.fire("GET_ITEM_INFO_RECEIVED", SILK, true)
+    eq(subject:GetText(), "Silk Cloth (4)", "filled when it arrives")
+    -- A name still loading never takes out the subject we filled.
+    local linen = wow.itemNames[LINEN]
+    wow.itemNames[LINEN] = nil
+    attach(2, LINEN, 20)
+    attach(1, nil)
+    eq(subject:GetText(), "Silk Cloth (4)", "kept while the next one's name loads")
+    wow.itemNames[LINEN] = linen
+    wow.fire("GET_ITEM_INFO_RECEIVED", LINEN, true)
+    eq(subject:GetText(), "Linen Cloth (20)")
+    wow.unloaded = nil
+end)
+
+test("an attachment the game fails to load is asked for once, never again in a loop", function()
+    atMailbox({})
+    local subject = SendMailSubjectEditBox
+    wow.unloaded = { [SILK] = true }
+    local silk = wow.itemNames[SILK]
+    wow.itemNames[SILK] = nil
+    wow.itemLoads = nil
+    attach(1, SILK, 4)
+    eq(#wow.itemLoads, 1)
+    wow.fire("GET_ITEM_INFO_RECEIVED", SILK, false)
+    eq(#wow.itemLoads, 1, "a failed load isn't asked for again at once")
+    wow.fire("MAIL_SEND_INFO_UPDATE")
+    attach(2, SILK, 1)
+    eq(#wow.itemLoads, 1, "nor later")
+    eq(subject:GetText(), nil)
+    wow.itemNames[SILK], wow.unloaded = silk, nil
+end)
+
 test("mail rules: Pack fills only the free attachment slots, and can be turned off", function()
     atMailbox({ ["c:7:5"] = { ["Tarn Moon"] = LINEN } })
     for i = 1, 11 do wow.outbox[i] = { SHIRT, 1 } end
@@ -465,4 +518,143 @@ test("mail rules: damaged rules are dropped at load", function()
     eq(AltsForeverDB.mailRules["i:1"], nil)
     eq(AltsForeverDB.mailRules[5], nil)
     eq(AltsForeverDB.mailRules["i:2"], nil, "an empty rule goes")
+end)
+
+-- Bind-on-equip gear for the BoE rules: a mail helm, a cloth robe and a sword (bind on
+-- equip), a leather cap that binds on pickup, boots that load late, a BoE bag (neither
+-- weapon nor armour).
+local BOE_HELM, BOE_ROBE, BOP_CAP, BOE_LATE, BOE_SWORD, BOE_BAG = 9001, 9002, 9003, 9004, 9005, 9006
+function boeItems()
+    for id, def in pairs({ [BOE_HELM] = { "Ringed Helm", 4, 3, 2 }, [BOE_ROBE] = { "Silk Robe", 4, 1, 2 },
+        [BOP_CAP] = { "Bound Cap", 4, 2, 1 }, [BOE_LATE] = { "Late Boots", 4, 2, 2 },
+        [BOE_SWORD] = { "Green Sword", 2, 7, 2 }, [BOE_BAG] = { "Red Bag", 1, 0, 2 } }) do
+        wow.itemNames[id], wow.itemClass[id] = def[1], def[2]
+        wow.items[id] = { sub = def[3], bind = def[4], stack = 1 }
+    end
+end
+
+test("mail rules: the bind-on-equip rule sends every BoE item, after an item's or category's own rule", function()
+    atMailbox({ ["b:equip"] = { ["Brak Stone"] = BOE_HELM }, ["c:4:1"] = { ["Tarn Moon"] = BOE_ROBE } })
+    boeItems()
+    local ns = mailNS
+    local key, rule = ns.MailRuleFor(BOE_HELM)
+    eq(key, "Brak Stone", "a BoE helm")
+    eq(rule, "b:equip")
+    eq(ns.MailRuleFor(BOE_ROBE), "Tarn Moon", "the Armor: Cloth rule comes first")
+    eq(ns.MailRuleFor(BOE_SWORD), "Brak Stone", "a weapon too")
+    eq(ns.MailRuleFor(BOE_BAG), "Brak Stone", "and a bag")
+    eq(ns.MailRuleFor(BOP_CAP), nil, "binds on pickup")
+    eq(ns.MailRuleFor(LINEN), nil, "trade goods don't bind")
+    wow.uncached[BOE_LATE] = true
+    wow.itemLoads = {}
+    eq(ns.MailRuleFor(BOE_LATE), nil, "not loaded yet")
+    eq(wow.itemLoads[1], BOE_LATE, "so it's asked for")
+    wow.uncached[BOE_LATE] = nil
+    eq(ns.MailRuleFor(BOE_LATE), "Brak Stone", "and found once it has loaded (not remembered as not BoE)")
+    attach(1, BOE_HELM)
+    eq(SendMailNameEditBox:GetText(), "Brak Stone")
+    eq(noteText(), "|cffc0c0c0Filled in by your bind-on-equip rule (click to undo)|r")
+end)
+
+test("mail rules: a BoE item that loads after the mailbox opened is filled in and packed once it arrives", function()
+    atMailbox({ ["b:equip"] = { ["Brak Stone"] = BOE_HELM } })
+    boeItems()
+    wow.uncached[BOE_LATE] = true
+    wow.setBag(0, 16, { { BOE_LATE, 1 } })
+    wow.fire("BAG_UPDATE_DELAYED")
+    eq(packButton():IsShown(), false, "not loaded: no rule yet")
+    attach(1, BOE_LATE)
+    eq(SendMailNameEditBox:GetText() or "", "", "nor for the To box")
+    wow.timers = {}
+    wow.uncached[BOE_LATE] = nil
+    wow.fire("GET_ITEM_INFO_RECEIVED", 9999, true)
+    eq(#wow.timers, 0, "an item nobody asked about changes nothing")
+    wow.fire("GET_ITEM_INFO_RECEIVED", BOE_LATE, true)
+    wow.fire("GET_ITEM_INFO_RECEIVED", BOE_LATE, true)
+    eq(#wow.timers, 1, "one look for the arrival")
+    for _, fn in ipairs(wow.timers) do fn() end
+    eq(SendMailNameEditBox:GetText(), "Brak Stone", "filled in once it arrived, with no other event")
+    eq(packButton():IsShown(), true, "and Pack offers it")
+    eq(noteText(), "|cffc0c0c0Filled in by your bind-on-equip rule (click to undo)|r")
+end)
+
+test("mail rules: a late BoE item never replaces a name the player typed, and a failed load is let go", function()
+    atMailbox({ ["b:equip"] = { ["Brak Stone"] = BOE_HELM } })
+    boeItems()
+    wow.uncached[BOE_LATE] = true
+    attach(1, BOE_LATE)
+    wow.timers = {}
+    wow.fire("GET_ITEM_INFO_RECEIVED", BOE_LATE, false)
+    eq(#wow.timers, 0, "failed: nothing to look at")
+    wow.fire("GET_ITEM_INFO_RECEIVED", BOE_LATE, true)
+    eq(#wow.timers, 0, "and let go: not waited for any more")
+    wow.type("Tarn Moon") -- looks it up again: asked for again
+    wow.uncached[BOE_LATE] = nil
+    wow.fire("GET_ITEM_INFO_RECEIVED", BOE_LATE, true)
+    eq(#wow.timers, 1)
+    for _, fn in ipairs(wow.timers) do fn() end
+    eq(SendMailNameEditBox:GetText(), "Tarn Moon", "the player's name stays")
+end)
+
+test("mail rules: BoE weapons and BoE armor rules come before the all-BoE one", function()
+    atMailbox({ ["b:equip"] = { ["Brak Stone"] = BOE_BAG }, ["b:weapon"] = { ["Tarn Moon"] = BOE_SWORD } })
+    boeItems()
+    local ns = mailNS
+    local key, rule = ns.MailRuleFor(BOE_SWORD)
+    eq(key, "Tarn Moon", "weapons to the seller")
+    eq(rule, "b:weapon")
+    eq(ns.MailRuleFor(BOE_HELM), "Brak Stone", "armour has no rule of its own: all BoE")
+    ns.SetMailRule("b:armor", "Tarn Moon", true, BOE_HELM)
+    key, rule = ns.MailRuleFor(BOE_HELM)
+    eq(key, "Tarn Moon") eq(rule, "b:armor")
+    eq(ns.MailRuleFor(BOE_BAG), "Brak Stone", "neither weapon nor armour")
+    ns.SetMailRule("b:weapon", "Horde Guy", true, BOE_SWORD)
+    eq(ns.MailRuleFor(BOE_SWORD), "Tarn Moon", "Horde Guy can't be mailed from here")
+    ns.SetMailRule("b:weapon", "Tarn Moon", false)
+    eq(ns.MailRuleFor(BOE_SWORD), "Brak Stone", "the weapon rule here gone: all BoE")
+    attach(1, BOE_HELM)
+    eq(noteText(), "|cffc0c0c0Filled in by your bind-on-equip armor rule (click to undo)|r")
+end)
+
+test("mail rules: Pack takes bind-on-equip items that aren't bound yet", function()
+    atMailbox({ ["b:equip"] = { ["Brak Stone"] = BOE_HELM } })
+    boeItems()
+    wow.setBag(0, 16, { { BOE_HELM, 1 }, { BOE_HELM, 1 }, { BOP_CAP, 1 }, { LINEN, 20 }, { BOE_ROBE, 1 } })
+    wow.bags[0][2].bound = true
+    wow.fire("BAG_UPDATE_DELAYED")
+    local p = packButton()
+    eq(p:GetText(), "Pack 2 for [WARRIOR]Brak", "the helm and robe; the worn-once helm and the cap are bound")
+    p.scripts.OnClick(p)
+    eq(wow.outbox[1][1], BOE_HELM) eq(wow.outbox[2][1], BOE_ROBE)
+end)
+
+test("mail rules: the arrow offers the BoE rules for what's attached; the window lists them", function()
+    atMailbox(nil)
+    boeItems()
+    wow.type("Brak Stone")
+    attach(1, LINEN, 20)
+    openArrow()
+    local texts = table.concat(mailMenuTexts(), " | ")
+    assert(not texts:find("bind-on-equip", 1, true), texts)
+    attach(2, BOE_HELM)
+    openArrow()
+    texts = mailMenuTexts()
+    eq(texts[#texts - 3], "Always send bind-on-equip armor here")
+    eq(texts[#texts - 2], "Always send all bind-on-equip items here", "last of the Remember ticks")
+    attach(3, BOE_SWORD)
+    openArrow()
+    texts = mailMenuTexts()
+    eq(texts[#texts - 4], "Always send bind-on-equip weapons here")
+    eq(texts[#texts - 3], "Always send bind-on-equip armor here")
+    eq(texts[#texts - 2], "Always send all bind-on-equip items here")
+    wow.menuItem("Always send all bind-on-equip items here").setSelected()
+    eq(AltsForeverDB.mailRules["b:equip"]["Brak Stone"], BOE_HELM, "the first BoE item kept for its icon")
+    wow.menuItem("Always send bind-on-equip weapons here").setSelected()
+    eq(AltsForeverDB.mailRules["b:weapon"]["Brak Stone"], BOE_SWORD)
+    eq(mailNS.MailRuleFor(BOE_ROBE), "Brak Stone")
+    SlashCmdList.ALTSFOREVER("mailrules")
+    local rows = AltsForeverMailRulesFrame.rows
+    eq(rows[1].label:GetText(), "All bind-on-equip items")
+    eq(rows[1].who:GetText(), "[WARRIOR]Brak Stone")
+    eq(rows[2].label:GetText(), "All bind-on-equip weapons")
 end)

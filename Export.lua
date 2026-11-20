@@ -259,7 +259,7 @@ local function Fill()
 end
 
 local function PickFormat(owner)
-    MenuUtil.CreateContextMenu(owner, function(_, root)
+    ns.OpenMenu(owner, function(_, root)
         for _, f in ipairs(FORMATS) do
             root:CreateRadio(CHOICES[f], function(v) return v == ns.ExportFormat() end, function(v)
                 -- nil for the default, so saves stay small.
@@ -347,7 +347,7 @@ local function CreateWindow()
         GameTooltip:Hide()
     end)
     -- Escape closes it, like Blizzard's own windows.
-    if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverExportFrame" end
+    ns.EscapeCloses(f)
     f:Hide()
     ns.GamepadWindow(f)
     ns.ScaleWindow(f)

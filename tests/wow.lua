@@ -261,6 +261,8 @@ function M.load(files)
     function frameMethods:GetName() return self.frameName end
     function frameMethods:SetEnabled(on) self.enabled = on and true or false end
     function frameMethods:IsEnabled() return self.enabled ~= false end
+    -- A DropdownButton's menu: kept so tests can open it as the game would.
+    function frameMethods:SetupMenu(generator) self.menuGenerator = generator end
     function frameMethods:GetChildren()
         local list = {}
         for _, f in ipairs(M.frames) do if f.parent == self then list[#list + 1] = f end end
@@ -319,7 +321,12 @@ function M.load(files)
     end
     function frameMethods:GetFrameLevel() return self.level or 1 end
     function frameMethods:SetFrameLevel(level) self.level = level end
-    function frameMethods:SetText(text) self.text = text end
+    function frameMethods:SetText(text)
+        -- The game takes a string, a number or nil; anything else is an error there.
+        local t = type(text)
+        assert(t == "string" or t == "number" or t == "nil", "SetText given a " .. t)
+        self.text = text
+    end
     function frameMethods:SetPoint(point, rel, relPoint, x, y) self.point = { point, rel, relPoint, x, y } end
     function frameMethods:GetNormalTexture() return self.normalTexture end
     function frameMethods:SetNormalTexture(t)
@@ -506,7 +513,7 @@ function M.load(files)
         GetItemInfoInstant = function(item)
             local id = type(item) == "number" and item or tonumber(item:match("item:(%d+)"))
             local it = M.items[id] or {}
-            return id, nil, nil, it.loc, "icon:" .. id, M.itemClass[id], it.sub
+            return id, nil, it.subName, it.loc, "icon:" .. id, M.itemClass[id], it.sub
         end,
         GetItemStats = function(link)
             local id = tonumber(link:match("item:(%d+)"))
@@ -562,7 +569,11 @@ function M.load(files)
     end
     GetSendMailItem = function(i)
         local item = M.outbox[i]
-        if item then return M.itemNames[item[1]] or "Item", item[1], nil, item[2] end
+        -- M.unloaded[id]: the game hasn't loaded it yet, so no name.
+        if item then
+            if M.unloaded and M.unloaded[item[1]] then return nil, item[1], nil, item[2] end
+            return M.itemNames[item[1]] or "Item", item[1], nil, item[2]
+        end
     end
     HasSendMailItem = function(i) return M.outbox[i] ~= nil end
     SendMail = function() end

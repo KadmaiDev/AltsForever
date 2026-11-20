@@ -239,15 +239,25 @@ local category, canvas
 -- Opens the overview from the page: Blizzard's panel closes first and the overview opens
 -- a frame later (as EllesmereUI does), so nothing of ours runs inside its closing. In
 -- combat the panel is left alone.
-local function OpenOverviewFromOptions()
+-- Opens one of our windows from the page: the Options window closes first (not in
+-- combat), so ours isn't left behind it, then ours opens a frame later.
+local function OpenFromOptions(open)
     if not InCombatLockdown() and SettingsPanel and SettingsPanel:IsShown() and HideUIPanel then
         HideUIPanel(SettingsPanel)
     end
     if C_Timer and C_Timer.After then
-        C_Timer.After(0, function() ns.ToggleOverview(true) end)
+        C_Timer.After(0, open)
     else
-        ns.ToggleOverview(true)
+        open()
     end
+end
+
+local function OpenOverviewFromOptions()
+    OpenFromOptions(function() ns.ToggleOverview(true) end)
+end
+
+local function OpenWeightsFromOptions()
+    OpenFromOptions(function() ns.ShowWeights() end)
 end
 
 local function Tooltip(owner, title, text)
@@ -270,7 +280,7 @@ local SETTINGS = {
     { L["Show skill-up details"], SkillupsSelected, function(on) ns.SetSkillups(on) end,
         L["Show which characters can still skill up: in Can craft, on materials (Skill-ups) and in the overview. Same as /af skillups."], section = "tooltips", sub = true },
     { L["Show upgrades"], UpgradesSelected, function(on) ns.SetUpgrades(on) end,
-        L["Item tooltips name which of your characters an item would be an upgrade for, judged by their talents. Right-click a character in the overview to change their role. Same as /af upgrades."], section = "tooltips", sub = true },
+        L["Item tooltips name which of your characters an item would be an upgrade for, judged by their talents. Right-click a character in the overview to change their role; Weights... beside this box changes what each stat is worth. Same as /af upgrades."], section = "tooltips", sub = true, weights = true },
     { L["Show Waylaid Crate materials"], CratesSelected, function(on) ns.SetCrates(on) end,
         L["A Waylaid Crate's tooltip shows how much of each material it asks for your characters have. Same as /af crates."], section = "tooltips", sub = true },
     { L["Show alts' gold on bag money"], GoldTipSelected, function(on) ns.SetGoldTip(on) end,
@@ -399,6 +409,23 @@ local function BuildCanvas(f)
     -- Left column: tooltips, then their icons.
     local tips = Heading(f, L["Tooltips"], "TOPLEFT", f, "TOPLEFT", 18, TOP)
     local above, indent = Checks(f, "tooltips", tips)
+    -- Upgrade weights (Weights.lua), beside Show upgrades. Always clickable: the character
+    -- sheet's anvils use the weights too, with upgrades in tooltips off.
+    for i, entry in ipairs(SETTINGS) do
+        if entry.weights and f.checks[i] then
+            local b = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+            b:SetSize(110, 20)
+            b:SetPoint("LEFT", f.checks[i].label, "RIGHT", 12, 0)
+            b:SetText(L["Weights..."])
+            b:SetScript("OnClick", OpenWeightsFromOptions)
+            b:SetScript("OnEnter", function(self)
+                Tooltip(self, L["Upgrade weights"], L["What each stat is worth to each role when upgrades are judged; you can change any of them. Same as /af weights."])
+            end)
+            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            ns.SkinButton(b)
+            f.weights = b
+        end
+    end
     local heading = Heading(f, L["Tooltip icons"], "TOPLEFT", above, "BOTTOMLEFT", 2 - indent, -GAP)
     f.icons = {}
     local row = heading
@@ -553,7 +580,7 @@ function ns.OptionsPanel() return canvas end
 -- overview's cog button (fromOverview: it leaves out Open overview there).
 function ns.ShowOptionsMenu(owner, fromOverview)
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return ns.ShowHelp() end
-    MenuUtil.CreateContextMenu(owner, function(_, root)
+    ns.OpenMenu(owner, function(_, root)
         root:CreateTitle("Alts Forever")
         -- Always there from the minimap: if the overview is already open behind other
         -- windows, this brings it to the front.
@@ -589,7 +616,7 @@ end
 function ns.ShowCharacterMenu(owner, key)
     local c = ns.db.chars[key]
     if not (c and MenuUtil and MenuUtil.CreateContextMenu) then return end
-    MenuUtil.CreateContextMenu(owner, function(_, root)
+    ns.OpenMenu(owner, function(_, root)
         root:CreateTitle(ns.ColoredName(key, c))
         root:CreateButton(L["Gear"], function() ns.ShowGear(key) end)
         root:CreateButton(L["Bags"], function() ns.ShowBags(key, "bags") end)
@@ -608,6 +635,11 @@ function ns.ShowCharacterMenu(owner, key)
                 roles:CreateRadio(ns.RoleName(role), function() return ns.ChosenRole(c) == role end,
                     function() ns.SetRole(key, role) end)
             end
+        end
+        -- What each stat is worth to their role, which the player can change (Weights.lua).
+        local role = ns.RoleOf(c)
+        if role then
+            root:CreateButton(L["Upgrade weights..."], function() ns.ShowWeights(ns.RoleOf(c)) end)
         end
         -- Pinned characters head the overview in the player's own order (Overview.lua).
         if ns.IsPinned(key) then

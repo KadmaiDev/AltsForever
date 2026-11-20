@@ -164,7 +164,7 @@ local function CreatePanel()
     f.empty:SetPoint("CENTER")
     f.empty:SetText(GREY .. L["No gear recorded yet.\nLog in on this character once."] .. "|r")
 
-    if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverGearFrame" end
+    ns.EscapeCloses(f)
     ns.SkinWindow(f)
     f:Hide()
     ns.GamepadWindow(f)

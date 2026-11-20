@@ -202,6 +202,7 @@ function ns.StartScanner()
         ns.version = ns.version + 1
         ns.BagsWindowChanged()
         if ns.RecipesChanged then ns.RecipesChanged() end -- how many they could make
+        if ns.RefreshOverview then ns.RefreshOverview() end -- its Bags and Bank columns, if open
     end
 
     -- Bank contents can only be read while the bank is open; outside that the tabs
@@ -215,6 +216,7 @@ function ns.StartScanner()
         ns.version = ns.version + 1
         ns.BagsWindowChanged()
         if ns.RecipesChanged then ns.RecipesChanged() end -- how many they could make
+        if ns.RefreshOverview then ns.RefreshOverview() end -- its Bags and Bank columns, if open
     end
 
     local function BankOpened()

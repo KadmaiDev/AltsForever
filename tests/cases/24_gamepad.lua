@@ -84,7 +84,7 @@ test("A on an overview row opens that character's menu: Gear, Bags, Bank, Profes
     row:OnSmartNavClick()
     local texts = {}
     for _, item in ipairs(wow.menu.items) do texts[#texts + 1] = item.text end
-    eq(table.concat(texts, " | "), "[DRUID]Tarn Moon | Gear | Bags | Bank | Mail | Professions | Upgrade role | Pin to top | Forget Tarn Moon...")
+    eq(table.concat(texts, " | "), "[DRUID]Tarn Moon | Gear | Bags | Bank | Mail | Professions | Upgrade role | Upgrade weights... | Pin to top | Forget Tarn Moon...")
     wow.menuItem("Gear").fn()
     eq(AltsForeverGearFrame:IsShown(), true)
 end)
@@ -174,6 +174,234 @@ test("with the Gamepad UI on at login (or switched on), the Options page is buil
     wow.gamepadUI = true
     wow.fire("INPUT_DEVICE_INTERFACE_TRANSITION", 1, 0)
     eq(ns.OptionsPanel().built, true, "switched on: built then")
+end)
+
+-- The controller menu's entries from the top: { text, row (nil for a title) }.
+function padMenu(ns)
+    local m, items = ns.GamepadMenu(), {}
+    for _, r in ipairs(m.rows) do
+        if r.shown then items[#items + 1] = { y = r.point[5], text = r.text:GetText(), row = r } end
+    end
+    for _, l in ipairs(m.labels) do
+        if l.shown then items[#items + 1] = { y = l.point[5], text = l:GetText() } end
+    end
+    table.sort(items, function(a, b) return a.y > b.y end)
+    return items
+end
+
+function padRow(ns, text)
+    for _, it in ipairs(padMenu(ns)) do
+        if it.row and it.text:find(text, 1, true) then return it.row end
+    end
+end
+
+test("with the Gamepad UI on, a menu of ours is our own window, never the game's", function()
+    local ns = wow.load(FILES)
+    wow.gamepadUI = true
+    wow.login({ v = 2, chars = { ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { level = 20, bags = {} }) } })
+    ns.ToggleOverview()
+    local row = overviewRows()[2]
+    wow.menu = nil
+    row:OnSmartNavClick()
+    eq(wow.menu, nil, "the game's menu never opens: it would carry our entries into Blizzard's controller code")
+    local m = ns.GamepadMenu()
+    eq(m:IsShown(), true)
+    eq(m.TitleText:GetText(), "Alts Forever", "the first list's title")
+    local items = padMenu(ns)
+    eq(items[1].text, "[DRUID]Tarn Moon", "the title first")
+    eq(items[1].row, nil, "a title can't be pressed")
+    eq(items[2].text, "Gear")
+    eq(padRow(ns, "Professions"):IsEnabled(), false, "no professions: greyed out")
+    assert(padRow(ns, "Upgrade role").text:GetText():find("ChatFrameExpandArrow", 1, true), "a sub-list is marked")
+
+    -- A sub-list: Back first; B steps back out of it, then closes the menu.
+    padRow(ns, "Upgrade role").scripts.OnClick(padRow(ns, "Upgrade role"))
+    eq(m.TitleText:GetText(), "Upgrade role")
+    assert(padMenu(ns)[1].row.back, "Back first")
+    assert(padRow(ns, "Automatic").text:GetText():find("UI-RadioButton", 1, true), "radio choices")
+    eq(m:SmartNavigationCloseHandler(), true)
+    eq(m:IsShown(), true, "B: back to the first list")
+    assert(padRow(ns, "Gear"))
+    padRow(ns, "Upgrade role").scripts.OnClick(padRow(ns, "Upgrade role"))
+    local tank = padRow(ns, "Healer")
+    tank.scripts.OnClick(tank)
+    eq(m:IsShown(), false, "a radio choice closes it")
+    eq(AltsForeverDB.chars["Tarn Moon"].role, "healer", "and was chosen")
+
+    row:OnSmartNavClick()
+    m:SmartNavigationCloseHandler()
+    eq(m:IsShown(), false, "B on the first list closes it")
+    row:OnSmartNavClick()
+    padRow(ns, "Gear").scripts.OnClick(padRow(ns, "Gear"))
+    eq(m:IsShown(), false)
+    eq(AltsForeverGearFrame:IsShown(), true, "a button does its job")
+
+    -- Tick boxes stay open and show the change; mouse players get the game's menu as ever.
+    ns.ShowOptionsMenu(nil, true)
+    local tick = padRow(ns, "Show other rulesets")
+    assert(tick.text:GetText():find("UI-CheckBox-Up", 1, true), "not ticked")
+    tick.scripts.OnClick(tick)
+    eq(AltsForeverDB.otherRulesets, true)
+    eq(m:IsShown(), true, "a tick box leaves the menu open")
+    assert(padRow(ns, "Show other rulesets").text:GetText():find("UI-CheckBox-Check", 1, true), "now ticked")
+    m:Hide()
+    wow.gamepadUI = false
+    ns.ShowOptionsMenu(nil, true)
+    assert(wow.menu, "mouse and keyboard: the game's menu")
+    eq(m:IsShown(), false)
+end)
+
+test("menus: every one goes through ns.OpenMenu (the game's menu only for mouse and keyboard)", function()
+    for _, file in ipairs(FILES) do
+        if file:match("%.lua$") and file ~= "Gamepad.lua" then
+            local text = assert(io.open(file)):read("*a")
+            assert(not text:find("MenuUtil.CreateContextMenu(", 1, true), file .. " opens the game's menu itself")
+            assert(not text:find("[^%w_]SetupMenu%(FilterMenu%)"), file .. " hands a dropdown our menu directly")
+        end
+    end
+end)
+
+test("with the Gamepad UI on, the professions window's filter is a plain button opening our menu", function()
+    local ns = wow.load(FILES)
+    wow.gamepadUI = true
+    wow.login({ v = 2, chars = { ["Vesp Ash"] = alt("Vesp Ash", "PALADIN", { profs = { Cooking = 50 }, recipes = { Cooking = {} } }) } })
+    ns.ShowRecipes("Vesp Ash")
+    local f = AltsForeverRecipesFrame
+    eq(f:IsShown(), true)
+    eq(f.padFilter:IsShown(), true, "our button")
+    eq(f.filter:IsShown(), false, "not the game's dropdown")
+    wow.menu = nil
+    f.padFilter.scripts.OnClick(f.padFilter)
+    eq(wow.menu, nil)
+    eq(ns.GamepadMenu():IsShown(), true)
+    eq(#padMenu(ns), 2, "its two tick boxes")
+    wow.menu = nil
+    MenuUtil.CreateContextMenu(f.filter, f.filter.menuGenerator)
+    eq(#wow.menu.items, 0, "the game's dropdown gets nothing of ours, should it be opened anyway")
+    ns.GamepadMenu():Hide()
+    f:Hide()
+    wow.gamepadUI = false
+    ns.ShowRecipes("Vesp Ash")
+    eq(f.filter:IsShown(), true, "mouse: the game's dropdown")
+    MenuUtil.CreateContextMenu(f.filter, f.filter.menuGenerator)
+    eq(#wow.menu.items, 2, "with its two tick boxes")
+    -- Switched with the window open: the buttons follow at once.
+    wow.gamepadUI = true
+    wow.fire("INPUT_DEVICE_INTERFACE_TRANSITION", 1, 0)
+    eq(f:IsShown(), true)
+    eq(f.padFilter:IsShown(), true, "open window, Gamepad UI on: our button")
+    eq(f.filter:IsShown(), false)
+    wow.gamepadUI = false
+    wow.fire("INPUT_DEVICE_INTERFACE_TRANSITION", 0, 1)
+    eq(f.filter:IsShown(), true, "and back")
+    eq(f.padFilter:IsShown(), false)
+    eq(f.padFilter:IsShown(), false)
+end)
+
+test("with the Gamepad UI on, our parts of the mailbox are made at login, not inside the open mailbox", function()
+    local ns = wow.load(FILES)
+    wow.gamepadUI = true
+    SendMailFrame:Hide() -- the mailbox closed, as at login
+    wow.login(nil)
+    local arrow = altsButton()
+    assert(arrow, "the arrow beside the To box, made at login")
+    eq(arrow:IsShown(), true)
+    assert(mailNote() and packButton(), "the rule note and Pack too")
+    eq(mailNote():IsShown(), false); eq(packButton():IsShown(), false)
+    local frames = #wow.frames
+    SendMailFrame:Show()
+    wow.fire("MAIL_SHOW")
+    eq(#wow.frames, frames, "opening the mailbox makes no frame")
+    eq(altsButton(), arrow)
+
+    -- "Send mail to alts" off: made all the same, hidden until it's turned on.
+    local saved = { v = 2, chars = {}, sendToAltOff = true }
+    ns = wow.load(FILES)
+    wow.gamepadUI = true
+    SendMailFrame:Hide()
+    wow.login(saved)
+    eq(altsButton():IsShown(), false)
+    ns.SetSendToAlt(true)
+    eq(altsButton():IsShown(), true)
+
+    -- Mouse and keyboard: made at the first MAIL_SHOW, as before.
+    wow.load(FILES)
+    wow.gamepadUI = false
+    wow.login(nil)
+    eq(altsButton(), nil)
+    wow.fire("MAIL_SHOW")
+    assert(altsButton())
+end)
+
+test("with the Gamepad UI on, a login in combat builds the mailbox parts once the fight ends", function()
+    wow.load(FILES)
+    wow.gamepadUI, wow.inCombat = true, true
+    SendMailFrame:Hide()
+    wow.login(nil)
+    eq(altsButton(), nil, "nothing made in combat")
+    wow.inCombat = nil
+    wow.fire("PLAYER_REGEN_ENABLED")
+    assert(altsButton() and mailNote() and packButton(), "made as combat ends, with no input change")
+    local frames = #wow.frames
+    SendMailFrame:Show()
+    wow.fire("MAIL_SHOW")
+    eq(#wow.frames, frames, "the mailbox then opens without making any")
+end)
+
+test("with the Gamepad UI on, the bank's Alts Forever button is never made inside the open bank", function()
+    local ns = wow.load(FILES)
+    wow.gamepadUI = true
+    wow.login(nil)
+    CreateFrame("Frame", "BankFrame")
+    CreateFrame("EditBox", "BankItemSearchBox", BankFrame)
+    BankFrame:Show()
+    wow.fire("BANKFRAME_OPENED")
+    for _, fn in ipairs(wow.timers) do fn() end
+    eq(ns.BagShortcuts().BankFrame, nil, "the bank is open: not now")
+    BankFrame:Hide()
+    if ToggleAllBags then ToggleAllBags() else wow.fire("PLAYER_ENTERING_WORLD") end
+    assert(ns.BagShortcuts().BankFrame, "made once the bank has closed")
+end)
+
+test("with the Gamepad UI on, Blizzard's bags get an Alts Forever button in the title bar instead of the portrait entry", function()
+    local ns = wow.load(FILES)
+    wow.gamepadUI = true
+    local bags = CreateFrame("Frame", "ContainerFrameCombinedBags")
+    bags.CloseButton = CreateFrame("Button", nil, bags)
+    bags:Hide() -- hidden until opened, as the game's
+    local one = CreateFrame("Frame", "ContainerFrame1")
+    one.CloseButton = CreateFrame("Button", nil, one)
+    one:Show()
+    wow.login(nil)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    local b = ns.BagShortcuts().ContainerFrameCombinedBags
+    assert(b, "made at login")
+    eq(b.parent, bags)
+    eq(b.point[1], "RIGHT"); eq(b.point[2], bags.CloseButton); eq(b.point[3], "LEFT")
+    eq(b:IsShown(), true)
+    eq(ns.BagShortcuts().ContainerFrame1, nil, "the separate backpack is open: not now")
+    b.scripts.OnClick(b)
+    eq(AltsForeverBagsFrame:IsShown(), true, "opens every character's bags")
+    one:Hide()
+    if ToggleAllBags then ToggleAllBags() else wow.fire("PLAYER_ENTERING_WORLD") end
+    assert(ns.BagShortcuts().ContainerFrame1, "made once it's closed")
+    -- Mouse and keyboard: hidden (the portrait entry is theirs), and back with the Gamepad UI.
+    wow.gamepadUI = false
+    wow.fire("INPUT_DEVICE_INTERFACE_TRANSITION", 0, 1)
+    eq(b:IsShown(), false)
+    eq(ns.BagShortcuts().ContainerFrame1:IsShown(), false)
+    wow.gamepadUI = true
+    wow.fire("INPUT_DEVICE_INTERFACE_TRANSITION", 1, 0)
+    eq(b:IsShown(), true)
+end)
+
+test("mouse and keyboard: Blizzard's bags get no button, only the portrait entry", function()
+    local ns = wow.load(FILES)
+    local bags = CreateFrame("Frame", "ContainerFrameCombinedBags")
+    bags.CloseButton = CreateFrame("Button", nil, bags)
+    wow.login(nil)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    eq(ns.BagShortcuts().ContainerFrameCombinedBags:IsShown(), false)
 end)
 
 test("the Options page's window size: - and + buttons step it 5% (a D-pad can't drag the slider)", function()

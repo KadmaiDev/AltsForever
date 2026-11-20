@@ -62,6 +62,71 @@ frame:SetScript("OnEvent", function(_, event, ...)
 end)
 
 ---------------------------------------------------------------------------
+-- Escape
+---------------------------------------------------------------------------
+-- The game's Escape hides every shown window named in UISpecialFrames at once, so with the
+-- overview listed too, a window opened from it took the overview down with it (the owner,
+-- 2026-11-20: and windows whose box had the keyboard closed alone, so it varied). Now Escape
+-- closes our other windows first and the overview only on a later press: the overview isn't
+-- listed itself; a stand-in frame of ours is, shown only while the overview is open and no other
+-- window of ours is, and Escape hiding it closes the overview.
+local escapeWindows, overviewWindow, escapeStandIn, escapeDue = {}, nil, nil, false
+
+local function OthersOpen()
+    for _, f in ipairs(escapeWindows) do
+        if f:IsShown() then return true end
+    end
+    return false
+end
+
+local function UpdateEscape()
+    escapeDue = false
+    if not escapeStandIn then return end
+    if overviewWindow and overviewWindow:IsShown() and not OthersOpen() then
+        escapeStandIn:Show()
+    elseif escapeStandIn:IsShown() then
+        escapeStandIn:Hide()
+    end
+end
+
+-- Shown a frame later: the press that closes our last other window must not also reach the
+-- stand-in, as the game goes through the whole list in one go.
+local function UpdateEscapeLater()
+    if escapeDue or not escapeStandIn or escapeStandIn:IsShown() then return end
+    if not (overviewWindow and overviewWindow:IsShown()) or OthersOpen() then return end
+    if not C_Timer then return UpdateEscape() end
+    escapeDue = true
+    C_Timer.After(0, UpdateEscape)
+end
+
+-- Each window of ours that Escape should close, once, when it's created; `overview` for the
+-- overview, which closes only once the others have.
+function ns.EscapeCloses(f, overview)
+    if not UISpecialFrames then return end
+    if overview then
+        overviewWindow = f
+        if not escapeStandIn then
+            escapeStandIn = CreateFrame("Frame", "AltsForeverEscape")
+            escapeStandIn:Hide()
+            -- Judged by what's open when it runs, never by a flag set around our own Hide: in
+            -- game, opening any window from the overview closed it (owner, 2026-11-20), so the
+            -- handler can't be relied on to run inside that Hide.
+            escapeStandIn:SetScript("OnHide", function()
+                if overviewWindow and overviewWindow:IsShown() and not OthersOpen() then overviewWindow:Hide() end
+            end)
+            UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverEscape"
+        end
+        f:HookScript("OnShow", UpdateEscape)
+        f:HookScript("OnHide", UpdateEscape)
+        return
+    end
+    escapeWindows[#escapeWindows + 1] = f
+    UISpecialFrames[#UISpecialFrames + 1] = f:GetName()
+    f:HookScript("OnShow", UpdateEscape)
+    f:HookScript("OnHide", UpdateEscapeLater)
+end
+
+---------------------------------------------------------------------------
 -- Saved data
 ---------------------------------------------------------------------------
 -- Version 1 keyed characters "Name-Realm". Forever has no realms (a full name is
@@ -161,7 +226,7 @@ local DB_FIELDS = {
     cratesOff = "boolean", goldTipOff = "boolean", barsOff = "boolean", recipeCategories = "table", profArt = "table",
     inspectAnvilsOff = "boolean", overviewSort = "string", overviewSortRev = "boolean",
     windows = "table", pinned = "table", hiddenColumns = "table",
-    mailRules = "table", mailFillOff = "boolean", mailPackOff = "boolean",
+    mailRules = "table", mailFillOff = "boolean", mailPackOff = "boolean", weights = "table",
 }
 
 -- Keeps only entries whose key and value are of these types (value nil = any).
@@ -250,6 +315,16 @@ local function Repair(saved)
             KeepOnly(names, "string", "number")
             if next(names) == nil then saved.mailRules[rule] = nil end
         end
+    end
+    -- Changed upgrade weights: { [role] = { [stat] = number } } (Upgrades.lua; values out of
+    -- range are skipped there).
+    if saved.weights then
+        KeepOnly(saved.weights, "string", "table")
+        for role, stats in pairs(saved.weights) do
+            KeepOnly(stats, "string", "number")
+            if next(stats) == nil then saved.weights[role] = nil end
+        end
+        if next(saved.weights) == nil then saved.weights = nil end
     end
     local chars = saved.chars
     -- A character under a key that isn't a name moves to its own name if that's free.
@@ -710,7 +785,7 @@ function commands.columns(arg)
     end
     local id, title = ns.ColumnId(word)
     if not id then
-        return Print(L["/af columns shows every overview column again; /af columns and one of level, rested, wellrested, legacy, gold, professions, mail, lockouts, zone, played or lastseen hides or shows that column."])
+        return Print(L["/af columns shows every overview column again; /af columns and one of level, rested, wellrested, legacy, gold, professions, mail, bags, bank, lockouts, zone, played or lastseen hides or shows that column."])
     end
     local on = not ns.ColumnShown(id)
     ns.SetColumnShown(id, on)
@@ -784,6 +859,18 @@ function commands.role(arg)
     end
     ns.SetRole(key, role)
     Print(L["Upgrades for %s are now judged as %s."]:format(key, ns.RoleName(role)))
+end
+
+-- /af weights [First Last]: the Upgrade weights window (Weights.lua), on that character's
+-- role, else yours.
+function commands.weights(arg)
+    local key = ns.charKey
+    if arg ~= "" then
+        key = FindChar(arg)
+        if not key then return Print(L["No character named '%s'. Use /af list."]:format(arg)) end
+    end
+    local c = ns.db.chars[key]
+    ns.ShowWeights(c and ns.RoleOf(c))
 end
 
 function commands.minimap()
@@ -869,12 +956,13 @@ function commands.help()
     Print(L["/af prof, with a name for another character, shows their professions and recipes."])
     Print(L["/af icons picks the icons item tooltips use for bags, bank, mail and worn items."])
     Print(L["/af upgrades turns upgrade hints in item tooltips on or off. /af role Name role sets what a character's upgrades are judged by (melee, ranged, marksman, caster, healer, tank, feral or auto)."])
+    Print(L["/af weights, with or without a name, opens the upgrade weights: what each stat is worth to each role, which you can change."])
     Print(L["/af itemnames turns saving item names in Alts Forever's saved file on or off (only for reading it outside the game)."])
     Print(L["/af anvils shows or hides the anvils on your character sheet that mark upgrades you or your alts can craft."])
     Print(L["/af inspect shows or hides the anvils in the inspect window that mark upgrades you or your alts can craft for that player."])
     Print(L["/af scale 150 makes Alts Forever's windows one and a half times their size (any size from 50 to 300), on top of the game's UI scale."])
     Print(L["/af pin and a character's name pins them to the top of the overview, or unpins them."])
-    Print(L["/af columns shows every overview column again; /af columns and one of level, rested, wellrested, legacy, gold, professions, mail, lockouts, zone, played or lastseen hides or shows that column."])
+    Print(L["/af columns shows every overview column again; /af columns and one of level, rested, wellrested, legacy, gold, professions, mail, bags, bank, lockouts, zone, played or lastseen hides or shows that column."])
     Print(L["/af resetwindows puts Alts Forever's windows back where they open by default."])
     if ns.HasEllesmereScale() then Print(L["/af scale eui makes them follow EllesmereUI's Window Scale again (the default)."]) end
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])

@@ -1030,7 +1030,7 @@ local function Start()
 end
 
 local function PickPartner(owner)
-    MenuUtil.CreateContextMenu(owner, function(_, root)
+    ns.OpenMenu(owner, function(_, root)
         for _, key in ipairs(ns.SyncPartners()) do
             root:CreateButton(key, function() frame.box:SetText(key) end)
         end
@@ -1146,7 +1146,7 @@ local function CreateWindow()
         GameTooltip:Hide()
     end)
     -- Escape closes it, like Blizzard's own windows.
-    if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverSyncFrame" end
+    ns.EscapeCloses(f)
     f:Hide()
     ns.GamepadWindow(f)
     ns.ScaleWindow(f)

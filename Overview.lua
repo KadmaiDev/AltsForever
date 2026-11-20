@@ -34,6 +34,12 @@ local COLUMNS = {
     { title = "", width = 104, gap = 16, id = "professions" },
     { title = "", width = 34, right = true, id = "professions" },
     { title = L["Mail"], width = 60, gap = 16, sort = "mail", id = "mail" },
+    -- Free slots of all slots (bags without the keyring; bank tabs as last visited), as
+    -- Altoholic shows them; pointing at one lists each bag (a player's request, 2026-11-19).
+    { title = L["Bags"], width = 58, center = true, sort = "bags", id = "bags", space = "bags",
+        tip = L["Free slots / all slots in each character's bags (not the keyring). Point at one to see each bag; click it to open their bags."] },
+    { title = L["Bank"], width = 58, center = true, sort = "bank", id = "bank", space = "bank",
+        tip = L["Free slots / all slots in each character's bank, as it was last visited. Point at one to see each tab; click it to open their bank."] },
     -- The account's instances this hour, then raid and dungeon saves running (the row
     -- tooltip lists both): "2/10 <key>1".
     { title = L["Lockouts"], width = 76, center = true, id = "lockouts" },
@@ -123,6 +129,19 @@ end
 
 -- Time until the soonest valuable mail expires; blank if none, "?" if the mailbox
 -- has never been opened on that character.
+-- Free slots / all slots in a character's bags or bank: orange once a tenth or less is
+-- free, "?" when not known (bank never visited).
+function ns.SpaceCell(free, total)
+    local n = free * 10 <= total and (ATTENTION .. free .. "|r") or tostring(free)
+    return n .. GREY .. "/" .. total .. "|r"
+end
+
+function ns.SpaceText(c, which)
+    local free, total = ns.BagSpace(c, which)
+    if not free then return GREY .. "?|r" end
+    return ns.SpaceCell(free, total)
+end
+
 function ns.MailText(c, now)
     if not c.mail then return GREY .. "?|r" end
     if not c.mailExpires then return "" end
@@ -167,6 +186,9 @@ local SORTS = {
     legacy = { value = function(_, c) return ns.LegacyUnspent(c) end }, -- points left to spend
     gold = { value = function(_, c) return c.money end },
     mail = { up = true, value = function(_, c) return c.mailExpires end },
+    -- Fewest free slots first: who needs to clear out.
+    bags = { up = true, value = function(_, c) return (ns.BagSpace(c, "bags")) end },
+    bank = { up = true, value = function(_, c) return (ns.BagSpace(c, "bank")) end },
     zone = { up = true, value = function(_, c) return c.zone end },
     played = { value = function(_, c, now) return ns.PlayedNow(c, now) end },
     seen = { value = function(key, c, now) return key == ns.charKey and now or c.updated or c.seen end },
@@ -445,7 +467,14 @@ local function RowTooltip(row)
     end
     ns.AddLockoutLines(tt, c, now)
     tt:AddLine(" ")
-    tt:AddLine(GREY .. (c.bank and L["Bank scanned"] or L["Bank not scanned yet - visit a banker"]) .. "|r")
+    local free, total = ns.BagSpace(c, "bags")
+    if free then tt:AddDoubleLine(L["Bags"], L["%d of %d free"]:format(free, total), 1, 0.82, 0, 1, 1, 1) end
+    free, total = ns.BagSpace(c, "bank")
+    if free then
+        tt:AddDoubleLine(L["Bank"], L["%d of %d free"]:format(free, total), 1, 0.82, 0, 1, 1, 1)
+    else
+        tt:AddLine(GREY .. (c.bank and L["Bank scanned"] or L["Bank not scanned yet - visit a banker"]) .. "|r")
+    end
     if c.dura then tt:AddDoubleLine(L["Lowest durability"], ns.DurabilityText(c.dura), 1, 0.82, 0, 1, 1, 1) end
     if key == ns.charKey then
         tt:AddLine("|cff66ccff" .. L["Click to see gear"] .. "|r")
@@ -515,6 +544,76 @@ local function HeadWidth(width)
     return width - colX[1] - 28
 end
 
+-- The Bags and Bank cells: pointing at one lists each bag or bank tab with its free slots,
+-- its kind if it holds only some things (Herb Bag, Quiver), and empty bag slots; a click
+-- opens that character's bags or bank, a right-click their menu as the row's does.
+local ITEM_CROP = ":0:0:0:0:64:64:5:59:5:59|t "
+
+local function SpaceTooltip(self)
+    local row = self.row
+    local key = row.key
+    local c = key and ns.db.chars[key]
+    if not c then return end
+    row:LockHighlight()
+    local which = self.which
+    local tt = GameTooltip
+    tt:SetOwner(self, "ANCHOR_RIGHT")
+    tt:AddDoubleLine(ns.ColoredName(key, c), which == "bank" and L["Bank"] or L["Bags"], 1, 1, 1, 1, 0.82, 0)
+    local free, total = ns.BagSpace(c, which)
+    if not free then
+        tt:AddLine(which == "bank" and L["Bank not scanned yet - visit a banker"]
+            or L["No bags recorded yet.\nLog in on this character once."], 0.62, 0.62, 0.62, true)
+    else
+        for _, e in ipairs(ns.BagSpaceList(c, which)) do
+            local left = (e.icon and ("|T" .. e.icon .. ITEM_CROP) or "") .. e.name
+                .. (e.kind and (GREY .. "  " .. e.kind .. "|r") or "")
+            local q = e.quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[e.quality]
+            if e.size == 0 then
+                tt:AddDoubleLine(left, "-", 0.62, 0.62, 0.62, 0.62, 0.62, 0.62)
+            else
+                tt:AddDoubleLine(left, ns.SpaceCell(e.free, e.size), q and q.r or 1, q and q.g or 1, q and q.b or 1, 1, 1, 1)
+            end
+        end
+        tt:AddDoubleLine(L["Total"], L["%d of %d free"]:format(free, total), 1, 0.82, 0, 1, 1, 1)
+        if which == "bank" and c.bankAt then
+            tt:AddLine(GREY .. L["Bank last visited: %s"]:format(ns.FormatAgo(time() - c.bankAt)) .. "|r")
+        end
+    end
+    tt:AddLine("|cff66ccff" .. (which == "bank" and L["Click to open their bank"] or L["Click to open their bags"]) .. "|r")
+    tt:Show()
+end
+
+local function SpaceLeave(self)
+    self.row:UnlockHighlight()
+    GameTooltip:Hide()
+end
+
+local function SpaceClick(self, button)
+    local key = self.row.key
+    if not key then return end
+    if button == "RightButton" then return ns.ShowCharacterMenu(self.row, key) end
+    GameTooltip:Hide()
+    ns.ShowBags(key, self.which)
+end
+
+local function CreateSpaceButtons(row)
+    row.spaces = {}
+    for i, col in ipairs(COLUMNS) do
+        if col.space then
+            local b = CreateFrame("Button", nil, row)
+            b:SetPoint("LEFT", row.cells[i], "LEFT", -4, 0)
+            b:SetSize(col.width - 2, ROW_HEIGHT)
+            b.row, b.which, b.index = row, col.space, i
+            b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+            b:SetScript("OnClick", SpaceClick)
+            b:SetScript("OnEnter", SpaceTooltip)
+            b:SetScript("OnLeave", SpaceLeave)
+            b:SetShown(colShown[i])
+            row.spaces[#row.spaces + 1] = b
+        end
+    end
+end
+
 local function CreateRow(i)
     local row = CreateFrame("Button", nil, frame)
     row:SetHeight(ROW_HEIGHT)
@@ -537,6 +636,7 @@ local function CreateRow(i)
     row.pct:SetWordWrap(false)
     row.pct:SetShown(colShown[2])
     row:SetScript("OnEnter", RowTooltip)
+    CreateSpaceButtons(row)
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     -- Left: gear. Right: the character's menu (Forget...).
     row:SetScript("OnClick", function(self, button)
@@ -611,7 +711,7 @@ end
 -- without some other event. One timer at a time: a new one only for a sooner change, and a
 -- numbered `dueTick` so only the latest acts.
 local dueAt, dueTick = nil, 0
-local Refresh
+local Refresh, SumSpace, SpaceSum
 
 local function Due(now)
     if not (C_Timer and C_Timer.After) then return end
@@ -664,7 +764,7 @@ end
 
 local function ColumnsMenu(owner)
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
-    MenuUtil.CreateContextMenu(owner, function(_, root)
+    ns.OpenMenu(owner, function(_, root)
         root:CreateTitle(L["Columns"])
         ns.FillColumnsMenu(root)
     end)
@@ -675,12 +775,80 @@ local function SortClick(b, button)
     ns.SortOverview(b.sort)
 end
 
+-- Under the Bags or Bank title: every character's slots added up, and who has a bag slot
+-- with no bag in it (bags) or whose bank isn't known yet (bank).
+local MAX_NAMES = 4
+
+local function Names(list)
+    local n = #list
+    if n > MAX_NAMES then
+        list[MAX_NAMES + 1] = L["+%d more"]:format(n - MAX_NAMES)
+        for i = MAX_NAMES + 2, n do list[i] = nil end
+    end
+    return table.concat(list, ", ")
+end
+
+local function SpaceSummary(tt, which)
+    local chars = ns.db.chars
+    local free, total, missing = 0, 0, {}
+    for _, key in ipairs(ns.OverviewOrder()) do
+        local c = chars[key]
+        local f, t = ns.BagSpace(c, which)
+        if f then
+            free, total = free + f, total + t
+            local empty = which == "bags" and ns.EmptyBagSlots(c) or 0
+            if empty > 0 then missing[#missing + 1] = ns.ShortName(key, c) .. " " .. empty end
+        elseif which == "bank" then
+            missing[#missing + 1] = ns.ShortName(key, c)
+        end
+    end
+    tt:AddLine(" ")
+    if total > 0 then
+        tt:AddDoubleLine(L["All characters"], L["%d of %d free"]:format(free, total), 1, 0.82, 0, 1, 1, 1)
+    end
+    if #missing > 0 then
+        local text = which == "bags" and L["Bag slots with no bag: %s"] or L["Bank not visited yet: %s"]
+        tt:AddLine(text:format(Names(missing)), 1, 0.5, 0, true)
+    end
+    tt:AddLine(" ")
+end
+
 local function SortTooltip(b)
     GameTooltip:SetOwner(b, "ANCHOR_TOPLEFT")
     GameTooltip:AddLine(b.col.title)
+    if b.col.tip then GameTooltip:AddLine(b.col.tip, 1, 1, 1, true) end
+    if b.col.space then SpaceSummary(GameTooltip, b.col.space) end
     GameTooltip:AddLine(L["Click to sort by this column, and again to reverse it."], 1, 1, 1)
     GameTooltip:AddLine(L["Right-click to choose which columns are shown."], 1, 1, 1)
     GameTooltip:Show()
+end
+
+-- Bag space added up per group, for the headings (when there's more than one character to
+-- add up, as with gold). Reused tables.
+local spaceFree = { bags = {}, bank = {} }
+local spaceTotal = { bags = {}, bank = {} }
+
+function SumSpace(keys, chars)
+    for which, t in pairs(spaceFree) do
+        wipe(t)
+        wipe(spaceTotal[which])
+    end
+    for _, key in ipairs(keys) do
+        local c = chars[key]
+        local g = Group(c)
+        for which, sums in pairs(spaceFree) do
+            local free, total = ns.BagSpace(c, which)
+            if free then
+                sums[g] = (sums[g] or 0) + free
+                spaceTotal[which][g] = (spaceTotal[which][g] or 0) + total
+            end
+        end
+    end
+end
+
+function SpaceSum(which, group)
+    local free = spaceFree[which][group]
+    return free and ns.SpaceCell(free, spaceTotal[which][group]) or ""
 end
 
 function Refresh()
@@ -697,6 +865,7 @@ function Refresh()
             gold[g] = (gold[g] or 0) + (chars[key].money or 0)
             count[g] = (count[g] or 0) + 1
         end
+        SumSpace(keys, chars)
     end
     -- Counts each account's instances this hour, for the footer and each row's Lockouts cell.
     local instances = ns.InstanceText(now)
@@ -719,7 +888,10 @@ function Refresh()
             head.label:SetText(hidden and (label .. "  " .. GREY .. "(" .. count[group] .. ")|r") or label)
             -- A total only when there's something to add up: one character's is on their row,
             -- unless the group is collapsed.
-            head.gold:SetText((hidden or count[group] > 1) and GetCoinTextureString(gold[group]) or "")
+            local sum = hidden or count[group] > 1
+            head.gold:SetText(sum and GetCoinTextureString(gold[group]) or "")
+            head.texts[12]:SetText(sum and SpaceSum("bags", group) or "")
+            head.texts[13]:SetText(sum and SpaceSum("bank", group) or "")
             head:Show()
             y = y + ROW_HEIGHT
         end
@@ -745,10 +917,12 @@ function Refresh()
         cells[9]:SetText(n2)
         cells[10]:SetText(s2)
         cells[11]:SetText(ns.MailText(c, now))
-        cells[12]:SetText(ns.LockoutText(c, now))
-        cells[13]:SetText(c.zone or (GREY .. "?|r"))
-        cells[14]:SetText(ns.PlayedText(c, now))
-        cells[15]:SetText(ns.SeenText(key, c, now))
+        cells[12]:SetText(ns.SpaceText(c, "bags"))
+        cells[13]:SetText(ns.SpaceText(c, "bank"))
+        cells[14]:SetText(ns.LockoutText(c, now))
+        cells[15]:SetText(c.zone or (GREY .. "?|r"))
+        cells[16]:SetText(ns.PlayedText(c, now))
+        cells[17]:SetText(ns.SeenText(key, c, now))
         total = total + (c.money or 0)
         played = played + (ns.PlayedNow(c, now) or 0)
         row:SetShown(not hidden)
@@ -1236,7 +1410,7 @@ local function CreateWindow()
         if AltsForeverRepFrame then AltsForeverRepFrame:Hide() end
     end)
     -- Escape closes it, like Blizzard's own windows.
-    if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverFrame" end
+    ns.EscapeCloses(f, true)
     f:Hide()
     ns.GamepadWindow(f)
     ns.ScaleWindow(f)
@@ -1256,6 +1430,7 @@ local function ApplyColumns()
     for _, row in ipairs(rows) do
         PlaceCells(row.cells, row)
         row.pct:SetShown(colShown[2])
+        for _, b in ipairs(row.spaces) do b:SetShown(colShown[b.index]) end
     end
     for _, head in ipairs(heads) do
         PlaceCells(head.texts, head)
