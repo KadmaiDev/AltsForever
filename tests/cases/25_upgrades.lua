@@ -677,6 +677,13 @@ test("upgrade weights window: shows a role's weights, takes a typed one, Reset p
     box.scripts.OnEnterPressed(box)
     eq(AltsForeverDB.weights, nil, "emptied: the default again")
     eq(box:GetText(), "0.2")
+    box:SetText("0.0001")
+    box.scripts.OnEnterPressed(box) -- then the focus loss its ClearFocus brings
+    eq(ns.Weight("caster", "sta"), 0.0001, "kept, not replaced by the rounded value the box shows")
+    box.scripts.OnEditFocusLost(box)
+    eq(ns.Weight("caster", "sta"), 0.0001, "nor by leaving the box untouched")
+    box:SetText("")
+    box.scripts.OnEnterPressed(box)
     rows.spi.box:SetText("2")
     rows.spi.box.scripts.OnEnterPressed(rows.spi.box)
     eq(ns.Weight("caster", "spi"), 2)

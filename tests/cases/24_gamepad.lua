@@ -211,6 +211,21 @@ test("with the Gamepad UI on, our parts of the mailbox are made at login, not in
     assert(altsButton())
 end)
 
+test("with the Gamepad UI on, a login in combat builds the mailbox parts once the fight ends", function()
+    wow.load(FILES)
+    wow.gamepadUI, wow.inCombat = true, true
+    SendMailFrame:Hide()
+    wow.login(nil)
+    eq(altsButton(), nil, "nothing made in combat")
+    wow.inCombat = nil
+    wow.fire("PLAYER_REGEN_ENABLED")
+    assert(altsButton() and mailNote() and packButton(), "made as combat ends, with no input change")
+    local frames = #wow.frames
+    SendMailFrame:Show()
+    wow.fire("MAIL_SHOW")
+    eq(#wow.frames, frames, "the mailbox then opens without making any")
+end)
+
 test("with the Gamepad UI on, the bank's Alts Forever button is never made inside the open bank", function()
     local ns = wow.load(FILES)
     wow.gamepadUI = true

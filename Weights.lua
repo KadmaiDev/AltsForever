@@ -41,6 +41,9 @@ local function Commit(box)
     if box.cancel or not (win and role and stat) then return end
     local text = box:GetText()
     if issecretvalue(text) or type(text) ~= "string" then return Fill() end
+    -- The box still shows what Fill put there (Enter, then the focus loss ClearFocus brings):
+    -- nothing typed, so the weight in use stays, not its rounded display.
+    if text == box.shown then return end
     if text:match("^%s*$") then
         if ns.WeightChanged(role, stat) then return ns.SetWeight(role, stat, nil) end
         return Fill()
@@ -120,7 +123,8 @@ Fill = function()
     for _, row in ipairs(win.rows) do
         local changed = ns.WeightChanged(role, row.stat)
         local box = row.box
-        box:SetText(Format(ns.Weight(role, row.stat)))
+        box.shown = Format(ns.Weight(role, row.stat))
+        box:SetText(box.shown)
         if box.SetCursorPosition then box:SetCursorPosition(0) end
         local c = changed and GREEN or WHITE
         box:SetTextColor(c[1], c[2], c[3])

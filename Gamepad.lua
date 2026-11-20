@@ -110,5 +110,8 @@ function ns.StartGamepad()
         end
     end
     ns.On("INPUT_DEVICE_INTERFACE_TRANSITION", Prepare)
+    -- Skipped in combat (a reload mid-fight, or the Gamepad UI switched on in one): done as
+    -- it ends. Each part is made once, so later fights' ends cost a few checks.
+    ns.On("PLAYER_REGEN_ENABLED", Prepare)
     Prepare()
 end
