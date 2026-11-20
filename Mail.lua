@@ -173,7 +173,7 @@ local subjectFilled -- the subject we put in, while it's still there
 -- nil before (Blizzard's own SendMailFrame_Update allows for it). The owner once saw Send
 -- greyed out after Pack (2026-11-20, not seen again: the second time the item was loaded),
 -- so a missing name is asked for and the subject filled when it arrives.
-local subjectWait = {} -- [itemID] = true while its name is asked for
+local subjectWait = {} -- [itemID] = true while its name is asked for, false once that failed (not asked again)
 
 function ns.ResetMailSubject() subjectFilled = nil end
 
@@ -183,7 +183,7 @@ local function AttachmentName(i)
     if name == nil and type(id) == "number" then
         name = C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(id)
         if issecretvalue(name) then name = nil end
-        if name == nil and not subjectWait[id] and C_Item and C_Item.RequestLoadItemDataByID then
+        if name == nil and subjectWait[id] == nil and C_Item and C_Item.RequestLoadItemDataByID then
             subjectWait[id] = true
             C_Item.RequestLoadItemDataByID(id)
         end
@@ -303,8 +303,12 @@ function ns.StartMail()
     end)
     ns.On("MAIL_CLOSED", function() mailOpen = false end)
     ns.On("MAIL_SEND_INFO_UPDATE", function() ns.FillMailSubject() end)
-    ns.On("GET_ITEM_INFO_RECEIVED", function(id)
+    ns.On("GET_ITEM_INFO_RECEIVED", function(id, ok)
         if not subjectWait[id] then return end
+        if not ok then
+            subjectWait[id] = false -- the game couldn't load it: not asked again this session
+            return
+        end
         subjectWait[id] = nil
         if SendMailFrame and SendMailFrame:IsVisible() then ns.FillMailSubject() end
     end)

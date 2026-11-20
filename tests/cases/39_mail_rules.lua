@@ -240,29 +240,54 @@ end)
 test("an attachment whose name hasn't loaded yet: the subject is filled once it arrives, so Send isn't left greyed out", function()
     atMailbox({})
     local subject = SendMailSubjectEditBox
-    wow.unloaded = { [SILK] = true }
-    local names = wow.itemNames[SILK]
-    wow.itemNames[SILK] = nil
+    -- The mail API has no name yet, but the game has the item cached: that name, nothing asked.
+    wow.unloaded = { [SILK] = true, [LINEN] = true }
     wow.itemLoads = nil
+    attach(1, LINEN, 20)
+    eq(subject:GetText(), "Linen Cloth (20)", "the cached name")
+    eq(wow.itemLoads, nil, "nothing to ask for")
+    attach(1, nil)
+    -- Not cached either: asked for once, filled when it arrives (still no name from the mail
+    -- API, so this is the cached-name lookup at work).
+    local silk = wow.itemNames[SILK]
+    wow.itemNames[SILK] = nil
     attach(1, SILK, 4)
-    eq(subject:GetText(), nil, "no name yet: nothing to fill")
+    eq(subject:GetText(), "", "no name yet: nothing to fill")
     attach(2, SILK, 1)
     eq(wow.itemLoads and #wow.itemLoads, 1, "asked for once")
+    eq(wow.itemLoads[1], SILK)
     attach(2, nil)
-    eq(wow.itemLoads and wow.itemLoads[1], SILK, "its name is asked for")
-    wow.unloaded, wow.itemNames[SILK] = nil, names
+    wow.itemNames[SILK] = silk
     wow.fire("GET_ITEM_INFO_RECEIVED", SILK, true)
     eq(subject:GetText(), "Silk Cloth (4)", "filled when it arrives")
     -- A name still loading never takes out the subject we filled.
-    wow.unloaded = { [LINEN] = true }
     local linen = wow.itemNames[LINEN]
     wow.itemNames[LINEN] = nil
     attach(2, LINEN, 20)
     attach(1, nil)
     eq(subject:GetText(), "Silk Cloth (4)", "kept while the next one's name loads")
-    wow.unloaded, wow.itemNames[LINEN] = nil, linen
+    wow.itemNames[LINEN] = linen
     wow.fire("GET_ITEM_INFO_RECEIVED", LINEN, true)
     eq(subject:GetText(), "Linen Cloth (20)")
+    wow.unloaded = nil
+end)
+
+test("an attachment the game fails to load is asked for once, never again in a loop", function()
+    atMailbox({})
+    local subject = SendMailSubjectEditBox
+    wow.unloaded = { [SILK] = true }
+    local silk = wow.itemNames[SILK]
+    wow.itemNames[SILK] = nil
+    wow.itemLoads = nil
+    attach(1, SILK, 4)
+    eq(#wow.itemLoads, 1)
+    wow.fire("GET_ITEM_INFO_RECEIVED", SILK, false)
+    eq(#wow.itemLoads, 1, "a failed load isn't asked for again at once")
+    wow.fire("MAIL_SEND_INFO_UPDATE")
+    attach(2, SILK, 1)
+    eq(#wow.itemLoads, 1, "nor later")
+    eq(subject:GetText(), nil)
+    wow.itemNames[SILK], wow.unloaded = silk, nil
 end)
 
 test("mail rules: Pack fills only the free attachment slots, and can be turned off", function()
