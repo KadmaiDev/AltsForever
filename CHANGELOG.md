@@ -1,4 +1,4 @@
-## Alts Forever (not yet released)
+## Alts Forever 1.9.1
 
 - **Hearthstone cooldown:** pointing at a character in the overview now shows when their hearthstone is ready again, beside where it's set ("Stormwind · ready in 23 min"). Each character's is read when you next log in on them. Thanks to FelixFitzgerald for the suggestion.
 - **Controllers:** the small Alts Forever button that 1.9.0 put in the bag window's title bar with the Gamepad UI on is gone again: it didn't work well with a controller. Open every character's bags with the **Bags and bank** key binding (Key Bindings > Alts Forever) or a `/af bags` macro instead.
