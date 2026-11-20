@@ -98,18 +98,21 @@ function ns.ListName(key, c)
     return ColoredName(key, c)
 end
 
--- First name only, in class colour, for narrow columns.
+-- The character's name in class colour, for narrow columns. Always the full name: on
+-- Classic Forever every character has a first and a last name, and alts often share the
+-- first one (Kuro Don, Kuro Longbraid...), so cutting to the first word made them
+-- indistinguishable in Skill-ups, Can craft and search results.
 function ns.ShortName(key, c)
     local s = shortNames[key]
     if not s then
-        s = InClassColor(c.class, (c.name or key):match("^(%S+)") or key)
+        s = InClassColor(c.class, c.name or key)
         shortNames[key] = s
     end
     return s
 end
 
 function ns.ListShortName(key, c)
-    if ns.Elsewhere(c) then return OUT .. ((c.name or key):match("^(%S+)") or key) .. "|r" end
+    if ns.Elsewhere(c) then return OUT .. (c.name or key) .. "|r" end
     return ns.ShortName(key, c)
 end
 

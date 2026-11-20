@@ -37,8 +37,8 @@ test("a Waylaid Crate shows a grid: a column per material, a row per character w
         "Materials on your characters = " .. crateCells(crateIcon(111), CRATE_UNKNOWN, crateIcon(333), CRATE_UNKNOWN),
         CD .. "Needed|r = " .. crateCells(CD .. "20|r", CD .. "4|r", CD .. "6|r", CD .. "2|r"),
         "[MAGE]Aldric = " .. crateCells(crateNone(), crateNone(), crateNum(4), crateNone()),
-        "[DRUID]Tarnia = " .. crateCells(crateNum(14), crateNone(), crateNum(1), crateNone()),
-        "[PALADIN]Vespera = " .. crateCells(crateNum(12), crateNone(), crateNum(2), crateNone()),
+        "[DRUID]Tarnia Moonwhisper = " .. crateCells(crateNum(14), crateNone(), crateNum(1), crateNone()),
+        "[PALADIN]Vespera Ashward = " .. crateCells(crateNum(12), crateNone(), crateNum(2), crateNone()),
         "Total = " .. crateCells(CG .. "26|r", CD .. "0|r", CG .. "7|r", CD .. "0|r"),
     }, "\n")
     assert(text:find(want, 1, true), "you first, then most; green where there's enough; a question mark for a material nobody has\n" .. text)
@@ -132,8 +132,8 @@ test("crates list up to 10 characters, then how many more; the totals count ever
     end
     wow.login({ v = 2, chars = chars })
     local text = textOf(wow.hover(GameTooltip, CRATE, CRATE_TEXT))
-    assert(text:find("[WARRIOR]Alt12 = " .. crateNum(12), 1, true), "most first\n" .. text)
-    assert(not text:find("[WARRIOR]Alt02 =", 1, true), "the 11th and 12th are left out\n" .. text)
+    assert(text:find("[WARRIOR]Alt12 Test = " .. crateNum(12), 1, true), "most first\n" .. text)
+    assert(not text:find("[WARRIOR]Alt02 Test =", 1, true), "the 11th and 12th are left out\n" .. text)
     assert(text:find(CD .. "+2 more|r = ", 1, true), text)
     assert(text:find("Total = " .. CG .. "78|r", 1, true), "1 + 2 + ... + 12\n" .. text)
 end)
@@ -149,7 +149,7 @@ test("the crate grid is lined up in columns, alongside the crate's own counts", 
     local lines = wow.hover(GameTooltip, CRATE, CRATE_TEXT)
     local grid, counts
     for i, l in ipairs(lines) do
-        if l[1] == "[PALADIN]Vespera" then grid = grid or i end
+        if l[1] == "[PALADIN]Vespera Ashward" and not grid then grid = i end
         if l[1] == "[PALADIN]Vespera Ashward" then counts = i end
     end
     assert(grid and counts and grid < counts, textOf(lines))
@@ -177,7 +177,7 @@ test("hovering the same crate again places its grid without measuring it again",
     local function grid()
         local lines = wow.hover(GameTooltip, CRATE, CRATE_TEXT)
         for i, l in ipairs(lines) do
-            if l[1] == "[PALADIN]Vespera" then return cellsOn(rights[i]) end
+            if l[1] == "[PALADIN]Vespera Ashward" then return cellsOn(rights[i]) end
         end
     end
     local first = grid()
