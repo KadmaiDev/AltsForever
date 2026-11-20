@@ -206,7 +206,7 @@ end
 -- one type check per stored value.
 local CHAR_FIELDS = {
     name = "string", class = "string", faction = "string", realm = "string", zone = "string",
-    hearth = "string", prof1 = "string", prof2 = "string", role = "string",
+    hearth = "string", hearthReady = "number", prof1 = "string", prof2 = "string", role = "string",
     money = "number", level = "number", xp = "number", xpMax = "number", rested = "number",
     seen = "number", updated = "number", ilvl = "number", dura = "number", played = "number",
     playedAt = "number", mailExpires = "number", spec = "number", wellRested = "number",

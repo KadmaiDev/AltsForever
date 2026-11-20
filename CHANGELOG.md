@@ -1,3 +1,7 @@
+## Alts Forever (not yet released)
+
+- **Hearthstone cooldown:** pointing at a character in the overview now shows when their hearthstone is ready again, beside where it's set ("Stormwind · ready in 23 min"). Each character's is read when you next log in on them. Thanks to FelixFitzgerald for the suggestion.
+
 ## Alts Forever 1.9.0
 
 - **Mail rules for bind-on-equip items:** send all your BoE weapons to one character (to sell them, say) and all BoE armour, or every BoE item, to another. Attach a BoE item at the mailbox, open the arrow beside the To box and tick the rule you want. A rule for the item itself or its category still comes first, then BoE weapons or armour, then all BoE. Rings, necks, trinkets, cloaks and shields count as armour. The Pack button picks up only items that aren't bound yet. Thanks to the player who asked.

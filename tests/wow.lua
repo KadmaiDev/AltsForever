@@ -11,7 +11,7 @@ local KNOWN_EVENTS = {
     ADDON_LOADED = true, PLAYER_LOGIN = true, PLAYER_LOGOUT = true,
     BAG_UPDATE = true, BAG_UPDATE_DELAYED = true, BAG_CONTAINER_UPDATE = true,
     PLAYER_EQUIPMENT_CHANGED = true, INSPECT_READY = true,
-    BANKFRAME_OPENED = true, BANKFRAME_CLOSED = true, INPUT_DEVICE_INTERFACE_TRANSITION = true,
+    BANKFRAME_OPENED = true, BANKFRAME_CLOSED = true, BAG_UPDATE_COOLDOWN = true, INPUT_DEVICE_INTERFACE_TRANSITION = true,
     MAIL_SHOW = true, MAIL_CLOSED = true, MAIL_INBOX_UPDATE = true,
     MAIL_SEND_SUCCESS = true, MAIL_FAILED = true, MAIL_SEND_INFO_UPDATE = true,
     PLAYER_MONEY = true,
@@ -481,7 +481,16 @@ function M.load(files)
     GetAddOnMemoryUsage = function() return 12.5 end
 
     local function slotData(bag, slot) return M.bags[bag] and M.bags[bag][slot] end
+    -- M.gameTime: GetTime(), the game's own seconds (not the clock); M.cooldowns[itemID] =
+    -- { start, duration } in those seconds.
+    M.gameTime, M.cooldowns = 1000, {}
+    GetTime = function() return M.gameTime end
     C_Container = {
+        GetItemCooldown = function(id)
+            local cd = M.cooldowns[id]
+            if cd then return cd[1], cd[2], 1 end
+            return 0, 0, 1
+        end,
         GetContainerNumSlots = function(bag) return M.bags[bag] and M.bags[bag].size or 0 end,
         GetContainerItemID = function(bag, slot) local s = slotData(bag, slot) return s and s.id end,
         GetContainerItemLink = function(bag, slot)
