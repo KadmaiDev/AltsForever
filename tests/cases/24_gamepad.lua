@@ -176,6 +176,117 @@ test("with the Gamepad UI on at login (or switched on), the Options page is buil
     eq(ns.OptionsPanel().built, true, "switched on: built then")
 end)
 
+-- The controller menu's entries from the top: { text, row (nil for a title) }.
+function padMenu(ns)
+    local m, items = ns.GamepadMenu(), {}
+    for _, r in ipairs(m.rows) do
+        if r.shown then items[#items + 1] = { y = r.point[5], text = r.text:GetText(), row = r } end
+    end
+    for _, l in ipairs(m.labels) do
+        if l.shown then items[#items + 1] = { y = l.point[5], text = l:GetText() } end
+    end
+    table.sort(items, function(a, b) return a.y > b.y end)
+    return items
+end
+
+function padRow(ns, text)
+    for _, it in ipairs(padMenu(ns)) do
+        if it.row and it.text:find(text, 1, true) then return it.row end
+    end
+end
+
+test("with the Gamepad UI on, a menu of ours is our own window, never the game's", function()
+    local ns = wow.load(FILES)
+    wow.gamepadUI = true
+    wow.login({ v = 2, chars = { ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { level = 20, bags = {} }) } })
+    ns.ToggleOverview()
+    local row = overviewRows()[2]
+    wow.menu = nil
+    row:OnSmartNavClick()
+    eq(wow.menu, nil, "the game's menu never opens: it would carry our entries into Blizzard's controller code")
+    local m = ns.GamepadMenu()
+    eq(m:IsShown(), true)
+    local items = padMenu(ns)
+    eq(items[1].text, "[DRUID]Tarn Moon", "the title first")
+    eq(items[1].row, nil, "a title can't be pressed")
+    eq(items[2].text, "Gear")
+    eq(padRow(ns, "Professions"):IsEnabled(), false, "no professions: greyed out")
+    assert(padRow(ns, "Upgrade role").text:GetText():find("ChatFrameExpandArrow", 1, true), "a sub-list is marked")
+
+    -- A sub-list: Back first; B steps back out of it, then closes the menu.
+    padRow(ns, "Upgrade role").scripts.OnClick(padRow(ns, "Upgrade role"))
+    eq(m.TitleText:GetText(), "Upgrade role")
+    assert(padMenu(ns)[1].row.back, "Back first")
+    assert(padRow(ns, "Automatic").text:GetText():find("UI-RadioButton", 1, true), "radio choices")
+    eq(m:SmartNavigationCloseHandler(), true)
+    eq(m:IsShown(), true, "B: back to the first list")
+    assert(padRow(ns, "Gear"))
+    padRow(ns, "Upgrade role").scripts.OnClick(padRow(ns, "Upgrade role"))
+    local tank = padRow(ns, "Healer")
+    tank.scripts.OnClick(tank)
+    eq(m:IsShown(), false, "a radio choice closes it")
+    eq(AltsForeverDB.chars["Tarn Moon"].role, "healer", "and was chosen")
+
+    row:OnSmartNavClick()
+    m:SmartNavigationCloseHandler()
+    eq(m:IsShown(), false, "B on the first list closes it")
+    row:OnSmartNavClick()
+    padRow(ns, "Gear").scripts.OnClick(padRow(ns, "Gear"))
+    eq(m:IsShown(), false)
+    eq(AltsForeverGearFrame:IsShown(), true, "a button does its job")
+
+    -- Tick boxes stay open and show the change; mouse players get the game's menu as ever.
+    ns.ShowOptionsMenu(nil, true)
+    local tick = padRow(ns, "Show other rulesets")
+    assert(tick.text:GetText():find("UI-CheckBox-Up", 1, true), "not ticked")
+    tick.scripts.OnClick(tick)
+    eq(AltsForeverDB.otherRulesets, true)
+    eq(m:IsShown(), true, "a tick box leaves the menu open")
+    assert(padRow(ns, "Show other rulesets").text:GetText():find("UI-CheckBox-Check", 1, true), "now ticked")
+    m:Hide()
+    wow.gamepadUI = false
+    ns.ShowOptionsMenu(nil, true)
+    assert(wow.menu, "mouse and keyboard: the game's menu")
+    eq(m:IsShown(), false)
+end)
+
+test("menus: every one goes through ns.OpenMenu (the game's menu only for mouse and keyboard)", function()
+    for _, file in ipairs(FILES) do
+        if file:match("%.lua$") and file ~= "Gamepad.lua" then
+            local text = assert(io.open(file)):read("*a")
+            assert(not text:find("MenuUtil.CreateContextMenu(", 1, true), file .. " opens the game's menu itself")
+            assert(not text:find("[^%w_]SetupMenu%(FilterMenu%)"), file .. " hands a dropdown our menu directly")
+        end
+    end
+end)
+
+test("with the Gamepad UI on, the professions window's filter is a plain button opening our menu", function()
+    local ns = wow.load(FILES)
+    wow.gamepadUI = true
+    wow.login({ v = 2, chars = { ["Vesp Ash"] = alt("Vesp Ash", "PALADIN", { profs = { Cooking = 50 }, recipes = { Cooking = {} } }) } })
+    ns.ShowRecipes("Vesp Ash")
+    local f = AltsForeverRecipesFrame
+    eq(f:IsShown(), true)
+    eq(f.padFilter:IsShown(), true, "our button")
+    eq(f.filter:IsShown(), false, "not the game's dropdown")
+    wow.menu = nil
+    f.padFilter.scripts.OnClick(f.padFilter)
+    eq(wow.menu, nil)
+    eq(ns.GamepadMenu():IsShown(), true)
+    eq(#padMenu(ns), 2, "its two tick boxes")
+    wow.menu = nil
+    MenuUtil.CreateContextMenu(f.filter, f.filter.menuGenerator)
+    eq(#wow.menu.items, 0, "the game's dropdown gets nothing of ours, should it be opened anyway")
+    ns.GamepadMenu():Hide()
+    f:Hide()
+    wow.gamepadUI = false
+    ns.ShowRecipes("Vesp Ash")
+    eq(f.filter:IsShown(), true, "mouse: the game's dropdown")
+    MenuUtil.CreateContextMenu(f.filter, f.filter.menuGenerator)
+    eq(#wow.menu.items, 2, "with its two tick boxes")
+    eq(f.padFilter:IsShown(), false)
+end)
+
 test("with the Gamepad UI on, our parts of the mailbox are made at login, not inside the open mailbox", function()
     local ns = wow.load(FILES)
     wow.gamepadUI = true

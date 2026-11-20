@@ -386,7 +386,7 @@ local function HolderMenu(row)
             Render()
         end
     end
-    MenuUtil.CreateContextMenu(row, function(_, root)
+    ns.OpenMenu(row, function(_, root)
         root:CreateTitle(name)
         for _, h in ipairs(e.holders) do
             local key, c = h.key, h.c
@@ -756,7 +756,7 @@ end
 -- The menu: All characters, then a tick box per character (in the overview's order, headed
 -- by ruleset and faction as there). Ticking one while all are searched starts with just them.
 PickCharacters = function(owner)
-    MenuUtil.CreateContextMenu(owner, function(_, root)
+    ns.OpenMenu(owner, function(_, root)
         root:CreateCheckbox(L["All characters"], function() return only == nil end, function()
             only = nil
             Changed()

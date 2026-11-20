@@ -1030,7 +1030,7 @@ local function Start()
 end
 
 local function PickPartner(owner)
-    MenuUtil.CreateContextMenu(owner, function(_, root)
+    ns.OpenMenu(owner, function(_, root)
         for _, key in ipairs(ns.SyncPartners()) do
             root:CreateButton(key, function() frame.box:SetText(key) end)
         end

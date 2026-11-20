@@ -689,7 +689,7 @@ end
 -- Every character, in the overview's order and, as there, headed by ruleset and faction
 -- when you have more than one group.
 local function PickCharacter(owner)
-    MenuUtil.CreateContextMenu(owner, function(_, root)
+    ns.OpenMenu(owner, function(_, root)
         local chars, keys = ns.db.chars, ns.OverviewOrder()
         local byRealm, byFaction = ns.GroupParts()
         local group

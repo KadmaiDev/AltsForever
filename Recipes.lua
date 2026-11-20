@@ -591,7 +591,11 @@ local function MakeList(f)
     f.filterMenu = FilterMenu
     local ok, filter = pcall(CreateFrame, "DropdownButton", nil, list, "WowStyle1FilterDropdownTemplate")
     if ok and filter and type(filter.SetupMenu) == "function" and type(filter.SetDefaultCallback) == "function" then
-        filter:SetupMenu(FilterMenu)
+        -- Nothing of ours in the game's menu with the Gamepad UI on (Gamepad.lua's ns.OpenMenu
+        -- says why): a plain Filter button opening our own list takes its place then.
+        filter:SetupMenu(function(owner, root)
+            if not ns.GamepadUI() then FilterMenu(owner, root) end
+        end)
         pcall(filter.SetIsDefaultCallback, filter, function() return not (filters.craftable or filters.skillups) end)
         pcall(filter.SetDefaultCallback, filter, function()
             wipe(filters)
@@ -599,11 +603,25 @@ local function MakeList(f)
             Fill()
         end)
         ns.SkinDropdown(filter)
+        local pad = CreateFrame("Button", nil, list, "UIPanelButtonTemplate")
+        pad:SetSize(93, 22)
+        pad:SetText(FILTER or L["Filter"])
+        pad:SetPoint("TOPRIGHT", list, "TOPRIGHT", -8, -9)
+        pad:SetScript("OnClick", function(self) ns.OpenMenu(self, FilterMenu) end)
+        ns.SkinButton(pad)
+        local function Which()
+            local on = ns.GamepadUI()
+            filter:SetShown(not on)
+            pad:SetShown(on)
+        end
+        f:HookScript("OnShow", Which)
+        Which()
+        f.padFilter = pad
     else
         filter = CreateFrame("Button", nil, list, "UIPanelButtonTemplate")
         filter:SetSize(93, 22)
         filter:SetText(FILTER or L["Filter"])
-        filter:SetScript("OnClick", function(self) MenuUtil.CreateContextMenu(self, FilterMenu) end)
+        filter:SetScript("OnClick", function(self) ns.OpenMenu(self, FilterMenu) end)
         ns.SkinButton(filter)
     end
     filter:SetPoint("TOPRIGHT", list, "TOPRIGHT", -8, -9)
@@ -916,7 +934,7 @@ end
 local function HasProfessions(c) return c.profs and next(c.profs) ~= nil end
 
 local function PickCharacter(owner)
-    MenuUtil.CreateContextMenu(owner, function(_, root)
+    ns.OpenMenu(owner, function(_, root)
         local chars = ns.db.chars
         local byRealm, byFaction = ns.GroupParts()
         local group

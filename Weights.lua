@@ -139,7 +139,7 @@ Fill = function()
 end
 
 local function PickRole(owner)
-    MenuUtil.CreateContextMenu(owner, function(_, root)
+    ns.OpenMenu(owner, function(_, root)
         for _, r in ipairs(ns.WeightRoles()) do
             local text = ns.WeightRoleLabel(r)
             if ns.RoleWeightsChanged(r) then text = text .. " |cff40ff40*|r" end

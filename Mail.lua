@@ -139,7 +139,7 @@ end
 
 local function AltsMenu(owner)
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
-    MenuUtil.CreateContextMenu(owner, function(_, root)
+    ns.OpenMenu(owner, function(_, root)
         root:CreateTitle(L["Send to"])
         local list = ns.SendToAltEntries()
         if #list == 0 then root:CreateTitle("|cff9d9d9d" .. L["No other characters yet"] .. "|r") end

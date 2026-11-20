@@ -764,7 +764,7 @@ end
 
 local function ColumnsMenu(owner)
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
-    MenuUtil.CreateContextMenu(owner, function(_, root)
+    ns.OpenMenu(owner, function(_, root)
         root:CreateTitle(L["Columns"])
         ns.FillColumnsMenu(root)
     end)

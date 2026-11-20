@@ -261,6 +261,8 @@ function M.load(files)
     function frameMethods:GetName() return self.frameName end
     function frameMethods:SetEnabled(on) self.enabled = on and true or false end
     function frameMethods:IsEnabled() return self.enabled ~= false end
+    -- A DropdownButton's menu: kept so tests can open it as the game would.
+    function frameMethods:SetupMenu(generator) self.menuGenerator = generator end
     function frameMethods:GetChildren()
         local list = {}
         for _, f in ipairs(M.frames) do if f.parent == self then list[#list + 1] = f end end

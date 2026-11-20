@@ -580,7 +580,7 @@ function ns.OptionsPanel() return canvas end
 -- overview's cog button (fromOverview: it leaves out Open overview there).
 function ns.ShowOptionsMenu(owner, fromOverview)
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return ns.ShowHelp() end
-    MenuUtil.CreateContextMenu(owner, function(_, root)
+    ns.OpenMenu(owner, function(_, root)
         root:CreateTitle("Alts Forever")
         -- Always there from the minimap: if the overview is already open behind other
         -- windows, this brings it to the front.
@@ -616,7 +616,7 @@ end
 function ns.ShowCharacterMenu(owner, key)
     local c = ns.db.chars[key]
     if not (c and MenuUtil and MenuUtil.CreateContextMenu) then return end
-    MenuUtil.CreateContextMenu(owner, function(_, root)
+    ns.OpenMenu(owner, function(_, root)
         root:CreateTitle(ns.ColoredName(key, c))
         root:CreateButton(L["Gear"], function() ns.ShowGear(key) end)
         root:CreateButton(L["Bags"], function() ns.ShowBags(key, "bags") end)
