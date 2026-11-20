@@ -1193,10 +1193,31 @@ local function FollowRow(f, b, search)
     Again()
 end
 
+-- Blizzard's bags (combined, or the backpack when separate) get a button only with the
+-- Gamepad UI on, in place of the portrait menu's entry (AddMenuEntry says why). With the
+-- Gamepad UI on the game stretches the search box across the header and hides its sort
+-- button (ContainerFrame.lua, forever branch), so it goes in the title bar, left of the close
+-- button. Made at login or a bag toggle, never inside the open bags with the Gamepad UI on
+-- (as the bank's); shown and hidden as the Gamepad UI is switched.
+local padButtons = {}
+local function BlizzardBags(f)
+    local close = f and f.CloseButton
+    if not (close and close.GetFrameLevel) then return end
+    if ns.GamepadUI() and f:IsVisible() then return end
+    local b = Shortcut(f, "bags", 18)
+    b:SetPoint("RIGHT", close, "LEFT", -2, 0)
+    b:SetFrameLevel(close:GetFrameLevel())
+    b:SetShown(ns.GamepadUI())
+    padButtons[#padButtons + 1] = b
+    return b
+end
+
 -- Where each window gets its button. Each returns the button, or nil if the window
 -- (or the part it's placed beside) isn't there yet. EllesmereUI's fields are not its
 -- official API: they're checked before use.
 local PLACES = {
+    ContainerFrameCombinedBags = function() return BlizzardBags(_G.ContainerFrameCombinedBags) end,
+    ContainerFrame1 = function() return BlizzardBags(_G.ContainerFrame1) end,
     -- Blizzard's bank: in the title area, left of the search box.
     BankFrame = function()
         local search = _G.BankItemSearchBox
@@ -1281,6 +1302,10 @@ function ns.StartBags()
         Menu.ModifyMenu("MENU_CONTAINER_FRAME", AddMenuEntry)
     end
     ns.On("PLAYER_ENTERING_WORLD", AttachShortcuts)
+    ns.On("INPUT_DEVICE_INTERFACE_TRANSITION", function()
+        local on = ns.GamepadUI()
+        for _, b in ipairs(padButtons) do b:SetShown(on) end
+    end)
     -- The bank windows may be made on the first visit.
     ns.On("BANKFRAME_OPENED", function()
         AttachShortcuts()

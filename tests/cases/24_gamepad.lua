@@ -363,6 +363,47 @@ test("with the Gamepad UI on, the bank's Alts Forever button is never made insid
     assert(ns.BagShortcuts().BankFrame, "made once the bank has closed")
 end)
 
+test("with the Gamepad UI on, Blizzard's bags get an Alts Forever button in the title bar instead of the portrait entry", function()
+    local ns = wow.load(FILES)
+    wow.gamepadUI = true
+    local bags = CreateFrame("Frame", "ContainerFrameCombinedBags")
+    bags.CloseButton = CreateFrame("Button", nil, bags)
+    bags:Hide() -- hidden until opened, as the game's
+    local one = CreateFrame("Frame", "ContainerFrame1")
+    one.CloseButton = CreateFrame("Button", nil, one)
+    one:Show()
+    wow.login(nil)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    local b = ns.BagShortcuts().ContainerFrameCombinedBags
+    assert(b, "made at login")
+    eq(b.parent, bags)
+    eq(b.point[1], "RIGHT"); eq(b.point[2], bags.CloseButton); eq(b.point[3], "LEFT")
+    eq(b:IsShown(), true)
+    eq(ns.BagShortcuts().ContainerFrame1, nil, "the separate backpack is open: not now")
+    b.scripts.OnClick(b)
+    eq(AltsForeverBagsFrame:IsShown(), true, "opens every character's bags")
+    one:Hide()
+    if ToggleAllBags then ToggleAllBags() else wow.fire("PLAYER_ENTERING_WORLD") end
+    assert(ns.BagShortcuts().ContainerFrame1, "made once it's closed")
+    -- Mouse and keyboard: hidden (the portrait entry is theirs), and back with the Gamepad UI.
+    wow.gamepadUI = false
+    wow.fire("INPUT_DEVICE_INTERFACE_TRANSITION", 0, 1)
+    eq(b:IsShown(), false)
+    eq(ns.BagShortcuts().ContainerFrame1:IsShown(), false)
+    wow.gamepadUI = true
+    wow.fire("INPUT_DEVICE_INTERFACE_TRANSITION", 1, 0)
+    eq(b:IsShown(), true)
+end)
+
+test("mouse and keyboard: Blizzard's bags get no button, only the portrait entry", function()
+    local ns = wow.load(FILES)
+    local bags = CreateFrame("Frame", "ContainerFrameCombinedBags")
+    bags.CloseButton = CreateFrame("Button", nil, bags)
+    wow.login(nil)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    eq(ns.BagShortcuts().ContainerFrameCombinedBags:IsShown(), false)
+end)
+
 test("the Options page's window size: - and + buttons step it 5% (a D-pad can't drag the slider)", function()
     local ns = wow.load(FILES)
     wow.login(nil)
