@@ -996,6 +996,7 @@ Changed = function()
     if SendMailFrame and SendMailFrame:IsVisible() then Refresh(true) end
 end
 ns.MailRulesChanged = Changed
+ns.PrebuildMailParts = function() CreateMailParts() end -- Mail.lua's ns.PrebuildMail
 
 function ns.StartMailRules()
     ns.On("MAIL_SHOW", function()

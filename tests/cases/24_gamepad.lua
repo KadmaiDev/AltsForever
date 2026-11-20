@@ -176,6 +176,56 @@ test("with the Gamepad UI on at login (or switched on), the Options page is buil
     eq(ns.OptionsPanel().built, true, "switched on: built then")
 end)
 
+test("with the Gamepad UI on, our parts of the mailbox are made at login, not inside the open mailbox", function()
+    local ns = wow.load(FILES)
+    wow.gamepadUI = true
+    SendMailFrame:Hide() -- the mailbox closed, as at login
+    wow.login(nil)
+    local arrow = altsButton()
+    assert(arrow, "the arrow beside the To box, made at login")
+    eq(arrow:IsShown(), true)
+    assert(mailNote() and packButton(), "the rule note and Pack too")
+    eq(mailNote():IsShown(), false); eq(packButton():IsShown(), false)
+    local frames = #wow.frames
+    SendMailFrame:Show()
+    wow.fire("MAIL_SHOW")
+    eq(#wow.frames, frames, "opening the mailbox makes no frame")
+    eq(altsButton(), arrow)
+
+    -- "Send mail to alts" off: made all the same, hidden until it's turned on.
+    local saved = { v = 2, chars = {}, sendToAltOff = true }
+    ns = wow.load(FILES)
+    wow.gamepadUI = true
+    SendMailFrame:Hide()
+    wow.login(saved)
+    eq(altsButton():IsShown(), false)
+    ns.SetSendToAlt(true)
+    eq(altsButton():IsShown(), true)
+
+    -- Mouse and keyboard: made at the first MAIL_SHOW, as before.
+    wow.load(FILES)
+    wow.gamepadUI = false
+    wow.login(nil)
+    eq(altsButton(), nil)
+    wow.fire("MAIL_SHOW")
+    assert(altsButton())
+end)
+
+test("with the Gamepad UI on, the bank's Alts Forever button is never made inside the open bank", function()
+    local ns = wow.load(FILES)
+    wow.gamepadUI = true
+    wow.login(nil)
+    CreateFrame("Frame", "BankFrame")
+    CreateFrame("EditBox", "BankItemSearchBox", BankFrame)
+    BankFrame:Show()
+    wow.fire("BANKFRAME_OPENED")
+    for _, fn in ipairs(wow.timers) do fn() end
+    eq(ns.BagShortcuts().BankFrame, nil, "the bank is open: not now")
+    BankFrame:Hide()
+    if ToggleAllBags then ToggleAllBags() else wow.fire("PLAYER_ENTERING_WORLD") end
+    assert(ns.BagShortcuts().BankFrame, "made once the bank has closed")
+end)
+
 test("the Options page's window size: - and + buttons step it 5% (a D-pad can't drag the slider)", function()
     local ns = wow.load(FILES)
     wow.login(nil)

@@ -1201,6 +1201,9 @@ local PLACES = {
     BankFrame = function()
         local search = _G.BankItemSearchBox
         if not (_G.BankFrame and search) then return end
+        -- Not made inside the open bank with the Gamepad UI on: Blizzard's navigator would
+        -- rebuild it from our code (see ns.PrebuildMail); the next login or bag toggle does it.
+        if ns.GamepadUI() and _G.BankFrame:IsVisible() then return end
         local b = Shortcut(_G.BankFrame, "bank", 22)
         b:SetPoint("RIGHT", search, "LEFT", -10, 0)
         return b

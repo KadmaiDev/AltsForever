@@ -222,8 +222,10 @@ local function PlaceAltsButton()
     altsButton:SetPoint("LEFT", anchor, "RIGHT", altsButton.elvArrow and 3 or 0, y)
 end
 
-local function CreateAltsButton()
-    if altsButton or not ns.SendToAltOn() or not (SendMailFrame and SendMailNameEditBox) then return end
+-- `early`: made before the mailbox opens (Gamepad UI, ns.PrebuildMail), so even with "Send
+-- mail to alts" off; it's hidden then, and SetSendToAlt shows it.
+local function CreateAltsButton(early)
+    if altsButton or not (early or ns.SendToAltOn()) or not (SendMailFrame and SendMailNameEditBox) then return end
     -- A small dropdown arrow just right of the To box. It fits the gap before "Postage"
     -- (a 52 px button there covered it).
     local b = CreateFrame("Button", nil, SendMailFrame)
@@ -244,6 +246,18 @@ local function CreateAltsButton()
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
     ns.SkinArrow(b, SendMailNameEditBox)
     altsButton = b
+    b:SetShown(ns.SendToAltOn())
+end
+
+-- With the Gamepad UI on (Gamepad.lua): our parts of the send tab are made while the mailbox
+-- is closed. Made at the first MAIL_SHOW instead, inside the open window, Blizzard's navigator
+-- rebuilds it from our code (its CreateFrame hook), which can taint its bindings: a player's
+-- ADDON_ACTION_FORBIDDEN on SetPreferredGamepadInteractTarget() closing the bags (2026-11-20).
+function ns.PrebuildMail()
+    if (MailFrame and MailFrame:IsVisible()) or (SendMailFrame and SendMailFrame:IsVisible()) then return end
+    CreateAltsButton(true)
+    PlaceAltsButton()
+    if ns.PrebuildMailParts then ns.PrebuildMailParts() end
 end
 
 function ns.StartMail()
