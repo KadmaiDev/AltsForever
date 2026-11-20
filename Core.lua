@@ -85,9 +85,7 @@ local function UpdateEscape()
     if overviewWindow and overviewWindow:IsShown() and not OthersOpen() then
         escapeStandIn:Show()
     elseif escapeStandIn:IsShown() then
-        escapeStandIn.quiet = true
         escapeStandIn:Hide()
-        escapeStandIn.quiet = nil
     end
 end
 
@@ -110,8 +108,11 @@ function ns.EscapeCloses(f, overview)
         if not escapeStandIn then
             escapeStandIn = CreateFrame("Frame", "AltsForeverEscape")
             escapeStandIn:Hide()
-            escapeStandIn:SetScript("OnHide", function(self)
-                if not self.quiet and overviewWindow and overviewWindow:IsShown() then overviewWindow:Hide() end
+            -- Judged by what's open when it runs, never by a flag set around our own Hide: in
+            -- game, opening any window from the overview closed it (owner, 2026-11-20), so the
+            -- handler can't be relied on to run inside that Hide.
+            escapeStandIn:SetScript("OnHide", function()
+                if overviewWindow and overviewWindow:IsShown() and not OthersOpen() then overviewWindow:Hide() end
             end)
             UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverEscape"
         end

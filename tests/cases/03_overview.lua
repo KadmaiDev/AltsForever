@@ -222,6 +222,15 @@ test("Escape closes the window on top first, then the overview", function()
     ns.ToggleOverview(true)
     runTimers()
     eq(AltsForeverFrame:IsShown(), true, "a later opening isn't closed by a stale stand-in")
+    -- Opening a window from it never closes it, even if the game runs the stand-in's OnHide late
+    -- (seen in game: every window opened from the overview closed it).
+    ns.ShowBags("Tarn Moon", "bags")
+    eq(AltsForeverEscape:IsShown(), false)
+    AltsForeverEscape.scripts.OnHide(AltsForeverEscape)
+    eq(AltsForeverFrame:IsShown(), true, "the late OnHide leaves the overview open")
+    ns.ToggleSync(true)
+    AltsForeverFrame.syncButton.scripts.OnClick(AltsForeverFrame.syncButton)
+    eq(AltsForeverFrame:IsShown(), true)
 end)
 
 test("overview rows: you first, then by level; totals gold", function()
