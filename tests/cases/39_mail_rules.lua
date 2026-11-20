@@ -237,6 +237,34 @@ test("the subject is filled from the first attachment, as the game does when C.O
     eq(subject:GetText(), "", "off: untouched")
 end)
 
+test("an attachment whose name hasn't loaded yet: the subject is filled once it arrives, so Send isn't left greyed out", function()
+    atMailbox({})
+    local subject = SendMailSubjectEditBox
+    wow.unloaded = { [SILK] = true }
+    local names = wow.itemNames[SILK]
+    wow.itemNames[SILK] = nil
+    wow.itemLoads = nil
+    attach(1, SILK, 4)
+    eq(subject:GetText(), nil, "no name yet: nothing to fill")
+    attach(2, SILK, 1)
+    eq(wow.itemLoads and #wow.itemLoads, 1, "asked for once")
+    attach(2, nil)
+    eq(wow.itemLoads and wow.itemLoads[1], SILK, "its name is asked for")
+    wow.unloaded, wow.itemNames[SILK] = nil, names
+    wow.fire("GET_ITEM_INFO_RECEIVED", SILK, true)
+    eq(subject:GetText(), "Silk Cloth (4)", "filled when it arrives")
+    -- A name still loading never takes out the subject we filled.
+    wow.unloaded = { [LINEN] = true }
+    local linen = wow.itemNames[LINEN]
+    wow.itemNames[LINEN] = nil
+    attach(2, LINEN, 20)
+    attach(1, nil)
+    eq(subject:GetText(), "Silk Cloth (4)", "kept while the next one's name loads")
+    wow.unloaded, wow.itemNames[LINEN] = nil, linen
+    wow.fire("GET_ITEM_INFO_RECEIVED", LINEN, true)
+    eq(subject:GetText(), "Linen Cloth (20)")
+end)
+
 test("mail rules: Pack fills only the free attachment slots, and can be turned off", function()
     atMailbox({ ["c:7:5"] = { ["Tarn Moon"] = LINEN } })
     for i = 1, 11 do wow.outbox[i] = { SHIRT, 1 } end

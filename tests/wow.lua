@@ -569,7 +569,11 @@ function M.load(files)
     end
     GetSendMailItem = function(i)
         local item = M.outbox[i]
-        if item then return M.itemNames[item[1]] or "Item", item[1], nil, item[2] end
+        -- M.unloaded[id]: the game hasn't loaded it yet, so no name.
+        if item then
+            if M.unloaded and M.unloaded[item[1]] then return nil, item[1], nil, item[2] end
+            return M.itemNames[item[1]] or "Item", item[1], nil, item[2]
+        end
     end
     HasSendMailItem = function(i) return M.outbox[i] ~= nil end
     SendMail = function() end

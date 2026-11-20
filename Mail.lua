@@ -169,21 +169,41 @@ end
 -- the player typed is never touched. Part of "Send mail to alts", like the rest of the
 -- mailbox help.
 local subjectFilled -- the subject we put in, while it's still there
+-- An attachment's name comes only once the game has loaded the item: GetSendMailItem gives
+-- nil before (Blizzard's own SendMailFrame_Update allows for it). The owner once saw Send
+-- greyed out after Pack (2026-11-20, not seen again: the second time the item was loaded),
+-- so a missing name is asked for and the subject filled when it arrives.
+local subjectWait = {} -- [itemID] = true while its name is asked for
 
 function ns.ResetMailSubject() subjectFilled = nil end
+
+local function AttachmentName(i)
+    local name, id, _, count = GetSendMailItem(i)
+    if issecretvalue(name) or issecretvalue(id) or issecretvalue(count) then return end
+    if name == nil and type(id) == "number" then
+        name = C_Item and C_Item.GetItemNameByID and C_Item.GetItemNameByID(id)
+        if issecretvalue(name) then name = nil end
+        if name == nil and not subjectWait[id] and C_Item and C_Item.RequestLoadItemDataByID then
+            subjectWait[id] = true
+            C_Item.RequestLoadItemDataByID(id)
+        end
+    end
+    return name, count, type(id) == "number"
+end
 
 function ns.FillMailSubject()
     local box = SendMailSubjectEditBox
     if not (box and C_Mail and C_Mail.IsCODEnabled) or not ns.SendToAltOn() then return end
     local cod = C_Mail.IsCODEnabled()
     if issecretvalue(cod) or cod ~= false then return end -- the game does it itself
-    local title
+    local title, attachedAny
     for i = 1, MAX_SEND do
-        local name, _, _, count = GetSendMailItem(i)
-        if not issecretvalue(name) and not issecretvalue(count) and name ~= nil then
+        local name, count, isItem = AttachmentName(i)
+        if name ~= nil then
             title = type(count) == "number" and count > 1 and (name .. " (" .. count .. ")") or name
             break
         end
+        attachedAny = attachedAny or isItem
     end
     local text = box:GetText()
     if issecretvalue(text) then return end
@@ -193,7 +213,7 @@ function ns.FillMailSubject()
             if text ~= title then box:SetText(title) end
             subjectFilled = title
         end
-    elseif subjectFilled then
+    elseif subjectFilled and not attachedAny then -- names still loading keep it
         if text == subjectFilled then box:SetText("") end
         subjectFilled = nil
     end
@@ -283,6 +303,11 @@ function ns.StartMail()
     end)
     ns.On("MAIL_CLOSED", function() mailOpen = false end)
     ns.On("MAIL_SEND_INFO_UPDATE", function() ns.FillMailSubject() end)
+    ns.On("GET_ITEM_INFO_RECEIVED", function(id)
+        if not subjectWait[id] then return end
+        subjectWait[id] = nil
+        if SendMailFrame and SendMailFrame:IsVisible() then ns.FillMailSubject() end
+    end)
     ns.On("MAIL_INBOX_UPDATE", function()
         if mailOpen then ScanInbox() end
     end)
