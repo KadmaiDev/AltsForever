@@ -301,7 +301,7 @@ local function BuildMenu()
         list, offset = nil, 0
         for _, row in ipairs(menu.rows) do row.entry = nil end
     end)
-    if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverMenuFrame" end
+    ns.EscapeCloses(menu)
     ns.SkinWindow(menu)
     menu:Hide()
     ns.GamepadWindow(menu)

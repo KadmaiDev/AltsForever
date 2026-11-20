@@ -226,7 +226,7 @@ local function CreateWindow()
         for _, box in ipairs(f.boxes) do box:ClearFocus() end
         GameTooltip:Hide()
     end)
-    if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverWeightsFrame" end
+    ns.EscapeCloses(f)
     ns.SkinWindow(f)
     f:Hide()
     ns.GamepadWindow(f)

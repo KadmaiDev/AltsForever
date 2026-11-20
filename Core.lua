@@ -62,6 +62,70 @@ frame:SetScript("OnEvent", function(_, event, ...)
 end)
 
 ---------------------------------------------------------------------------
+-- Escape
+---------------------------------------------------------------------------
+-- The game's Escape hides every shown window named in UISpecialFrames at once, so with the
+-- overview listed too, a window opened from it took the overview down with it (the owner,
+-- 2026-11-20: and windows whose box had the keyboard closed alone, so it varied). Now Escape
+-- closes our other windows first and the overview only on a later press: the overview isn't
+-- listed itself; a stand-in frame of ours is, shown only while the overview is open and no other
+-- window of ours is, and Escape hiding it closes the overview.
+local escapeWindows, overviewWindow, escapeStandIn, escapeDue = {}, nil, nil, false
+
+local function OthersOpen()
+    for _, f in ipairs(escapeWindows) do
+        if f:IsShown() then return true end
+    end
+    return false
+end
+
+local function UpdateEscape()
+    escapeDue = false
+    if not escapeStandIn then return end
+    if overviewWindow and overviewWindow:IsShown() and not OthersOpen() then
+        escapeStandIn:Show()
+    elseif escapeStandIn:IsShown() then
+        escapeStandIn.quiet = true
+        escapeStandIn:Hide()
+        escapeStandIn.quiet = nil
+    end
+end
+
+-- Shown a frame later: the press that closes our last other window must not also reach the
+-- stand-in, as the game goes through the whole list in one go.
+local function UpdateEscapeLater()
+    if escapeDue or not escapeStandIn or escapeStandIn:IsShown() then return end
+    if not (overviewWindow and overviewWindow:IsShown()) or OthersOpen() then return end
+    if not C_Timer then return UpdateEscape() end
+    escapeDue = true
+    C_Timer.After(0, UpdateEscape)
+end
+
+-- Each window of ours that Escape should close, once, when it's created; `overview` for the
+-- overview, which closes only once the others have.
+function ns.EscapeCloses(f, overview)
+    if not UISpecialFrames then return end
+    if overview then
+        overviewWindow = f
+        if not escapeStandIn then
+            escapeStandIn = CreateFrame("Frame", "AltsForeverEscape")
+            escapeStandIn:Hide()
+            escapeStandIn:SetScript("OnHide", function(self)
+                if not self.quiet and overviewWindow and overviewWindow:IsShown() then overviewWindow:Hide() end
+            end)
+            UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverEscape"
+        end
+        f:HookScript("OnShow", UpdateEscape)
+        f:HookScript("OnHide", UpdateEscape)
+        return
+    end
+    escapeWindows[#escapeWindows + 1] = f
+    UISpecialFrames[#UISpecialFrames + 1] = f:GetName()
+    f:HookScript("OnShow", UpdateEscape)
+    f:HookScript("OnHide", UpdateEscapeLater)
+end
+
+---------------------------------------------------------------------------
 -- Saved data
 ---------------------------------------------------------------------------
 -- Version 1 keyed characters "Name-Realm". Forever has no realms (a full name is

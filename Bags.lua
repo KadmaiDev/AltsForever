@@ -930,7 +930,7 @@ local function CreateWindow()
         end
     end)
 
-    if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverBagsFrame" end
+    ns.EscapeCloses(f)
     ns.SkinWindow(f, ns.BagsShellOpts())
     ns.SkinBagsWindow(f)
     f:Hide()

@@ -378,7 +378,7 @@ local function CreatePicker()
 
     -- The icon lists are big: let them go when the picker closes.
     f:SetScript("OnHide", function(self) self.list, self.browse, self.pool, self.names = nil, nil, nil, nil end)
-    if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverIconPicker" end
+    ns.EscapeCloses(f)
     ns.SkinWindow(f)
     f:Hide()
     ns.GamepadWindow(f)

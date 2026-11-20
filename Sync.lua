@@ -1146,7 +1146,7 @@ local function CreateWindow()
         GameTooltip:Hide()
     end)
     -- Escape closes it, like Blizzard's own windows.
-    if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverSyncFrame" end
+    ns.EscapeCloses(f)
     f:Hide()
     ns.GamepadWindow(f)
     ns.ScaleWindow(f)

@@ -1105,7 +1105,7 @@ local function CreateWindow()
     ns.SkinButton(who)
     f.who = who
 
-    if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverRecipesFrame" end
+    ns.EscapeCloses(f)
     ns.SkinWindow(f)
     -- EllesmereUI's look has no portrait, as on the game's window with it.
     if Flat() and f.portraitShown then

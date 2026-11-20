@@ -1410,7 +1410,7 @@ local function CreateWindow()
         if AltsForeverRepFrame then AltsForeverRepFrame:Hide() end
     end)
     -- Escape closes it, like Blizzard's own windows.
-    if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverFrame" end
+    ns.EscapeCloses(f, true)
     f:Hide()
     ns.GamepadWindow(f)
     ns.ScaleWindow(f)

@@ -160,9 +160,68 @@ test("the overview window isn't built until /af is used", function()
     eq(AltsForeverFrame:IsShown(), true)
     SlashCmdList.ALTSFOREVER("")
     eq(AltsForeverFrame:IsShown(), false, "/af again closes it")
+    SlashCmdList.ALTSFOREVER("")
+    runTimers()
+    pressEscape()
+    eq(AltsForeverFrame:IsShown(), false, "Escape closes it")
+end)
+
+-- The game's Escape (CloseSpecialWindows): every shown frame named in UISpecialFrames, hidden
+-- in one go. Returns whether any was.
+function pressEscape()
     local found = false
-    for _, name in ipairs(UISpecialFrames) do found = found or name == "AltsForeverFrame" end
-    eq(found, true, "Escape closes it")
+    for _, name in pairs(UISpecialFrames) do
+        local f = _G[name]
+        if f and f:IsShown() then
+            f:Hide()
+            found = true
+        end
+    end
+    runTimers()
+    return found
+end
+
+test("Escape closes the window on top first, then the overview", function()
+    local ns = wow.load(FILES)
+    wow.login({ v = 2, chars = { ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { level = 20, bags = {} }) } })
+    -- The bags window made first, so it's before the stand-in in the game's list.
+    ns.ShowBags("Tarn Moon", "bags")
+    ns.ToggleOverview(true)
+    runTimers()
+    ns.ShowGear("Tarn Moon")
+    eq(AltsForeverBagsFrame:IsShown(), true)
+    eq(pressEscape(), true)
+    eq(AltsForeverBagsFrame:IsShown(), false, "the windows on top close")
+    eq(AltsForeverGearFrame:IsShown(), false)
+    eq(AltsForeverFrame:IsShown(), true, "the overview stays")
+    eq(pressEscape(), true)
+    eq(AltsForeverFrame:IsShown(), false, "and closes on the next press")
+    eq(pressEscape(), false, "nothing of ours left: the game opens its menu")
+    -- The bags alone, listed before the stand-in: the same press doesn't reach the overview.
+    ns.ToggleOverview(true)
+    ns.ShowBags("Tarn Moon", "bags")
+    pressEscape()
+    eq(AltsForeverBagsFrame:IsShown(), false)
+    eq(AltsForeverFrame:IsShown(), true, "the overview stays")
+    pressEscape()
+    eq(AltsForeverFrame:IsShown(), false)
+
+    -- A window opened without the overview closes as before; the overview, reopened, still does.
+    ns.ShowBags("Tarn Moon", "bags")
+    pressEscape()
+    eq(AltsForeverBagsFrame:IsShown(), false)
+    ns.ToggleOverview(true)
+    runTimers()
+    pressEscape()
+    eq(AltsForeverFrame:IsShown(), false)
+    -- Closing it some other way leaves nothing for Escape.
+    ns.ToggleOverview(true)
+    runTimers()
+    AltsForeverFrame:Hide()
+    eq(pressEscape(), false)
+    ns.ToggleOverview(true)
+    runTimers()
+    eq(AltsForeverFrame:IsShown(), true, "a later opening isn't closed by a stale stand-in")
 end)
 
 test("overview rows: you first, then by level; totals gold", function()

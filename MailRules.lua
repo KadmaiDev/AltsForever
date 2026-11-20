@@ -971,7 +971,7 @@ local function CreateWindow()
     f.off:SetTextColor(0.6, 0.6, 0.6)
     f.off:SetText(L["Send mail to alts is off in the options, so these rules aren't used at the mailbox."])
     ns.SkinText(f.off)
-    if UISpecialFrames then UISpecialFrames[#UISpecialFrames + 1] = "AltsForeverMailRulesFrame" end
+    ns.EscapeCloses(f)
     ns.SkinWindow(f)
     f:Hide()
     ns.GamepadWindow(f)
