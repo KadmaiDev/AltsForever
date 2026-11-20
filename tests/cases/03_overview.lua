@@ -288,6 +288,45 @@ test("hovering a row shows rested details, hearthstone and item level", function
     assert(not table.concat(mine, "\n"):find("forget", 1, true), "not on your own row")
 end)
 
+test("the hearthstone's cooldown: when it's ready again, in the row tooltip", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    -- Used 10 minutes ago (game seconds), 60 minutes' cooldown: ready in 50.
+    wow.cooldowns[6948] = { wow.gameTime - 600, 3600 }
+    wow.login(overviewAlts())
+    local c = ns.char
+    eq(c.hearthReady, NOW + 3000)
+    eq(ns.HearthText(c, NOW), "Razor Hill · ready in 50 min")
+    eq(ns.HearthText(c, NOW + 2950), "Razor Hill · ready in 1 min", "rounded up")
+    eq(ns.HearthText(c, NOW + 3000), "Razor Hill · ready", "and once it's over, even offline")
+    -- The global cooldown after another spell isn't the hearthstone's.
+    wow.cooldowns[6948] = { wow.gameTime, 1.5 }
+    wow.fire("BAG_UPDATE_COOLDOWN")
+    eq(c.hearthReady, 0, "ready")
+    eq(ns.HearthText(c, NOW), "Razor Hill · ready")
+    wow.cooldowns[6948] = { wow.gameTime, 1800 }
+    wow.fire("BAG_UPDATE_COOLDOWN")
+    eq(c.hearthReady, NOW + 1800, "followed as it's used")
+    -- A character never read since: just the place, as before.
+    eq(ns.HearthText({ hearth = "Stormwind" }, NOW), "Stormwind")
+    eq(ns.HearthText({}, NOW), nil)
+    -- Shown on the row.
+    SlashCmdList.ALTSFOREVER("")
+    local you = overviewRows()[1]
+    you.scripts.OnEnter(you)
+    local lines = {}
+    for _, l in ipairs(GameTooltip.lines) do lines[#lines + 1] = table.concat(l, " = ") end
+    local all = table.concat(lines, " | ")
+    assert(all:find("Hearthstone = Razor Hill · ready in 30 min", 1, true), all)
+    -- A secret answer from the game is left alone.
+    wow.cooldowns[6948] = nil
+    local get = C_Container.GetItemCooldown
+    C_Container.GetItemCooldown = function() return wow.SECRET, wow.SECRET, 1 end
+    wow.fire("BAG_UPDATE_COOLDOWN")
+    eq(c.hearthReady, NOW + 1800, "kept")
+    C_Container.GetItemCooldown = get
+end)
+
 test("the window still opens if the client lacks Blizzard's frame templates", function()
     wow.load(FILES)
     wow.missingTemplates.DefaultPanelTemplate = true

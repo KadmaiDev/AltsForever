@@ -8,6 +8,8 @@ local issecretvalue = issecretvalue or function() return false end
 local UnitLevel, UnitXP, UnitXPMax = UnitLevel, UnitXP, UnitXPMax
 local GetXPExhaustion, IsResting = GetXPExhaustion, IsResting
 local GetZoneText, GetBindLocation, GetAverageItemLevel = GetZoneText, GetBindLocation, GetAverageItemLevel
+local GetTime = GetTime
+local HEARTHSTONE = 6948
 
 -- Rested XP builds at 5% of a level per 8 hours logged out in an inn or city, a
 -- quarter of that anywhere else, up to 150% of a level. The inn rate was measured on
@@ -45,7 +47,39 @@ function ns.ScanCharacter(c)
     if not issecretvalue(hearth) and hearth and hearth ~= "" then c.hearth = hearth end
     local _, equipped = GetAverageItemLevel()
     if Plain(equipped) and equipped > 0 then c.ilvl = floor(equipped + 0.5) end
+    ns.ScanHearth(c)
     c.updated = time()
+end
+
+-- The hearthstone's cooldown (a player's request, 2026-11-20: where it's set showed, not
+-- when it can be used). c.hearthReady = the clock time it's ready again, 0 when it was ready
+-- at the last reading, nil never read. The game counts cooldowns in GetTime() seconds, so
+-- the end is turned into a clock time to keep. A cooldown of 2 seconds or less is the global
+-- cooldown after another spell, not the hearthstone's.
+function ns.ScanHearth(c)
+    local get = C_Container and C_Container.GetItemCooldown
+    if not (get and GetTime) then return end
+    local start, duration = get(HEARTHSTONE)
+    if issecretvalue(start) or issecretvalue(duration) or type(start) ~= "number" or type(duration) ~= "number" then return end
+    local now = time()
+    if start > 0 and duration > 2 then
+        local ready = floor(now + start + duration - GetTime() + 0.5)
+        c.hearthReady = ready > now and ready or 0
+    else
+        c.hearthReady = 0
+    end
+end
+
+-- "Stormwind · ready in 23 min", "Stormwind · ready", or just the place when the cooldown
+-- was never read; nil without a place.
+function ns.HearthText(c, now)
+    if not c.hearth then return nil end
+    local ready = c.hearthReady
+    if not ready then return c.hearth end
+    if ready > now then
+        return c.hearth .. " · " .. ns.L["ready in %s"]:format(ns.L["%d min"]:format(math.ceil((ready - now) / 60)))
+    end
+    return c.hearth .. " · " .. ns.L["ready"]
 end
 
 -- Returns rested XP now, the cap, and seconds until full, or nil at max level.
@@ -200,6 +234,7 @@ function ns.StartCharacter()
     }) do
         ns.On(event, Scan)
     end
+    ns.On("BAG_UPDATE_COOLDOWN", function() ns.ScanHearth(char) end)
     -- Don't read stats at logout (they're already zeroed); just note the time, which
     -- is where the offline rested XP estimate starts from.
     ns.On("PLAYER_LOGOUT", function() char.updated = time() end)

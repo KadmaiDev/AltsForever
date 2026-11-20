@@ -434,7 +434,7 @@ local function RowTooltip(row)
         tt:AddDoubleLine(L["Mail expires"], ns.ExpiryColor(left) .. ns.ExpiryText(left) .. "|r", 1, 0.82, 0, 1, 1, 1)
         tt:AddLine(GREY .. (c.mailDeletes and L["The soonest will be deleted, not returned"] or L["The soonest goes back to its sender"]) .. "|r")
     end
-    if c.hearth then tt:AddDoubleLine(L["Hearthstone"], c.hearth, 1, 0.82, 0, 1, 1, 1) end
+    if c.hearth then tt:AddDoubleLine(L["Hearthstone"], ns.HearthText(c, now), 1, 0.82, 0, 1, 1, 1) end
     if c.played then tt:AddDoubleLine(L["Played"], ns.PlayedText(c, now), 1, 0.82, 0, 1, 1, 1) end
     if c.ilvl then tt:AddDoubleLine(L["Item level"], c.ilvl, 1, 0.82, 0, 1, 1, 1) end
     if c.money then tt:AddDoubleLine(L["Gold"], GetCoinTextureString(c.money), 1, 0.82, 0, 1, 1, 1) end
