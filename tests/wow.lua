@@ -321,7 +321,12 @@ function M.load(files)
     end
     function frameMethods:GetFrameLevel() return self.level or 1 end
     function frameMethods:SetFrameLevel(level) self.level = level end
-    function frameMethods:SetText(text) self.text = text end
+    function frameMethods:SetText(text)
+        -- The game takes a string, a number or nil; anything else is an error there.
+        local t = type(text)
+        assert(t == "string" or t == "number" or t == "nil", "SetText given a " .. t)
+        self.text = text
+    end
     function frameMethods:SetPoint(point, rel, relPoint, x, y) self.point = { point, rel, relPoint, x, y } end
     function frameMethods:GetNormalTexture() return self.normalTexture end
     function frameMethods:SetNormalTexture(t)

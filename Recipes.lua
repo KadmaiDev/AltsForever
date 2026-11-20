@@ -615,6 +615,10 @@ local function MakeList(f)
             pad:SetShown(on)
         end
         f:HookScript("OnShow", Which)
+        -- The Gamepad UI switched on or off with the window open.
+        ns.On("INPUT_DEVICE_INTERFACE_TRANSITION", function()
+            if f:IsShown() then Which() end
+        end)
         Which()
         f.padFilter = pad
     else

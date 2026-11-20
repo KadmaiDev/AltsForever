@@ -206,6 +206,7 @@ test("with the Gamepad UI on, a menu of ours is our own window, never the game's
     eq(wow.menu, nil, "the game's menu never opens: it would carry our entries into Blizzard's controller code")
     local m = ns.GamepadMenu()
     eq(m:IsShown(), true)
+    eq(m.TitleText:GetText(), "Alts Forever", "the first list's title")
     local items = padMenu(ns)
     eq(items[1].text, "[DRUID]Tarn Moon", "the title first")
     eq(items[1].row, nil, "a title can't be pressed")
@@ -284,6 +285,16 @@ test("with the Gamepad UI on, the professions window's filter is a plain button 
     eq(f.filter:IsShown(), true, "mouse: the game's dropdown")
     MenuUtil.CreateContextMenu(f.filter, f.filter.menuGenerator)
     eq(#wow.menu.items, 2, "with its two tick boxes")
+    -- Switched with the window open: the buttons follow at once.
+    wow.gamepadUI = true
+    wow.fire("INPUT_DEVICE_INTERFACE_TRANSITION", 1, 0)
+    eq(f:IsShown(), true)
+    eq(f.padFilter:IsShown(), true, "open window, Gamepad UI on: our button")
+    eq(f.filter:IsShown(), false)
+    wow.gamepadUI = false
+    wow.fire("INPUT_DEVICE_INTERFACE_TRANSITION", 0, 1)
+    eq(f.filter:IsShown(), true, "and back")
+    eq(f.padFilter:IsShown(), false)
     eq(f.padFilter:IsShown(), false)
 end)
 

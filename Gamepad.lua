@@ -101,8 +101,12 @@ local BACK_ICON = "|TInterface\\Buttons\\UI-SpellbookIcon-PrevPage-Up:16:16|t "
 
 local function Noop() end
 local Entry = {}
--- Calls our menus don't use (tooltips, responses...) do nothing rather than fail.
-local EntryMeta = { __index = function(_, k) return Entry[k] or Noop end }
+-- Methods our menus don't use (tooltips, responses...) do nothing rather than fail. Only
+-- capitalised names, as the game's: our own fields (text, data...) stay nil when unset.
+local EntryMeta = { __index = function(_, k)
+    if Entry[k] then return Entry[k] end
+    if type(k) == "string" and k:find("^%u") then return Noop end
+end }
 
 local function NewEntry(kind, text, a, b, data)
     return setmetatable({ kind = kind, text = text, a = a, b = b, data = data, enabled = true, children = {} }, EntryMeta)
