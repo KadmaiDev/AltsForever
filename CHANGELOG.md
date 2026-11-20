@@ -1,3 +1,7 @@
+## Alts Forever (not yet released)
+
+- **Controllers:** the small Alts Forever button that 1.9.0 put in the bag window's title bar with the Gamepad UI on is gone again: it didn't work well with a controller. Open every character's bags with the **Bags and bank** key binding (Key Bindings > Alts Forever) or a `/af bags` macro instead.
+
 ## Alts Forever 1.9.0
 
 - **Mail rules for bind-on-equip items:** send all your BoE weapons to one character (to sell them, say) and all BoE armour, or every BoE item, to another. Attach a BoE item at the mailbox, open the arrow beside the To box and tick the rule you want. A rule for the item itself or its category still comes first, then BoE weapons or armour, then all BoE. Rings, necks, trinkets, cloaks and shields count as armour. The Pack button picks up only items that aren't bound yet. Thanks to the player who asked.
