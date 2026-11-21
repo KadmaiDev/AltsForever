@@ -1,3 +1,7 @@
+## Alts Forever (not yet released)
+
+- **Can craft and recipe status are now two settings:** "Show Can craft and recipes" is split into **Show Can craft** (which of your characters can make an item, on item tooltips) and **Show recipe status** (Known, Can learn or Needs skill for each character, on recipe tooltips), so you can keep one without the other. On the Options page, or `/af crafting` and the new `/af recipes`. If you had the old one off, both start off. Thanks to the player who asked.
+
 ## Alts Forever 1.9.1
 
 - **Hearthstone cooldown:** pointing at a character in the overview now shows when their hearthstone is ready again, beside where it's set ("Stormwind · ready in 23 min"). Each character's is read when you next log in on them. Thanks to FelixFitzgerald for the suggestion.
