@@ -816,12 +816,12 @@ local function SpaceSummary(tt, which)
     local first
     if #rows > 0 then
         tt:AddLine(which == "bags" and L["Slots in each bag, then free of all"]
-            or L["Slots in the bank and each bank bag, then free of all"], 0.62, 0.62, 0.62)
+            or L["Slots in each bank bag, then free of all"], 0.62, 0.62, 0.62)
         first = tt.NumLines and tt:NumLines() + 1
         -- One column per bag slot, short rows padded so the free column lines up.
         for i, r in ipairs(rows) do
             local sizes = r[2]
-            tt:AddDoubleLine(r[1], table.concat(sizes, "/") .. "   " .. r[3], 1, 1, 1, 1, 1, 1)
+            tt:AddDoubleLine(r[1], (#sizes > 0 and table.concat(sizes, "/") .. "   " or "") .. r[3], 1, 1, 1, 1, 1, 1)
             local cells = { r[1] }
             for col = 1, widest do cells[col + 1] = sizes[col] or "" end
             cells[widest + 2] = r[3]

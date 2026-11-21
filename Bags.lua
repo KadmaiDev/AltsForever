@@ -263,7 +263,7 @@ local function Unbought(c)
 end
 ns.BankBagsUnbought = Unbought
 
--- Each bag (or bank tab) in order, for the tooltip: { name, icon, quality, kind, free,
+-- Each bag (or bank tab) in order, for the tooltip: { bag, name, icon, quality, kind, free,
 -- size }, size 0 for an empty bag slot (or a bought bank bag slot with no bag). Names not
 -- loaded yet are requested and read as "Bag n" until they are.
 local spaceList = {}
@@ -277,7 +277,7 @@ function ns.BagSpaceList(c, which)
         local empty = which == "bank" and index > 1 and index <= bought and L["Empty bank bag slot"]
             or which ~= "bank" and BAG_SLOTS[bag]
         if values or empty then
-            local e = { free = 0, size = values and #values or 0 }
+            local e = { bag = bag, free = 0, size = values and #values or 0 }
             for i = 1, e.size do
                 if values[i] == 0 then e.free = e.free + 1 end
             end
@@ -306,13 +306,15 @@ function ns.BagSpaceList(c, which)
 end
 
 -- Each bag's size in order, "-" for a slot with no bag, for the overview's grid of every
--- character (Altoholic's "20/14/14/-/14"; a player planning bag upgrades, 2026-11-22).
--- Fills `out` (wiped) and returns it; empty when not known.
+-- character (Altoholic's "14/14/-/14"; a player planning bag upgrades, 2026-11-22). The
+-- backpack and the bank's own slots are left out: the same size for everyone (owner,
+-- 2026-11-22). Fills `out` (wiped) and returns it; empty when not known.
 function ns.BagSizes(c, which, out)
     wipe(out)
     if not ns.BagSpace(c, which) then return out end
-    for i, e in ipairs(ns.BagSpaceList(c, which)) do
-        out[i] = e.size == 0 and "-" or tostring(e.size)
+    local fixed = which == "bank" and ns.BANK_TABS[1] or BagIndex.Backpack
+    for _, e in ipairs(ns.BagSpaceList(c, which)) do
+        if e.bag ~= fixed then out[#out + 1] = e.size == 0 and "-" or tostring(e.size) end
     end
     return out
 end

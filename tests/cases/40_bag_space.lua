@@ -193,13 +193,13 @@ test("the Bags and Bank titles list every character's bags in a grid: each bag's
     f.sorts.bags.scripts.OnEnter(f.sorts.bags)
     local lines = tipLines()
     assert(hasLine(lines, "Slots in each bag, then free of all"), table.concat(lines, " | "))
-    assert(hasLine(lines, "[ROGUE]Low = 16/-/-/-/-/-   " .. ORANGE .. "0|r" .. G .. "/16|r"), "backpack, four bag slots, reagent slot")
-    assert(hasLine(lines, "[PRIEST]High = 16/16/12/-/-/-   19" .. G .. "/44|r"), table.concat(lines, " | "))
+    assert(hasLine(lines, "[ROGUE]Low = -/-/-/-/-   " .. ORANGE .. "0|r" .. G .. "/16|r"), "four bag slots and the reagent slot; the backpack left out")
+    assert(hasLine(lines, "[PRIEST]High = 16/12/-/-/-   19" .. G .. "/44|r"), table.concat(lines, " | "))
     assert(not hasLine(lines, "Far ="), "nothing recorded: left out")
     f.sorts.bank.scripts.OnEnter(f.sorts.bank)
     lines = tipLines()
-    assert(hasLine(lines, "Slots in the bank and each bank bag, then free of all"))
-    assert(hasLine(lines, "[PRIEST]High = 28/28   10" .. G .. "/56|r"), table.concat(lines, " | "))
+    assert(hasLine(lines, "Slots in each bank bag, then free of all"))
+    assert(hasLine(lines, "[PRIEST]High = 28   10" .. G .. "/56|r"), table.concat(lines, " | "))
     assert(not hasLine(lines, "Low ="), "bank never visited: only in the not-visited line")
 end)
 
@@ -231,7 +231,7 @@ test("a bank visit records each bank bag and how many bank bag slots are bought;
     assert(hasLine(tipLines(), "Bank bag slots not bought yet: 4"), table.concat(tipLines(), " | "))
     local f = AltsForeverFrame
     f.sorts.bank.scripts.OnEnter(f.sorts.bank)
-    assert(hasLine(tipLines(), "Aldric = 28/10/-   37" .. G .. "/38|r"), table.concat(tipLines(), " | "))
+    assert(hasLine(tipLines(), "Aldric = 10/-   37" .. G .. "/38|r"), table.concat(tipLines(), " | "))
     eq(ns.BagsSectionName(c, 7), "Mooncloth Bag", "the bags window's By bag heading")
     eq(ns.BagsSectionName(c, 6), "Bank")
 
@@ -276,15 +276,16 @@ test("the bank grid under the title lines up: bag columns and free/total in the 
         for i = #cells, 1, -1 do if cells[i].text ~= "" then t[#t + 1] = cells[i].text end end
         return table.concat(t, " ")
     end
-    eq(texts(low), "28 - - - 3" .. G .. "/28|r", "the bank, then three bought slots with no bag")
-    eq(texts(high), "28 28 10" .. G .. "/56|r")
+    eq(texts(low), "- - - 3" .. G .. "/28|r", "three bought slots with no bag; the bank's own 28 left out")
+    eq(texts(high), "28 10" .. G .. "/56|r")
     local function at(cells, text)
         for _, c in ipairs(cells) do if c.text == text then return c.x end end
     end
-    eq(at(low, "28"), at(high, "28") and (function()
-        local far = 0
-        for _, c in ipairs(high) do if c.text == "28" and c.x > far then far = c.x end end
+    local function farthest(cells, text)
+        local far
+        for _, c in ipairs(cells) do if c.text == text and (not far or c.x > far) then far = c.x end end
         return far
-    end)(), "the bank's own slots in the first column for both")
+    end
+    eq(farthest(low, "-"), at(high, "28"), "the first bank bag slot in the same column for both")
     clearTooltipLines()
 end)
