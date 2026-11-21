@@ -1,3 +1,7 @@
+## Alts Forever (not yet released)
+
+- **Every character's bags at a glance:** point at the **Bags** or **Bank** column title in the overview for a grid of all your characters: each bag's slots, a "-" where a bag slot is empty, then free slots of the total, as in Altoholic's bag report. Handy for planning bag upgrades or passing old bags to an alt. An empty reagent bag slot now counts as a bag slot with no bag, and the bank shows each bank bag by name, bought bank bag slots with no bag in them, and how many are still to buy (from each character's next bank visit). Thanks to the player who asked.
+
 ## Alts Forever 1.9.1
 
 - **Hearthstone cooldown:** pointing at a character in the overview now shows when their hearthstone is ready again, beside where it's set ("Stormwind · ready in 23 min"). Each character's is read when you next log in on them. Thanks to FelixFitzgerald for the suggestion.

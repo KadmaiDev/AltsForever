@@ -207,11 +207,36 @@ function ns.StartScanner()
 
     -- Bank contents can only be read while the bank is open; outside that the tabs
     -- can report as empty, which must not overwrite what we saw last time.
+    -- Forever's bank (Blizzard_UIPanels_Game Camelot/BankFrame.lua, forever branch): tab 1
+    -- is the bank itself, tabs 2 on are bank bag slots, each bought or not and holding a bag
+    -- or not (both read as 0 slots). The bag in tab n is slot n of the Characterbanktab
+    -- container, as the bank's bag buttons read it. Kept for the overview's Bank column
+    -- (a player planning bag upgrades, 2026-11-22; owner approved both): the bag at
+    -- layout[tab][0], as for carried bags, and how many tabs are bought, tab 1 included
+    -- (c.bankBought), so a bought slot with no bag can be listed.
+    local function BankBags()
+        local bank, kind = C_Bank, Enum.BankType and Enum.BankType.Character
+        if bank and kind and bank.FetchNumPurchasedBankTabs then
+            local ok, n = pcall(bank.FetchNumPurchasedBankTabs, kind)
+            if ok and not issecretvalue(n) and type(n) == "number" then char.bankBought = n end
+        end
+        local holder = BagIndex.Characterbanktab
+        if not holder then return end
+        for i = 2, #BANK_BAGS do
+            local slots = char.layout[BANK_BAGS[i]]
+            if slots then
+                local ok, id = pcall(GetContainerItemID, holder, i)
+                if ok and not issecretvalue(id) and type(id) == "number" then slots[0] = id end
+            end
+        end
+    end
+
     local function ScanBank()
         bankDirty = false
         char.bank = char.bank or {}
         char.layout = char.layout or {}
         ScanInto(BANK_BAGS, char.bank)
+        BankBags()
         char.bankAt = time()
         ns.version = ns.version + 1
         ns.BagsWindowChanged()

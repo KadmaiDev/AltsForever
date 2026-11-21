@@ -110,7 +110,8 @@ function M.load(files)
 
     Enum = {
         BagIndex = { Keyring = -1, Backpack = 0, Bag_1 = 1, Bag_2 = 2, Bag_3 = 3, Bag_4 = 4, ReagentBag = 5,
-            CharacterBankTab_1 = 6, CharacterBankTab_2 = 7, CharacterBankTab_3 = 8 },
+            CharacterBankTab_1 = 6, CharacterBankTab_2 = 7, CharacterBankTab_3 = 8, Characterbanktab = -2 },
+        BankType = { Character = 0, Account = 2 },
         TooltipDataType = { Item = 0, Spell = 1 },
         SendAddonMessageResult = { Success = 0, InvalidPrefix = 1, InvalidMessage = 2, AddonMessageThrottle = 3,
             ChannelThrottle = 8, GeneralError = 9, AddOnMessageLockdown = 11, TargetOffline = 12 },
@@ -484,6 +485,12 @@ function M.load(files)
     -- M.gameTime: GetTime(), the game's own seconds (not the clock); M.cooldowns[itemID] =
     -- { start, duration } in those seconds.
     M.gameTime, M.cooldowns = 1000, {}
+    -- The bank: tabs bought (tab 1 included) and the most there can be; nil = not answered.
+    M.bankBought, M.bankMax = nil, nil
+    C_Bank = {
+        FetchNumPurchasedBankTabs = function(kind) return kind == 0 and M.bankBought or 0 end,
+        FetchMaxNumBankTabs = function(kind) return kind == 0 and M.bankMax or 0 end,
+    }
     GetTime = function() return M.gameTime end
     C_Container = {
         GetItemCooldown = function(id)

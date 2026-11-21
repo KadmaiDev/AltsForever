@@ -88,7 +88,8 @@ test("pointing at a Bags cell lists each bag, its kind and empty bag slots; a cl
     eq(lines[4][2], "12" .. G .. "/12|r", "empty: nothing in it yet")
     assert(lines[5][1]:find("|t Empty bag slot$")); eq(lines[5][2], "-")
     assert(lines[6][1]:find("|t Empty bag slot$"), "bag slots 3 and 4")
-    eq(lines[7][1], "Total"); eq(lines[7][2], "19 of 44 free")
+    assert(lines[7][1]:find("|t Empty reagent bag slot$"), "and the reagent bag slot"); eq(lines[7][2], "-")
+    eq(lines[8][1], "Total"); eq(lines[8][2], "19 of 44 free")
     assert(not hasLine(tipLines(), "Keyring"), "no keyring")
     assert(hasLine(tipLines(), "Click to open their bags"))
     bags.scripts.OnLeave(bags)
@@ -96,7 +97,7 @@ test("pointing at a Bags cell lists each bag, its kind and empty bag slots; a cl
 
     bank.scripts.OnEnter(bank)
     lines = GameTooltip.lines
-    eq(lines[2][1], "Tab 1"); eq(lines[2][2], "10" .. G .. "/28|r")
+    eq(lines[2][1], "Bank"); eq(lines[2][2], "10" .. G .. "/28|r")
     eq(lines[3][1], "Tab 2"); eq(lines[3][2], ORANGE .. "0|r" .. G .. "/28|r")
     eq(lines[4][2], "10 of 56 free")
     assert(hasLine(tipLines(), "Bank last visited: 2d ago"), table.concat(tipLines(), " | "))
@@ -126,7 +127,7 @@ test("Bags and Bank sort fewest free first; their titles add up every character"
     f.sorts.bags.scripts.OnEnter(f.sorts.bags)
     local lines = tipLines()
     assert(hasLine(lines, "All characters = 19 of 60 free"), table.concat(lines, " | "))
-    assert(hasLine(lines, "Bag slots with no bag: [ROGUE]Low 4, [PRIEST]High 2"), "in the overview's order: " .. table.concat(lines, " | "))
+    assert(hasLine(lines, "Bag slots with no bag: [ROGUE]Low 5, [PRIEST]High 3"), "in the overview's order: " .. table.concat(lines, " | "))
     assert(hasLine(lines, "Click to sort by this column"))
     f.sorts.bank.scripts.OnEnter(f.sorts.bank)
     lines = tipLines()
@@ -184,4 +185,53 @@ test("an open overview's Bags and Bank cells follow bag and bank scans", functio
     wow.setBag(1, 10, {})
     wow.fire("BAG_CONTAINER_UPDATE")
     eq(cell(spaceRow("Aldric"), 12), "23" .. G .. "/26|r", "a bag put in")
+end)
+
+test("the Bags and Bank titles list every character's bags in a grid: each bag's slots, '-' for none, then free", function()
+    spaceStart()
+    local f = AltsForeverFrame
+    f.sorts.bags.scripts.OnEnter(f.sorts.bags)
+    local lines = tipLines()
+    assert(hasLine(lines, "Slots in each bag, then free of all"), table.concat(lines, " | "))
+    assert(hasLine(lines, "[ROGUE]Low = 16/-/-/-/-/-   " .. ORANGE .. "0|r" .. G .. "/16|r"), "backpack, four bag slots, reagent slot")
+    assert(hasLine(lines, "[PRIEST]High = 16/16/12/-/-/-   19" .. G .. "/44|r"), table.concat(lines, " | "))
+    assert(not hasLine(lines, "Far ="), "nothing recorded: left out")
+    f.sorts.bank.scripts.OnEnter(f.sorts.bank)
+    lines = tipLines()
+    assert(hasLine(lines, "Slots in the bank and each bank bag, then free of all"))
+    assert(hasLine(lines, "[PRIEST]High = 28/28   10" .. G .. "/56|r"), table.concat(lines, " | "))
+    assert(not hasLine(lines, "Low ="), "bank never visited: only in the not-visited line")
+end)
+
+test("a bank visit records each bank bag and how many bank bag slots are bought; the Bank cell names them", function()
+    local MOONCLOTH = 14155
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.itemNames[MOONCLOTH] = "Mooncloth Bag"
+    wow.setBag(0, 16, {})
+    wow.setBag(6, 28, { [1] = { 100, 5 } }) -- tab 1: the bank itself
+    wow.setBag(7, 10, {}) -- tab 2: a bag in the first bank bag slot
+    -- tab 3 bought but no bag in it: no slots
+    wow.setBag(Enum.BagIndex.Characterbanktab, 9, { [2] = { MOONCLOTH, 1 } })
+    wow.bankBought, wow.bankMax = 3, 7
+    wow.login(overviewAlts())
+    wow.fire("BANKFRAME_OPENED")
+    local c = AltsForeverDB.chars.Aldric
+    eq(c.layout[7][0], MOONCLOTH, "the bag in bank bag slot 1")
+    eq(c.layout[6][0], nil, "tab 1 is the bank, not a bag")
+    eq(c.bankBought, 3)
+    SlashCmdList.ALTSFOREVER("")
+    local bank = spaceRow("Aldric").spaces[2]
+    bank.scripts.OnEnter(bank)
+    local lines = GameTooltip.lines
+    eq(lines[2][1], "Bank"); eq(lines[2][2], "27" .. G .. "/28|r")
+    eq(lines[3][1], "Mooncloth Bag"); eq(lines[3][2], "10" .. G .. "/10|r")
+    assert(lines[4][1]:find("|t Empty bank bag slot$"), "bought, no bag: " .. lines[4][1]); eq(lines[4][2], "-")
+    eq(lines[5][2], "37 of 38 free")
+    assert(hasLine(tipLines(), "Bank bag slots not bought yet: 4"), table.concat(tipLines(), " | "))
+    local f = AltsForeverFrame
+    f.sorts.bank.scripts.OnEnter(f.sorts.bank)
+    assert(hasLine(tipLines(), "Aldric = 28/10/-   37" .. G .. "/38|r"), table.concat(tipLines(), " | "))
+    eq(ns.BagsSectionName(c, 7), "Mooncloth Bag", "the bags window's By bag heading")
+    eq(ns.BagsSectionName(c, 6), "Bank")
 end)

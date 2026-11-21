@@ -168,10 +168,12 @@ local function SectionName(c, bag)
     if not bag then return view == "bank" and L["Bank"] or view == "mail" and L["Mail"] or L["Bags"] end
     if bag == BagIndex.Backpack then return BACKPACK_TOOLTIP or L["Backpack"] end
     if bag == BagIndex.Keyring then return KEYRING or L["Keyring"] end
+    local item = c.layout[bag] and c.layout[bag][0]
+    -- Forever's bank: tab 1 is the bank itself, the others bank bags (named once the bag is
+    -- recorded: bank visits since 2026-11-22).
     for i, tab in ipairs(ns.BANK_TABS) do
-        if tab == bag then return L["Tab %d"]:format(i) end
+        if tab == bag and not item then return i == 1 and L["Bank"] or L["Tab %d"]:format(i) end
     end
-    local item = c.layout[bag][0]
     local name = item and C_Item.GetItemNameByID(item)
     if not name and item and C_Item.RequestLoadItemDataByID then
         C_Item.RequestLoadItemDataByID(item)
@@ -187,12 +189,14 @@ ns.BagsSectionName = SectionName
 -- tab for the cell's tooltip. No UI here, so tests can check it.
 ---------------------------------------------------------------------------
 
--- Bags 1-4 can be empty (no bag bought yet): the tooltip says so. The backpack is always
--- there; the reagent bag and keyring aren't listed when missing.
+-- Bags 1-4 and the reagent bag slot can be empty (no bag yet): the tooltip says so (the
+-- reagent slot since a player asked, 2026-11-22). The backpack is always there; the
+-- keyring isn't listed. BAG_SLOTS[bag] = what an empty one is called.
 local BAG_SLOTS = {}
 for _, name in ipairs({ "Bag_1", "Bag_2", "Bag_3", "Bag_4" }) do
-    if BagIndex[name] then BAG_SLOTS[BagIndex[name]] = true end
+    if BagIndex[name] then BAG_SLOTS[BagIndex[name]] = L["Empty bag slot"] end
 end
+if BagIndex.ReagentBag then BAG_SLOTS[BagIndex.ReagentBag] = L["Empty reagent bag slot"] end
 
 local function Places(which)
     return which == "bank" and ns.BANK_TABS or ns.CARRIED_BAGS
@@ -241,24 +245,45 @@ local function BagKind(item)
     return nil
 end
 
+-- Bank bag slots a character could still buy: Forever's most tabs (tab 1 included) less
+-- the ones they've bought; nil when either isn't known.
+local maxTabs
+local function Unbought(c)
+    local bought = c and c.bankBought
+    if type(bought) ~= "number" then return nil end
+    if not maxTabs then
+        local kind = Enum.BankType and Enum.BankType.Character
+        if not (C_Bank and C_Bank.FetchMaxNumBankTabs and kind) then return nil end
+        local ok, n = pcall(C_Bank.FetchMaxNumBankTabs, kind)
+        if not ok or issecretvalue(n) or type(n) ~= "number" then return nil end
+        maxTabs = n
+    end
+    local left = maxTabs - bought
+    return left > 0 and left or nil
+end
+ns.BankBagsUnbought = Unbought
+
 -- Each bag (or bank tab) in order, for the tooltip: { name, icon, quality, kind, free,
--- size }, size 0 for an empty bag slot. Names not loaded yet are requested and read as
--- "Bag n" until they are.
+-- size }, size 0 for an empty bag slot (or a bought bank bag slot with no bag). Names not
+-- loaded yet are requested and read as "Bag n" until they are.
 local spaceList = {}
 function ns.BagSpaceList(c, which)
     wipe(spaceList)
     local layout = c and c.layout
     if type(layout) ~= "table" then return spaceList end
-    for _, bag in ipairs(Places(which)) do
+    local bought = which == "bank" and type(c.bankBought) == "number" and c.bankBought or 0
+    for index, bag in ipairs(Places(which)) do
         local values = bag ~= BagIndex.Keyring and layout[bag]
-        if values or BAG_SLOTS[bag] then
+        local empty = which == "bank" and index > 1 and index <= bought and L["Empty bank bag slot"]
+            or which ~= "bank" and BAG_SLOTS[bag]
+        if values or empty then
             local e = { free = 0, size = values and #values or 0 }
             for i = 1, e.size do
                 if values[i] == 0 then e.free = e.free + 1 end
             end
             local item = values and values[0]
             if not values then
-                e.name, e.icon = L["Empty bag slot"], "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"
+                e.name, e.icon = empty, "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"
             elseif item and item ~= 0 then
                 local name = C_Item.GetItemNameByID(item)
                 if issecretvalue(name) or type(name) ~= "string" then
@@ -278,6 +303,18 @@ function ns.BagSpaceList(c, which)
         end
     end
     return spaceList
+end
+
+-- Each bag's size in order, "-" for a slot with no bag, for the overview's grid of every
+-- character (Altoholic's "20/14/14/-/14"; a player planning bag upgrades, 2026-11-22).
+-- Fills `out` (wiped) and returns it; empty when not known.
+function ns.BagSizes(c, which, out)
+    wipe(out)
+    if not ns.BagSpace(c, which) then return out end
+    for i, e in ipairs(ns.BagSpaceList(c, which)) do
+        out[i] = e.size == 0 and "-" or tostring(e.size)
+    end
+    return out
 end
 
 ---------------------------------------------------------------------------
