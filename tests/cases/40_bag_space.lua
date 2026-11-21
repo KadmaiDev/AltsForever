@@ -234,4 +234,57 @@ test("a bank visit records each bank bag and how many bank bag slots are bought;
     assert(hasLine(tipLines(), "Aldric = 28/10/-   37" .. G .. "/38|r"), table.concat(tipLines(), " | "))
     eq(ns.BagsSectionName(c, 7), "Mooncloth Bag", "the bags window's By bag heading")
     eq(ns.BagsSectionName(c, 6), "Bank")
+
+    -- Buying another bank bag slot, with the bank still open: no contents change, only the tabs.
+    GameTooltip:Hide()
+    wow.bankBought = 4
+    wow.fire("BANK_TABS_CHANGED", 0)
+    eq(c.bankBought, 4, "the new slot is counted")
+    bank.scripts.OnEnter(bank)
+    lines = GameTooltip.lines
+    assert(lines[5][1]:find("|t Empty bank bag slot$"), "a second empty bought slot: " .. tostring(lines[5][1]))
+    assert(hasLine(tipLines(), "Bank bag slots not bought yet: 3"), table.concat(tipLines(), " | "))
+    -- Closed, a tab change isn't read (the bank can't be read then).
+    wow.fire("BANKFRAME_CLOSED")
+    wow.bankBought = 5
+    wow.fire("BANK_TABS_CHANGED", 0)
+    eq(c.bankBought, 4)
+end)
+
+test("the bank grid under the title lines up: bag columns and free/total in the same place for rows of different lengths", function()
+    local saved = spaceAlts()
+    saved.chars.Low.layout[6] = bagSlots(28, 3)
+    saved.chars.Low.bankBought = 4 -- the bank and three bank bag slots, none with a bag
+    saved.chars.Low.bank = {}
+    spaceStart(saved)
+    local rights = columnTooltip()
+    local f = AltsForeverFrame
+    f.sorts.bank.scripts.OnEnter(f.sorts.bank)
+    local byName = {}
+    for i, l in ipairs(GameTooltip.lines) do
+        local name = tostring(l[1])
+        if name:find("Low", 1, true) then byName.low = rights[i] end
+        if name:find("High", 1, true) then byName.high = rights[i] end
+    end
+    assert(byName.low and byName.high, "a row each")
+    eq(checkColumns({ byName.low, byName.high }) >= 3, true, "free/total plus bag columns")
+    local low, high = cellsOn(byName.low), cellsOn(byName.high)
+    eq(low[1].text, "3" .. G .. "/28|r"); eq(high[1].text, "10" .. G .. "/56|r")
+    eq(low[1].x, high[1].x, "free/total in one column")
+    local function texts(cells)
+        local t = {}
+        for i = #cells, 1, -1 do if cells[i].text ~= "" then t[#t + 1] = cells[i].text end end
+        return table.concat(t, " ")
+    end
+    eq(texts(low), "28 - - - 3" .. G .. "/28|r", "the bank, then three bought slots with no bag")
+    eq(texts(high), "28 28 10" .. G .. "/56|r")
+    local function at(cells, text)
+        for _, c in ipairs(cells) do if c.text == text then return c.x end end
+    end
+    eq(at(low, "28"), at(high, "28") and (function()
+        local far = 0
+        for _, c in ipairs(high) do if c.text == "28" and c.x > far then far = c.x end end
+        return far
+    end)(), "the bank's own slots in the first column for both")
+    clearTooltipLines()
 end)

@@ -11,7 +11,7 @@ local KNOWN_EVENTS = {
     ADDON_LOADED = true, PLAYER_LOGIN = true, PLAYER_LOGOUT = true,
     BAG_UPDATE = true, BAG_UPDATE_DELAYED = true, BAG_CONTAINER_UPDATE = true,
     PLAYER_EQUIPMENT_CHANGED = true, INSPECT_READY = true,
-    BANKFRAME_OPENED = true, BANKFRAME_CLOSED = true, BAG_UPDATE_COOLDOWN = true, INPUT_DEVICE_INTERFACE_TRANSITION = true,
+    BANKFRAME_OPENED = true, BANKFRAME_CLOSED = true, BAG_UPDATE_COOLDOWN = true, BANK_TABS_CHANGED = true, INPUT_DEVICE_INTERFACE_TRANSITION = true,
     MAIL_SHOW = true, MAIL_CLOSED = true, MAIL_INBOX_UPDATE = true,
     MAIL_SEND_SUCCESS = true, MAIL_FAILED = true, MAIL_SEND_INFO_UPDATE = true,
     PLAYER_MONEY = true,
@@ -110,7 +110,8 @@ function M.load(files)
 
     Enum = {
         BagIndex = { Keyring = -1, Backpack = 0, Bag_1 = 1, Bag_2 = 2, Bag_3 = 3, Bag_4 = 4, ReagentBag = 5,
-            CharacterBankTab_1 = 6, CharacterBankTab_2 = 7, CharacterBankTab_3 = 8, Characterbanktab = -2 },
+            CharacterBankTab_1 = 6, CharacterBankTab_2 = 7, CharacterBankTab_3 = 8, CharacterBankTab_4 = 9,
+            CharacterBankTab_5 = 10, Characterbanktab = -2 },
         BankType = { Character = 0, Account = 2 },
         TooltipDataType = { Item = 0, Spell = 1 },
         SendAddonMessageResult = { Success = 0, InvalidPrefix = 1, InvalidMessage = 2, AddonMessageThrottle = 3,

@@ -252,6 +252,9 @@ function ns.StartScanner()
 
     ns.On("BANKFRAME_OPENED", BankOpened)
     ns.On("BANKFRAME_CLOSED", function() bankOpen = false end)
+    -- Buying a bank bag slot changes the tabs, not their contents (no BAG_UPDATE), so the
+    -- bought count is read again then, as Blizzard's bank window does (peer review 2026-11-22).
+    ns.On("BANK_TABS_CHANGED", function() if bankOpen then ScanBank() end end)
     -- Newer clients announce the banker through the interaction manager too.
     local Banker = Enum.PlayerInteractionType and Enum.PlayerInteractionType.Banker
     if Banker then
