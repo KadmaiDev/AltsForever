@@ -2,6 +2,7 @@
 
 - **Can craft and recipe status are now two settings:** "Show Can craft and recipes" is split into **Show Can craft** (which of your characters can make an item, on item tooltips) and **Show recipe status** (Known, Can learn or Needs skill for each character, on recipe tooltips), so you can keep one without the other. On the Options page, or `/af crafting` and the new `/af recipes`. If you had the old one off, both start off. Thanks to the player who asked.
 - **For addon authors:** other addons can now ask Alts Forever how many of an item your characters have, with `AltsForever.Count(itemID)`. Described in the README.
+- **Profession cooldowns:** Mooncloth, transmutes and other crafts with a cooldown now show when each of your characters can make them again, in a new **Cooldowns** column in the overview: a green Ready (or "2 ready") when one is, otherwise how long until the soonest. Point at it to see each one, or click it to open that character's professions. The column appears once one of your characters has a cooldown, so it stays out of the way for everyone else; hide it or show it from the column menu like any other; /af cooldowns lists everyone in chat. A cooldown is picked up when that character crafts it with their profession window open, or opens the window while it's running. Transmutes that share one cooldown show as one line. Thanks to the player who asked.
 
 ## Alts Forever 1.9.1
 

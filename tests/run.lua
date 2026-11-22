@@ -100,6 +100,7 @@ CASES = {
     "39_mail_rules.lua",
     "40_bag_space.lua",
     "41_api.lua",
+    "42_cooldowns.lua",
 }
 do
     local where = {}
