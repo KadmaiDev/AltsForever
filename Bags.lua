@@ -168,10 +168,12 @@ local function SectionName(c, bag)
     if not bag then return view == "bank" and L["Bank"] or view == "mail" and L["Mail"] or L["Bags"] end
     if bag == BagIndex.Backpack then return BACKPACK_TOOLTIP or L["Backpack"] end
     if bag == BagIndex.Keyring then return KEYRING or L["Keyring"] end
+    local item = c.layout[bag] and c.layout[bag][0]
+    -- Forever's bank: tab 1 is the bank itself, the others bank bags (named once the bag is
+    -- recorded: bank visits since 2026-11-22).
     for i, tab in ipairs(ns.BANK_TABS) do
-        if tab == bag then return L["Tab %d"]:format(i) end
+        if tab == bag and not item then return i == 1 and L["Bank"] or L["Tab %d"]:format(i) end
     end
-    local item = c.layout[bag][0]
     local name = item and C_Item.GetItemNameByID(item)
     if not name and item and C_Item.RequestLoadItemDataByID then
         C_Item.RequestLoadItemDataByID(item)
@@ -187,27 +189,81 @@ ns.BagsSectionName = SectionName
 -- tab for the cell's tooltip. No UI here, so tests can check it.
 ---------------------------------------------------------------------------
 
--- Bags 1-4 can be empty (no bag bought yet): the tooltip says so. The backpack is always
--- there; the reagent bag and keyring aren't listed when missing.
+-- Bags 1-4 and the reagent bag slot can be empty (no bag yet): the tooltip says so (the
+-- reagent slot since a player asked, 2026-11-22). The backpack is always there; the
+-- keyring isn't listed. BAG_SLOTS[bag] = what an empty one is called.
 local BAG_SLOTS = {}
 for _, name in ipairs({ "Bag_1", "Bag_2", "Bag_3", "Bag_4" }) do
-    if BagIndex[name] then BAG_SLOTS[BagIndex[name]] = true end
+    if BagIndex[name] then BAG_SLOTS[BagIndex[name]] = L["Empty bag slot"] end
 end
+if BagIndex.ReagentBag then BAG_SLOTS[BagIndex.ReagentBag] = L["Empty reagent bag slot"] end
 
 local function Places(which)
     return which == "bank" and ns.BANK_TABS or ns.CARRIED_BAGS
 end
 
--- Free and all slots in a character's bags (keyring left out: it holds only keys) or bank
--- tabs; nil when not known (bags: no layout yet; bank: never visited, or visited before
--- slot layouts were saved).
+-- Special bags hold only some things, so their slots aren't free space for loot: left out
+-- of the Bags and Bank counts, and coloured in the lists (owner, 2026-11-22). The reagent
+-- bag is coloured too but counted: trade goods are most of what's farmed. Classic's numbers: quivers and
+-- ammo pouches are item class 11; containers (class 1) by subclass, 1 Soul Bag, 2-10 the
+-- profession bags (herb, enchanting, engineering, gem, mining...), 11 Reagent Bag.
+-- Cached per bag item (a few per character; GetItemInfoInstant needs no loading).
+local families = {}
+local function BagFamily(item)
+    if not item or item == 0 or not C_Item.GetItemInfoInstant then return nil end
+    local family = families[item]
+    if family == nil then
+        local _, _, _, _, _, class, subclass = C_Item.GetItemInfoInstant(item)
+        -- Not answered (or secret): not cached, asked again next time.
+        if issecretvalue(class) or issecretvalue(subclass) or class == nil then return nil end
+        family = false
+        if class == 11 then
+            family = "ammo"
+        elseif class == 1 and subclass == 1 then
+            family = "soul"
+        elseif class == 1 and type(subclass) == "number" and subclass >= 2 and subclass <= 10 then
+            family = "profession"
+        elseif class == 1 and subclass == 11 then
+            family = "reagent"
+        end
+        families[item] = family
+    end
+    return family or nil
+end
+ns.BagFamily = BagFamily
+
+local FAMILY_ORDER = { "ammo", "soul", "profession" }
+local FAMILY_COLOR = { ammo = "|cffc79c6e", soul = "|cff9482c9", profession = "|cff6fcf6f", reagent = "|cff66b2ff" }
+local FAMILY_NAME = { ammo = L["Quiver or ammo pouch"], soul = L["Soul bag"], profession = L["Profession bag"],
+    reagent = L["Reagent bag"] }
+local COUNTED = { reagent = true } -- coloured, but its slots are free space
+ns.BAG_FAMILY_COLOR = FAMILY_COLOR
+
+-- The key for the families in `seen` (a set), in their colours: "Quiver or ammo pouch,
+-- Soul bag" not counted, then the reagent bag counted; each nil when none. Made only on hover.
+function ns.BagFamilyLegend(seen)
+    local parts
+    for _, family in ipairs(FAMILY_ORDER) do
+        if seen[family] then
+            parts = parts or {}
+            parts[#parts + 1] = FAMILY_COLOR[family] .. FAMILY_NAME[family] .. "|r"
+        end
+    end
+    return parts and table.concat(parts, ", "),
+        seen.reagent and (FAMILY_COLOR.reagent .. FAMILY_NAME.reagent .. "|r") or nil
+end
+
+-- Free and all slots in a character's bags (keyring left out: it holds only keys; special
+-- bags too, see BagFamily) or bank tabs; nil when not known (bags: no layout yet; bank:
+-- never visited, or visited before slot layouts were saved).
 function ns.BagSpace(c, which)
     local layout = c and c.layout
     if type(layout) ~= "table" then return nil end
     local free, total = 0, 0
     for _, bag in ipairs(Places(which)) do
         local values = bag ~= BagIndex.Keyring and layout[bag]
-        if values then
+        local family = values and BagFamily(values[0])
+        if values and not (family and not COUNTED[family]) then
             local n = #values
             total = total + n
             for i = 1, n do
@@ -241,24 +297,45 @@ local function BagKind(item)
     return nil
 end
 
--- Each bag (or bank tab) in order, for the tooltip: { name, icon, quality, kind, free,
--- size }, size 0 for an empty bag slot. Names not loaded yet are requested and read as
--- "Bag n" until they are.
+-- Bank bag slots a character could still buy: Forever's most tabs (tab 1 included) less
+-- the ones they've bought; nil when either isn't known.
+local maxTabs
+local function Unbought(c)
+    local bought = c and c.bankBought
+    if type(bought) ~= "number" then return nil end
+    if not maxTabs then
+        local kind = Enum.BankType and Enum.BankType.Character
+        if not (C_Bank and C_Bank.FetchMaxNumBankTabs and kind) then return nil end
+        local ok, n = pcall(C_Bank.FetchMaxNumBankTabs, kind)
+        if not ok or issecretvalue(n) or type(n) ~= "number" then return nil end
+        maxTabs = n
+    end
+    local left = maxTabs - bought
+    return left > 0 and left or nil
+end
+ns.BankBagsUnbought = Unbought
+
+-- Each bag (or bank tab) in order, for the tooltip: { bag, name, icon, quality, kind,
+-- family (special bags), free, size }, size 0 for an empty bag slot (or a bought bank bag slot with no bag). Names not
+-- loaded yet are requested and read as "Bag n" until they are.
 local spaceList = {}
 function ns.BagSpaceList(c, which)
     wipe(spaceList)
     local layout = c and c.layout
     if type(layout) ~= "table" then return spaceList end
-    for _, bag in ipairs(Places(which)) do
+    local bought = which == "bank" and type(c.bankBought) == "number" and c.bankBought or 0
+    for index, bag in ipairs(Places(which)) do
         local values = bag ~= BagIndex.Keyring and layout[bag]
-        if values or BAG_SLOTS[bag] then
-            local e = { free = 0, size = values and #values or 0 }
+        local empty = which == "bank" and index > 1 and index <= bought and L["Empty bank bag slot"]
+            or which ~= "bank" and BAG_SLOTS[bag]
+        if values or empty then
+            local e = { bag = bag, free = 0, size = values and #values or 0 }
             for i = 1, e.size do
                 if values[i] == 0 then e.free = e.free + 1 end
             end
             local item = values and values[0]
             if not values then
-                e.name, e.icon = L["Empty bag slot"], "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"
+                e.name, e.icon = empty, "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"
             elseif item and item ~= 0 then
                 local name = C_Item.GetItemNameByID(item)
                 if issecretvalue(name) or type(name) ~= "string" then
@@ -270,6 +347,7 @@ function ns.BagSpaceList(c, which)
                 local q = C_Item.GetItemQualityByID and C_Item.GetItemQualityByID(item)
                 if not issecretvalue(q) then e.quality = q end
                 e.kind = BagKind(item)
+                e.family = BagFamily(item)
             else -- the backpack, a bank tab, or a bag whose item wasn't recorded
                 e.name = SectionName(c, bag)
                 e.icon = bag == BagIndex.Backpack and "Interface\\Buttons\\Button-Backpack-Up" or nil
@@ -278,6 +356,28 @@ function ns.BagSpaceList(c, which)
         end
     end
     return spaceList
+end
+
+-- Each bag's size in order, "-" for a slot with no bag, for the overview's grid of every
+-- character (Altoholic's "14/14/-/14"; a player planning bag upgrades, 2026-11-22). The
+-- backpack and the bank's own slots are left out: the same size for everyone (owner,
+-- 2026-11-22). Special bags in their family's colour, each family noted in `seen` (a set,
+-- optional). Fills `out` (wiped) and returns it; empty when not known.
+function ns.BagSizes(c, which, out, seen)
+    wipe(out)
+    if not ns.BagSpace(c, which) then return out end
+    local fixed = which == "bank" and ns.BANK_TABS[1] or BagIndex.Backpack
+    for _, e in ipairs(ns.BagSpaceList(c, which)) do
+        if e.bag ~= fixed then
+            local size = e.size == 0 and "-" or tostring(e.size)
+            if e.family then
+                size = FAMILY_COLOR[e.family] .. size .. "|r"
+                if seen then seen[e.family] = true end
+            end
+            out[#out + 1] = size
+        end
+    end
+    return out
 end
 
 ---------------------------------------------------------------------------

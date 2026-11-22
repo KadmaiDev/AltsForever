@@ -391,8 +391,10 @@ end
 
 -- Opens the overview on Aldric (24, 300c, Durotar) with Far (60, 7c), High (40, 1g,
 -- Orgrimmar) and Low (12, 5s); returns a function clicking a column's title.
-function sortStart(saved)
+-- `before`, if given, runs after loading and before login (item data the overview needs).
+function sortStart(saved, before)
     local ns = wow.load(FILES)
+    if before then before() end
     wow.now = NOW
     wow.money = 300
     wow.login(saved or overviewAlts())

@@ -140,7 +140,7 @@ test("all in one or by bag (remembered), bank tabs as sections, and money at the
     eq(AltsForeverDB.bagsSplit, true, "remembered")
     eq(bagsHeadings(), "Backpack|cff9d9d9d  (1 / 2)|r | Red Linen Bag|cff9d9d9d  (1 / 2)|r")
     f.bank.scripts.OnClick(f.bank)
-    eq(bagsHeadings(), "Tab 1|cff9d9d9d  (1 / 2)|r | Tab 2|cff9d9d9d  (1 / 3)|r")
+    eq(bagsHeadings(), "Bank|cff9d9d9d  (1 / 2)|r | Tab 2|cff9d9d9d  (1 / 3)|r", "tab 1 is the bank itself; a bank bag with no bag recorded yet stays Tab 2")
     eq(bagsGrid(), "400x2 - - - 401x1")
     eq(f.info.text, "3 of 5 slots free")
     assert(f.seen.text:find("Bank last visited", 1, true), f.seen.text)

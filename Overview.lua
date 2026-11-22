@@ -576,6 +576,14 @@ end
 -- opens that character's bags or bank, a right-click their menu as the row's does.
 local ITEM_CROP = ":0:0:0:0:64:64:5:59:5:59|t "
 
+-- The colour key under a bag list or grid: special bags left out of free space, then the
+-- reagent bag (coloured, counted).
+local function AddBagLegend(tt, seen)
+    local uncounted, counted = ns.BagFamilyLegend(seen)
+    if uncounted then tt:AddLine(GREY .. L["Not counted as free space: %s"]:format(uncounted .. GREY) .. "|r", 1, 1, 1, true) end
+    if counted then tt:AddLine(GREY .. L["Counted as free space: %s"]:format(counted .. GREY) .. "|r", 1, 1, 1, true) end
+end
+
 local function SpaceTooltip(self)
     local row = self.row
     local key = row.key
@@ -591,9 +599,14 @@ local function SpaceTooltip(self)
         tt:AddLine(which == "bank" and L["Bank not scanned yet - visit a banker"]
             or L["No bags recorded yet.\nLog in on this character once."], 0.62, 0.62, 0.62, true)
     else
+        local seen
         for _, e in ipairs(ns.BagSpaceList(c, which)) do
+            if e.family then
+                seen = seen or {}
+                seen[e.family] = true
+            end
             local left = (e.icon and ("|T" .. e.icon .. ITEM_CROP) or "") .. e.name
-                .. (e.kind and (GREY .. "  " .. e.kind .. "|r") or "")
+                .. (e.kind and ((e.family and ns.BAG_FAMILY_COLOR[e.family] or GREY) .. "  " .. e.kind .. "|r") or "")
             local q = e.quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[e.quality]
             if e.size == 0 then
                 tt:AddDoubleLine(left, "-", 0.62, 0.62, 0.62, 0.62, 0.62, 0.62)
@@ -602,6 +615,9 @@ local function SpaceTooltip(self)
             end
         end
         tt:AddDoubleLine(L["Total"], L["%d of %d free"]:format(free, total), 1, 0.82, 0, 1, 1, 1)
+        if seen then AddBagLegend(tt, seen) end
+        local unbought = which == "bank" and ns.BankBagsUnbought(c)
+        if unbought then tt:AddLine(GREY .. L["Bank bag slots not bought yet: %d"]:format(unbought) .. "|r") end
         if which == "bank" and c.bankAt then
             tt:AddLine(GREY .. L["Bank last visited: %s"]:format(ns.FormatAgo(time() - c.bankAt)) .. "|r")
         end
@@ -867,9 +883,14 @@ local function Names(list)
     return table.concat(list, ", ")
 end
 
+-- Under the Bags or Bank title: every character's bags in a grid, one column per bag
+-- slot ("-" with no bag) then free of all, as Altoholic's bag report (a player planning
+-- bag upgrades and passing old bags on, 2026-11-22; owner chose the title tooltip). Made
+-- only on hover, so its tables cost nothing in play. Returns the grid's rows and first
+-- line, lined up by the caller once the tooltip is shown.
 local function SpaceSummary(tt, which)
     local chars = ns.db.chars
-    local free, total, missing = 0, 0, {}
+    local free, total, missing, rows, widest, seen = 0, 0, {}, {}, 0, {}
     for _, key in ipairs(ns.OverviewOrder()) do
         local c = chars[key]
         local f, t = ns.BagSpace(c, which)
@@ -877,11 +898,30 @@ local function SpaceSummary(tt, which)
             free, total = free + f, total + t
             local empty = which == "bags" and ns.EmptyBagSlots(c) or 0
             if empty > 0 then missing[#missing + 1] = ns.ShortName(key, c) .. " " .. empty end
+            local sizes = ns.BagSizes(c, which, {}, seen)
+            if #sizes > widest then widest = #sizes end
+            rows[#rows + 1] = { ns.ShortName(key, c), sizes, ns.SpaceCell(f, t) }
         elseif which == "bank" then
             missing[#missing + 1] = ns.ShortName(key, c)
         end
     end
     tt:AddLine(" ")
+    local first
+    if #rows > 0 then
+        tt:AddLine(which == "bags" and L["Slots in each bag, then free of all"]
+            or L["Slots in each bank bag, then free of all"], 0.62, 0.62, 0.62)
+        first = tt.NumLines and tt:NumLines() + 1
+        -- One column per bag slot, short rows padded so the free column lines up.
+        for i, r in ipairs(rows) do
+            local sizes = r[2]
+            tt:AddDoubleLine(r[1], (#sizes > 0 and table.concat(sizes, "/") .. "   " or "") .. r[3], 1, 1, 1, 1, 1, 1)
+            local cells = { r[1] }
+            for col = 1, widest do cells[col + 1] = sizes[col] or "" end
+            cells[widest + 2] = r[3]
+            rows[i] = cells
+        end
+        AddBagLegend(tt, seen)
+    end
     if total > 0 then
         tt:AddDoubleLine(L["All characters"], L["%d of %d free"]:format(free, total), 1, 0.82, 0, 1, 1, 1)
     end
@@ -890,16 +930,21 @@ local function SpaceSummary(tt, which)
         tt:AddLine(text:format(Names(missing)), 1, 0.5, 0, true)
     end
     tt:AddLine(" ")
+    return first and rows, first
 end
 
 local function SortTooltip(b)
-    GameTooltip:SetOwner(b, "ANCHOR_TOPLEFT")
-    GameTooltip:AddLine(b.col.title)
-    if b.col.tip then GameTooltip:AddLine(b.col.tip, 1, 1, 1, true) end
-    if b.col.space then SpaceSummary(GameTooltip, b.col.space) end
-    GameTooltip:AddLine(L["Click to sort by this column, and again to reverse it."], 1, 1, 1)
-    GameTooltip:AddLine(L["Right-click to choose which columns are shown."], 1, 1, 1)
-    GameTooltip:Show()
+    local tt = GameTooltip
+    tt:SetOwner(b, "ANCHOR_TOPLEFT")
+    tt:AddLine(b.col.title)
+    if b.col.tip then tt:AddLine(b.col.tip, 1, 1, 1, true) end
+    local rows, first
+    if b.col.space then rows, first = SpaceSummary(tt, b.col.space) end
+    tt:AddLine(L["Click to sort by this column, and again to reverse it."], 1, 1, 1)
+    tt:AddLine(L["Right-click to choose which columns are shown."], 1, 1, 1)
+    tt:Show()
+    -- Lined up in the font the tooltip is shown in, as the row tooltip's professions.
+    if rows and ns.AlignColumns(tt, first, rows, NO_LABELS) then tt:Show() end
 end
 
 -- Bag space added up per group, for the headings (when there's more than one character to
