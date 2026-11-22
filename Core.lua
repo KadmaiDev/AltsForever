@@ -214,7 +214,7 @@ local CHAR_FIELDS = {
     bags = "table", bank = "table", mail = "table", equip = "table", gear = "table",
     layout = "table", profs = "table", profMax = "table", recipes = "table", crafts = "table",
     reps = "table", duraSlots = "table", saves = "table", saveKills = "table",
-    account = "string", runs = "table", recipesAt = "table", links = "table",
+    account = "string", runs = "table", recipesAt = "table", links = "table", cooldowns = "table",
 }
 local DB_FIELDS = {
     icons = "table", goldDays = "table", goldDaysBy = "table", factions = "table",
@@ -223,6 +223,7 @@ local DB_FIELDS = {
     legacyPool = "number", scale = "number", minimapAngle = "number", bagsCols = "number",
     bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
     account = "string", tooltipsOff = "boolean", countsOff = "boolean", craftTipsOff = "boolean",
+    canCraftOff = "boolean", recipeTipsOff = "boolean",
     cratesOff = "boolean", goldTipOff = "boolean", barsOff = "boolean", recipeCategories = "table", profArt = "table",
     inspectAnvilsOff = "boolean", overviewSort = "string", overviewSortRev = "boolean",
     windows = "table", pinned = "table", hiddenColumns = "table",
@@ -251,6 +252,14 @@ local function RepairChar(c)
     if c.recipes then KeepOnly(c.recipes, "string", "table") end
     if c.crafts then KeepOnly(c.crafts, "string", "table") end
     if c.recipesAt then KeepOnly(c.recipesAt, "string", "number") end
+    if c.cooldowns then
+        KeepOnly(c.cooldowns, "string", "table")
+        for prof, t in pairs(c.cooldowns) do
+            KeepOnly(t, "string", "number")
+            if next(t) == nil then c.cooldowns[prof] = nil end
+        end
+        if next(c.cooldowns) == nil then c.cooldowns = nil end
+    end
     if c.saves then KeepOnly(c.saves, "string", "number") end
     if c.saveKills then KeepOnly(c.saveKills, "string", "string") end
     if c.runs then
@@ -600,6 +609,9 @@ ns.On("ADDON_LOADED", function(name)
     ns.db = AltsForeverDB
     -- Left over from the rested XP rate check, which has been removed.
     ns.db.restedChecks, ns.db.restCheckOff = nil, nil
+    -- Until 1.9.1 one switch turned off both Can craft and recipe status: now two.
+    if ns.db.craftTipsOff then ns.db.canCraftOff, ns.db.recipeTipsOff = true, true end
+    ns.db.craftTipsOff = nil
     -- Before login, so EllesmereUI's minimap finds it when it collects addon buttons.
     ns.CreateMinimapButton()
 end)
@@ -725,7 +737,12 @@ end
 
 function commands.crafting()
     ns.SetCraftTips(not ns.CraftTipsOn())
-    TipPrint(ns.CraftTipsOn() and L["Can craft and recipes in tooltips on."] or L["Can craft and recipes in tooltips off."])
+    TipPrint(ns.CraftTipsOn() and L["Can craft in tooltips on."] or L["Can craft in tooltips off."])
+end
+
+function commands.recipes()
+    ns.SetRecipeTips(not ns.RecipeTipsOn())
+    TipPrint(ns.RecipeTipsOn() and L["Recipe status in tooltips on."] or L["Recipe status in tooltips off."])
 end
 
 function commands.crates()
@@ -785,7 +802,7 @@ function commands.columns(arg)
     end
     local id, title = ns.ColumnId(word)
     if not id then
-        return Print(L["/af columns shows every overview column again; /af columns and one of level, rested, wellrested, legacy, gold, professions, mail, bags, bank, lockouts, zone, played or lastseen hides or shows that column."])
+        return Print(L["/af columns shows every overview column again; /af columns and one of level, rested, wellrested, legacy, gold, professions, mail, bags, bank, lockouts, cooldowns, zone, played or lastseen hides or shows that column."])
     end
     local on = not ns.ColumnShown(id)
     ns.SetColumnShown(id, on)
@@ -926,6 +943,26 @@ function commands.rep()
     ns.ToggleReputation()
 end
 
+-- /af cooldowns: every character's profession cooldowns (Professions.lua), in the
+-- overview's order.
+function commands.cooldowns()
+    local now, any = time(), false
+    for _, key in ipairs(ns.OverviewOrder()) do
+        local rows = ns.CooldownRows(ns.db.chars[key], now)
+        if rows then
+            if not any then Print(L["Profession cooldowns:"]) end
+            any = true
+            local parts = {}
+            for i, r in ipairs(rows) do parts[i] = ns.CooldownName(r) .. " " .. ns.CooldownText(r[2], now) end
+            Print("  " .. ns.ColoredName(key, ns.db.chars[key]) .. ": " .. table.concat(parts, ", "))
+        end
+    end
+    if not any then
+        Print(L["No profession cooldowns seen yet. One shows once a character has crafted something with a cooldown (Mooncloth, a transmute...) with their profession window open."])
+    end
+end
+commands.cooldown, commands.cd = commands.cooldowns, commands.cooldowns
+
 -- /af lockouts: the Lockouts window (Lockouts.lua).
 function commands.lockouts()
     ns.ToggleLockouts()
@@ -950,7 +987,7 @@ function commands.help()
     Print(L["by Kadmai. /af opens the overview. Also: /af rep | export | mail | list | delete Name | skillups | sendmail | minimap | stats | mem"])
     Print(L["/af settings opens the Options page; /af help lists every command."])
     Print(L["/af search (or /afs), with or without a name, finds an item on any of your characters, or who can craft it."])
-    Print(L["/af tooltips turns everything Alts Forever adds to tooltips on or off. /af crafting, crates, gold and bars turn one part on or off."])
+    Print(L["/af tooltips turns everything Alts Forever adds to tooltips on or off. /af crafting, recipes, crates, gold and bars turn one part on or off."])
     Print(L["/af counts turns the item counts in tooltips on or off (if another addon, such as Baganator, already shows them)."])
     Print(L["/af bags or /af bank, with a name for another character, shows their bags or bank slot by slot."])
     Print(L["/af prof, with a name for another character, shows their professions and recipes."])
@@ -962,12 +999,13 @@ function commands.help()
     Print(L["/af inspect shows or hides the anvils in the inspect window that mark upgrades you or your alts can craft for that player."])
     Print(L["/af scale 150 makes Alts Forever's windows one and a half times their size (any size from 50 to 300), on top of the game's UI scale."])
     Print(L["/af pin and a character's name pins them to the top of the overview, or unpins them."])
-    Print(L["/af columns shows every overview column again; /af columns and one of level, rested, wellrested, legacy, gold, professions, mail, bags, bank, lockouts, zone, played or lastseen hides or shows that column."])
+    Print(L["/af columns shows every overview column again; /af columns and one of level, rested, wellrested, legacy, gold, professions, mail, bags, bank, lockouts, cooldowns, zone, played or lastseen hides or shows that column."])
     Print(L["/af resetwindows puts Alts Forever's windows back where they open by default."])
     if ns.HasEllesmereScale() then Print(L["/af scale eui makes them follow EllesmereUI's Window Scale again (the default)."]) end
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
     Print(L["/af mailrules lists which items always go to which character by mail; make rules from the arrow beside the To box at the mailbox."])
     Print(L["/af lockouts opens your characters' raid lockouts and the instances each game account has entered this hour."])
+    Print(L["/af cooldowns lists your characters' profession cooldowns (Mooncloth, transmutes...) and when each is ready."])
     Print(L["/af sync and the name of your character on another game account swaps characters with it, so both accounts see all of them. Both need to be online at the same time, on the same ruleset and faction."])
     Print(L["/af sync auto turns syncing by itself on or off."])
     Print(L["/af rulesets shows or hides your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; they can't trade with this one."])

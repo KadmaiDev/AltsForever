@@ -191,6 +191,11 @@ function M.load(files)
             return r and { recipeID = id, name = r.name, learned = r.learned, maxTrivialLevel = r.grey,
                 categoryID = r.cat, icon = r.icon, relativeDifficulty = r.diff }
         end,
+        -- Seconds left on a recipe's cooldown (r.cd), nil when none.
+        GetRecipeCooldown = function(id)
+            local r = ts().recipes[id]
+            return r and r.cd
+        end,
         GetProfessionInfoByRecipeID = function(id)
             local r = ts().recipes[id]
             M.profLookups = (M.profLookups or 0) + 1
