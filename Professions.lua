@@ -454,7 +454,11 @@ local function ReadCooldowns()
     for id, name in pairs(cdIDs) do
         local ok, left = pcall(get, id)
         local had = t and t[name]
-        if ok and not issecretvalue(left) and type(left) == "number" and left > 0 then
+        -- A failed call, a secret or anything but a number or nil says nothing: what's
+        -- stored stays.
+        if not ok or issecretvalue(left) or (left ~= nil and type(left) ~= "number") then
+            -- unreadable
+        elseif left and left > 0 then
             local ready = floor(now + left + 0.5)
             -- Steady readings drift by a second or so: only a real change is recorded.
             if not had or had < ready - 60 or had > ready + 60 then
@@ -466,7 +470,7 @@ local function ReadCooldowns()
                 t[name], changed = ready, true
             end
         elseif had and had > now then
-            t[name], changed = now, true -- ready early (a reset, or the game says so)
+            t[name], changed = now, true -- no cooldown: ready early (a reset, or the game says so)
         end
     end
     -- Recipes no longer known (unlearned or renamed) go.
@@ -486,12 +490,29 @@ local function ReadCooldowns()
     return changed
 end
 
+-- A cooldown recorded, ended or forgotten: an open overview shows it (its Cooldowns
+-- column may appear or go). The caller bumps ns.version as for any profession change.
+local function CooldownsRead()
+    if ReadCooldowns() and ns.RefreshOverview then ns.RefreshOverview() end
+end
+
 -- Called by a recipe scan with its learned recipes (ID -> name); reads them at once.
 function ns.WatchCooldowns(c, prof, ids)
     cdChar, cdProf = c, prof
     wipe(cdIDs)
     for id, name in pairs(ids) do cdIDs[id] = name end
-    ReadCooldowns()
+    CooldownsRead()
+end
+
+-- A recipe learned with its profession's window open (from a recipe item or the trainer):
+-- watched from now on, so making it at once records its cooldown.
+local function WatchLearned(recipeID)
+    if not cdProf then return end
+    local r = TS.GetRecipeInfo(recipeID)
+    if not (r and r.name and r.learned ~= false) then return end
+    if ProfessionName(TS.GetProfessionInfoByRecipeID(recipeID)) ~= cdProf then return end
+    cdIDs[recipeID] = r.name
+    CooldownsRead()
 end
 
 local function StopCooldowns()
@@ -648,11 +669,17 @@ function ns.StartProfessions()
     ns.On("TRADE_SKILL_CLOSE", function() pending = false StopCooldowns() end)
     -- A craft started a cooldown: its item has landed in the bags. Only while the window is
     -- open and scanned (a few hundred number reads at most, no tables).
+    -- Ours runs after the scanner's (registered first), so the overview is refreshed again
+    -- once the cooldown is in.
     ns.On("BAG_UPDATE_DELAYED", function()
-        if cdProf and ReadCooldowns() then Changed() end
+        if cdProf and ReadCooldowns() then
+            Changed()
+            if ns.RefreshOverview then ns.RefreshOverview() end
+        end
     end)
     ns.On("NEW_RECIPE_LEARNED", function(recipeID)
         ns.RecipeLearned(char, recipeID)
+        WatchLearned(recipeID)
         Changed()
     end)
 

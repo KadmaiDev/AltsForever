@@ -230,7 +230,6 @@ test("the Cooldowns column shows itself once someone has a cooldown, unless the 
     eq(AltsForeverDB.hiddenColumns, nil, "nothing saved for it")
     -- The first one seen: the open overview makes room for it.
     tailoring(DAY)
-    ns.RefreshOverview()
     eq(ns.ColumnShown("cooldowns"), true)
     eq(overviewRows()[1].cells[15].shown, true)
     eq(f.width, narrow + 70)
@@ -238,7 +237,6 @@ test("the Cooldowns column shows itself once someone has a cooldown, unless the 
     -- The last one forgotten: gone again.
     wow.tradeskill.recipes[2001].learned = false
     wow.fire("TRADE_SKILL_SHOW")
-    ns.RefreshOverview()
     eq(ns.ColumnShown("cooldowns"), false)
     eq(f.width, narrow)
     -- Shown by the player: stays with none.
@@ -249,11 +247,56 @@ test("the Cooldowns column shows itself once someone has a cooldown, unless the 
     ns.SetColumnShown("cooldowns", false)
     wow.tradeskill.recipes[2001].learned = true
     wow.fire("TRADE_SKILL_SHOW")
-    ns.RefreshOverview()
     eq(AltsForeverDB.hiddenColumns.cooldowns, true)
     eq(ns.ColumnShown("cooldowns"), false)
     eq(overviewRows()[1].cells[15].shown, false)
     -- A damaged choice counts as none.
     AltsForeverDB.hiddenColumns.cooldowns = "yes"
     eq(ns.ColumnShown("cooldowns"), true, "someone has one")
+end)
+
+test("profession cooldowns: an unreadable answer keeps a running cooldown; the open overview follows a craft", function()
+    local ns, c = cooldownStart()
+    SlashCmdList.ALTSFOREVER("")
+    tailoring(3 * DAY)
+    eq(c.cooldowns.Tailoring.Mooncloth, NOW + 3 * DAY)
+    -- The call failing, or a secret answer: nothing known, the running cooldown stays.
+    local real = C_TradeSkillUI.GetRecipeCooldown
+    C_TradeSkillUI.GetRecipeCooldown = function() error("not now") end
+    wow.fire("BAG_UPDATE_DELAYED")
+    C_TradeSkillUI.GetRecipeCooldown = real
+    eq(c.cooldowns.Tailoring.Mooncloth, NOW + 3 * DAY, "a failed call")
+    wow.tradeskill.recipes[2001].cd = wow.SECRET
+    wow.fire("BAG_UPDATE_DELAYED")
+    eq(c.cooldowns.Tailoring.Mooncloth, NOW + 3 * DAY, "a secret")
+    wow.tradeskill.recipes[2001].cd = "soon"
+    wow.fire("BAG_UPDATE_DELAYED")
+    eq(c.cooldowns.Tailoring.Mooncloth, NOW + 3 * DAY, "not a number")
+    -- Only a readable "no cooldown" means ready.
+    wow.tradeskill.recipes[2001].cd = 0
+    wow.fire("BAG_UPDATE_DELAYED")
+    eq(c.cooldowns.Tailoring.Mooncloth, NOW, "0: ready")
+    local you = overviewRows()[1]
+    eq(cell(you, 15), "|cff20ff20Ready|r", "the open overview shows it")
+    -- Made again with the window open: the cell follows the craft, no other refresh.
+    wow.tradeskill.recipes[2001].cd = DAY
+    wow.fire("BAG_UPDATE_DELAYED")
+    eq(cell(you, 15), "1d 0h")
+end)
+
+test("profession cooldowns: a recipe learned with the window open is watched at once", function()
+    local ns, c = cooldownStart()
+    tailoring(nil)
+    wow.tradeskill.recipes[2001].learned = false
+    wow.fire("TRADE_SKILL_SHOW")
+    -- Learned (from the pattern) and made without closing the window.
+    wow.tradeskill.recipes[2001].learned = true
+    wow.fire("NEW_RECIPE_LEARNED", 2001)
+    wow.tradeskill.recipes[2001].cd = 4 * DAY
+    wow.fire("BAG_UPDATE_DELAYED")
+    eq(c.cooldowns and c.cooldowns.Tailoring.Mooncloth, NOW + 4 * DAY)
+    -- Another profession's recipe isn't added.
+    wow.tradeskill.recipes[9001] = { name = "Transmute: Arcanite", learned = true, cd = DAY, prof = "Alchemy" }
+    wow.fire("NEW_RECIPE_LEARNED", 9001)
+    eq(c.cooldowns.Alchemy, nil)
 end)
