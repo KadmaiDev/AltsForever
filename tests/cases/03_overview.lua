@@ -774,7 +774,8 @@ test("columns can be hidden from the titles' right-click menu, and brought back"
     local row = overviewRows()[2]
     local goldX, profX = row.cells[6].point[4], row.cells[7].point[4]
     eq(columnsMenu("Character"), nil, "the names can't be hidden")
-    eq(columnsMenu("Show all columns").enabled, false, "nothing hidden yet")
+    eq(columnsMenu("Show all columns").enabled, true, "Cooldowns waits for a cooldown, so not every column shows")
+    eq(columnsMenu("Cooldowns").isSelected(), false)
     local gold = columnsMenu("Gold")
     eq(gold.kind, "checkbox"); eq(gold.isSelected(), true)
     gold.setSelected()
@@ -800,8 +801,10 @@ test("columns can be hidden from the titles' right-click menu, and brought back"
     columnsMenu("Level").setSelected()
     eq(row.cells[2].shown, true); eq(row.pct.shown, true); eq(f.sortArrow.shown, true)
     all.fn()
-    eq(AltsForeverDB.hiddenColumns, nil)
-    eq(f.width, full)
+    eq(AltsForeverDB.hiddenColumns.gold, nil)
+    eq(AltsForeverDB.hiddenColumns.cooldowns, false, "every column, the empty Cooldowns one too")
+    eq(f.width, full + 70)
+    eq(columnsMenu("Show all columns").enabled, false, "now all are shown")
     eq(row.cells[6].shown, true); eq(row.cells[7].point[4], profX)
     eq(f.sorts.gold.shown, true)
 
@@ -818,7 +821,7 @@ end)
 
 test("hidden columns are kept between sessions; the window never gets too narrow", function()
     sortStart()
-    for _, name in ipairs({ "Level", "Rested", "Well Rested", "Legacy", "Gold", "Professions", "Mail", "Bags", "Bank", "Lockouts", "Cooldowns", "Zone", "Played", "Last seen" }) do
+    for _, name in ipairs({ "Level", "Rested", "Well Rested", "Legacy", "Gold", "Professions", "Mail", "Bags", "Bank", "Lockouts", "Zone", "Played", "Last seen" }) do
         columnsMenu(name).setSelected()
     end
     local f = AltsForeverFrame
@@ -849,7 +852,7 @@ test("hidden columns are kept between sessions; the window never gets too narrow
     assert(table.concat(wow.printed, " "):find("/af columns shows every overview column again", 1, true))
     eq(ns.ColumnShown("gold"), false)
     SlashCmdList.ALTSFOREVER("columns")
-    eq(AltsForeverDB.hiddenColumns, nil)
+    eq(AltsForeverDB.hiddenColumns.gold, nil)
     for i = 1, 18 do eq(overviewRows()[1].cells[i].shown, true, "cell " .. i) end
 end)
 
@@ -858,7 +861,7 @@ test("damaged hidden columns hide nothing; the Character column can't be hidden"
         local saved = overviewAlts()
         saved.hiddenColumns = bad
         local _, ns = sortStart(saved)
-        for i = 1, 18 do eq(overviewRows()[1].cells[i].shown, true, "cell " .. i) end
+        for i = 1, 18 do eq(overviewRows()[1].cells[i].shown, i ~= 15, "cell " .. i .. " (Cooldowns: nobody has one)") end
         ns.SetColumnShown("name", false)
         ns.SetColumnShown("character", false)
         eq(overviewRows()[1].cells[1].shown, true)

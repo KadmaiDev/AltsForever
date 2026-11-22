@@ -545,6 +545,15 @@ local function Soonest(c, now)
     return ready, soon
 end
 
+-- Whether any character has a cooldown recorded: the overview's Cooldowns column shows
+-- itself only then (unless the player chose).
+function ns.AnyCooldowns()
+    for _, c in pairs(ns.db.chars) do
+        if type(c.cooldowns) == "table" and next(c.cooldowns) ~= nil then return true end
+    end
+    return false
+end
+
 -- The cell: green "Ready" / "2 ready" when any are, else how long until the soonest;
 -- blank for a character with none.
 function ns.CooldownCell(c, now)

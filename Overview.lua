@@ -45,16 +45,31 @@ local COLUMNS = {
     { title = L["Lockouts"], width = 76, center = true, id = "lockouts" },
     -- Profession cooldowns (Mooncloth, transmutes): "Ready", "2 ready" or the soonest
     -- "2d 4h"; pointing at one lists them (a player's request, 2026-11-22).
+    -- `auto`: shown only once some character has one, unless the player chose (hiddenColumns
+    -- false = shown, true = hidden), so most players never see an empty column.
     { title = L["Cooldowns"], width = 70, center = true, sort = "cooldowns", id = "cooldowns", hover = "cooldowns",
+        auto = function() return ns.AnyCooldowns() end,
         tip = L["When each character's profession cooldowns (Mooncloth, transmutes...) are ready. Point at one to see each; click it to open their professions."] },
     { title = L["Zone"], width = 140, sort = "zone", id = "zone" },
     { title = L["Played"], width = 70, right = true, sort = "played", id = "played" },
     { title = L["Last seen"], width = 80, right = true, sort = "seen", id = "lastseen" },
 }
--- The columns that can be hidden, in order, each once: { id, title }.
-local HIDEABLE = {}
+-- The columns that can be hidden, in order, each once: { id, title }; AUTO = by id, the
+-- columns that show themselves only when they have something to show.
+local HIDEABLE, AUTO = {}, {}
 for _, col in ipairs(COLUMNS) do
     if col.id and col.title ~= "" then HIDEABLE[#HIDEABLE + 1] = { col.id, col.title } end
+    if col.auto then AUTO[col.id] = col.auto end
+end
+
+-- Whether the column with this id shows: hidden by the player (true), shown by the player
+-- (false, kept only for an `auto` column), else its `auto` answer, else shown.
+local function Visible(id, hidden)
+    local chosen = nil
+    if id and type(hidden) == "table" then chosen = hidden[id] end
+    if chosen == true then return false end
+    if chosen == false or not (id and AUTO[id]) then return true end
+    return AUTO[id]() == true
 end
 -- Never narrower than this, however many columns are hidden: the title bar's buttons and
 -- the footer need the room.
@@ -510,10 +525,9 @@ local colX, colShown = {}, {}
 
 local function Measure()
     local hidden = ns.db.hiddenColumns
-    if type(hidden) ~= "table" then hidden = nil end
     local x = 12
     for i, col in ipairs(COLUMNS) do
-        local shown = not (hidden and col.id and hidden[col.id] == true)
+        local shown = Visible(col.id, hidden)
         colShown[i] = shown
         if shown then
             x = x + (col.gap or 0)
@@ -756,7 +770,17 @@ end
 -- without some other event, and each minute while a profession cooldown is counting down. One timer at a time: a new one only for a sooner change, and a
 -- numbered `dueTick` so only the latest acts.
 local dueAt, dueTick = nil, 0
-local Refresh, SumSpace, SpaceSum
+local Refresh, SumSpace, SpaceSum, ApplyColumns
+
+-- An `auto` column whose answer has changed since the layout was worked out (a first
+-- cooldown seen, or the last one forgotten). One check per such column per refresh.
+local function AutoChanged()
+    local hidden = ns.db.hiddenColumns
+    for i, col in ipairs(COLUMNS) do
+        if col.auto and Visible(col.id, hidden) ~= colShown[i] then return true end
+    end
+    return false
+end
 
 local function Due(now)
     if not (C_Timer and C_Timer.After) then return end
@@ -797,11 +821,19 @@ local function MarkSort()
     end
 end
 
+-- Whether some column isn't showing (the menu's Show all columns is greyed out otherwise).
+local function AnyHidden()
+    for _, col in ipairs(HIDEABLE) do
+        if not ns.ColumnShown(col[1]) then return true end
+    end
+    return false
+end
+
 -- The columns to show: a tick each, and one entry to bring them all back. Filled into a
 -- menu of its own (right-click on the column titles) or the cog menu's Columns entry.
 function ns.FillColumnsMenu(menu)
     local all = menu:CreateButton(L["Show all columns"], function() ns.ShowAllColumns() end)
-    if ns.db.hiddenColumns == nil then all:SetEnabled(false) end
+    if not AnyHidden() then all:SetEnabled(false) end
     for _, col in ipairs(HIDEABLE) do
         local id = col[1]
         menu:CreateCheckbox(col[2], function() return ns.ColumnShown(id) end,
@@ -899,6 +931,7 @@ function SpaceSum(which, group)
 end
 
 function Refresh()
+    if AutoChanged() then return ApplyColumns() end -- lays the window out again, then refreshes
     local now = time()
     local chars = ns.db.chars
     local keys = ns.OverviewOrder()
@@ -1469,7 +1502,7 @@ end
 
 -- Lays the open window out again after a column is hidden or shown: its width, the
 -- titles, every row and group heading made so far. No frame is created.
-local function ApplyColumns()
+function ApplyColumns()
     if not frame then return end
     local width = Measure()
     frame:SetWidth(width)
@@ -1489,8 +1522,7 @@ local function ApplyColumns()
 end
 
 function ns.ColumnShown(id)
-    local hidden = ns.db.hiddenColumns
-    return not (type(hidden) == "table" and hidden[id] == true)
+    return Visible(id, ns.db.hiddenColumns)
 end
 
 -- The id of a column that can be hidden, from the word a player types; nil if none.
@@ -1506,15 +1538,25 @@ function ns.SetColumnShown(id, on)
     if not ns.ColumnId(id) then return end
     local db = ns.db
     local hidden = type(db.hiddenColumns) == "table" and db.hiddenColumns or {}
-    hidden[id] = not on or nil
+    -- An `auto` column remembers either choice; the others only being hidden.
+    if AUTO[id] then hidden[id] = not on else hidden[id] = not on or nil end
     db.hiddenColumns = next(hidden) ~= nil and hidden or nil
     ApplyColumns()
 end
 
+-- Every column, `auto` ones too, even with nothing in them.
 function ns.ShowAllColumns()
-    ns.db.hiddenColumns = nil
+    local shown
+    for id, auto in pairs(AUTO) do
+        if auto() ~= true then
+            shown = shown or {}
+            shown[id] = false
+        end
+    end
+    ns.db.hiddenColumns = shown
     ApplyColumns()
 end
+
 
 -- Opens or closes the overview; `open` only ever opens it (menus, settings page).
 function ns.ToggleOverview(open)

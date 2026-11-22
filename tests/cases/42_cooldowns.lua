@@ -219,3 +219,41 @@ test("the open overview turns a cooldown to Ready when its time comes, only whil
     sortStart(saved)
     eq(countdown(), nil)
 end)
+
+test("the Cooldowns column shows itself once someone has a cooldown, unless the player chose", function()
+    local ns = cooldownStart()
+    SlashCmdList.ALTSFOREVER("")
+    local f = AltsForeverFrame
+    local narrow = f.width
+    eq(ns.ColumnShown("cooldowns"), false, "nobody has one: hidden")
+    eq(overviewRows()[1].cells[15].shown, false)
+    eq(AltsForeverDB.hiddenColumns, nil, "nothing saved for it")
+    -- The first one seen: the open overview makes room for it.
+    tailoring(DAY)
+    ns.RefreshOverview()
+    eq(ns.ColumnShown("cooldowns"), true)
+    eq(overviewRows()[1].cells[15].shown, true)
+    eq(f.width, narrow + 70)
+    eq(AltsForeverDB.hiddenColumns, nil, "still the player's default")
+    -- The last one forgotten: gone again.
+    wow.tradeskill.recipes[2001].learned = false
+    wow.fire("TRADE_SKILL_SHOW")
+    ns.RefreshOverview()
+    eq(ns.ColumnShown("cooldowns"), false)
+    eq(f.width, narrow)
+    -- Shown by the player: stays with none.
+    ns.SetColumnShown("cooldowns", true)
+    eq(AltsForeverDB.hiddenColumns.cooldowns, false)
+    eq(ns.ColumnShown("cooldowns"), true)
+    -- Hidden by the player: stays hidden with one.
+    ns.SetColumnShown("cooldowns", false)
+    wow.tradeskill.recipes[2001].learned = true
+    wow.fire("TRADE_SKILL_SHOW")
+    ns.RefreshOverview()
+    eq(AltsForeverDB.hiddenColumns.cooldowns, true)
+    eq(ns.ColumnShown("cooldowns"), false)
+    eq(overviewRows()[1].cells[15].shown, false)
+    -- A damaged choice counts as none.
+    AltsForeverDB.hiddenColumns.cooldowns = "yes"
+    eq(ns.ColumnShown("cooldowns"), true, "someone has one")
+end)
