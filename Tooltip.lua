@@ -334,9 +334,13 @@ end
 -- setting is kept for when it's turned back on. Each part also has its own switch.
 function ns.TooltipsOn() return not ns.db.tooltipsOff end
 function ns.SetTooltips(on) ns.db.tooltipsOff = not on or nil end
--- Can craft and recipe status (Known / Can learn / Needs skill).
-function ns.CraftTipsOn() return not ns.db.craftTipsOff end
-function ns.SetCraftTips(on) ns.db.craftTipsOff = not on or nil end
+-- Can craft on items, and recipe status (Known / Can learn / Needs skill) on recipes. One
+-- switch until 1.9.1 (`craftTipsOff`, folded into both at load); split at a player's request
+-- (2026-11-22: Can craft made their item tooltips long, but they wanted the recipe status).
+function ns.CraftTipsOn() return not ns.db.canCraftOff end
+function ns.SetCraftTips(on) ns.db.canCraftOff = not on or nil end
+function ns.RecipeTipsOn() return not ns.db.recipeTipsOff end
+function ns.SetRecipeTips(on) ns.db.recipeTipsOff = not on or nil end
 -- The Waylaid Crate materials grid.
 function ns.CratesOn() return not ns.db.cratesOff end
 function ns.SetCrates(on) ns.db.cratesOff = not on or nil end
@@ -426,9 +430,9 @@ local function OnItem(tt, data)
     end
     if id then
         local db = ns.db
-        if not db.craftTipsOff then ns.AddRecipeLines(tt, id, data) end
+        if not db.recipeTipsOff then ns.AddRecipeLines(tt, id, data) end
         ns.AddUpgradeLines(tt, id, data)
-        if not db.craftTipsOff then ns.AddCraftLines(tt, id) end
+        if not db.canCraftOff then ns.AddCraftLines(tt, id) end
         ns.AddSkillupLines(tt, id)
         if not db.cratesOff then ns.AddCrateLines(tt, id, data) end
         if not db.countsOff then ns.AddLines(tt, id) end

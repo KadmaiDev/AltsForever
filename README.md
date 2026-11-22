@@ -14,7 +14,7 @@ The current character always comes first. Other characters are sorted by count. 
 
 Hovering the money at the bottom of your bags lists each character's gold and the total, laid out the same way (also in ElvUI's bags, and in EllesmereUI's when its own gold tracking is turned off). Hovering the **experience bar** lists your other characters still levelling, with their level, XP and rested XP, and hovering the **reputation bar** lists their standing with the faction you're watching.
 
-Type `/af` to open the **overview**: every character with level and XP, rested XP (including what they've built up since logging out), Legacy points left to spend and their Well Rested rank, gold, main professions, zone, time played and when you last played them, with total time played at the bottom. With characters on more than one ruleset or both factions, they're grouped under headings such as "Normal · Horde", each with its gold total; click a heading to collapse it. Hover a row for details such as rested XP until full, hearthstone location and item level. **Click a row** to see that character's gear, laid out like the character panel: hover any item for its tooltip, shift-click to link it in chat. Nearly broken items are tinted red and the lowest durability is shown.
+Type `/af` to open the **overview**: every character with level and XP, rested XP (including what they've built up since logging out), Legacy points left to spend and their Well Rested rank, gold, main professions, profession cooldowns (Mooncloth, transmutes: Ready, or how long until the soonest), zone, time played and when you last played them, with total time played at the bottom. With characters on more than one ruleset or both factions, they're grouped under headings such as "Normal · Horde", each with its gold total; click a heading to collapse it. Hover a row for details such as rested XP until full, hearthstone location, item level and profession cooldowns. **Click a row** to see that character's gear, laid out like the character panel: hover any item for its tooltip, shift-click to link it in chat. Nearly broken items are tinted red and the lowest durability is shown.
 
 ![The overview window, grouped by ruleset and faction, with a character's details and gear panel](media/alt-overview.png)
 
@@ -120,6 +120,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af sync [Full Name]` | Open the sync window, or swap characters with your character on another game account, e.g. `/af sync Thessa Oakenbrook` |
 | `/af sync auto` | Turn syncing by itself on or off |
 | `/af prof [name]` | Open a character's professions (yours without a name) |
+| `/af cooldowns` | List each character's profession cooldowns (Mooncloth, transmutes...) and when each is ready again |
 | `/af lockouts` | Open or close the Lockouts window: the instances each game account has entered this hour, and each character's raid lockouts |
 | `/af icons` | Choose the icons item tooltips use for bags, bank, mail and worn items |
 | `/af bags [name]`, `/af bank [name]` | Show your bags or bank slot by slot, or another character's, e.g. `/af bank Tarnia` |
@@ -130,7 +131,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af upgrades` | Turn upgrades in item tooltips on or off |
 | `/af anvils` | Show or hide the anvils on your character sheet that mark craftable upgrades |
 | `/af itemnames` | Save item names and qualities in the saved file when you log out, only for reading it outside the game (off by default) |
-| `/af tooltips` | Turn everything Alts Forever adds to tooltips on or off. `/af crafting`, `/af crates`, `/af gold` and `/af bars` turn Can craft and recipes, Waylaid Crate materials, your alts' gold on the bag money, and your alts on the XP and reputation bars on or off |
+| `/af tooltips` | Turn everything Alts Forever adds to tooltips on or off. `/af crafting`, `/af recipes`, `/af crates`, `/af gold` and `/af bars` turn Can craft on items, recipe status on recipes, Waylaid Crate materials, your alts' gold on the bag money, and your alts on the XP and reputation bars on or off |
 | `/af counts` | Turn the item counts in tooltips on or off, e.g. if Baganator or Bagnon already shows them (Can craft, skill-ups, upgrades and crates stay) |
 | `/af rulesets` | Show or hide your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; hidden by default |
 | `/af legacy` | List each character's Legacy points to spend and Well Rested rank; `/af legacy on` or `off` turns the chat reminders on or off |
@@ -144,6 +145,20 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af mem` | Show the addon's memory use |
 
 `/altsforever` also works.
+
+## For addon authors
+
+Other addons can ask Alts Forever how many of an item the player's characters have. Add `## OptionalDeps: AltsForever` to your `.toc` and check that the table exists:
+
+```lua
+if AltsForever and AltsForever.API_VERSION >= 1 then
+    local total, characters = AltsForever.Count(2589) -- Linen Cloth
+end
+```
+
+- `AltsForever.Count(itemID)` returns the total held by the characters the player can mail (the one they're on, plus others on the same ruleset and faction) in bags, bank, mailbox and worn, as last seen, and a list of those characters with any: you first, then most first, each `{ name, you, count, bags, bank, mail, equip }`. Before the player has logged in it returns nil. The list is a new table each call, so keep or change it as you like.
+- `AltsForever.DataVersion()` changes whenever a count may have changed: cache your answers until it does.
+- `AltsForever.API_VERSION` goes up when something is added. Nothing is ever removed or changed.
 
 ## Tests
 
