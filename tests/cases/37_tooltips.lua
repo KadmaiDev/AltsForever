@@ -62,7 +62,8 @@ test("each part of the tooltips turns off on its own", function()
     local ns, bar = tipsStart()
     for _, case in ipairs({
         { "counts", "countsOff", "craft recipe crate gold bars" },
-        { "crafting", "craftTipsOff", "counts crate gold bars" },
+        { "crafting", "canCraftOff", "counts recipe crate gold bars" },
+        { "recipes", "recipeTipsOff", "counts craft crate gold bars" },
         { "crates", "cratesOff", "counts craft recipe gold bars" },
         { "gold", "goldTipOff", "counts craft recipe crate bars" },
         { "bars", "barsOff", "counts craft recipe crate gold" },
@@ -94,7 +95,7 @@ test("Options page: the tooltip parts sit indented under Show Alts Forever in to
     local master = f.checks[1]
     eq(master.label.text, "Show Alts Forever in tooltips")
     local subs = {}
-    for i = 2, 8 do subs[#subs + 1] = f.checks[i] end
+    for i = 2, 9 do subs[#subs + 1] = f.checks[i] end
     eq(master.point[4], -2)
     eq(subs[1].point[4], 20, "indented under it")
     eq(subs[2].point[4], 0, "then in line with the one above")
@@ -114,5 +115,34 @@ test("Options page: the tooltip parts sit indented under Show Alts Forever in to
     master:SetChecked(true)
     master.scripts.OnClick(master)
     for _, check in ipairs(subs) do eq(check:IsEnabled(), true) end
-    eq(f.checks[9]:IsEnabled(), true, "the extras are never greyed")
+    eq(f.checks[10]:IsEnabled(), true, "the extras are never greyed")
+end)
+
+test("Can craft and recipe status: the old single switch turns both off, then each turns on by itself and stays", function()
+    local ns, bar = tipsStart()
+    local saved = AltsForeverDB
+    saved.craftTipsOff = true -- 1.9.1 and before: one switch for both
+    wow.load(FILES)
+    wow.login(saved)
+    eq(AltsForeverDB.craftTipsOff, nil, "the old switch is folded in")
+    eq(AltsForeverDB.canCraftOff, true); eq(AltsForeverDB.recipeTipsOff, true)
+    SlashCmdList.ALTSFOREVER("recipes")
+    eq(AltsForeverDB.recipeTipsOff, nil, "recipe status back on")
+    saved = AltsForeverDB
+    wow.load(FILES)
+    wow.login(saved)
+    eq(AltsForeverDB.canCraftOff, true, "Can craft stays off")
+    eq(AltsForeverDB.recipeTipsOff, nil, "recipe status stays on after the next login")
+end)
+
+test("Can craft and recipe status are two boxes on the Options page, each with its own setting", function()
+    wow.load(FILES)
+    wow.login(nil)
+    showOptionsPage()
+    local craft, recipe = pageBox("Show Can craft"), pageBox("Show recipe status")
+    craft.setSelected()
+    eq(AltsForeverDB.canCraftOff, true); eq(AltsForeverDB.recipeTipsOff, nil)
+    eq(craft.isSelected(), false); eq(recipe.isSelected(), true)
+    recipe.setSelected()
+    eq(AltsForeverDB.recipeTipsOff, true)
 end)

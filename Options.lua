@@ -211,6 +211,7 @@ end
 local function TooltipsSelected() return ns.TooltipsOn() end
 local function CountsSelected() return ns.CountsOn() end
 local function CraftTipsSelected() return ns.CraftTipsOn() end
+local function RecipeTipsSelected() return ns.RecipeTipsOn() end
 local function CratesSelected() return ns.CratesOn() end
 local function GoldTipSelected() return ns.GoldTipOn() end
 local function BarsSelected() return ns.BarsOn() end
@@ -275,8 +276,10 @@ local SETTINGS = {
         L["Everything Alts Forever adds to tooltips: item counts, Can craft and recipes, upgrades, Waylaid Crates, gold on your bag money and the XP and reputation bars. Untick it to leave tooltips as the game shows them; the overview, bags, bank, search and lockouts still work. The boxes under it turn each part on or off. Same as /af tooltips."], section = "tooltips" },
     { L["Show item counts"], CountsSelected, function(on) ns.SetCounts(on) end,
         L["Item tooltips list how many of the item each of your characters has, and where. Turn this off if another addon, such as Baganator, already shows them; Can craft, skill-ups, upgrades and crates stay. Same as /af counts."], section = "tooltips", sub = true },
-    { L["Show Can craft and recipes"], CraftTipsSelected, function(on) ns.SetCraftTips(on) end,
-        L["Item tooltips name which of your characters can craft the item, and recipe tooltips whether each one knows the recipe, can learn it or needs more skill. Same as /af crafting."], section = "tooltips", sub = true },
+    { L["Show Can craft"], CraftTipsSelected, function(on) ns.SetCraftTips(on) end,
+        L["Item tooltips name which of your characters can craft the item. Same as /af crafting."], section = "tooltips", sub = true },
+    { L["Show recipe status"], RecipeTipsSelected, function(on) ns.SetRecipeTips(on) end,
+        L["Recipe tooltips say whether each of your characters knows the recipe, can learn it or needs more skill. Same as /af recipes."], section = "tooltips", sub = true },
     { L["Show skill-up details"], SkillupsSelected, function(on) ns.SetSkillups(on) end,
         L["Show which characters can still skill up: in Can craft, on materials (Skill-ups) and in the overview. Same as /af skillups."], section = "tooltips", sub = true },
     { L["Show upgrades"], UpgradesSelected, function(on) ns.SetUpgrades(on) end,
