@@ -1,6 +1,7 @@
 ## Alts Forever (not yet released)
 
 - **Can craft and recipe status are now two settings:** "Show Can craft and recipes" is split into **Show Can craft** (which of your characters can make an item, on item tooltips) and **Show recipe status** (Known, Can learn or Needs skill for each character, on recipe tooltips), so you can keep one without the other. On the Options page, or `/af crafting` and the new `/af recipes`. If you had the old one off, both start off. Thanks to the player who asked.
+- **For addon authors:** other addons can now ask Alts Forever how many of an item your characters have, with `AltsForever.Count(itemID)`. Described in the README.
 
 ## Alts Forever 1.9.1
 
