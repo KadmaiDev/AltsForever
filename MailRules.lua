@@ -482,6 +482,26 @@ function ns.MailPackPlan()
     return who, min(n, free)
 end
 
+-- Everyone Pack could pack for now, as { key, n } (stacks), most first then by name: the
+-- list behind the button's right-click. Reused tables; nil when Pack isn't offered at all.
+local choices, choiceN = {}, {}
+local function ByStacks(a, b)
+    if choiceN[a] ~= choiceN[b] then return choiceN[a] > choiceN[b] end
+    return a < b
+end
+function ns.MailPackChoices()
+    if not ns.MailPackPlan() then return nil end
+    FindPackable(nil)
+    wipe(choices)
+    wipe(choiceN)
+    for key, n in pairs(counts) do
+        choices[#choices + 1] = key
+        choiceN[key] = n
+    end
+    table.sort(choices, ByStacks)
+    return choices, choiceN
+end
+
 local function UpdatePack()
     if not pack then return end
     local who, n = ns.MailPackPlan()
@@ -619,6 +639,27 @@ local function Pack()
 end
 ns.PackMail = Pack
 
+-- Right-click: who else Pack could pack for (owner, 2026-11-22: skipping the character it
+-- picked meant knowing whose name to type). A pick goes in the To box as the player's own
+-- choice, which Pack then follows.
+local function PackMenu(owner)
+    local list, n = ns.MailPackChoices()
+    if not list then return end
+    ns.OpenMenu(owner, function(_, root)
+        root:CreateTitle(L["Pack for"])
+        for _, key in ipairs(list) do
+            local c = ns.db.chars[key]
+            local stacks = (n[key] == 1 and L["%d stack"] or L["%d stacks"]):format(n[key])
+            root:CreateRadio(ns.ColoredName(key, c) .. LIGHT .. " · " .. stacks .. "|r",
+                function() return pack and pack.who == key end,
+                function()
+                    SendMailNameEditBox:SetText(c.name or key)
+                    ns.MailRecipientChosen()
+                end)
+        end
+    end)
+end
+
 local function PackTooltip(self)
     if not self.who then return end
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -636,6 +677,7 @@ local function PackTooltip(self)
         end
     end
     GameTooltip:AddLine(L["Shift-click: full stacks only."], 0.5, 0.8, 1, true)
+    GameTooltip:AddLine(L["Right-click: pack for another character."], 0.5, 0.8, 1, true)
     GameTooltip:Show()
 end
 
@@ -678,7 +720,11 @@ local function CreateMailParts()
 
     pack = CreateFrame("Button", nil, SendMailFrame, "UIPanelButtonTemplate")
     pack:SetSize(110, 20)
-    pack:SetScript("OnClick", Pack)
+    pack:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    pack:SetScript("OnClick", function(self, button)
+        if button == "RightButton" then return PackMenu(self) end
+        Pack()
+    end)
     pack:SetScript("OnEnter", PackTooltip)
     pack:SetScript("OnLeave", function() GameTooltip:Hide() end)
     pack.mailPack = true
