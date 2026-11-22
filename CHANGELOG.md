@@ -1,3 +1,7 @@
+## Alts Forever (not yet released)
+
+- **Profession cooldowns:** Mooncloth, transmutes and other crafts with a cooldown now show when each of your characters can make them again: point at a character in the overview, or type /af cooldowns for everyone. A cooldown is picked up when that character crafts it with their profession window open, or opens the window while it's running. Transmutes that share one cooldown show as one line. Thanks to the player who asked.
+
 ## Alts Forever 1.9.1
 
 - **Hearthstone cooldown:** pointing at a character in the overview now shows when their hearthstone is ready again, beside where it's set ("Stormwind · ready in 23 min"). Each character's is read when you next log in on them. Thanks to FelixFitzgerald for the suggestion.

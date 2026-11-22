@@ -93,6 +93,10 @@ function ns.ScanSkills(c, live)
             if not read[name] then
                 if c.recipes then c.recipes[name] = nil end
                 if c.crafts then c.crafts[name] = nil end
+                if c.cooldowns then
+                    c.cooldowns[name] = nil
+                    if next(c.cooldowns) == nil then c.cooldowns = nil end
+                end
                 dropped = true
             end
         end
@@ -307,7 +311,7 @@ function ns.ScanRecipes(c)
     local stored = StoredNames(prof)
     local ids = TS.GetAllRecipeIDs()
     local mine, found = {}, false
-    local learned, crafts, reagentsOf, madeOf = {}, {}, {}, {}
+    local learned, crafts, reagentsOf, madeOf, learnedIDs = {}, {}, {}, {}, {}
     local unchecked, cats = nil, {}
     for _, id in ipairs(ids) do
         local r = TS.GetRecipeInfo(id)
@@ -318,7 +322,7 @@ function ns.ScanRecipes(c)
                     found, mine[lname] = true, true
                     RecordCategory(cats, r.categoryID)
                     if r.learned then
-                        learned[lname] = r
+                        learned[lname], learnedIDs[id] = r, r.name
                         local s = TS.GetRecipeSchematic and TS.GetRecipeSchematic(id, false)
                         local item = OutputItem(id, s)
                         if item then crafts[item] = lname end
@@ -357,6 +361,7 @@ function ns.ScanRecipes(c)
     c.recipesAt[prof] = c.profs and c.profs[prof]
     Repair(prof, mine)
     ns.PruneRecipeInfo() -- other professions' strays too (a few hundred lookups, window open only)
+    ns.WatchCooldowns(c, prof, learnedIDs)
     ns.craftVersion = ns.craftVersion + 1
     return true
 end
@@ -427,6 +432,130 @@ function ns.SkillupCount(c, prof)
     return n
 end
 
+---------------------------------------------------------------------------
+-- Profession cooldowns (Mooncloth, transmutes, salt...; a player asked 2026-11-22).
+-- C_TradeSkillUI.GetRecipeCooldown(recipeID) is undocumented on Forever; on retail it
+-- returns the seconds left (then isDayCooldown, charges, maxCharges), and DataStore_Crafts
+-- (Altoholic) reads it the same way on Forever. Read for every learned recipe while the
+-- character's own profession window is open: at each recipe scan, and after each craft
+-- (what it made lands in the bags: BAG_UPDATE_DELAYED). Only recipes seen on cooldown are
+-- kept, c.cooldowns[profession][recipe name] = clock time it's ready (past = ready), so a
+-- recipe shows only once it has been on cooldown. Not yet seen in game.
+
+local cdChar, cdProf, cdIDs = nil, nil, {} -- whose window is open: recipe ID -> name
+
+-- Reads the open window's cooldowns into the character's record; true if anything changed.
+local function ReadCooldowns()
+    local get, c, prof = TS.GetRecipeCooldown, cdChar, cdProf
+    if not (get and c and prof) then return false end
+    local now = time()
+    local t = c.cooldowns and c.cooldowns[prof]
+    local changed = false
+    for id, name in pairs(cdIDs) do
+        local ok, left = pcall(get, id)
+        local had = t and t[name]
+        if ok and not issecretvalue(left) and type(left) == "number" and left > 0 then
+            local ready = floor(now + left + 0.5)
+            -- Steady readings drift by a second or so: only a real change is recorded.
+            if not had or had < ready - 60 or had > ready + 60 then
+                if not t then
+                    c.cooldowns = c.cooldowns or {}
+                    t = {}
+                    c.cooldowns[prof] = t
+                end
+                t[name], changed = ready, true
+            end
+        elseif had and had > now then
+            t[name], changed = now, true -- ready early (a reset, or the game says so)
+        end
+    end
+    -- Recipes no longer known (unlearned or renamed) go.
+    if t then
+        for name in pairs(t) do
+            local still = false
+            for _, n in pairs(cdIDs) do
+                if n == name then still = true break end
+            end
+            if not still then t[name], changed = nil, true end
+        end
+        if next(t) == nil then
+            c.cooldowns[prof] = nil
+            if next(c.cooldowns) == nil then c.cooldowns = nil end
+        end
+    end
+    return changed
+end
+
+-- Called by a recipe scan with its learned recipes (ID -> name); reads them at once.
+function ns.WatchCooldowns(c, prof, ids)
+    cdChar, cdProf = c, prof
+    wipe(cdIDs)
+    for id, name in pairs(ids) do cdIDs[id] = name end
+    ReadCooldowns()
+end
+
+local function StopCooldowns()
+    cdChar, cdProf = nil, nil
+    wipe(cdIDs)
+end
+
+local DAY, HOUR = 86400, 3600
+
+-- "ready" (green) or "ready in 2d 4h" / "3h 20m" / "15 min".
+function ns.CooldownText(ready, now)
+    local left = ready - now
+    if left <= 0 then return "|cff20ff20" .. L["ready"] .. "|r" end
+    local d, h, m = floor(left / DAY), floor(left % DAY / HOUR), math.ceil(left % HOUR / 60)
+    if m == 60 then h, m = h + 1, 0 end
+    if h == 24 then d, h = d + 1, 0 end
+    local text
+    if d > 0 then
+        text = L["%dd %dh"]:format(d, h)
+    elseif h > 0 then
+        text = L["%dh %dm"]:format(h, m)
+    else
+        text = L["%d min"]:format(m)
+    end
+    return L["ready in %s"]:format(text)
+end
+
+local function ByReady(a, b)
+    if a[2] ~= b[2] then return a[2] < b[2] end
+    if a[4] ~= b[4] then return a[4] < b[4] end
+    return a[1] < b[1]
+end
+
+-- A character's cooldowns, soonest ready first, as { name, ready at, more, profession }:
+-- recipes of one profession ready together (a shared cooldown, as Classic's transmutes, or
+-- all of them ready) make one row named after the first, with how many more. nil when none.
+-- Built only when asked for (a tooltip or /af cooldowns).
+function ns.CooldownRows(c, now)
+    if type(c.cooldowns) ~= "table" then return nil end
+    local all = {}
+    for prof, t in pairs(c.cooldowns) do
+        for name, ready in pairs(t) do
+            all[#all + 1] = { name, ready > now and ready or now, 0, prof }
+        end
+    end
+    if not all[1] then return nil end
+    sort(all, ByReady)
+    local rows, last = {}, nil
+    for _, e in ipairs(all) do
+        if last and last[4] == e[4] and e[2] - last[2] <= 60 then
+            last[3] = last[3] + 1
+        else
+            rows[#rows + 1] = e
+            last = e
+        end
+    end
+    return rows
+end
+
+-- "Transmute: Arcanite Bar +5 more"
+function ns.CooldownName(row)
+    return row[3] > 0 and (row[1] .. " " .. L["+%d more"]:format(row[3])) or row[1]
+end
+
 function ns.StartProfessions()
     local char = ns.char
     local pending = false
@@ -449,10 +578,15 @@ function ns.StartProfessions()
         Changed()
     end)
     -- The recipe list may not be ready when the window opens; LIST_UPDATE follows.
-    ns.On("TRADE_SKILL_SHOW", function() pending = true TryScan() end)
-    ns.On("TRADE_SKILL_DATA_SOURCE_CHANGED", function() pending = true TryScan() end)
+    ns.On("TRADE_SKILL_SHOW", function() StopCooldowns() pending = true TryScan() end)
+    ns.On("TRADE_SKILL_DATA_SOURCE_CHANGED", function() StopCooldowns() pending = true TryScan() end)
     ns.On("TRADE_SKILL_LIST_UPDATE", TryScan)
-    ns.On("TRADE_SKILL_CLOSE", function() pending = false end)
+    ns.On("TRADE_SKILL_CLOSE", function() pending = false StopCooldowns() end)
+    -- A craft started a cooldown: its item has landed in the bags. Only while the window is
+    -- open and scanned (a few hundred number reads at most, no tables).
+    ns.On("BAG_UPDATE_DELAYED", function()
+        if cdProf and ReadCooldowns() then Changed() end
+    end)
     ns.On("NEW_RECIPE_LEARNED", function(recipeID)
         ns.RecipeLearned(char, recipeID)
         Changed()

@@ -214,7 +214,7 @@ local CHAR_FIELDS = {
     bags = "table", bank = "table", mail = "table", equip = "table", gear = "table",
     layout = "table", profs = "table", profMax = "table", recipes = "table", crafts = "table",
     reps = "table", duraSlots = "table", saves = "table", saveKills = "table",
-    account = "string", runs = "table", recipesAt = "table", links = "table",
+    account = "string", runs = "table", recipesAt = "table", links = "table", cooldowns = "table",
 }
 local DB_FIELDS = {
     icons = "table", goldDays = "table", goldDaysBy = "table", factions = "table",
@@ -251,6 +251,14 @@ local function RepairChar(c)
     if c.recipes then KeepOnly(c.recipes, "string", "table") end
     if c.crafts then KeepOnly(c.crafts, "string", "table") end
     if c.recipesAt then KeepOnly(c.recipesAt, "string", "number") end
+    if c.cooldowns then
+        KeepOnly(c.cooldowns, "string", "table")
+        for prof, t in pairs(c.cooldowns) do
+            KeepOnly(t, "string", "number")
+            if next(t) == nil then c.cooldowns[prof] = nil end
+        end
+        if next(c.cooldowns) == nil then c.cooldowns = nil end
+    end
     if c.saves then KeepOnly(c.saves, "string", "number") end
     if c.saveKills then KeepOnly(c.saveKills, "string", "string") end
     if c.runs then
@@ -926,6 +934,26 @@ function commands.rep()
     ns.ToggleReputation()
 end
 
+-- /af cooldowns: every character's profession cooldowns (Professions.lua), in the
+-- overview's order.
+function commands.cooldowns()
+    local now, any = time(), false
+    for _, key in ipairs(ns.OverviewOrder()) do
+        local rows = ns.CooldownRows(ns.db.chars[key], now)
+        if rows then
+            if not any then Print(L["Profession cooldowns:"]) end
+            any = true
+            local parts = {}
+            for i, r in ipairs(rows) do parts[i] = ns.CooldownName(r) .. " " .. ns.CooldownText(r[2], now) end
+            Print("  " .. ns.ColoredName(key, ns.db.chars[key]) .. ": " .. table.concat(parts, ", "))
+        end
+    end
+    if not any then
+        Print(L["No profession cooldowns seen yet. One shows once a character has crafted something with a cooldown (Mooncloth, a transmute...) with their profession window open."])
+    end
+end
+commands.cooldown, commands.cd = commands.cooldowns, commands.cooldowns
+
 -- /af lockouts: the Lockouts window (Lockouts.lua).
 function commands.lockouts()
     ns.ToggleLockouts()
@@ -968,6 +996,7 @@ function commands.help()
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
     Print(L["/af mailrules lists which items always go to which character by mail; make rules from the arrow beside the To box at the mailbox."])
     Print(L["/af lockouts opens your characters' raid lockouts and the instances each game account has entered this hour."])
+    Print(L["/af cooldowns lists your characters' profession cooldowns (Mooncloth, transmutes...) and when each is ready."])
     Print(L["/af sync and the name of your character on another game account swaps characters with it, so both accounts see all of them. Both need to be online at the same time, on the same ruleset and faction."])
     Print(L["/af sync auto turns syncing by itself on or off."])
     Print(L["/af rulesets shows or hides your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; they can't trade with this one."])

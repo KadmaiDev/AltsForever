@@ -465,6 +465,13 @@ local function RowTooltip(row)
             tt:AddDoubleLine(r[1], r[3] ~= "" and (r[2] .. "  " .. r[3]) or r[2], 1, 1, 1, 1, 1, 1)
         end
     end
+    local cooldowns = ns.CooldownRows(c, now)
+    if cooldowns then
+        if not profRows then tt:AddLine(" ") end
+        for _, r in ipairs(cooldowns) do
+            tt:AddDoubleLine(ns.CooldownName(r), ns.CooldownText(r[2], now), 1, 0.82, 0, 1, 1, 1)
+        end
+    end
     ns.AddLockoutLines(tt, c, now)
     tt:AddLine(" ")
     local free, total = ns.BagSpace(c, "bags")
