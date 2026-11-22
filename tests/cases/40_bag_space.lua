@@ -57,7 +57,7 @@ function hasLine(lines, text)
 end
 
 local ORANGE = "|cffff8000"
-local AMMO, SOUL, PROFESSION = "|cffc79c6e", "|cff9482c9", "|cff6fcf6f"
+local AMMO, SOUL, PROFESSION, REAGENT_BLUE = "|cffc79c6e", "|cff9482c9", "|cff6fcf6f", "|cff66b2ff"
 
 test("the overview's Bags and Bank columns: free slots of all, the keyring left out", function()
     spaceStart()
@@ -294,7 +294,7 @@ test("the bank grid under the title lines up: bag columns and free/total in the 
     clearTooltipLines()
 end)
 
-test("quivers, ammo pouches and soul bags aren't free space: left out of the counts, coloured, and named in the legend", function()
+test("quivers, ammo pouches and soul bags aren't free space: left out of the counts, coloured, and named in the legend; the reagent bag coloured but counted", function()
     local QUIVER, POUCH, SOUL_BAG, REAGENT = 2662, 2663, 21340, 222
     local saved = spaceAlts()
     local low = saved.chars.Low
@@ -321,17 +321,20 @@ test("quivers, ammo pouches and soul bags aren't free space: left out of the cou
     local lines = tipLines()
     assert(hasLine(lines, "Light Quiver" .. AMMO .. "  Quiver|r = 16"), table.concat(lines, " | "))
     assert(hasLine(lines, "Felcloth Bag" .. SOUL .. "  Soul Bag|r = 4"), "each still listed with its own free slots")
-    assert(hasLine(lines, "Reagent Pouch" .. G .. "  Reagent Bag|r"), "the reagent bag: its kind in grey, as before")
+    assert(hasLine(lines, "Reagent Pouch" .. REAGENT_BLUE .. "  Reagent Bag|r"), "the reagent bag: its kind in its colour")
     assert(hasLine(lines, "Total = 6 of 22 free"))
     assert(hasLine(lines, G .. "Not counted as free space: " .. AMMO .. "Quiver or ammo pouch|r, " .. SOUL .. "Soul bag|r" .. G .. "|r"),
         table.concat(lines, " | "))
+    assert(hasLine(lines, G .. "Counted as free space: " .. REAGENT_BLUE .. "Reagent bag|r" .. G .. "|r"), table.concat(lines, " | "))
     local f = AltsForeverFrame
     f.sorts.bags.scripts.OnEnter(f.sorts.bags)
     lines = tipLines()
-    assert(hasLine(lines, "[ROGUE]Low = " .. AMMO .. "16|r/" .. SOUL .. "10|r/-/-/6   6" .. G .. "/22|r"), table.concat(lines, " | "))
+    assert(hasLine(lines, "[ROGUE]Low = " .. AMMO .. "16|r/" .. SOUL .. "10|r/-/-/" .. REAGENT_BLUE .. "6|r   6" .. G .. "/22|r"), table.concat(lines, " | "))
     assert(hasLine(lines, G .. "Not counted as free space: " .. AMMO .. "Quiver or ammo pouch|r, " .. SOUL .. "Soul bag|r, "
         .. PROFESSION .. "Profession bag|r" .. G .. "|r"), "every family in the grid, in one order: " .. table.concat(lines, " | "))
+    assert(hasLine(lines, G .. "Counted as free space: " .. REAGENT_BLUE .. "Reagent bag|r" .. G .. "|r"), "the reagent bag's key")
     f.sorts.bank.scripts.OnEnter(f.sorts.bank)
     lines = tipLines()
     assert(hasLine(lines, "[ROGUE]Low = " .. AMMO .. "8|r   3" .. G .. "/28|r"), table.concat(lines, " | "))
+    assert(not hasLine(lines, "Counted as free space"), "no reagent bag in the bank: no key for it")
 end)

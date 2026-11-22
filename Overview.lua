@@ -549,6 +549,14 @@ end
 -- opens that character's bags or bank, a right-click their menu as the row's does.
 local ITEM_CROP = ":0:0:0:0:64:64:5:59:5:59|t "
 
+-- The colour key under a bag list or grid: special bags left out of free space, then the
+-- reagent bag (coloured, counted).
+local function AddBagLegend(tt, seen)
+    local uncounted, counted = ns.BagFamilyLegend(seen)
+    if uncounted then tt:AddLine(GREY .. L["Not counted as free space: %s"]:format(uncounted .. GREY) .. "|r", 1, 1, 1, true) end
+    if counted then tt:AddLine(GREY .. L["Counted as free space: %s"]:format(counted .. GREY) .. "|r", 1, 1, 1, true) end
+end
+
 local function SpaceTooltip(self)
     local row = self.row
     local key = row.key
@@ -580,8 +588,7 @@ local function SpaceTooltip(self)
             end
         end
         tt:AddDoubleLine(L["Total"], L["%d of %d free"]:format(free, total), 1, 0.82, 0, 1, 1, 1)
-        local legend = seen and ns.BagFamilyLegend(seen)
-        if legend then tt:AddLine(GREY .. L["Not counted as free space: %s"]:format(legend .. GREY) .. "|r", 1, 1, 1, true) end
+        if seen then AddBagLegend(tt, seen) end
         local unbought = which == "bank" and ns.BankBagsUnbought(c)
         if unbought then tt:AddLine(GREY .. L["Bank bag slots not bought yet: %d"]:format(unbought) .. "|r") end
         if which == "bank" and c.bankAt then
@@ -834,8 +841,7 @@ local function SpaceSummary(tt, which)
             cells[widest + 2] = r[3]
             rows[i] = cells
         end
-        local legend = ns.BagFamilyLegend(seen)
-        if legend then tt:AddLine(GREY .. L["Not counted as free space: %s"]:format(legend .. GREY) .. "|r", 1, 1, 1, true) end
+        AddBagLegend(tt, seen)
     end
     if total > 0 then
         tt:AddDoubleLine(L["All characters"], L["%d of %d free"]:format(free, total), 1, 0.82, 0, 1, 1, 1)

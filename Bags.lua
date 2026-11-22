@@ -204,7 +204,7 @@ end
 
 -- Special bags hold only some things, so their slots aren't free space for loot: left out
 -- of the Bags and Bank counts, and coloured in the lists (owner, 2026-11-22). The reagent
--- bag is counted: trade goods are most of what's farmed. Classic's numbers: quivers and
+-- bag is coloured too but counted: trade goods are most of what's farmed. Classic's numbers: quivers and
 -- ammo pouches are item class 11; containers (class 1) by subclass, 1 Soul Bag, 2-10 the
 -- profession bags (herb, enchanting, engineering, gem, mining...), 11 Reagent Bag.
 -- Cached per bag item (a few per character; GetItemInfoInstant needs no loading).
@@ -223,6 +223,8 @@ local function BagFamily(item)
             family = "soul"
         elseif class == 1 and type(subclass) == "number" and subclass >= 2 and subclass <= 10 then
             family = "profession"
+        elseif class == 1 and subclass == 11 then
+            family = "reagent"
         end
         families[item] = family
     end
@@ -231,12 +233,14 @@ end
 ns.BagFamily = BagFamily
 
 local FAMILY_ORDER = { "ammo", "soul", "profession" }
-local FAMILY_COLOR = { ammo = "|cffc79c6e", soul = "|cff9482c9", profession = "|cff6fcf6f" }
-local FAMILY_NAME = { ammo = L["Quiver or ammo pouch"], soul = L["Soul bag"], profession = L["Profession bag"] }
+local FAMILY_COLOR = { ammo = "|cffc79c6e", soul = "|cff9482c9", profession = "|cff6fcf6f", reagent = "|cff66b2ff" }
+local FAMILY_NAME = { ammo = L["Quiver or ammo pouch"], soul = L["Soul bag"], profession = L["Profession bag"],
+    reagent = L["Reagent bag"] }
+local COUNTED = { reagent = true } -- coloured, but its slots are free space
 ns.BAG_FAMILY_COLOR = FAMILY_COLOR
 
--- "Quiver or ammo pouch, Soul bag" in their colours, for the families in `seen` (a set);
--- nil when none. Made only on hover.
+-- The key for the families in `seen` (a set), in their colours: "Quiver or ammo pouch,
+-- Soul bag" not counted, then the reagent bag counted; each nil when none. Made only on hover.
 function ns.BagFamilyLegend(seen)
     local parts
     for _, family in ipairs(FAMILY_ORDER) do
@@ -245,7 +249,8 @@ function ns.BagFamilyLegend(seen)
             parts[#parts + 1] = FAMILY_COLOR[family] .. FAMILY_NAME[family] .. "|r"
         end
     end
-    return parts and table.concat(parts, ", ")
+    return parts and table.concat(parts, ", "),
+        seen.reagent and (FAMILY_COLOR.reagent .. FAMILY_NAME.reagent .. "|r") or nil
 end
 
 -- Free and all slots in a character's bags (keyring left out: it holds only keys; special
@@ -257,7 +262,8 @@ function ns.BagSpace(c, which)
     local free, total = 0, 0
     for _, bag in ipairs(Places(which)) do
         local values = bag ~= BagIndex.Keyring and layout[bag]
-        if values and not BagFamily(values[0]) then
+        local family = values and BagFamily(values[0])
+        if values and not (family and not COUNTED[family]) then
             local n = #values
             total = total + n
             for i = 1, n do
