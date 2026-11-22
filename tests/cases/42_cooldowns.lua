@@ -133,3 +133,89 @@ test("profession cooldowns: forgotten with the recipe or profession; secret answ
     eq(cd.Tailoring.Mooncloth, NOW); eq(cd.Tailoring.bad, nil)
     eq(cd[3], nil); eq(cd.Alchemy, nil); eq(cd.Empty, nil, "emptied by the repair: dropped")
 end)
+
+local function cooldownSaved()
+    local saved = overviewAlts()
+    local chars = saved.chars
+    chars.High.cooldowns = { Tailoring = { Mooncloth = NOW - 10 },
+        Alchemy = { ["Transmute: Arcanite"] = NOW + 3 * HOUR, ["Transmute: Iron to Gold"] = NOW + 3 * HOUR } }
+    chars.Far.cooldowns = { Alchemy = { ["Transmute: Arcanite"] = NOW + 2 * DAY + 4 * HOUR } }
+    chars.Low.cooldowns = { Tailoring = { Mooncloth = NOW - 5 }, Alchemy = { ["Transmute: Arcanite"] = NOW - 1 } }
+    return saved
+end
+
+local function rowOf(name)
+    for _, r in ipairs(overviewRows()) do
+        if cell(r, 1):find(name, 1, true) then return r end
+    end
+end
+
+local function cooldownButton(row)
+    for _, b in ipairs(row.spaces) do
+        if b.which == "cooldowns" then return b end
+    end
+end
+
+local function tipText()
+    local lines = {}
+    for _, l in ipairs(GameTooltip.lines) do lines[#lines + 1] = table.concat(l, " = ") end
+    return table.concat(lines, " | ")
+end
+
+test("the overview's Cooldowns column: ready, how many, or the soonest; sorts; points and clicks", function()
+    local click = sortStart(cooldownSaved())
+    local READY = "|cff20ff20"
+    eq(AltsForeverFrame.sorts.cooldowns.col.title, "Cooldowns")
+    eq(cell(rowOf("Aldric"), 15), "", "none seen: blank")
+    eq(cell(rowOf("High"), 15), READY .. "Ready|r", "Mooncloth ready, the transmutes not")
+    eq(cell(rowOf("Low"), 15), READY .. "2 ready|r", "one per profession")
+    eq(cell(rowOf("Far"), 15), "2d 4h", "none ready: the soonest")
+    eq(cell(rowOf("High"), 16), "Orgrimmar", "Zone after it")
+    -- Sorted: the most ready first, then the soonest; none last.
+    click("cooldowns")
+    eq(overviewNames(), "Low, High, Far, Aldric")
+    -- Pointing at a cell lists them; a click opens their professions on the first.
+    local b = cooldownButton(rowOf("High"))
+    b.scripts.OnEnter(b)
+    local tip = tipText()
+    assert(tip:find("[PRIEST]High = Cooldowns", 1, true), tip)
+    assert(tip:find("Mooncloth = " .. READY .. "ready|r", 1, true), tip)
+    assert(tip:find("Transmute: Arcanite +1 more = ready in 3h 0m", 1, true), tip)
+    assert(tip:find("Click to open their professions", 1, true), tip)
+    b.scripts.OnLeave(b)
+    b.scripts.OnClick(b, "LeftButton")
+    eq(AltsForeverRecipesFrame:IsShown(), true)
+    eq(AltsForeverRecipesFrame.titleText, "Tailoring", "the profession of the first one listed")
+    -- A character with none: the row's own tooltip and click.
+    b = cooldownButton(rowOf("Aldric"))
+    b.scripts.OnEnter(b)
+    tip = tipText()
+    assert(tip:find("Level 24", 1, true) and not tip:find("Click to open their professions", 1, true), tip)
+    b.scripts.OnClick(b, "LeftButton")
+    eq(AltsForeverGearFrame:IsShown(), true, "their gear, as the row's click")
+end)
+
+test("the open overview turns a cooldown to Ready when its time comes, only while the column shows", function()
+    local saved = overviewAlts()
+    saved.chars.Low.cooldowns = { Tailoring = { Mooncloth = NOW + 30 } }
+    local function countdown()
+        for i = #wow.timers, 1, -1 do
+            local fn = wow.timers[i]
+            if wow.delays[fn] == 30 then return fn end
+        end
+    end
+    sortStart(saved)
+    eq(cell(rowOf("Low"), 15), "1 min")
+    local fn = countdown()
+    assert(fn, "a refresh when it's ready")
+    wow.now = NOW + 30
+    fn()
+    eq(cell(rowOf("Low"), 15), "|cff20ff20Ready|r")
+    -- Column hidden: nothing to keep current.
+    saved = overviewAlts()
+    saved.chars.Low.cooldowns = { Tailoring = { Mooncloth = NOW + 30 } }
+    saved.hiddenColumns = { cooldowns = true }
+    wow.now = NOW
+    sortStart(saved)
+    eq(countdown(), nil)
+end)

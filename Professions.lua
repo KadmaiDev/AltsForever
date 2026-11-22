@@ -500,11 +500,10 @@ local function StopCooldowns()
 end
 
 local DAY, HOUR = 86400, 3600
+local READY = "|cff20ff20"
 
--- "ready" (green) or "ready in 2d 4h" / "3h 20m" / "15 min".
-function ns.CooldownText(ready, now)
-    local left = ready - now
-    if left <= 0 then return "|cff20ff20" .. L["ready"] .. "|r" end
+-- How long until ready: "2d 4h" / "3h 20m" / "15 min" (minutes rounded up).
+local function TimeLeft(left)
     local d, h, m = floor(left / DAY), floor(left % DAY / HOUR), math.ceil(left % HOUR / 60)
     if m == 60 then h, m = h + 1, 0 end
     if h == 24 then d, h = d + 1, 0 end
@@ -516,7 +515,63 @@ function ns.CooldownText(ready, now)
     else
         text = L["%d min"]:format(m)
     end
-    return L["ready in %s"]:format(text)
+    return text
+end
+
+-- "ready" (green) or "ready in 2d 4h" / "3h 20m" / "15 min".
+function ns.CooldownText(ready, now)
+    if ready <= now then return READY .. L["ready"] .. "|r" end
+    return L["ready in %s"]:format(TimeLeft(ready - now))
+end
+
+-- For the overview's Cooldowns column, without building rows: how many cooldowns are
+-- ready (one per profession with any ready, as CooldownRows makes them one row), and when
+-- the soonest of the rest is. nil, nil when the character has none.
+local function Soonest(c, now)
+    local t = c.cooldowns
+    if type(t) ~= "table" or next(t) == nil then return nil, nil end
+    local ready, soon = 0, nil
+    for _, recipes in pairs(t) do
+        local any = false
+        for _, at in pairs(recipes) do
+            if at <= now then
+                any = true
+            elseif not soon or at < soon then
+                soon = at
+            end
+        end
+        if any then ready = ready + 1 end
+    end
+    return ready, soon
+end
+
+-- The cell: green "Ready" / "2 ready" when any are, else how long until the soonest;
+-- blank for a character with none.
+function ns.CooldownCell(c, now)
+    local ready, soon = Soonest(c, now)
+    if not ready then return "" end
+    if ready == 1 then return READY .. L["Ready"] .. "|r" end
+    if ready > 1 then return READY .. L["%d ready"]:format(ready) .. "|r" end
+    return soon and TimeLeft(soon - now) or ""
+end
+
+-- What the column sorts by (smallest first): the most ready first, then the soonest.
+function ns.CooldownSortValue(c, now)
+    local ready, soon = Soonest(c, now)
+    if not ready then return nil end
+    if ready > 0 then return now - ready end
+    return soon
+end
+
+-- Seconds until some character's Cooldowns cell next changes (at most a minute, as the
+-- cell counts minutes), nil when none is waiting. The overview's timed refresh.
+function ns.CooldownsChangeIn(now)
+    local wait
+    for _, c in pairs(ns.db.chars) do
+        local _, soon = Soonest(c, now)
+        if soon and (not wait or soon - now < wait) then wait = soon - now end
+    end
+    return wait and (wait < 60 and wait or 60) or nil
 end
 
 local function ByReady(a, b)

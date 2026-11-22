@@ -43,6 +43,10 @@ local COLUMNS = {
     -- The account's instances this hour, then raid and dungeon saves running (the row
     -- tooltip lists both): "2/10 <key>1".
     { title = L["Lockouts"], width = 76, center = true, id = "lockouts" },
+    -- Profession cooldowns (Mooncloth, transmutes): "Ready", "2 ready" or the soonest
+    -- "2d 4h"; pointing at one lists them (a player's request, 2026-11-22).
+    { title = L["Cooldowns"], width = 70, center = true, sort = "cooldowns", id = "cooldowns", hover = "cooldowns",
+        tip = L["When each character's profession cooldowns (Mooncloth, transmutes...) are ready. Point at one to see each; click it to open their professions."] },
     { title = L["Zone"], width = 140, sort = "zone", id = "zone" },
     { title = L["Played"], width = 70, right = true, sort = "played", id = "played" },
     { title = L["Last seen"], width = 80, right = true, sort = "seen", id = "lastseen" },
@@ -189,6 +193,8 @@ local SORTS = {
     -- Fewest free slots first: who needs to clear out.
     bags = { up = true, value = function(_, c) return (ns.BagSpace(c, "bags")) end },
     bank = { up = true, value = function(_, c) return (ns.BagSpace(c, "bank")) end },
+    -- The most cooldowns ready first, then the soonest ready.
+    cooldowns = { up = true, value = function(_, c, now) return ns.CooldownSortValue(c, now) end },
     zone = { up = true, value = function(_, c) return c.zone end },
     played = { value = function(_, c, now) return ns.PlayedNow(c, now) end },
     seen = { value = function(key, c, now) return key == ns.charKey and now or c.updated or c.seen end },
@@ -603,17 +609,49 @@ local function SpaceClick(self, button)
     ns.ShowBags(key, self.which)
 end
 
+-- The Cooldowns cell: each cooldown, soonest first; a click opens their professions on the
+-- soonest one's. A character with none gets the row's tooltip and click.
+local function CooldownTooltip(self)
+    local row = self.row
+    local key = row.key
+    local c = key and ns.db.chars[key]
+    if not c then return end
+    local now = time()
+    local rows = ns.CooldownRows(c, now)
+    if not rows then return RowTooltip(row) end
+    row:LockHighlight()
+    local tt = GameTooltip
+    tt:SetOwner(self, "ANCHOR_RIGHT")
+    tt:AddDoubleLine(ns.ColoredName(key, c), L["Cooldowns"], 1, 1, 1, 1, 0.82, 0)
+    for _, r in ipairs(rows) do
+        tt:AddDoubleLine(ns.CooldownName(r), ns.CooldownText(r[2], now), 1, 0.82, 0, 1, 1, 1)
+    end
+    tt:AddLine("|cff66ccff" .. L["Click to open their professions"] .. "|r")
+    tt:Show()
+end
+
+local function CooldownClick(self, button)
+    local key = self.row.key
+    if not key then return end
+    if button == "RightButton" then return ns.ShowCharacterMenu(self.row, key) end
+    GameTooltip:Hide()
+    local c = ns.db.chars[key]
+    local rows = c and ns.CooldownRows(c, time())
+    if rows and ns.ShowRecipes then return ns.ShowRecipes(key, rows[1][4], true) end
+    ns.ShowGear(key)
+end
+
 local function CreateSpaceButtons(row)
     row.spaces = {}
     for i, col in ipairs(COLUMNS) do
-        if col.space then
+        if col.space or col.hover then
             local b = CreateFrame("Button", nil, row)
             b:SetPoint("LEFT", row.cells[i], "LEFT", -4, 0)
             b:SetSize(col.width - 2, ROW_HEIGHT)
-            b.row, b.which, b.index = row, col.space, i
+            b.row, b.which, b.index = row, col.space or col.hover, i
             b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-            b:SetScript("OnClick", SpaceClick)
-            b:SetScript("OnEnter", SpaceTooltip)
+            b:SetScript("OnClick", col.hover and CooldownClick or SpaceClick)
+            b:SetScript("OnEnter", col.hover and CooldownTooltip or SpaceTooltip)
             b:SetScript("OnLeave", SpaceLeave)
             b:SetShown(colShown[i])
             row.spaces[#row.spaces + 1] = b
@@ -715,7 +753,7 @@ end
 
 -- While open, the overview refreshes itself when its instance counts change (a visit stops
 -- counting, or the wait at the limit ticks over), so an account at 10/10 shows free again
--- without some other event. One timer at a time: a new one only for a sooner change, and a
+-- without some other event, and each minute while a profession cooldown is counting down. One timer at a time: a new one only for a sooner change, and a
 -- numbered `dueTick` so only the latest acts.
 local dueAt, dueTick = nil, 0
 local Refresh, SumSpace, SpaceSum
@@ -723,6 +761,8 @@ local Refresh, SumSpace, SpaceSum
 local function Due(now)
     if not (C_Timer and C_Timer.After) then return end
     local wait = ns.InstancesChangeIn(now)
+    local cool = ns.ColumnShown("cooldowns") and ns.CooldownsChangeIn(now)
+    if cool and (not wait or cool < wait) then wait = cool end
     if not wait or (dueAt and now + wait >= dueAt) then return end
     dueTick, dueAt = dueTick + 1, now + wait
     local mine = dueTick
@@ -927,9 +967,10 @@ function Refresh()
         cells[12]:SetText(ns.SpaceText(c, "bags"))
         cells[13]:SetText(ns.SpaceText(c, "bank"))
         cells[14]:SetText(ns.LockoutText(c, now))
-        cells[15]:SetText(c.zone or (GREY .. "?|r"))
-        cells[16]:SetText(ns.PlayedText(c, now))
-        cells[17]:SetText(ns.SeenText(key, c, now))
+        cells[15]:SetText(ns.CooldownCell(c, now))
+        cells[16]:SetText(c.zone or (GREY .. "?|r"))
+        cells[17]:SetText(ns.PlayedText(c, now))
+        cells[18]:SetText(ns.SeenText(key, c, now))
         total = total + (c.money or 0)
         played = played + (ns.PlayedNow(c, now) or 0)
         row:SetShown(not hidden)
