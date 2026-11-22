@@ -564,9 +564,14 @@ local function SpaceTooltip(self)
         tt:AddLine(which == "bank" and L["Bank not scanned yet - visit a banker"]
             or L["No bags recorded yet.\nLog in on this character once."], 0.62, 0.62, 0.62, true)
     else
+        local seen
         for _, e in ipairs(ns.BagSpaceList(c, which)) do
+            if e.family then
+                seen = seen or {}
+                seen[e.family] = true
+            end
             local left = (e.icon and ("|T" .. e.icon .. ITEM_CROP) or "") .. e.name
-                .. (e.kind and (GREY .. "  " .. e.kind .. "|r") or "")
+                .. (e.kind and ((e.family and ns.BAG_FAMILY_COLOR[e.family] or GREY) .. "  " .. e.kind .. "|r") or "")
             local q = e.quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[e.quality]
             if e.size == 0 then
                 tt:AddDoubleLine(left, "-", 0.62, 0.62, 0.62, 0.62, 0.62, 0.62)
@@ -575,6 +580,8 @@ local function SpaceTooltip(self)
             end
         end
         tt:AddDoubleLine(L["Total"], L["%d of %d free"]:format(free, total), 1, 0.82, 0, 1, 1, 1)
+        local legend = seen and ns.BagFamilyLegend(seen)
+        if legend then tt:AddLine(GREY .. L["Not counted as free space: %s"]:format(legend .. GREY) .. "|r", 1, 1, 1, true) end
         local unbought = which == "bank" and ns.BankBagsUnbought(c)
         if unbought then tt:AddLine(GREY .. L["Bank bag slots not bought yet: %d"]:format(unbought) .. "|r") end
         if which == "bank" and c.bankAt then
@@ -797,7 +804,7 @@ end
 -- line, lined up by the caller once the tooltip is shown.
 local function SpaceSummary(tt, which)
     local chars = ns.db.chars
-    local free, total, missing, rows, widest = 0, 0, {}, {}, 0
+    local free, total, missing, rows, widest, seen = 0, 0, {}, {}, 0, {}
     for _, key in ipairs(ns.OverviewOrder()) do
         local c = chars[key]
         local f, t = ns.BagSpace(c, which)
@@ -805,7 +812,7 @@ local function SpaceSummary(tt, which)
             free, total = free + f, total + t
             local empty = which == "bags" and ns.EmptyBagSlots(c) or 0
             if empty > 0 then missing[#missing + 1] = ns.ShortName(key, c) .. " " .. empty end
-            local sizes = ns.BagSizes(c, which, {})
+            local sizes = ns.BagSizes(c, which, {}, seen)
             if #sizes > widest then widest = #sizes end
             rows[#rows + 1] = { ns.ShortName(key, c), sizes, ns.SpaceCell(f, t) }
         elseif which == "bank" then
@@ -827,6 +834,8 @@ local function SpaceSummary(tt, which)
             cells[widest + 2] = r[3]
             rows[i] = cells
         end
+        local legend = ns.BagFamilyLegend(seen)
+        if legend then tt:AddLine(GREY .. L["Not counted as free space: %s"]:format(legend .. GREY) .. "|r", 1, 1, 1, true) end
     end
     if total > 0 then
         tt:AddDoubleLine(L["All characters"], L["%d of %d free"]:format(free, total), 1, 0.82, 0, 1, 1, 1)

@@ -1,6 +1,7 @@
 ## Alts Forever (not yet released)
 
 - **Every character's bags at a glance:** point at the **Bags** or **Bank** column title in the overview for a grid of all your characters: each bag's slots (the backpack and the bank's own slots, the same for everyone, are left out), a "-" where a bag slot is empty, then free slots of the total, as in Altoholic's bag report. Handy for planning bag upgrades or passing old bags to an alt. An empty reagent bag slot now counts as a bag slot with no bag, and the bank shows each bank bag by name, bought bank bag slots with no bag in them, and how many are still to buy (from each character's next bank visit). Thanks to the player who asked.
+- **Special bags aren't counted as free space:** quivers, ammo pouches, soul bags and profession bags (herb, enchanting, mining and the like) only hold some things, so the Bags and Bank columns now count only the space your loot can go in. They're still listed when you point at a cell, and they're coloured in the lists and the grid, with a key saying which is which. The reagent bag still counts.
 
 ## Alts Forever 1.9.1
 
