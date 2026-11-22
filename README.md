@@ -130,7 +130,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af upgrades` | Turn upgrades in item tooltips on or off |
 | `/af anvils` | Show or hide the anvils on your character sheet that mark craftable upgrades |
 | `/af itemnames` | Save item names and qualities in the saved file when you log out, only for reading it outside the game (off by default) |
-| `/af tooltips` | Turn everything Alts Forever adds to tooltips on or off. `/af crafting`, `/af crates`, `/af gold` and `/af bars` turn Can craft and recipes, Waylaid Crate materials, your alts' gold on the bag money, and your alts on the XP and reputation bars on or off |
+| `/af tooltips` | Turn everything Alts Forever adds to tooltips on or off. `/af crafting`, `/af recipes`, `/af crates`, `/af gold` and `/af bars` turn Can craft on items, recipe status on recipes, Waylaid Crate materials, your alts' gold on the bag money, and your alts on the XP and reputation bars on or off |
 | `/af counts` | Turn the item counts in tooltips on or off, e.g. if Baganator or Bagnon already shows them (Can craft, skill-ups, upgrades and crates stay) |
 | `/af rulesets` | Show or hide your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; hidden by default |
 | `/af legacy` | List each character's Legacy points to spend and Well Rested rank; `/af legacy on` or `off` turns the chat reminders on or off |
