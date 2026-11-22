@@ -1,3 +1,7 @@
+## Alts Forever (not yet released)
+
+- **Alts with the same first name are told apart:** where Alts Forever shows only first names to save room (Skill-ups and crate tooltips, search results, the mail rules, the Reputation and Lockouts windows, the profession window's character button), a character whose first name another of yours shares now shows their full name, so Kuro Don and Kuro Longbraid no longer both read "Kuro". Thanks to jeske for the fix.
+
 ## Alts Forever 1.9.1
 
 - **Hearthstone cooldown:** pointing at a character in the overview now shows when their hearthstone is ready again, beside where it's set ("Stormwind · ready in 23 min"). Each character's is read when you next log in on them. Thanks to FelixFitzgerald for the suggestion.

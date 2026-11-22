@@ -98,21 +98,44 @@ function ns.ListName(key, c)
     return ColoredName(key, c)
 end
 
--- The character's name in class colour, for narrow columns. Always the full name: on
--- Classic Forever every character has a first and a last name, and alts often share the
--- first one (Kuro Don, Kuro Longbraid...), so cutting to the first word made them
--- indistinguishable in Skill-ups, Can craft and search results.
+-- The name for narrow places (Skill-ups, crate grids, search results, mail notes, the
+-- Reputation and Lockouts columns, the profession window's character button): the first
+-- name, unless another of your characters shares it. On Forever every character has a
+-- first and a last name, and alts often share the first (Kuro Don, Kuro Longbraid...), so
+-- those get their full name (a player's PR, 2026-11-20); everyone else keeps the short
+-- labels the fixed-width columns need. firstCount (first name -> characters with it) is
+-- built on first use and dropped with the name cache (ns.InvalidateCache: forgetting a
+-- character, a sync).
+local firstCount
+
+local function FirstName(key, c)
+    local full = c.name or key
+    return full:match("^(%S+)") or full, full
+end
+
+local function NarrowName(key, c)
+    local first, full = FirstName(key, c)
+    if not firstCount then
+        firstCount = {}
+        for k, other in pairs(ns.db.chars) do
+            local f = FirstName(k, other)
+            firstCount[f] = (firstCount[f] or 0) + 1
+        end
+    end
+    return (firstCount[first] or 0) > 1 and full or first
+end
+
 function ns.ShortName(key, c)
     local s = shortNames[key]
     if not s then
-        s = InClassColor(c.class, c.name or key)
+        s = InClassColor(c.class, NarrowName(key, c))
         shortNames[key] = s
     end
     return s
 end
 
 function ns.ListShortName(key, c)
-    if ns.Elsewhere(c) then return OUT .. (c.name or key) .. "|r" end
+    if ns.Elsewhere(c) then return OUT .. NarrowName(key, c) .. "|r" end
     return ns.ShortName(key, c)
 end
 
@@ -328,6 +351,7 @@ function ns.InvalidateCache()
     wipe(cache)
     wipe(names)
     wipe(shortNames)
+    firstCount = nil
     cacheSize = 0
     lastId = nil
     ns.version = ns.version + 1 -- also refreshes memoised recipe lines

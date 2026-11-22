@@ -52,27 +52,27 @@ test("search finds items your characters have or can craft: best matches first, 
     SlashCmdList.ALTSFOREVERSEARCH("linen")
     eq(AltsForeverSearchFrame:IsShown(), true)
     -- The name's start before a later word; Far Away's 99 aren't counted (another ruleset).
-    eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn Moon 20, [MAGE]Aldric 5\n"
-        .. "Bolt of Linen Cloth (3) = [DRUID]Tarn Moon 3 · can craft: [PALADIN]Smith (Tailoring)")
+    eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn 20, [MAGE]Aldric 5\n"
+        .. "Bolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
     -- Made by a recipe, owned by nobody.
     searchType("glo")
     eq(searchRows(), "Linked Gloves = none owned · can craft: [PALADIN]Smith (Blacksmithing)", "not Far Away's gloves")
     -- Anywhere in the name; every word, in any order.
     searchType("nen")
-    eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn Moon 20, [MAGE]Aldric 5\nBolt of Linen Cloth (3) = [DRUID]Tarn Moon 3 · can craft: [PALADIN]Smith (Tailoring)")
+    eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn 20, [MAGE]Aldric 5\nBolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
     searchType("cloth bolt")
-    eq(searchRows(), "Bolt of Linen Cloth (3) = [DRUID]Tarn Moon 3 · can craft: [PALADIN]Smith (Tailoring)")
+    eq(searchRows(), "Bolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
     -- @owned and @craft narrow it (any start of the word). With @craft, who can make
     -- it comes first.
     searchType("@craft l")
-    eq(searchRows(), "Linked Gloves = can craft: [PALADIN]Smith (Blacksmithing) · none owned\nBolt of Linen Cloth (3) = can craft: [PALADIN]Smith (Tailoring) · [DRUID]Tarn Moon 3",
+    eq(searchRows(), "Linked Gloves = can craft: [PALADIN]Smith (Blacksmithing) · none owned\nBolt of Linen Cloth (3) = can craft: [PALADIN]Smith (Tailoring) · [DRUID]Tarn 3",
         "starts with it, then a later word")
     searchType("@own linen")
-    eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn Moon 20, [MAGE]Aldric 5\nBolt of Linen Cloth (3) = [DRUID]Tarn Moon 3 · can craft: [PALADIN]Smith (Tailoring)",
+    eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn 20, [MAGE]Aldric 5\nBolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)",
         "any of your characters")
     -- An @ word it doesn't know (@mine was dropped) is left out of the search.
     searchType("@mine linen")
-    eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn Moon 20, [MAGE]Aldric 5\nBolt of Linen Cloth (3) = [DRUID]Tarn Moon 3 · can craft: [PALADIN]Smith (Tailoring)")
+    eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn 20, [MAGE]Aldric 5\nBolt of Linen Cloth (3) = [DRUID]Tarn 3 · can craft: [PALADIN]Smith (Tailoring)")
     -- Nothing typed yet: what it does and the two words; nothing found: it says so.
     searchType("")
     eq(searchRows(), "")
@@ -89,7 +89,7 @@ test("search finds items your characters have or can craft: best matches first, 
     SlashCmdList.ALTSFOREVER("rulesets")
     AltsForeverSearchFrame:Hide()
     SlashCmdList.ALTSFOREVERSEARCH("far")
-    eq(searchRows(), "Far Gloves (1) = Far Away 1")
+    eq(searchRows(), "Far Gloves (1) = Far 1")
 end)
 
 test("Enter opens the bags of whoever has it, lit up (you first); arrows move; only Shift+Enter links it", function()
@@ -189,7 +189,7 @@ test("the search opens from /afs, /af search, the binding, the menu and the over
     eq(AltsForeverSearchFrame:IsShown(), false, "the binding again closes it")
     SlashCmdList.ALTSFOREVER("search silk")
     eq(AltsForeverSearchBox.text, "silk")
-    eq(searchRows(), "Silk Cloth (2) = [DRUID]Tarn Moon 2")
+    eq(searchRows(), "Silk Cloth (2) = [DRUID]Tarn 2")
     AltsForeverSearchBox.scripts.OnEscapePressed(AltsForeverSearchBox)
     eq(AltsForeverSearchFrame:IsShown(), false)
     eq(#ns.SearchMatches("linen"), 0, "names let go while closed")
@@ -221,7 +221,7 @@ test("a name still loading is asked for, and the search runs again a second late
     eq(asked, true)
     wow.itemNames[7001] = late
     for _, fn in ipairs(wow.timers) do fn() end
-    eq(searchRows(), "Late Cloth (4) = [DRUID]Tarn Moon 4")
+    eq(searchRows(), "Late Cloth (4) = [DRUID]Tarn 4")
 end)
 
 -- The rows of the last menu, by text.
@@ -362,10 +362,10 @@ test("with the bags window open the search works on it: that character only, bes
     eq(f.point[2], bags, "docked beside the bags window")
     -- Only what Tarn has (or can make), Tarn's numbers: not Aldric's, not Smith's crafts.
     searchType("cloth")
-    eq(searchRows(), "Linen Cloth (20) = [DRUID]Tarn Moon 20\n"
-        .. "Wool Cloth (4) = [DRUID]Tarn Moon 4\n"
-        .. "Bolt of Linen Cloth (3) = [DRUID]Tarn Moon 3\n"
-        .. "Silk Cloth (2) = [DRUID]Tarn Moon 2")
+    eq(searchRows(), "Linen Cloth (20) = [DRUID]Tarn 20\n"
+        .. "Wool Cloth (4) = [DRUID]Tarn 4\n"
+        .. "Bolt of Linen Cloth (3) = [DRUID]Tarn 3\n"
+        .. "Silk Cloth (2) = [DRUID]Tarn 2")
     -- Nothing picked yet: every match lit on Tarn, the buttons count them all, and the footer
     -- says what was searched for (the owner's idea, 2026-11-18).
     eq(ns.BagsHighlight(), nil, "no one item picked")
@@ -678,8 +678,8 @@ test("the character menu: all, or any you tick; one ticked names them, several c
     searchTick("Tarn")
     eq(f.chars.text, "2 characters")
     eq(f.title.text, "Search your characters")
-    eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn Moon 20, [MAGE]Aldric 5\n"
-        .. "Bolt of Linen Cloth (3) = [DRUID]Tarn Moon 3")
+    eq(searchRows(), "Linen Cloth (25) = [DRUID]Tarn 20, [MAGE]Aldric 5\n"
+        .. "Bolt of Linen Cloth (3) = [DRUID]Tarn 3")
     -- Unticking both: all of them again.
     searchTick("Aldric")
     searchTick("Tarn")
@@ -747,7 +747,7 @@ test("names slower than a second are still waited for, a few times, then no more
     eq(searchRows(), "", "not yet after a second")
     wow.itemNames[7001] = late
     runTimers()
-    eq(searchRows(), "Late Cloth (4) = [DRUID]Tarn Moon 4", "two seconds in")
+    eq(searchRows(), "Late Cloth (4) = [DRUID]Tarn 4", "two seconds in")
     local tries = 0
     while #wow.timers > 0 and tries < 20 do tries = tries + 1 runTimers() end
     eq(#wow.timers, 0, "stopped")

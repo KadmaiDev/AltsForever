@@ -124,7 +124,7 @@ test("reagent tooltip lists the recipes that still give each character a skill-u
     eq(lines[1][1], " "); eq(lines[2][1], "Skill-ups")
     eq(lines[3][1], "  Mechanical Squirrel"); eq(lines[3][2], "[MAGE]Aldric" .. to(100))
     eq(lines[4][1], "  Rough Dynamite"); eq(lines[4][2], "[MAGE]Aldric" .. to(60))
-    eq(lines[5][1], "  Linen Bandage"); eq(lines[5][2], "[DRUID]Tarnia Moon" .. to(80))
+    eq(lines[5][1], "  Linen Bandage"); eq(lines[5][2], "[DRUID]Tarnia" .. to(80))
     eq(#lines, 5, "Brakka is past grey; nobody knows Heavy Linen Bandage")
     eq(textOf(wow.hover(GameTooltip, 9999)):find("Skill-ups", 1, true), nil, "unused item: no section")
     -- Skill goes up: Rough Dynamite (grey 60) stops counting.
@@ -158,10 +158,10 @@ test("reagent tooltip: 2 recipes per character with the most skill-ups left", fu
     eq(lines[2][1], "Skill-ups")
     eq(lines[3][1], "  Shirt 7"); eq(lines[3][2], "[MAGE]Aldric" .. to(120), "you first even though Zed has more left")
     eq(lines[4][1], "  Shirt 6"); eq(lines[4][2], "[MAGE]Aldric" .. to(110))
-    eq(lines[5][1], "  Bag"); eq(lines[5][2], "[ROGUE]Zed Moor" .. to(200), "then the alt with the most left, though Z")
-    eq(lines[6][1], "  Cap"); eq(lines[6][2], "[ROGUE]Zed Moor" .. to(70))
-    eq(lines[7][1], "  Vest"); eq(lines[7][2], "[DRUID]Amy Ash" .. to(95))
-    eq(lines[8][1], "  Cap"); eq(lines[8][2], "[DRUID]Amy Ash" .. to(70))
+    eq(lines[5][1], "  Bag"); eq(lines[5][2], "[ROGUE]Zed" .. to(200), "then the alt with the most left, though Z")
+    eq(lines[6][1], "  Cap"); eq(lines[6][2], "[ROGUE]Zed" .. to(70))
+    eq(lines[7][1], "  Vest"); eq(lines[7][2], "[DRUID]Amy" .. to(95))
+    eq(lines[8][1], "  Cap"); eq(lines[8][2], "[DRUID]Amy" .. to(70))
     eq(lines[9][1], "  +5 more", "your 5 other shirts; Old Timer is past grey")
 end)
 
@@ -173,7 +173,7 @@ test("reagent tooltip: never more than 6 recipe lines", function()
     end
     wow.login({ v = 2, recipeInfo = { Tailoring = info }, chars = chars })
     local lines = wow.hover(GameTooltip, LINEN)
-    eq(lines[7][2], "[PRIEST]Cy Dee" .. to(80)); eq(lines[8][2], "[PRIEST]Cy Dee" .. to(70), "three alts fill the 6 lines")
+    eq(lines[7][2], "[PRIEST]Cy" .. to(80)); eq(lines[8][2], "[PRIEST]Cy" .. to(70), "three alts fill the 6 lines")
     eq(lines[9][1], "  +2 more"); eq(#lines, 9)
 end)
 
@@ -225,7 +225,7 @@ test("a character at their rank cap gets no skill-up lines", function()
             recipes = { Tailoring = { cap = true } }, crafts = { Tailoring = { [777] = "cap" } } }),
     } })
     local lines = wow.hover(GameTooltip, LINEN)
-    eq(lines[3][2], "[ROGUE]Bo Cee" .. to(100)); eq(#lines, 3, "Ann at 75/75 can't skill up")
+    eq(lines[3][2], "[ROGUE]Bo" .. to(100)); eq(#lines, 3, "Ann at 75/75 can't skill up")
     eq(craftLine(wow.hover(GameTooltip, 777)), "[PRIEST]Ann Bee, [ROGUE]Bo Cee" .. skillupsTo(100))
 end)
 
@@ -447,4 +447,36 @@ test("a login that reads no professions keeps the ones known", function()
     eq(ns.char.profs.Engineering, 55)
     eq(ns.char.crafts.Engineering[SQUIRREL_ITEM], "mechanical squirrel")
     eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)), "[MAGE]Aldric")
+end)
+
+test("short names: the first name, unless another of your characters shares it (a player's PR)", function()
+    local ns = wow.load(FILES)
+    wow.profs = { { "First Aid", 40 } }
+    local saved = reagentAlts()
+    -- Two Kuros and a Tarnia: the Kuros can't be told apart by first name.
+    saved.chars["Kuro Don"] = alt("Kuro Don", "ROGUE", { profs = { ["First Aid"] = 30 },
+        recipes = { ["First Aid"] = { ["linen bandage"] = true } } })
+    saved.chars["Kuro Longbraid"] = alt("Kuro Longbraid", "WARRIOR", { profs = { ["First Aid"] = 20 },
+        recipes = { ["First Aid"] = { ["linen bandage"] = true } } })
+    wow.login(saved)
+    local chars = AltsForeverDB.chars
+    eq(ns.ShortName("Kuro Don", chars["Kuro Don"]), "[ROGUE]Kuro Don")
+    eq(ns.ShortName("Kuro Longbraid", chars["Kuro Longbraid"]), "[WARRIOR]Kuro Longbraid")
+    eq(ns.ShortName("Tarnia Moon", chars["Tarnia Moon"]), "[DRUID]Tarnia", "a first name nobody else has")
+    -- Where jeske saw it: the Skill-ups lines.
+    local text = {}
+    for _, l in ipairs(wow.hover(GameTooltip, LINEN)) do text[#text + 1] = table.concat(l, " = ") end
+    text = table.concat(text, "\n")
+    assert(text:find("[ROGUE]Kuro Don" .. to(80), 1, true), text)
+    assert(text:find("[WARRIOR]Kuro Longbraid" .. to(80), 1, true), text)
+    assert(text:find("[DRUID]Tarnia" .. to(80), 1, true), text)
+    -- One Kuro forgotten: the other is just Kuro again.
+    eq(ns.ForgetCharacter("Kuro Longbraid"), true)
+    eq(ns.ShortName("Kuro Don", chars["Kuro Don"]), "[ROGUE]Kuro")
+    -- Another ruleset's character (grey in lists) is told apart the same way.
+    chars["Kuro Far"] = alt("Kuro Far", "MAGE", { realm = "ElsewhereRealm" })
+    ns.InvalidateCache()
+    local far = ns.ListShortName("Kuro Far", chars["Kuro Far"])
+    assert(far:find("Kuro Far", 1, true), far)
+    eq(ns.ShortName("Kuro Don", chars["Kuro Don"]), "[ROGUE]Kuro Don")
 end)

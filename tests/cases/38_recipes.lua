@@ -228,7 +228,7 @@ test("the profession window shows an offline alt's recipes as the game's window 
     eq(f:IsShown(), true)
     eq(f.titleText, "Blacksmithing")
     eq(f.rank.text:GetText():find("120", 1, true) ~= nil, true)
-    eq(f.who:GetText(), "[PALADIN]Vesp Ash", "the full name: alts often share a first name")
+    eq(f.who:GetText(), "[PALADIN]Vesp", "first name only: a full one didn't fit")
     eq(f.tabs[1].prof, "Blacksmithing"); eq(f.tabs[2].prof, "Cooking"); eq(f.tabs[3], nil)
     eq(recipeRows(f), "# Weapon Stones | Rough Sharpening Stone [3]  | # Camping | Sharpening Wheel [1]  | "
         .. "# Mail Chestguards | Rough Bronze Cuirass [1] ^ | # Other | old recipe")
@@ -279,7 +279,7 @@ test("the profession window shows an offline alt's recipes as the game's window 
     ns.ToggleOverview(true)
     AltsForeverFrame.profsButton.scripts.OnClick(AltsForeverFrame.profsButton)
     eq(f:IsShown(), true)
-    eq(f.who:GetText(), "[PALADIN]Vesp Ash")
+    eq(f.who:GetText(), "[PALADIN]Vesp")
     AltsForeverFrame.profsButton.scripts.OnClick(AltsForeverFrame.profsButton)
     eq(f:IsShown(), false)
     ns.ShowRecipes("Vesp Ash", "Cooking")
