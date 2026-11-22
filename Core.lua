@@ -802,7 +802,7 @@ function commands.columns(arg)
     end
     local id, title = ns.ColumnId(word)
     if not id then
-        return Print(L["/af columns shows every overview column again; /af columns and one of level, rested, wellrested, legacy, gold, professions, mail, bags, bank, lockouts, cooldowns, zone, played or lastseen hides or shows that column."])
+        return Print(L["/af columns shows every overview column again; /af columns and one of level, rested, restedfull, wellrested, legacy, gold, professions, mail, bags, bank, lockouts, cooldowns, zone, played or lastseen hides or shows that column."])
     end
     local on = not ns.ColumnShown(id)
     ns.SetColumnShown(id, on)
@@ -999,7 +999,7 @@ function commands.help()
     Print(L["/af inspect shows or hides the anvils in the inspect window that mark upgrades you or your alts can craft for that player."])
     Print(L["/af scale 150 makes Alts Forever's windows one and a half times their size (any size from 50 to 300), on top of the game's UI scale."])
     Print(L["/af pin and a character's name pins them to the top of the overview, or unpins them."])
-    Print(L["/af columns shows every overview column again; /af columns and one of level, rested, wellrested, legacy, gold, professions, mail, bags, bank, lockouts, cooldowns, zone, played or lastseen hides or shows that column."])
+    Print(L["/af columns shows every overview column again; /af columns and one of level, rested, restedfull, wellrested, legacy, gold, professions, mail, bags, bank, lockouts, cooldowns, zone, played or lastseen hides or shows that column."])
     Print(L["/af resetwindows puts Alts Forever's windows back where they open by default."])
     if ns.HasEllesmereScale() then Print(L["/af scale eui makes them follow EllesmereUI's Window Scale again (the default)."]) end
     Print(L["/af legacy lists each character's Legacy points to spend and Well Rested rank; /af legacy on or off turns the reminders on or off."])
