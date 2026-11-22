@@ -448,3 +448,35 @@ test("a login that reads no professions keeps the ones known", function()
     eq(ns.char.crafts.Engineering[SQUIRREL_ITEM], "mechanical squirrel")
     eq(craftLine(wow.hover(GameTooltip, SQUIRREL_ITEM)), "[MAGE]Aldric")
 end)
+
+test("short names: the first name, unless another of your characters shares it (a player's PR)", function()
+    local ns = wow.load(FILES)
+    wow.profs = { { "First Aid", 40 } }
+    local saved = reagentAlts()
+    -- Two Kuros and a Tarnia: the Kuros can't be told apart by first name.
+    saved.chars["Kuro Don"] = alt("Kuro Don", "ROGUE", { profs = { ["First Aid"] = 30 },
+        recipes = { ["First Aid"] = { ["linen bandage"] = true } } })
+    saved.chars["Kuro Longbraid"] = alt("Kuro Longbraid", "WARRIOR", { profs = { ["First Aid"] = 20 },
+        recipes = { ["First Aid"] = { ["linen bandage"] = true } } })
+    wow.login(saved)
+    local chars = AltsForeverDB.chars
+    eq(ns.ShortName("Kuro Don", chars["Kuro Don"]), "[ROGUE]Kuro Don")
+    eq(ns.ShortName("Kuro Longbraid", chars["Kuro Longbraid"]), "[WARRIOR]Kuro Longbraid")
+    eq(ns.ShortName("Tarnia Moon", chars["Tarnia Moon"]), "[DRUID]Tarnia", "a first name nobody else has")
+    -- Where jeske saw it: the Skill-ups lines.
+    local text = {}
+    for _, l in ipairs(wow.hover(GameTooltip, LINEN)) do text[#text + 1] = table.concat(l, " = ") end
+    text = table.concat(text, "\n")
+    assert(text:find("[ROGUE]Kuro Don" .. to(80), 1, true), text)
+    assert(text:find("[WARRIOR]Kuro Longbraid" .. to(80), 1, true), text)
+    assert(text:find("[DRUID]Tarnia" .. to(80), 1, true), text)
+    -- One Kuro forgotten: the other is just Kuro again.
+    eq(ns.ForgetCharacter("Kuro Longbraid"), true)
+    eq(ns.ShortName("Kuro Don", chars["Kuro Don"]), "[ROGUE]Kuro")
+    -- Another ruleset's character (grey in lists) is told apart the same way.
+    chars["Kuro Far"] = alt("Kuro Far", "MAGE", { realm = "ElsewhereRealm" })
+    ns.InvalidateCache()
+    local far = ns.ListShortName("Kuro Far", chars["Kuro Far"])
+    assert(far:find("Kuro Far", 1, true), far)
+    eq(ns.ShortName("Kuro Don", chars["Kuro Don"]), "[ROGUE]Kuro Don")
+end)
