@@ -223,6 +223,7 @@ local DB_FIELDS = {
     legacyPool = "number", scale = "number", minimapAngle = "number", bagsCols = "number",
     bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
     account = "string", tooltipsOff = "boolean", countsOff = "boolean", craftTipsOff = "boolean",
+    canCraftOff = "boolean", recipeTipsOff = "boolean",
     cratesOff = "boolean", goldTipOff = "boolean", barsOff = "boolean", recipeCategories = "table", profArt = "table",
     inspectAnvilsOff = "boolean", overviewSort = "string", overviewSortRev = "boolean",
     windows = "table", pinned = "table", hiddenColumns = "table",
@@ -608,6 +609,9 @@ ns.On("ADDON_LOADED", function(name)
     ns.db = AltsForeverDB
     -- Left over from the rested XP rate check, which has been removed.
     ns.db.restedChecks, ns.db.restCheckOff = nil, nil
+    -- Until 1.9.1 one switch turned off both Can craft and recipe status: now two.
+    if ns.db.craftTipsOff then ns.db.canCraftOff, ns.db.recipeTipsOff = true, true end
+    ns.db.craftTipsOff = nil
     -- Before login, so EllesmereUI's minimap finds it when it collects addon buttons.
     ns.CreateMinimapButton()
 end)
@@ -733,7 +737,12 @@ end
 
 function commands.crafting()
     ns.SetCraftTips(not ns.CraftTipsOn())
-    TipPrint(ns.CraftTipsOn() and L["Can craft and recipes in tooltips on."] or L["Can craft and recipes in tooltips off."])
+    TipPrint(ns.CraftTipsOn() and L["Can craft in tooltips on."] or L["Can craft in tooltips off."])
+end
+
+function commands.recipes()
+    ns.SetRecipeTips(not ns.RecipeTipsOn())
+    TipPrint(ns.RecipeTipsOn() and L["Recipe status in tooltips on."] or L["Recipe status in tooltips off."])
 end
 
 function commands.crates()
@@ -978,7 +987,7 @@ function commands.help()
     Print(L["by Kadmai. /af opens the overview. Also: /af rep | export | mail | list | delete Name | skillups | sendmail | minimap | stats | mem"])
     Print(L["/af settings opens the Options page; /af help lists every command."])
     Print(L["/af search (or /afs), with or without a name, finds an item on any of your characters, or who can craft it."])
-    Print(L["/af tooltips turns everything Alts Forever adds to tooltips on or off. /af crafting, crates, gold and bars turn one part on or off."])
+    Print(L["/af tooltips turns everything Alts Forever adds to tooltips on or off. /af crafting, recipes, crates, gold and bars turn one part on or off."])
     Print(L["/af counts turns the item counts in tooltips on or off (if another addon, such as Baganator, already shows them)."])
     Print(L["/af bags or /af bank, with a name for another character, shows their bags or bank slot by slot."])
     Print(L["/af prof, with a name for another character, shows their professions and recipes."])
