@@ -145,6 +145,20 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 
 `/altsforever` also works.
 
+## For addon authors
+
+Other addons can ask Alts Forever how many of an item the player's characters have. Add `## OptionalDeps: AltsForever` to your `.toc` and check that the table exists:
+
+```lua
+if AltsForever and AltsForever.API_VERSION >= 1 then
+    local total, characters = AltsForever.Count(2589) -- Linen Cloth
+end
+```
+
+- `AltsForever.Count(itemID)` returns the total held by the characters the player can mail (the one they're on, plus others on the same ruleset and faction) in bags, bank, mailbox and worn, as last seen, and a list of those characters with any: you first, then most first, each `{ name, you, count, bags, bank, mail, equip }`. Before the player has logged in it returns nil. The list is a new table each call, so keep or change it as you like.
+- `AltsForever.DataVersion()` changes whenever a count may have changed: cache your answers until it does.
+- `AltsForever.API_VERSION` goes up when something is added. Nothing is ever removed or changed.
+
 ## Tests
 
 The tests run the addon outside the game against a small fake of the WoW API (`tests/wow.lua`). They need Lua 5.1 (the version WoW uses):

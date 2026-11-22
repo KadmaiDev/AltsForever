@@ -1,3 +1,7 @@
+## Alts Forever (not yet released)
+
+- **For addon authors:** other addons can now ask Alts Forever how many of an item your characters have, with `AltsForever.Count(itemID)`. Described in the README.
+
 ## Alts Forever 1.9.1
 
 - **Hearthstone cooldown:** pointing at a character in the overview now shows when their hearthstone is ready again, beside where it's set ("Stormwind · ready in 23 min"). Each character's is read when you next log in on them. Thanks to FelixFitzgerald for the suggestion.
