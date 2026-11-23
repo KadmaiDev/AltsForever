@@ -242,17 +242,17 @@ test("overview rows: you first, then by level; totals gold", function()
     SlashCmdList.ALTSFOREVER("")
     local rows = overviewRows()
     eq(#rows, 4)
-    eq(cell(rows[1], 1), "[MAGE]Aldric"); eq(cell(rows[1], 18), "|cff20ff20Online|r")
-    eq(cell(rows[1], 7), "|cffc0c0c0Engineering|r"); eq(cell(rows[1], 8), "107")
-    eq(cell(rows[1], 9), "|cffc0c0c0Mining|r"); eq(cell(rows[1], 10), "99")
+    eq(cell(rows[1], 1), "[MAGE]Aldric"); eq(cell(rows[1], 19), "|cff20ff20Online|r")
+    eq(cell(rows[1], 8), "|cffc0c0c0Engineering|r"); eq(cell(rows[1], 9), "107")
+    eq(cell(rows[1], 10), "|cffc0c0c0Mining|r"); eq(cell(rows[1], 11), "99")
     eq(cell(rows[2], 1), "[MAGE]Far"); eq(cell(rows[2], 2), "60"); eq(cell(rows[2], 3), G .. "-|r")
     eq(cell(rows[3], 1), "[PRIEST]High")
     eq(cell(rows[3], 3), "|cff4da6ff150%|r", "was already full")
-    eq(cell(rows[3], 16), "Orgrimmar"); eq(cell(rows[3], 18), "3h ago")
+    eq(cell(rows[3], 17), "Orgrimmar"); eq(cell(rows[3], 19), "3h ago")
     eq(cell(rows[4], 1), "[ROGUE]Low"); eq(cell(rows[4], 2), "12")
     eq(rows[4].pct.text, G .. "10%|r", "the percentage in its own cell, so they line up")
     eq(rows[2].pct.text, "", "none at max level")
-    eq(cell(rows[4], 18), "2d ago")
+    eq(cell(rows[4], 19), "2d ago")
 end)
 
 test("an open overview updates when your money changes", function()
@@ -260,10 +260,10 @@ test("an open overview updates when your money changes", function()
     wow.money = 100
     wow.login(nil)
     SlashCmdList.ALTSFOREVER("")
-    eq(cell(overviewRows()[1], 6), "100c")
+    eq(cell(overviewRows()[1], 7), "100c")
     wow.money = 250
     wow.fire("PLAYER_MONEY")
-    eq(cell(overviewRows()[1], 6), "250c")
+    eq(cell(overviewRows()[1], 7), "250c")
 end)
 
 test("hovering a row shows rested details, hearthstone and item level", function()
@@ -412,12 +412,12 @@ test("the overview starts by level with you first, the arrow on Level, nothing s
     eq(f.sortArrow.texture, "Interface\\Buttons\\Arrow-Down-Up")
     eq(f.sortArrow.point[2], f.sorts.level.title, "beside the Level title")
     eq(AltsForeverDB.overviewSort, nil); eq(AltsForeverDB.overviewSortRev, nil)
-    for _, name in ipairs({ "name", "level", "rested", "wellRested", "legacy", "gold", "mail", "bags", "bank", "cooldowns", "zone", "played", "seen" }) do
+    for _, name in ipairs({ "name", "level", "rested", "restedFull", "wellRested", "legacy", "gold", "mail", "bags", "bank", "cooldowns", "zone", "played", "seen" }) do
         assert(f.sorts[name], name .. " can be clicked")
     end
     local n = 0
     for _ in pairs(f.sorts) do n = n + 1 end
-    eq(n, 13, "professions and lockouts can't")
+    eq(n, 14, "professions and lockouts can't")
 end)
 
 test("clicking a column title orders by it, you among the rest; again turns it round", function()
@@ -774,7 +774,7 @@ test("columns can be hidden from the titles' right-click menu, and brought back"
     local f = AltsForeverFrame
     local full = f.width
     local row = overviewRows()[2]
-    local goldX, profX = row.cells[6].point[4], row.cells[7].point[4]
+    local goldX, profX = row.cells[7].point[4], row.cells[8].point[4]
     eq(columnsMenu("Character"), nil, "the names can't be hidden")
     eq(columnsMenu("Show all columns").enabled, true, "Cooldowns waits for a cooldown, so not every column shows")
     eq(columnsMenu("Cooldowns").isSelected(), false)
@@ -783,11 +783,11 @@ test("columns can be hidden from the titles' right-click menu, and brought back"
     gold.setSelected()
     eq(gold.isSelected(), false)
     eq(AltsForeverDB.hiddenColumns.gold, true)
-    eq(row.cells[6].shown, false, "the cell")
-    eq(f.titles[6].shown, false, "its title")
+    eq(row.cells[7].shown, false, "the cell")
+    eq(f.titles[7].shown, false, "its title")
     eq(f.sorts.gold.shown, false, "and the button on it")
-    eq(row.cells[7].point[4], profX - 120, "the columns after it close up")
-    eq(row.cells[5].point[4], goldX - 60, "those before stay")
+    eq(row.cells[8].point[4], profX - 120, "the columns after it close up")
+    eq(row.cells[6].point[4], goldX - 60, "those before stay")
     eq(f.width, full - 120, "and the window is that much narrower")
 
     -- Professions is four cells; Level takes its percentage with it.
@@ -807,7 +807,7 @@ test("columns can be hidden from the titles' right-click menu, and brought back"
     eq(AltsForeverDB.hiddenColumns.cooldowns, false, "every column, the empty Cooldowns one too")
     eq(f.width, full + 70)
     eq(columnsMenu("Show all columns").enabled, false, "now all are shown")
-    eq(row.cells[6].shown, true); eq(row.cells[7].point[4], profX)
+    eq(row.cells[7].shown, true); eq(row.cells[8].point[4], profX)
     eq(f.sorts.gold.shown, true)
 
     -- A title that sorts opens the same menu on a right-click, and doesn't sort.
@@ -823,7 +823,7 @@ end)
 
 test("hidden columns are kept between sessions; the window never gets too narrow", function()
     sortStart()
-    for _, name in ipairs({ "Level", "Rested", "Well Rested", "Legacy", "Gold", "Professions", "Mail", "Bags", "Bank", "Lockouts", "Zone", "Played", "Last seen" }) do
+    for _, name in ipairs({ "Level", "Rested", "Full in", "Well Rested", "Legacy", "Gold", "Professions", "Mail", "Bags", "Bank", "Lockouts", "Zone", "Played", "Last seen" }) do
         columnsMenu(name).setSelected()
     end
     local f = AltsForeverFrame
@@ -834,14 +834,14 @@ test("hidden columns are kept between sessions; the window never gets too narrow
     eq(f.width, 560)
     for _, row in ipairs(overviewRows()) do
         eq(row.cells[1].shown, true)
-        for i = 2, 18 do eq(row.cells[i].shown, false, "cell " .. i) end
+        for i = 2, 19 do eq(row.cells[i].shown, false, "cell " .. i) end
     end
     eq(ns.ColumnShown("gold"), false)
     -- The cog menu has the list too; the minimap's menu doesn't.
     ns.ShowOptionsMenu(f.cog, true)
     local columns = wow.menuItem("Columns")
     eq(columns.items[1].text, "Show all columns")
-    eq(#columns.items, 15, "the fourteen columns and Show all")
+    eq(#columns.items, 16, "the fifteen columns and Show all")
     ns.ShowOptionsMenu(UIParent)
     eq(wow.menuItem("Columns"), nil)
     -- /af columns: one column, or all of them back.
@@ -855,7 +855,7 @@ test("hidden columns are kept between sessions; the window never gets too narrow
     eq(ns.ColumnShown("gold"), false)
     SlashCmdList.ALTSFOREVER("columns")
     eq(AltsForeverDB.hiddenColumns.gold, nil)
-    for i = 1, 18 do eq(overviewRows()[1].cells[i].shown, true, "cell " .. i) end
+    for i = 1, 19 do eq(overviewRows()[1].cells[i].shown, true, "cell " .. i) end
 end)
 
 test("damaged hidden columns hide nothing; the Character column can't be hidden", function()
@@ -863,7 +863,7 @@ test("damaged hidden columns hide nothing; the Character column can't be hidden"
         local saved = overviewAlts()
         saved.hiddenColumns = bad
         local _, ns = sortStart(saved)
-        for i = 1, 18 do eq(overviewRows()[1].cells[i].shown, i ~= 15, "cell " .. i .. " (Cooldowns: nobody has one)") end
+        for i = 1, 19 do eq(overviewRows()[1].cells[i].shown, i ~= 16, "cell " .. i .. " (Cooldowns: nobody has one)") end
         ns.SetColumnShown("name", false)
         ns.SetColumnShown("character", false)
         eq(overviewRows()[1].cells[1].shown, true)
@@ -1009,4 +1009,34 @@ test("a window at a smaller scale than the overview docks by where it is on scre
     drop(lock, 2208, 2808, 1600, 1200)
     eq(AltsForeverDB.windows.lockouts.dock, "right"); eq(AltsForeverDB.windows.lockouts.off, 100)
     eq(placed(lock), "TOPLEFT overview TOPRIGHT 4 -200")
+end)
+
+test("the Full in column: how long until rested XP is full, orange outside an inn; sorts soonest first", function()
+    local click, ns = sortStart()
+    local O = "|cffff8000"
+    -- 5% of a level per 8 hours in an inn: from 0 to 150% is 30 periods, 10 days.
+    eq(ns.RestedFullText({ level = 20, xpMax = 10000, rested = 0, resting = true, updated = NOW }, NOW), "10d 0h")
+    eq(ns.RestedFullText({ level = 20, xpMax = 10000, rested = 0, updated = NOW }, NOW), O .. "40d 0h|r",
+        "a quarter of the rate outside an inn or city, in orange as the Rested cell")
+    eq(ns.RestedFullText({ level = 20, xpMax = 10000, rested = 14900, resting = true, updated = NOW }, NOW), "1h",
+        "under an hour left still says 1h")
+    eq(ns.RestedFullText({ level = 20, xpMax = 10000, rested = 15000, resting = true, updated = NOW }, NOW), "", "full: blank")
+    eq(ns.RestedFullText({ level = 20, xpMax = 10000, rested = 0, resting = true, updated = NOW - 10 * DAY }, NOW), "",
+        "filled up while logged out")
+    eq(ns.RestedFullText({ level = 60, xpMax = 10000, rested = 0 }, NOW), "", "max level: blank")
+    eq(ns.RestedFullText({}, NOW), G .. "?|r", "not logged in since: unknown")
+
+    local f = AltsForeverFrame
+    eq(f.sorts.restedFull.col.title, "Full in")
+    local function of(name)
+        for _, r in ipairs(overviewRows()) do
+            if cell(r, 1):find(name, 1, true) then return r end
+        end
+    end
+    eq(cell(of("Low"), 4), O .. "38d 0h|r", "Low: 7.5% after two days outside, 142.5% to go at 1.25% per 8 hours")
+    eq(cell(of("High"), 4), "", "High is full")
+    eq(cell(of("Far"), 4), "", "Far is level 60")
+    eq(cell(of("Aldric"), 4), O .. "40d 0h|r", "you: none yet, outside an inn, if you logged out now")
+    click("restedFull")
+    eq(overviewNames(), "High, Low, Aldric, Far", "full already first, then soonest; max level last")
 end)
