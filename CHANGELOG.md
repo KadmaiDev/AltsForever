@@ -1,5 +1,7 @@
 ## Alts Forever 1.10.1 (not yet released)
 
+- **Pack for someone else:** right-click the **Pack** button at the mailbox for everyone your mail rules have something for in your bags, with how many stacks each. Pick one to put them in the To box, and Pack packs theirs instead, so you can skip the character it picked without typing a name.
+- **Full in:** a new overview column beside Rested shows how long until each character's rested XP is full ("2d 4h"), at the rate where they logged out: in orange when they're outside an inn or city, where it fills four times slower. Click its title to sort by it, soonest first, or hide it from the column menu. Thanks to the player who asked.
 - **Sync stops when the other character logs out:** if your other account logged out part way through a sync, the rest of the swap went on being sent to them, and every message printed "No player named ... is currently playing." in chat until you relogged or they came back. The sync now stops at the first of those lines, and hides them.
 
 ## Alts Forever 1.10.0

@@ -658,3 +658,46 @@ test("mail rules: the arrow offers the BoE rules for what's attached; the window
     eq(rows[1].who:GetText(), "[WARRIOR]Brak Stone")
     eq(rows[2].label:GetText(), "All bind-on-equip weapons")
 end)
+
+test("mail rules: right-click Pack lists everyone it could pack for, and a pick goes in the To box", function()
+    atMailbox({ ["c:7:5"] = { ["Tarn Moon"] = LINEN }, ["c:7:7"] = { ["Brak Stone"] = COPPER } })
+    wow.setBag(0, 16, { { LINEN, 20 }, { SILK, 5 }, { COPPER, 10 }, { LINEN, 7 } })
+    wow.setBag(1, 8, { [4] = { COPPER, 5 } })
+    wow.fire("BAG_UPDATE_DELAYED")
+    local p = packButton()
+    eq(p:GetText(), "Pack 3 for [DRUID]Tarn")
+    p.scripts.OnClick(p, "RightButton")
+    eq(wow.attachClicks or 0, 0, "right-click attaches nothing")
+    local items = wow.menu.items
+    eq(#items, 3)
+    eq(items[1].text, "Pack for")
+    eq(items[2].text, "[DRUID]Tarn Moon|cffc0c0c0 · 3 stacks|r", "most first")
+    eq(items[3].text, "[WARRIOR]Brak Stone|cffc0c0c0 · 2 stacks|r")
+    eq(items[2].isSelected(), true, "the one Pack offers now")
+    eq(items[3].isSelected(), false)
+    -- The tooltip lists only what goes to the one Pack offers.
+    p.scripts.OnEnter(p)
+    local parts = {}
+    for _, l in ipairs(GameTooltip.lines) do parts[#parts + 1] = tostring(l[1]) end
+    local tip = table.concat(parts, "\n")
+    eq(tip:find("Copper Ore", 1, true), nil, "Brak's copper isn't in Tarn's tooltip")
+    eq(tip:find("Right-click: pack for another character.", 1, true) ~= nil, true)
+    -- Skip Tarn: Brak in the To box, kept as the player's choice, and Pack packs his.
+    items[3].setSelected()
+    eq(SendMailNameEditBox:GetText(), "Brak Stone")
+    eq(p:GetText(), "Pack 2 for [WARRIOR]Brak")
+    p.scripts.OnClick(p, "LeftButton")
+    eq(wow.attachClicks, 2)
+    eq(wow.outbox[1][1], COPPER) eq(wow.outbox[2][1], COPPER)
+    wow.fire("MAIL_SEND_INFO_UPDATE")
+    eq(SendMailNameEditBox:GetText(), "Brak Stone", "a rule doesn't take the To box back")
+    -- One stack reads as one.
+    wow.type("")
+    wow.outbox = {}
+    wow.setBag(0, 16, { { LINEN, 20 } })
+    wow.setBag(1, 8, {})
+    wow.fire("BAG_UPDATE_DELAYED")
+    p.scripts.OnClick(p, "RightButton")
+    eq(wow.menu.items[2].text, "[DRUID]Tarn Moon|cffc0c0c0 · 1 stack|r")
+    eq(#wow.menu.items, 2)
+end)

@@ -22,6 +22,10 @@ local COLUMNS = {
     { title = L["Character"], width = 180, sort = "name" },
     { title = L["Level"], width = 80, sort = "level", id = "level" },
     { title = L["Rested"], width = 70, sort = "rested", id = "rested" },
+    -- How long until rested XP is full at the rate where they logged out (a player's
+    -- request, 2026-11-23; the row tooltip already said it).
+    { title = L["Full in"], width = 60, sort = "restedFull", id = "restedfull",
+        tip = L["How long until each character's rested XP is full, at the rate where they logged out: orange outside an inn or city, where it fills four times slower."] },
     -- Well Rested's rank beside Rested, then Legacy points spent of the total: short
     -- values under wider titles, so both are centred.
     { title = L["Well Rested"], width = 84, center = true, sort = "wellRested", id = "wellrested" },
@@ -91,6 +95,16 @@ local function Duration(seconds)
     local d, h = floor(seconds / 86400), floor(seconds % 86400 / 3600)
     if d > 0 then return L["%dd %dh"]:format(d, h) end
     return L["%dh"]:format(max(h, 1))
+end
+
+-- Time until rested XP is full: "2d 4h", orange while filling outside an inn or city (as
+-- the Rested cell), blank when full or at max level, "?" when the level isn't known.
+function ns.RestedFullText(c, now)
+    if not c.level then return GREY .. "?|r" end
+    local rested, cap, left = ns.RestedNow(c, now)
+    if not rested or rested >= cap then return "" end
+    local text = Duration(left)
+    return c.resting and text or (ATTENTION .. text .. "|r")
 end
 
 -- Legacy points spent of the total they can spend ("3/16", orange while some are left) and
@@ -200,6 +214,11 @@ local SORTS = {
     rested = { value = function(_, c, now)
         local rested = ns.RestedNow(c, now)
         return rested and rested / c.xpMax or nil
+    end },
+    -- Soonest full first (full already = 0); max level and unknown last.
+    restedFull = { up = true, value = function(_, c, now)
+        local _, _, left = ns.RestedNow(c, now)
+        return left
     end },
     wellRested = { value = function(_, c) return c.wellRested end },
     legacy = { value = function(_, c) return ns.LegacyUnspent(c) end }, -- points left to spend
@@ -567,7 +586,7 @@ end
 -- A group heading's name may run on past the columns before Gold (empty in a heading), or
 -- to the window's edge when Gold is hidden.
 local function HeadWidth(width)
-    if colShown[6] then return colX[6] - colX[1] - 8 end
+    if colShown[7] then return colX[7] - colX[1] - 8 end
     return width - colX[1] - 28
 end
 
@@ -769,7 +788,7 @@ local function CreateHead(i)
     head.line = line
     local texts = CreateCells(head, "GameFontNormalSmall")
     texts[1]:SetWidth(HeadWidth(frame:GetWidth()))
-    head.texts, head.label, head.gold = texts, texts[1], texts[6]
+    head.texts, head.label, head.gold = texts, texts[1], texts[7]
     heads[i] = head
     return head
 end
@@ -1015,8 +1034,8 @@ function Refresh()
             -- unless the group is collapsed.
             local sum = hidden or count[group] > 1
             head.gold:SetText(sum and GetCoinTextureString(gold[group]) or "")
-            head.texts[12]:SetText(sum and SpaceSum("bags", group) or "")
-            head.texts[13]:SetText(sum and SpaceSum("bank", group) or "")
+            head.texts[13]:SetText(sum and SpaceSum("bags", group) or "")
+            head.texts[14]:SetText(sum and SpaceSum("bank", group) or "")
             head:Show()
             y = y + ROW_HEIGHT
         end
@@ -1032,23 +1051,24 @@ function Refresh()
         cells[2]:SetText(level)
         row.pct:SetText(pct)
         cells[3]:SetText(ns.RestedText(c, now))
+        cells[4]:SetText(ns.RestedFullText(c, now))
         local points, rank = ns.LegacyCells(c)
-        cells[4]:SetText(rank)
-        cells[5]:SetText(points)
-        cells[6]:SetText(c.money and GetCoinTextureString(c.money) or (GREY .. "?|r"))
+        cells[5]:SetText(rank)
+        cells[6]:SetText(points)
+        cells[7]:SetText(c.money and GetCoinTextureString(c.money) or (GREY .. "?|r"))
         local n1, s1, n2, s2 = ns.ProfCells(c)
-        cells[7]:SetText(n1)
-        cells[8]:SetText(s1)
-        cells[9]:SetText(n2)
-        cells[10]:SetText(s2)
-        cells[11]:SetText(ns.MailText(c, now))
-        cells[12]:SetText(ns.SpaceText(c, "bags"))
-        cells[13]:SetText(ns.SpaceText(c, "bank"))
-        cells[14]:SetText(ns.LockoutText(c, now))
-        cells[15]:SetText(ns.CooldownCell(c, now))
-        cells[16]:SetText(c.zone or (GREY .. "?|r"))
-        cells[17]:SetText(ns.PlayedText(c, now))
-        cells[18]:SetText(ns.SeenText(key, c, now))
+        cells[8]:SetText(n1)
+        cells[9]:SetText(s1)
+        cells[10]:SetText(n2)
+        cells[11]:SetText(s2)
+        cells[12]:SetText(ns.MailText(c, now))
+        cells[13]:SetText(ns.SpaceText(c, "bags"))
+        cells[14]:SetText(ns.SpaceText(c, "bank"))
+        cells[15]:SetText(ns.LockoutText(c, now))
+        cells[16]:SetText(ns.CooldownCell(c, now))
+        cells[17]:SetText(c.zone or (GREY .. "?|r"))
+        cells[18]:SetText(ns.PlayedText(c, now))
+        cells[19]:SetText(ns.SeenText(key, c, now))
         total = total + (c.money or 0)
         played = played + (ns.PlayedNow(c, now) or 0)
         row:SetShown(not hidden)

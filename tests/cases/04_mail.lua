@@ -124,7 +124,7 @@ test("the open overview's Mail column follows the inbox and mail sent to an alt"
     SlashCmdList.ALTSFOREVER("")
     local function mailOf(key)
         for _, row in ipairs(overviewRows()) do
-            if row.key == key then return cell(row, 11) end
+            if row.key == key then return cell(row, 12) end
         end
     end
     eq(mailOf(ns.charKey), G .. "?|r", "mailbox never opened")
