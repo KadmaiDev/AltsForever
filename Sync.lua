@@ -200,6 +200,7 @@ local sessions = {} -- [full name] = { target = name to whisper, ours = we start
 local current       -- the latest session, kept after it ends so the window can show how it went
 local Pump, Refresh -- Refresh: the window's, set when it's made
 local Keep          -- remembers who to swap with again
+local Unwatch       -- lets the "no such player" filter go once nothing needs it
 local partner       -- { name, target }: who we last swapped with; nil once they've gone
 local lastSwap = 0
 local afterCombat = false -- a swap fell due in combat: it runs as soon as the fight ends
@@ -253,6 +254,7 @@ local function Ended(name, why)
         end
     end
     sessions[name] = nil
+    Unwatch()
     Notify()
 end
 
@@ -361,38 +363,97 @@ end
 ---------------------------------------------------------------------------
 -- Trying a character who may be offline: the game may answer with a "no such player" line in
 -- chat. Only that line, about the name just tried, is held back, and only for a few seconds.
+--
+-- Mid-swap it's the only sign the other side has gone: a whisper to someone who has logged out
+-- still answers Success (seen 2026-11-06), so the rest of the swap went on being sent, a piece
+-- every PACE, and each one printed the line (owner, 2026-11-23, until a relog or their return).
+-- While a swap runs, the line about its name ends the swap and is hidden.
 ---------------------------------------------------------------------------
 local tried     -- [name as the game may print it] = true, while the filter is on
 local notFound  -- the game's line as a pattern, capturing the name
 local hiding = 0
+local filterOn, listening = false, false
+
+local function Bare(name) return name:match("^(.-)%-[^%-]+$") or name end
+
+local function NotFoundName(text)
+    if issecretvalue(text) or type(text) ~= "string" or type(ERR_CHAT_PLAYER_NOT_FOUND_S) ~= "string" then return nil end
+    notFound = notFound or ("^" .. ERR_CHAT_PLAYER_NOT_FOUND_S:gsub("%p", "%%%0"):gsub("%%%%s", "(.+)") .. "$")
+    return text:match(notFound)
+end
+
+-- The swap or queued message a name the game printed belongs to: its name, as sent or as known.
+local function SendingTo(printed)
+    local want = Bare(printed):lower()
+    for name, s in pairs(sessions) do
+        if name:lower() == want or (type(s.target) == "string" and Bare(s.target):lower() == want) then return name end
+    end
+    for i = head, #queue do
+        local m = queue[i]
+        if m.name:lower() == want or Bare(m.target):lower() == want then return m.name end
+    end
+end
 
 local function HideNotFound(_, _, text)
-    if not tried or issecretvalue(text) or type(text) ~= "string" then return false end
-    local name = text:match(notFound)
+    local name = NotFoundName(text)
     if not name then return false end
-    return tried[name:match("^(.-)%-[^%-]+$") or name] == true
+    if tried and tried[Bare(name)] then return true end
+    return SendingTo(name) ~= nil
+end
+
+local function Filter(on)
+    if on == filterOn then return end
+    local f
+    if on then
+        f = ChatFrame_AddMessageEventFilter or (ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter)
+    else
+        f = ChatFrame_RemoveMessageEventFilter or (ChatFrameUtil and ChatFrameUtil.RemoveMessageEventFilter)
+    end
+    if not f or type(ERR_CHAT_PLAYER_NOT_FOUND_S) ~= "string" then return false end
+    f("CHAT_MSG_SYSTEM", HideNotFound)
+    filterOn = on
+    return true
+end
+
+-- Off once no one is being tried and no swap runs.
+function Unwatch()
+    if hiding <= 0 and not next(sessions) then Filter(false) end
 end
 
 local function StopHiding()
     hiding = hiding - 1
     if hiding > 0 then return end
     tried = nil
-    local remove = ChatFrame_RemoveMessageEventFilter or (ChatFrameUtil and ChatFrameUtil.RemoveMessageEventFilter)
-    if remove then remove("CHAT_MSG_SYSTEM", HideNotFound) end
+    Unwatch()
 end
 
 local function HideOffline(name)
-    local add = ChatFrame_AddMessageEventFilter or (ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter)
-    if not add or type(ERR_CHAT_PLAYER_NOT_FOUND_S) ~= "string" then return end
-    if not tried then
-        tried = {}
-        notFound = notFound or ("^" .. ERR_CHAT_PLAYER_NOT_FOUND_S:gsub("%p", "%%%0"):gsub("%%%%s", "(.+)") .. "$")
-        add("CHAT_MSG_SYSTEM", HideNotFound)
-    end
+    if not filterOn and not Filter(true) then return end
+    tried = tried or {}
     tried[name] = true
     tried[name:match("^(%S+)") or name] = true
     hiding = hiding + 1
     After(HIDE_FOR, StopHiding)
+end
+
+-- They've logged out: what's still queued for them goes, and the swap ends. The lines for
+-- messages already on their way come after this one, so they're hidden for a while too.
+local function OnSystem(text)
+    if not next(sessions) and not queue[head] then return end
+    local printed = NotFoundName(text)
+    local name = printed and SendingTo(printed)
+    if not name then return end
+    Debug("%s is offline", printed)
+    HideOffline(name)
+    Stop(name, L["they're not online"])
+end
+
+-- From the first swap on: the line is listened for, and hidden while a swap runs.
+local function Listen()
+    Filter(true)
+    if listening then return end
+    listening = true
+    ns.On("CHAT_MSG_SYSTEM", OnSystem)
 end
 
 ---------------------------------------------------------------------------
@@ -606,6 +667,7 @@ end
 local function NewSession(name, s)
     s.name, s.got, s.at = name, 0, time()
     sessions[name] = s
+    Listen()
     if not (s.quiet and s.ours) then current = s end
     After(QUIET, function() Watch(name, s) end)
     return s

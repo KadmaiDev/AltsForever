@@ -1,3 +1,7 @@
+## Alts Forever 1.10.1 (not yet released)
+
+- **Sync stops when the other character logs out:** if your other account logged out part way through a sync, the rest of the swap went on being sent to them, and every message printed "No player named ... is currently playing." in chat until you relogged or they came back. The sync now stops at the first of those lines, and hides them.
+
 ## Alts Forever 1.10.0
 
 - **Profession cooldowns:** Mooncloth, transmutes and other crafts with a cooldown now show when each of your characters can make them again, in a new **Cooldowns** column in the overview: a green Ready (or "2 ready") when one is, otherwise how long until the soonest. Point at it to see each one, or click it to open that character's professions. The column appears once one of your characters has a cooldown, so it stays out of the way for everyone else; hide it or show it from the column menu like any other; /af cooldowns lists everyone in chat. A cooldown is picked up when that character crafts it with their profession window open, or opens the window while it's running. Transmutes that share one cooldown show as one line. Thanks to the player who asked.
