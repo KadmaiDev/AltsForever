@@ -976,6 +976,80 @@ test("a sync that ends sends nothing more", function()
     eq(#wow.sent, before, "what was queued for them went with it")
 end)
 
+test("the other side logging out part way through ends the swap, without a chat line per message left", function()
+    -- Sends to someone gone still answer Success; the game's "no such player" line is the sign.
+    local ns = syncStart()
+    local line = "No player named '%s' is currently playing."
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, reply = true, have = {} })
+    syncFrom(ns, "Bob Smith", { k = "want", keys = { "Aldric", "Tarn Moon" } })
+    eq(wow.chatFilter("CHAT_MSG_SYSTEM", line:format("Bob Smith")), true, "hidden while the swap runs")
+    eq(wow.chatFilter("CHAT_MSG_SYSTEM", line:format("Someone Else")), false, "your own typo still shows")
+    wow.fire("CHAT_MSG_SYSTEM", line:format("Someone Else"))
+    eq(progress(ns).going, true, "someone else's line changes nothing")
+
+    local before = #wow.sent
+    wow.fire("CHAT_MSG_SYSTEM", line:format("Bob Smith"))
+    assert(syncPrinted():find("Sync with Bob Smith stopped: they're not online.", 1, true), syncPrinted())
+    eq(progress(ns).going, false)
+    eq(wow.chatFilter("CHAT_MSG_SYSTEM", line:format("Bob Smith")), true, "lines for messages already sent")
+    syncPump()
+    eq(#wow.sent, before, "nothing more goes")
+    eq(#(wow.filters.CHAT_MSG_SYSTEM or {}), 0, "the filter goes after a few seconds")
+    wow.fire("CHAT_MSG_SYSTEM", line:format("Bob Smith"))
+    eq(select(2, syncPrinted():gsub("not online", "")), 1, "said once")
+end)
+
+test("a \"no such player\" line with only the first name ends the swap it fits, and only one", function()
+    local ns = syncStart()
+    local line = "No player named '%s' is currently playing."
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, reply = true, have = {} })
+    syncFrom(ns, "Bob Smith", { k = "want", keys = { "Aldric", "Tarn Moon" } })
+    eq(wow.chatFilter("CHAT_MSG_SYSTEM", line:format("Bob")), true, "hidden while the swap runs")
+    local before = #wow.sent
+    wow.fire("CHAT_MSG_SYSTEM", line:format("Bob"))
+    assert(syncPrinted():find("Sync with Bob Smith stopped: they're not online.", 1, true), syncPrinted())
+    syncPump()
+    eq(#wow.sent, before, "nothing more goes")
+    wow.now = NOW + 30 -- well past the few seconds the lines are hidden for after it ends
+    SlashCmdList.ALTSFOREVER("sync Bob Smith") -- trying again while they're still away
+    eq(wow.chatFilter("CHAT_MSG_SYSTEM", line:format("Bob")), true, "later lines stay hidden while one runs")
+
+    -- Two swaps a first name could mean: neither is stopped on a guess.
+    ns = syncStart()
+    ns.db.syncWith = { ["Bob Smith"] = true, ["Bob Jones"] = true }
+    syncFrom(ns, "Bob Smith", { k = "ping" })
+    syncFrom(ns, "Bob Jones", { k = "ping" })
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, reply = true, auto = true, have = {} })
+    syncFrom(ns, "Bob Jones", { k = "hello", v = 1, reply = true, auto = true, have = {} })
+    syncFrom(ns, "Bob Smith", { k = "want", keys = { "Aldric" } })
+    syncFrom(ns, "Bob Jones", { k = "want", keys = { "Aldric" } })
+    wow.fire("CHAT_MSG_SYSTEM", line:format("Bob"))
+    wow.sent = {}
+    syncPump()
+    assert(#syncSent(ns, "Bob Smith") > 0 and #syncSent(ns, "Bob Jones") > 0, "both still going")
+end)
+
+test("an automatic swap whose other side logs out says nothing and stops checking on them", function()
+    local ns = syncStart()
+    local line = "No player named '%s' is currently playing."
+    ns.db.syncWith = { ["Bob Smith"] = true }
+    syncFrom(ns, "Bob Smith", { k = "ping" })
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, reply = true, auto = true, have = {} })
+    syncFrom(ns, "Bob Smith", { k = "want", keys = { "Aldric", "Tarn Moon" } })
+    wow.fire("CHAT_MSG_SYSTEM", line:format("Bob Smith"))
+    syncPump()
+    eq(syncPrinted(), "")
+    wow.sent = {}
+    eq(progress(ns).going, false)
+    wow.now = NOW + 700
+    runTimers() -- the 10 minute check: their next login pings us instead
+    wow.now = NOW + 1400
+    runTimers()
+    eq(#wow.sent, 0)
+end)
+
 test("a held-up hello given up on never goes out late", function()
     local ns = syncStart()
     wow.chatLockdown = true
