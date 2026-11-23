@@ -382,16 +382,31 @@ local function NotFoundName(text)
     return text:match(notFound)
 end
 
+local function First(name) return name:match("^(%S+)") or name end
+
 -- The swap or queued message a name the game printed belongs to: its name, as sent or as known.
+-- A first name alone (if the game prints one) counts only when it fits just one of them.
 local function SendingTo(printed)
     local want = Bare(printed):lower()
+    local single = not find(want, " ", 1, true)
+    local match, many
+    local function Try(name, target)
+        local t = type(target) == "string" and Bare(target):lower() or ""
+        local n = name:lower()
+        if n == want or t == want then return true end
+        if single and (First(n) == want or First(t) == want) then
+            if match and match ~= name then many = true end
+            match = match or name
+        end
+    end
     for name, s in pairs(sessions) do
-        if name:lower() == want or (type(s.target) == "string" and Bare(s.target):lower() == want) then return name end
+        if Try(name, s.target) then return name end
     end
     for i = head, #queue do
         local m = queue[i]
-        if m.name:lower() == want or Bare(m.target):lower() == want then return m.name end
+        if Try(m.name, m.target) then return m.name end
     end
+    return not many and match or nil
 end
 
 local function HideNotFound(_, _, text)
