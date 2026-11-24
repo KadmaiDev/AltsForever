@@ -1,4 +1,4 @@
-## Alts Forever (not yet released)
+## Alts Forever 1.11.0
 
 - **A narrower overview:** each main profession now shows as its icon and skill instead of its name, and gold shows to the whole gold with the coin ("1,234"). Hover a row for the professions' names and gold to the copper. With every column shown the window is about 130 pixels narrower, even with the new secondary profession columns below. Thanks to the player who asked.
 - **Secondary professions in the overview:** Cooking, First Aid and Fishing get a narrow column each after Professions, under the profession's icon, with each character's skill (blank if they haven't learned it). Click an icon to sort by it, highest first. Hide all three at once from the column menu ("Secondary professions") or with /af columns secondary. Thanks to the same player.
