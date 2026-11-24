@@ -1,3 +1,8 @@
+## Alts Forever (not yet released)
+
+- **A narrower overview:** each main profession now shows as its icon and skill instead of its name, and gold shows to the whole gold with the coin ("1,234"). Hover a row for the professions' names and gold to the copper. With every column shown the window is about 220 pixels narrower. Thanks to the player who asked.
+- **Secondary professions in the overview:** Cooking, First Aid and Fishing get a narrow column each after Professions, under the profession's icon, with each character's skill (blank if they haven't learned it). Click an icon to sort by it, highest first. Hide all three at once from the column menu ("Secondary professions") or with /af columns secondary. Thanks to the same player.
+
 ## Alts Forever 1.10.1
 
 - **Pack for someone else:** right-click the **Pack** button at the mailbox for everyone your mail rules have something for in your bags, with how many stacks each. Pick one to put them in the To box, and Pack packs theirs instead, so you can skip the character it picked without typing a name.
