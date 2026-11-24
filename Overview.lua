@@ -219,12 +219,32 @@ function ns.ProfessionLineName(line)
     return name
 end
 
+-- A profession name's skill line, as Recipes.lua's ns.ProfessionArt knows it (the skill
+-- scan's db.profArt, else the game's names in this language); kept once found.
+local nameLines = {}
+local function NameLine(name)
+    local line = nameLines[name]
+    if line then return line end
+    line = ns.ProfessionArt and (ns.ProfessionArt(name))
+    if line then nameLines[name] = line end
+    return line
+end
+
 -- A character's skill in the profession with this skill line, or nil if they haven't
--- learned it (or it isn't known yet).
+-- learned it (or it isn't known yet). By this client's name for it first; else by each of
+-- their professions' skill line, as a character synced from a client in another language
+-- keeps its names ("Kochkunst"), with db.profArt saying which line that is (peer review,
+-- 2026-11-24).
 function ns.LineSkill(c, line)
-    local name = c.profs and ns.ProfessionLineName(line)
-    local skill = name and c.profs[name]
-    return type(skill) == "number" and skill or nil
+    local profs = c.profs
+    if not profs then return nil end
+    local name = ns.ProfessionLineName(line)
+    local skill = name and profs[name]
+    if type(skill) == "number" then return skill end
+    for other, s in pairs(profs) do
+        if type(s) == "number" and other ~= name and NameLine(other) == line then return s end
+    end
+    return nil
 end
 
 -- Gold in the overview's narrow column: whole gold with the coin ("1,234" and the gold

@@ -886,6 +886,25 @@ test("secondary professions: a column each under its icon, sorted by skill, hidd
     eq(row("High").cells[15].shown, true, "Mail stays")
 end)
 
+test("a character synced from a client in another language shows its secondary professions", function()
+    local saved = overviewAlts()
+    -- Synced from a German client: its profession names are German, and the skill scan
+    -- there recorded which skill line each is.
+    saved.chars.High.profs = { Schneiderei = 200, Kochkunst = 150, Angeln = 75 }
+    saved.profArt = { Schneiderei = "197;136249", Kochkunst = "185;133971", Angeln = "356;136245" }
+    local sortBy = sortStart(saved, function()
+        wow.skillLineNames = { [185] = "Cooking", [129] = "First Aid", [356] = "Fishing" }
+    end)
+    local high
+    for _, r in ipairs(overviewRows()) do
+        if cell(r, 1):find("High", 1, true) then high = r end
+    end
+    eq(cell(high, 12), 150, "Kochkunst is Cooking"); eq(cell(high, 13), "")
+    eq(cell(high, 14), 75, "Angeln is Fishing")
+    sortBy("cooking")
+    eq(cell(overviewRows()[1], 1), "[PRIEST]High", "and sorts as a cook")
+end)
+
 test("hidden columns are kept between sessions; the window never gets too narrow", function()
     sortStart()
     for _, name in ipairs({ "Level", "Rested", "Full in", "Well Rested", "Legacy", "Gold", "Professions", "Secondary professions", "Mail", "Bags", "Bank", "Lockouts", "Zone", "Played", "Last seen" }) do
