@@ -30,13 +30,25 @@ local COLUMNS = {
     -- values under wider titles, so both are centred.
     { title = L["Well Rested"], width = 84, center = true, sort = "wellRested", id = "wellrested" },
     { title = L["Legacy"], width = 60, center = true, sort = "legacy", id = "legacy" },
-    { title = L["Gold"], width = 120, right = true, sort = "gold", id = "gold" },
-    -- Each main profession gets a name column and a right-aligned skill column, so
-    -- the skill numbers line up. The gap separates it from the right-aligned gold.
-    { title = L["Professions"], width = 104, gap = 16, id = "professions" },
-    { title = "", width = 34, right = true, id = "professions" },
-    { title = "", width = 104, gap = 16, id = "professions" },
-    { title = "", width = 34, right = true, id = "professions" },
+    -- Whole gold only (ns.GoldShort): the row tooltip has it to the copper.
+    { title = L["Gold"], width = 70, right = true, sort = "gold", id = "gold" },
+    -- Each main profession gets its icon and its skill (ns.ProfIconCells), so the skill
+    -- numbers line up; the row tooltip names them. The gap separates it from the
+    -- right-aligned gold. `cell`: the text's width where it isn't width - 8; `titleWidth`:
+    -- the title runs over the cells after it, which have none.
+    { title = L["Professions"], width = 20, cell = 16, titleWidth = 120, gap = 16, id = "professions" },
+    { title = "", width = 30, id = "professions" },
+    { title = "", width = 20, cell = 16, gap = 6, id = "professions" },
+    { title = "", width = 30, id = "professions" },
+    -- Secondary professions (a player's request, 2026-11-24): the same three for everyone,
+    -- so the icon is the title and the cell just the skill. Found by skill line (`line`),
+    -- so it works in every language; hidden and shown together under `menu`.
+    { title = "|TInterface\\Icons\\INV_Misc_Food_15:14:14:0:0:64:64:5:59:5:59|t", width = 30, gap = 10,
+        center = true, sort = "cooking", id = "secondary", line = 185, menu = L["Secondary professions"] },
+    { title = "|TInterface\\Icons\\Spell_Holy_SealOfSacrifice:14:14:0:0:64:64:5:59:5:59|t", width = 30,
+        center = true, sort = "firstaid", id = "secondary", line = 129 },
+    { title = "|TInterface\\Icons\\Trade_Fishing:14:14:0:0:64:64:5:59:5:59|t", width = 30,
+        center = true, sort = "fishing", id = "secondary", line = 356 },
     { title = L["Mail"], width = 60, gap = 16, sort = "mail", id = "mail" },
     -- Free slots of all slots (bags without the keyring; bank tabs as last visited), as
     -- Altoholic shows them; pointing at one lists each bag (a player's request, 2026-11-19).
@@ -61,9 +73,15 @@ local COLUMNS = {
 -- The columns that can be hidden, in order, each once: { id, title }; AUTO = by id, the
 -- columns that show themselves only when they have something to show.
 local HIDEABLE, AUTO = {}, {}
-for _, col in ipairs(COLUMNS) do
-    if col.id and col.title ~= "" then HIDEABLE[#HIDEABLE + 1] = { col.id, col.title } end
-    if col.auto then AUTO[col.id] = col.auto end
+do
+    local listed = {}
+    for _, col in ipairs(COLUMNS) do
+        if col.id and col.title ~= "" and not listed[col.id] then
+            listed[col.id] = true
+            HIDEABLE[#HIDEABLE + 1] = { col.id, col.menu or col.title }
+        end
+        if col.auto then AUTO[col.id] = col.auto end
+    end
 end
 
 -- Whether the column with this id shows: hidden by the player (true), shown by the player
@@ -160,6 +178,84 @@ function ns.ProfCells(c)
     return n1, s1, n2, s2
 end
 
+-- The overview's four profession cells: icon, skill, icon, skill (the names take room the
+-- other columns need; owner, 2026-11-24, after a player asked for a narrower window). An
+-- icon's text is kept per profession, so a refresh builds none; a profession without one
+-- (Recipes.lua's ns.ProfessionArt finds none) shows its first three letters.
+local profIcons = {}
+local function ProfIcon(name)
+    local text = profIcons[name]
+    if text then return text end
+    local icon = ns.ProfessionArt and select(2, ns.ProfessionArt(name))
+    if not icon then return LIGHT .. name:sub(1, 3) .. "|r" end
+    text = "|T" .. icon .. ":14:14:0:0:64:64:5:59:5:59|t"
+    profIcons[name] = text
+    return text
+end
+
+function ns.ProfIconCells(c)
+    local p = c.profs
+    if not p then return GREY .. "?|r", "", "", "" end
+    if not c.prof1 and not c.prof2 then return GREY .. "-|r", "", "", "" end
+    local function Cell(name)
+        if not name then return "", "" end
+        return ProfIcon(name), tostring(p[name] or "?")
+    end
+    local i1, s1 = Cell(c.prof1)
+    local i2, s2 = Cell(c.prof2)
+    return i1, s1, i2, s2
+end
+
+-- A secondary profession's name in the player's language, from its skill line (Cooking 185,
+-- First Aid 129, Fishing 356), as Gathering() below; kept once the game has given it.
+local lineNames = {}
+function ns.ProfessionLineName(line)
+    local name = lineNames[line]
+    if name then return name end
+    local ts = C_TradeSkillUI
+    name = ts and ts.GetTradeSkillDisplayName and ts.GetTradeSkillDisplayName(line)
+    if issecretvalue(name) or type(name) ~= "string" or name == "" then return nil end
+    lineNames[line] = name
+    return name
+end
+
+-- A profession name's skill line, as Recipes.lua's ns.ProfessionArt knows it (the skill
+-- scan's db.profArt, else the game's names in this language); kept once found.
+local nameLines = {}
+local function NameLine(name)
+    local line = nameLines[name]
+    if line then return line end
+    line = ns.ProfessionArt and (ns.ProfessionArt(name))
+    if line then nameLines[name] = line end
+    return line
+end
+
+-- A character's skill in the profession with this skill line, or nil if they haven't
+-- learned it (or it isn't known yet). By this client's name for it first; else by each of
+-- their professions' skill line, as a character synced from a client in another language
+-- keeps its names ("Kochkunst"), with db.profArt saying which line that is (peer review,
+-- 2026-11-24).
+function ns.LineSkill(c, line)
+    local profs = c.profs
+    if not profs then return nil end
+    local name = ns.ProfessionLineName(line)
+    local skill = name and profs[name]
+    if type(skill) == "number" then return skill end
+    for other, s in pairs(profs) do
+        if type(s) == "number" and other ~= name and NameLine(other) == line then return s end
+    end
+    return nil
+end
+
+-- Gold in the overview's narrow column: whole gold with the coin ("1,234" and the gold
+-- icon); under a gold, silver and copper as the game writes them.
+local GOLD_ICON = "|TInterface\\MoneyFrame\\UI-GoldIcon:0:0:2:0|t"
+local BigNumber = BreakUpLargeNumbers or tostring
+function ns.GoldShort(copper)
+    if copper >= 10000 then return BigNumber(floor(copper / 10000)) .. GOLD_ICON end
+    return GetCoinTextureString(copper)
+end
+
 -- Time until the soonest valuable mail expires; blank if none, "?" if the mailbox
 -- has never been opened on that character.
 -- Free slots / all slots in a character's bags or bank: orange once a tenth or less is
@@ -223,6 +319,10 @@ local SORTS = {
     wellRested = { value = function(_, c) return c.wellRested end },
     legacy = { value = function(_, c) return ns.LegacyUnspent(c) end }, -- points left to spend
     gold = { value = function(_, c) return c.money end },
+    -- The highest skill first; those who haven't learned it last.
+    cooking = { value = function(_, c) return ns.LineSkill(c, 185) end },
+    firstaid = { value = function(_, c) return ns.LineSkill(c, 129) end },
+    fishing = { value = function(_, c) return ns.LineSkill(c, 356) end },
     mail = { up = true, value = function(_, c) return c.mailExpires end },
     -- Fewest free slots first: who needs to clear out.
     bags = { up = true, value = function(_, c) return (ns.BagSpace(c, "bags")) end },
@@ -574,7 +674,7 @@ local function CreateCells(parent, font)
     for i, col in ipairs(COLUMNS) do
         local fs = parent:CreateFontString(nil, "OVERLAY", font)
         ns.SkinText(fs)
-        fs:SetWidth(col.width - 8)
+        fs:SetWidth(col.cell or col.width - 8)
         fs:SetJustifyH(col.right and "RIGHT" or col.center and "CENTER" or "LEFT")
         fs:SetWordWrap(false)
         cells[i] = fs
@@ -955,7 +1055,9 @@ end
 local function SortTooltip(b)
     local tt = GameTooltip
     tt:SetOwner(b, "ANCHOR_TOPLEFT")
-    tt:AddLine(b.col.title)
+    -- A secondary profession's title is its icon: the tooltip names it.
+    local line = b.col.line
+    tt:AddLine(line and (ns.ProfessionLineName(line) or L["Secondary professions"]) or b.col.title)
     if b.col.tip then tt:AddLine(b.col.tip, 1, 1, 1, true) end
     local rows, first
     if b.col.space then rows, first = SpaceSummary(tt, b.col.space) end
@@ -1033,9 +1135,9 @@ function Refresh()
             -- A total only when there's something to add up: one character's is on their row,
             -- unless the group is collapsed.
             local sum = hidden or count[group] > 1
-            head.gold:SetText(sum and GetCoinTextureString(gold[group]) or "")
-            head.texts[13]:SetText(sum and SpaceSum("bags", group) or "")
-            head.texts[14]:SetText(sum and SpaceSum("bank", group) or "")
+            head.gold:SetText(sum and ns.GoldShort(gold[group]) or "")
+            head.texts[16]:SetText(sum and SpaceSum("bags", group) or "")
+            head.texts[17]:SetText(sum and SpaceSum("bank", group) or "")
             head:Show()
             y = y + ROW_HEIGHT
         end
@@ -1055,20 +1157,23 @@ function Refresh()
         local points, rank = ns.LegacyCells(c)
         cells[5]:SetText(rank)
         cells[6]:SetText(points)
-        cells[7]:SetText(c.money and GetCoinTextureString(c.money) or (GREY .. "?|r"))
-        local n1, s1, n2, s2 = ns.ProfCells(c)
+        cells[7]:SetText(c.money and ns.GoldShort(c.money) or (GREY .. "?|r"))
+        local n1, s1, n2, s2 = ns.ProfIconCells(c)
         cells[8]:SetText(n1)
         cells[9]:SetText(s1)
         cells[10]:SetText(n2)
         cells[11]:SetText(s2)
-        cells[12]:SetText(ns.MailText(c, now))
-        cells[13]:SetText(ns.SpaceText(c, "bags"))
-        cells[14]:SetText(ns.SpaceText(c, "bank"))
-        cells[15]:SetText(ns.LockoutText(c, now))
-        cells[16]:SetText(ns.CooldownCell(c, now))
-        cells[17]:SetText(c.zone or (GREY .. "?|r"))
-        cells[18]:SetText(ns.PlayedText(c, now))
-        cells[19]:SetText(ns.SeenText(key, c, now))
+        cells[12]:SetText(ns.LineSkill(c, 185) or "")
+        cells[13]:SetText(ns.LineSkill(c, 129) or "")
+        cells[14]:SetText(ns.LineSkill(c, 356) or "")
+        cells[15]:SetText(ns.MailText(c, now))
+        cells[16]:SetText(ns.SpaceText(c, "bags"))
+        cells[17]:SetText(ns.SpaceText(c, "bank"))
+        cells[18]:SetText(ns.LockoutText(c, now))
+        cells[19]:SetText(ns.CooldownCell(c, now))
+        cells[20]:SetText(c.zone or (GREY .. "?|r"))
+        cells[21]:SetText(ns.PlayedText(c, now))
+        cells[22]:SetText(ns.SeenText(key, c, now))
         total = total + (c.money or 0)
         played = played + (ns.PlayedNow(c, now) or 0)
         row:SetShown(not hidden)
@@ -1399,6 +1504,7 @@ local function CreateWindow()
     for i, fs in ipairs(f.titles) do
         local col = COLUMNS[i]
         fs:SetText(col.title)
+        if col.titleWidth then fs:SetWidth(col.titleWidth) end
         if col.sort then
             -- The title is a button: click to order by this column, again to turn it round.
             local b = CreateFrame("Button", nil, header)
