@@ -271,7 +271,7 @@ test("overview rows: you first, then by level; totals gold", function()
     SlashCmdList.ALTSFOREVER("")
     local rows = overviewRows()
     eq(#rows, 4)
-    eq(cell(rows[1], 1), "[MAGE]Aldric"); eq(cell(rows[1], 19), "|cff20ff20Online|r")
+    eq(cell(rows[1], 1), "[MAGE]Aldric"); eq(cell(rows[1], 22), "|cff20ff20Online|r")
     eq(cell(rows[1], 8), "|T136243:14:14:0:0:64:64:5:59:5:59|t", "a profession shows as its icon")
     eq(cell(rows[1], 9), "107")
     eq(cell(rows[1], 10), "|TInterface\\Icons\\Trade_Mining:14:14:0:0:64:64:5:59:5:59|t", "else the game's icon for it")
@@ -279,12 +279,12 @@ test("overview rows: you first, then by level; totals gold", function()
     eq(cell(rows[2], 1), "[MAGE]Far"); eq(cell(rows[2], 2), "60"); eq(cell(rows[2], 3), G .. "-|r")
     eq(cell(rows[3], 1), "[PRIEST]High")
     eq(cell(rows[3], 3), "|cff4da6ff150%|r", "was already full")
-    eq(cell(rows[3], 17), "Orgrimmar"); eq(cell(rows[3], 19), "3h ago")
+    eq(cell(rows[3], 20), "Orgrimmar"); eq(cell(rows[3], 22), "3h ago")
     eq(cell(rows[3], 7), "1|TInterface\\MoneyFrame\\UI-GoldIcon:0:0:2:0|t", "gold to the whole gold")
     eq(cell(rows[4], 1), "[ROGUE]Low"); eq(cell(rows[4], 2), "12")
     eq(rows[4].pct.text, G .. "10%|r", "the percentage in its own cell, so they line up")
     eq(rows[2].pct.text, "", "none at max level")
-    eq(cell(rows[4], 19), "2d ago")
+    eq(cell(rows[4], 22), "2d ago")
 end)
 
 test("an open overview updates when your money changes", function()
@@ -444,12 +444,12 @@ test("the overview starts by level with you first, the arrow on Level, nothing s
     eq(f.sortArrow.texture, "Interface\\Buttons\\Arrow-Down-Up")
     eq(f.sortArrow.point[2], f.sorts.level.title, "beside the Level title")
     eq(AltsForeverDB.overviewSort, nil); eq(AltsForeverDB.overviewSortRev, nil)
-    for _, name in ipairs({ "name", "level", "rested", "restedFull", "wellRested", "legacy", "gold", "mail", "bags", "bank", "cooldowns", "zone", "played", "seen" }) do
+    for _, name in ipairs({ "name", "level", "rested", "restedFull", "wellRested", "legacy", "gold", "cooking", "firstaid", "fishing", "mail", "bags", "bank", "cooldowns", "zone", "played", "seen" }) do
         assert(f.sorts[name], name .. " can be clicked")
     end
     local n = 0
     for _ in pairs(f.sorts) do n = n + 1 end
-    eq(n, 14, "professions and lockouts can't")
+    eq(n, 17, "professions and lockouts can't")
 end)
 
 test("clicking a column title orders by it, you among the rest; again turns it round", function()
@@ -853,9 +853,42 @@ test("columns can be hidden from the titles' right-click menu, and brought back"
     assert(table.concat(text, " "):find("Right-click to choose which columns are shown.", 1, true))
 end)
 
+test("secondary professions: a column each under its icon, sorted by skill, hidden together", function()
+    local saved = overviewAlts()
+    saved.chars.High.profs = { Tailoring = 200, Enchanting = 180, Kochkunst = 150, Angeln = 75 }
+    saved.chars.Low.profs = { Kochkunst = 225 }
+    -- Found by skill line, in the client's language (a German client here).
+    local sortBy, ns = sortStart(saved, function()
+        wow.skillLineNames = { [185] = "Kochkunst", [129] = "Erste Hilfe", [356] = "Angeln" }
+    end)
+    local function row(name)
+        for _, r in ipairs(overviewRows()) do
+            if cell(r, 1):find(name, 1, true) then return r end
+        end
+    end
+    eq(cell(row("High"), 12), 150, "Cooking"); eq(cell(row("High"), 13), "", "First Aid not learned: blank")
+    eq(cell(row("High"), 14), 75, "Fishing")
+    eq(cell(row("Low"), 12), 225); eq(cell(row("Far"), 12), "", "no professions recorded: blank too")
+    eq(ns.LineSkill({ profs = { Cooking = 5 } }, 185), nil, "an English name on a German client isn't it")
+
+    sortBy("cooking")
+    local order = {}
+    for _, r in ipairs(overviewRows()) do order[#order + 1] = cell(r, 1) end
+    eq(order[1], "[ROGUE]Low"); eq(order[2], "[PRIEST]High", "the best cook first, then those without it")
+
+    local b = AltsForeverFrame.sorts.fishing
+    b.scripts.OnEnter(b)
+    eq(GameTooltip.lines[1][1], "Angeln", "the icon's tooltip names it")
+
+    SlashCmdList.ALTSFOREVER("columns secondary")
+    eq(AltsForeverDB.hiddenColumns.secondary, true)
+    for i = 12, 14 do eq(row("High").cells[i].shown, false, "cell " .. i) end
+    eq(row("High").cells[15].shown, true, "Mail stays")
+end)
+
 test("hidden columns are kept between sessions; the window never gets too narrow", function()
     sortStart()
-    for _, name in ipairs({ "Level", "Rested", "Full in", "Well Rested", "Legacy", "Gold", "Professions", "Mail", "Bags", "Bank", "Lockouts", "Zone", "Played", "Last seen" }) do
+    for _, name in ipairs({ "Level", "Rested", "Full in", "Well Rested", "Legacy", "Gold", "Professions", "Secondary professions", "Mail", "Bags", "Bank", "Lockouts", "Zone", "Played", "Last seen" }) do
         columnsMenu(name).setSelected()
     end
     local f = AltsForeverFrame
@@ -866,14 +899,19 @@ test("hidden columns are kept between sessions; the window never gets too narrow
     eq(f.width, 560)
     for _, row in ipairs(overviewRows()) do
         eq(row.cells[1].shown, true)
-        for i = 2, 19 do eq(row.cells[i].shown, false, "cell " .. i) end
+        for i = 2, 22 do eq(row.cells[i].shown, false, "cell " .. i) end
     end
     eq(ns.ColumnShown("gold"), false)
     -- The cog menu has the list too; the minimap's menu doesn't.
     ns.ShowOptionsMenu(f.cog, true)
     local columns = wow.menuItem("Columns")
     eq(columns.items[1].text, "Show all columns")
-    eq(#columns.items, 16, "the fifteen columns and Show all")
+    eq(#columns.items, 17, "the sixteen columns and Show all")
+    local second = 0
+    for _, item in ipairs(columns.items) do
+        if item.text == "Secondary professions" then second = second + 1 end
+    end
+    eq(second, 1, "the three secondary professions are one entry")
     ns.ShowOptionsMenu(UIParent)
     eq(wow.menuItem("Columns"), nil)
     -- /af columns: one column, or all of them back.
@@ -887,7 +925,7 @@ test("hidden columns are kept between sessions; the window never gets too narrow
     eq(ns.ColumnShown("gold"), false)
     SlashCmdList.ALTSFOREVER("columns")
     eq(AltsForeverDB.hiddenColumns.gold, nil)
-    for i = 1, 19 do eq(overviewRows()[1].cells[i].shown, true, "cell " .. i) end
+    for i = 1, 22 do eq(overviewRows()[1].cells[i].shown, true, "cell " .. i) end
 end)
 
 test("damaged hidden columns hide nothing; the Character column can't be hidden", function()
@@ -895,7 +933,7 @@ test("damaged hidden columns hide nothing; the Character column can't be hidden"
         local saved = overviewAlts()
         saved.hiddenColumns = bad
         local _, ns = sortStart(saved)
-        for i = 1, 19 do eq(overviewRows()[1].cells[i].shown, i ~= 16, "cell " .. i .. " (Cooldowns: nobody has one)") end
+        for i = 1, 22 do eq(overviewRows()[1].cells[i].shown, i ~= 19, "cell " .. i .. " (Cooldowns: nobody has one)") end
         ns.SetColumnShown("name", false)
         ns.SetColumnShown("character", false)
         eq(overviewRows()[1].cells[1].shown, true)

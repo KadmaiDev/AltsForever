@@ -40,6 +40,15 @@ local COLUMNS = {
     { title = "", width = 30, id = "professions" },
     { title = "", width = 20, cell = 16, gap = 6, id = "professions" },
     { title = "", width = 30, id = "professions" },
+    -- Secondary professions (a player's request, 2026-11-24): the same three for everyone,
+    -- so the icon is the title and the cell just the skill. Found by skill line (`line`),
+    -- so it works in every language; hidden and shown together under `menu`.
+    { title = "|TInterface\\Icons\\INV_Misc_Food_15:14:14:0:0:64:64:5:59:5:59|t", width = 30, gap = 10,
+        center = true, sort = "cooking", id = "secondary", line = 185, menu = L["Secondary professions"] },
+    { title = "|TInterface\\Icons\\Spell_Holy_SealOfSacrifice:14:14:0:0:64:64:5:59:5:59|t", width = 30,
+        center = true, sort = "firstaid", id = "secondary", line = 129 },
+    { title = "|TInterface\\Icons\\Trade_Fishing:14:14:0:0:64:64:5:59:5:59|t", width = 30,
+        center = true, sort = "fishing", id = "secondary", line = 356 },
     { title = L["Mail"], width = 60, gap = 16, sort = "mail", id = "mail" },
     -- Free slots of all slots (bags without the keyring; bank tabs as last visited), as
     -- Altoholic shows them; pointing at one lists each bag (a player's request, 2026-11-19).
@@ -64,9 +73,15 @@ local COLUMNS = {
 -- The columns that can be hidden, in order, each once: { id, title }; AUTO = by id, the
 -- columns that show themselves only when they have something to show.
 local HIDEABLE, AUTO = {}, {}
-for _, col in ipairs(COLUMNS) do
-    if col.id and col.title ~= "" then HIDEABLE[#HIDEABLE + 1] = { col.id, col.title } end
-    if col.auto then AUTO[col.id] = col.auto end
+do
+    local listed = {}
+    for _, col in ipairs(COLUMNS) do
+        if col.id and col.title ~= "" and not listed[col.id] then
+            listed[col.id] = true
+            HIDEABLE[#HIDEABLE + 1] = { col.id, col.menu or col.title }
+        end
+        if col.auto then AUTO[col.id] = col.auto end
+    end
 end
 
 -- Whether the column with this id shows: hidden by the player (true), shown by the player
@@ -191,6 +206,27 @@ function ns.ProfIconCells(c)
     return i1, s1, i2, s2
 end
 
+-- A secondary profession's name in the player's language, from its skill line (Cooking 185,
+-- First Aid 129, Fishing 356), as Gathering() below; kept once the game has given it.
+local lineNames = {}
+function ns.ProfessionLineName(line)
+    local name = lineNames[line]
+    if name then return name end
+    local ts = C_TradeSkillUI
+    name = ts and ts.GetTradeSkillDisplayName and ts.GetTradeSkillDisplayName(line)
+    if issecretvalue(name) or type(name) ~= "string" or name == "" then return nil end
+    lineNames[line] = name
+    return name
+end
+
+-- A character's skill in the profession with this skill line, or nil if they haven't
+-- learned it (or it isn't known yet).
+function ns.LineSkill(c, line)
+    local name = c.profs and ns.ProfessionLineName(line)
+    local skill = name and c.profs[name]
+    return type(skill) == "number" and skill or nil
+end
+
 -- Gold in the overview's narrow column: whole gold with the coin ("1,234" and the gold
 -- icon); under a gold, silver and copper as the game writes them.
 local GOLD_ICON = "|TInterface\\MoneyFrame\\UI-GoldIcon:0:0:2:0|t"
@@ -263,6 +299,10 @@ local SORTS = {
     wellRested = { value = function(_, c) return c.wellRested end },
     legacy = { value = function(_, c) return ns.LegacyUnspent(c) end }, -- points left to spend
     gold = { value = function(_, c) return c.money end },
+    -- The highest skill first; those who haven't learned it last.
+    cooking = { value = function(_, c) return ns.LineSkill(c, 185) end },
+    firstaid = { value = function(_, c) return ns.LineSkill(c, 129) end },
+    fishing = { value = function(_, c) return ns.LineSkill(c, 356) end },
     mail = { up = true, value = function(_, c) return c.mailExpires end },
     -- Fewest free slots first: who needs to clear out.
     bags = { up = true, value = function(_, c) return (ns.BagSpace(c, "bags")) end },
@@ -995,7 +1035,9 @@ end
 local function SortTooltip(b)
     local tt = GameTooltip
     tt:SetOwner(b, "ANCHOR_TOPLEFT")
-    tt:AddLine(b.col.title)
+    -- A secondary profession's title is its icon: the tooltip names it.
+    local line = b.col.line
+    tt:AddLine(line and (ns.ProfessionLineName(line) or L["Secondary professions"]) or b.col.title)
     if b.col.tip then tt:AddLine(b.col.tip, 1, 1, 1, true) end
     local rows, first
     if b.col.space then rows, first = SpaceSummary(tt, b.col.space) end
@@ -1074,8 +1116,8 @@ function Refresh()
             -- unless the group is collapsed.
             local sum = hidden or count[group] > 1
             head.gold:SetText(sum and ns.GoldShort(gold[group]) or "")
-            head.texts[13]:SetText(sum and SpaceSum("bags", group) or "")
-            head.texts[14]:SetText(sum and SpaceSum("bank", group) or "")
+            head.texts[16]:SetText(sum and SpaceSum("bags", group) or "")
+            head.texts[17]:SetText(sum and SpaceSum("bank", group) or "")
             head:Show()
             y = y + ROW_HEIGHT
         end
@@ -1101,14 +1143,17 @@ function Refresh()
         cells[9]:SetText(s1)
         cells[10]:SetText(n2)
         cells[11]:SetText(s2)
-        cells[12]:SetText(ns.MailText(c, now))
-        cells[13]:SetText(ns.SpaceText(c, "bags"))
-        cells[14]:SetText(ns.SpaceText(c, "bank"))
-        cells[15]:SetText(ns.LockoutText(c, now))
-        cells[16]:SetText(ns.CooldownCell(c, now))
-        cells[17]:SetText(c.zone or (GREY .. "?|r"))
-        cells[18]:SetText(ns.PlayedText(c, now))
-        cells[19]:SetText(ns.SeenText(key, c, now))
+        cells[12]:SetText(ns.LineSkill(c, 185) or "")
+        cells[13]:SetText(ns.LineSkill(c, 129) or "")
+        cells[14]:SetText(ns.LineSkill(c, 356) or "")
+        cells[15]:SetText(ns.MailText(c, now))
+        cells[16]:SetText(ns.SpaceText(c, "bags"))
+        cells[17]:SetText(ns.SpaceText(c, "bank"))
+        cells[18]:SetText(ns.LockoutText(c, now))
+        cells[19]:SetText(ns.CooldownCell(c, now))
+        cells[20]:SetText(c.zone or (GREY .. "?|r"))
+        cells[21]:SetText(ns.PlayedText(c, now))
+        cells[22]:SetText(ns.SeenText(key, c, now))
         total = total + (c.money or 0)
         played = played + (ns.PlayedNow(c, now) or 0)
         row:SetShown(not hidden)

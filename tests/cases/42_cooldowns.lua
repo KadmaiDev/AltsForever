@@ -166,11 +166,11 @@ test("the overview's Cooldowns column: ready, how many, or the soonest; sorts; p
     local click = sortStart(cooldownSaved())
     local READY = "|cff20ff20"
     eq(AltsForeverFrame.sorts.cooldowns.col.title, "Cooldowns")
-    eq(cell(rowOf("Aldric"), 16), "", "none seen: blank")
-    eq(cell(rowOf("High"), 16), READY .. "Ready|r", "Mooncloth ready, the transmutes not")
-    eq(cell(rowOf("Low"), 16), READY .. "2 ready|r", "one per profession")
-    eq(cell(rowOf("Far"), 16), "2d 4h", "none ready: the soonest")
-    eq(cell(rowOf("High"), 17), "Orgrimmar", "Zone after it")
+    eq(cell(rowOf("Aldric"), 19), "", "none seen: blank")
+    eq(cell(rowOf("High"), 19), READY .. "Ready|r", "Mooncloth ready, the transmutes not")
+    eq(cell(rowOf("Low"), 19), READY .. "2 ready|r", "one per profession")
+    eq(cell(rowOf("Far"), 19), "2d 4h", "none ready: the soonest")
+    eq(cell(rowOf("High"), 20), "Orgrimmar", "Zone after it")
     -- Sorted: the most ready first, then the soonest; none last.
     click("cooldowns")
     eq(overviewNames(), "Low, High, Far, Aldric")
@@ -205,12 +205,12 @@ test("the open overview turns a cooldown to Ready when its time comes, only whil
         end
     end
     sortStart(saved)
-    eq(cell(rowOf("Low"), 16), "1 min")
+    eq(cell(rowOf("Low"), 19), "1 min")
     local fn = countdown()
     assert(fn, "a refresh when it's ready")
     wow.now = NOW + 30
     fn()
-    eq(cell(rowOf("Low"), 16), "|cff20ff20Ready|r")
+    eq(cell(rowOf("Low"), 19), "|cff20ff20Ready|r")
     -- Column hidden: nothing to keep current.
     saved = overviewAlts()
     saved.chars.Low.cooldowns = { Tailoring = { Mooncloth = NOW + 30 } }
@@ -226,12 +226,12 @@ test("the Cooldowns column shows itself once someone has a cooldown, unless the 
     local f = AltsForeverFrame
     local narrow = f.width
     eq(ns.ColumnShown("cooldowns"), false, "nobody has one: hidden")
-    eq(overviewRows()[1].cells[16].shown, false)
+    eq(overviewRows()[1].cells[19].shown, false)
     eq(AltsForeverDB.hiddenColumns, nil, "nothing saved for it")
     -- The first one seen: the open overview makes room for it.
     tailoring(DAY)
     eq(ns.ColumnShown("cooldowns"), true)
-    eq(overviewRows()[1].cells[16].shown, true)
+    eq(overviewRows()[1].cells[19].shown, true)
     eq(f.width, narrow + 70)
     eq(AltsForeverDB.hiddenColumns, nil, "still the player's default")
     -- The last one forgotten: gone again.
@@ -249,7 +249,7 @@ test("the Cooldowns column shows itself once someone has a cooldown, unless the 
     wow.fire("TRADE_SKILL_SHOW")
     eq(AltsForeverDB.hiddenColumns.cooldowns, true)
     eq(ns.ColumnShown("cooldowns"), false)
-    eq(overviewRows()[1].cells[16].shown, false)
+    eq(overviewRows()[1].cells[19].shown, false)
     -- A damaged choice counts as none.
     AltsForeverDB.hiddenColumns.cooldowns = "yes"
     eq(ns.ColumnShown("cooldowns"), true, "someone has one")
@@ -277,11 +277,11 @@ test("profession cooldowns: an unreadable answer keeps a running cooldown; the o
     wow.fire("BAG_UPDATE_DELAYED")
     eq(c.cooldowns.Tailoring.Mooncloth, NOW, "0: ready")
     local you = overviewRows()[1]
-    eq(cell(you, 16), "|cff20ff20Ready|r", "the open overview shows it")
+    eq(cell(you, 19), "|cff20ff20Ready|r", "the open overview shows it")
     -- Made again with the window open: the cell follows the craft, no other refresh.
     wow.tradeskill.recipes[2001].cd = DAY
     wow.fire("BAG_UPDATE_DELAYED")
-    eq(cell(you, 16), "1d 0h")
+    eq(cell(you, 19), "1d 0h")
 end)
 
 test("profession cooldowns: a recipe learned with the window open is watched at once", function()

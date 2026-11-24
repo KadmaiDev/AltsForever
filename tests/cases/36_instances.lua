@@ -363,18 +363,18 @@ test("the overview's Lockouts column: each account's instances this hour on its 
             if cell(r, 1):find(name, 1, true) then return r end
         end
     end
-    eq(cell(row("Aldric"), 15), "1/10", "you: your account's count, though your saves aren't read yet")
-    eq(cell(row("Low"), 15), "1/10  " .. LOCK_KEY .. "1", "the same count on the account's other characters, then their saves")
-    eq(cell(row("High"), 15), "", "another account with none this hour, saved nowhere")
-    eq(cell(row("Far"), 15), G .. "?|r", "account unknown: never shown as free")
+    eq(cell(row("Aldric"), 18), "1/10", "you: your account's count, though your saves aren't read yet")
+    eq(cell(row("Low"), 18), "1/10  " .. LOCK_KEY .. "1", "the same count on the account's other characters, then their saves")
+    eq(cell(row("High"), 18), "", "another account with none this hour, saved nowhere")
+    eq(cell(row("Far"), 18), G .. "?|r", "account unknown: never shown as free")
 
     -- The other account reaches the limit: orange on its characters.
     local runs = {}
     for i = 1, 10 do runs[i] = { at = NOW - 1200, left = NOW - 600, map = 389, name = "Ragefire Chasm" } end
     ns.db.chars["High"].runs = runs
     ns.RefreshOverview()
-    eq(cell(row("High"), 15), "|cffff800010/10|r")
-    eq(cell(row("Low"), 15), "1/10  " .. LOCK_KEY .. "1", "yours unchanged")
+    eq(cell(row("High"), 18), "|cffff800010/10|r")
+    eq(cell(row("Low"), 18), "1/10  " .. LOCK_KEY .. "1", "yours unchanged")
 
     -- The row tooltip lists the account's visits, then the character's saves.
     local r = row("Low")
@@ -403,7 +403,7 @@ test("the open overview refreshes itself as visits stop counting, with no event"
     SlashCmdList.ALTSFOREVER("")
     local function high()
         for _, r in ipairs(overviewRows()) do
-            if cell(r, 1):find("High", 1, true) then return cell(r, 15) end
+            if cell(r, 1):find("High", 1, true) then return cell(r, 18) end
         end
     end
     local function nextRefresh()

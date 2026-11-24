@@ -42,7 +42,7 @@ test("no English text reaches the player without going through the translation t
                 local code = line:gsub("%-%-.*$", "")
                 for _, sink in ipairs(sinks) do
                     for literal in code:gmatch(sink .. '%s*"([^"]*)"') do
-                        local plain = literal:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("[%s:]+$", "")
+                        local plain = literal:gsub("|T.-|t", ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("[%s:]+$", "")
                         if plain:find("%a%a") and not allowed[plain] then
                             error(file .. ":" .. n .. ": untranslated text: " .. literal)
                         end
@@ -76,7 +76,7 @@ test("on a Spanish client your own row says you're online in Spanish", function(
     wow.now = NOW
     wow.login(overviewAlts())
     SlashCmdList.ALTSFOREVER("")
-    eq(cell(overviewRows()[1], 19), "|cff20ff20En línea|r")
+    eq(cell(overviewRows()[1], 22), "|cff20ff20En línea|r")
 end)
 
 test("on an English client nothing is translated", function()
