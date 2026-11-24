@@ -145,6 +145,33 @@ test("overview text: time since, level, rested and professions", function()
     eq(s1, "99"); eq(n2, ""); eq(s2, "", "only one main profession")
 end)
 
+test("the overview shows professions as icons and gold to the whole gold", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    ns.db.profArt = { Engineering = "202;136243", Tailoring = "197;Interface\\Icons\\Trade_Tailoring" }
+    local i1, s1, i2, s2 = ns.ProfIconCells({ profs = { Engineering = 107, Tailoring = 53, Cooking = 35 },
+        prof1 = "Engineering", prof2 = "Tailoring" })
+    eq(i1, "|T136243:14:14:0:0:64:64:5:59:5:59|t"); eq(s1, "107")
+    eq(i2, "|TInterface\\Icons\\Trade_Tailoring:14:14:0:0:64:64:5:59:5:59|t", "an icon path"); eq(s2, "53")
+    eq((ns.ProfIconCells({})), "|cff9d9d9d?|r", "never recorded")
+    eq((ns.ProfIconCells({ profs = { Cooking = 35 } })), "|cff9d9d9d-|r", "no main professions")
+    i1, s1, i2, s2 = ns.ProfIconCells({ profs = { Juggling = 99 }, prof1 = "Juggling" })
+    eq(i1, "|cffc0c0c0Jug|r", "no icon known: its first letters"); eq(s1, "99"); eq(i2, ""); eq(s2, "")
+    i1 = ns.ProfIconCells({ profs = { Mining = 99 }, prof1 = "Mining" })
+    eq(i1, "|TInterface\\Icons\\Trade_Mining:14:14:0:0:64:64:5:59:5:59|t", "else the game's icon for it")
+    i1, s1 = ns.ProfIconCells({ profs = { Engineering = 107 }, prof1 = "Engineering", prof2 = "Leatherworking" })
+    eq(s1, "107"); eq((select(4, ns.ProfIconCells({ profs = {}, prof1 = "Engineering" }))), "")
+
+    local GOLD = "|TInterface\\MoneyFrame\\UI-GoldIcon:0:0:2:0|t"
+    eq(ns.GoldShort(12345678), "1234" .. GOLD, "silver and copper left out")
+    eq(ns.GoldShort(10000), "1" .. GOLD)
+    eq(ns.GoldShort(9999), "9999c", "under a gold: as the game writes it")
+    BreakUpLargeNumbers = function(n) return "1,234" end
+    ns = wow.load(FILES)
+    eq(ns.GoldShort(12345678), "1,234" .. GOLD, "thousands grouped as the game groups them")
+    BreakUpLargeNumbers = nil
+end)
+
 test("main professions are the first two the game lists", function()
     local ns = wow.load(FILES)
     wow.profs = { { "Engineering", 107 }, { "Mining", 99 }, { "Cooking", 35 } }
@@ -239,16 +266,21 @@ test("overview rows: you first, then by level; totals gold", function()
     wow.money = 1234
     wow.profs = { { "Engineering", 107 }, { "Mining", 99 } }
     wow.login(overviewAlts())
+    -- Engineering's icon as the skill scan recorded it; Mining's from the game's own list.
+    AltsForeverDB.profArt = { Engineering = "202;136243" }
     SlashCmdList.ALTSFOREVER("")
     local rows = overviewRows()
     eq(#rows, 4)
     eq(cell(rows[1], 1), "[MAGE]Aldric"); eq(cell(rows[1], 19), "|cff20ff20Online|r")
-    eq(cell(rows[1], 8), "|cffc0c0c0Engineering|r"); eq(cell(rows[1], 9), "107")
-    eq(cell(rows[1], 10), "|cffc0c0c0Mining|r"); eq(cell(rows[1], 11), "99")
+    eq(cell(rows[1], 8), "|T136243:14:14:0:0:64:64:5:59:5:59|t", "a profession shows as its icon")
+    eq(cell(rows[1], 9), "107")
+    eq(cell(rows[1], 10), "|TInterface\\Icons\\Trade_Mining:14:14:0:0:64:64:5:59:5:59|t", "else the game's icon for it")
+    eq(cell(rows[1], 11), "99")
     eq(cell(rows[2], 1), "[MAGE]Far"); eq(cell(rows[2], 2), "60"); eq(cell(rows[2], 3), G .. "-|r")
     eq(cell(rows[3], 1), "[PRIEST]High")
     eq(cell(rows[3], 3), "|cff4da6ff150%|r", "was already full")
     eq(cell(rows[3], 17), "Orgrimmar"); eq(cell(rows[3], 19), "3h ago")
+    eq(cell(rows[3], 7), "1|TInterface\\MoneyFrame\\UI-GoldIcon:0:0:2:0|t", "gold to the whole gold")
     eq(cell(rows[4], 1), "[ROGUE]Low"); eq(cell(rows[4], 2), "12")
     eq(rows[4].pct.text, G .. "10%|r", "the percentage in its own cell, so they line up")
     eq(rows[2].pct.text, "", "none at max level")
@@ -786,9 +818,9 @@ test("columns can be hidden from the titles' right-click menu, and brought back"
     eq(row.cells[7].shown, false, "the cell")
     eq(f.titles[7].shown, false, "its title")
     eq(f.sorts.gold.shown, false, "and the button on it")
-    eq(row.cells[8].point[4], profX - 120, "the columns after it close up")
+    eq(row.cells[8].point[4], profX - 70, "the columns after it close up")
     eq(row.cells[6].point[4], goldX - 60, "those before stay")
-    eq(f.width, full - 120, "and the window is that much narrower")
+    eq(f.width, full - 70, "and the window is that much narrower")
 
     -- Professions is four cells; Level takes its percentage with it.
     columnsMenu("Professions").setSelected()

@@ -30,13 +30,16 @@ local COLUMNS = {
     -- values under wider titles, so both are centred.
     { title = L["Well Rested"], width = 84, center = true, sort = "wellRested", id = "wellrested" },
     { title = L["Legacy"], width = 60, center = true, sort = "legacy", id = "legacy" },
-    { title = L["Gold"], width = 120, right = true, sort = "gold", id = "gold" },
-    -- Each main profession gets a name column and a right-aligned skill column, so
-    -- the skill numbers line up. The gap separates it from the right-aligned gold.
-    { title = L["Professions"], width = 104, gap = 16, id = "professions" },
-    { title = "", width = 34, right = true, id = "professions" },
-    { title = "", width = 104, gap = 16, id = "professions" },
-    { title = "", width = 34, right = true, id = "professions" },
+    -- Whole gold only (ns.GoldShort): the row tooltip has it to the copper.
+    { title = L["Gold"], width = 70, right = true, sort = "gold", id = "gold" },
+    -- Each main profession gets its icon and its skill (ns.ProfIconCells), so the skill
+    -- numbers line up; the row tooltip names them. The gap separates it from the
+    -- right-aligned gold. `cell`: the text's width where it isn't width - 8; `titleWidth`:
+    -- the title runs over the cells after it, which have none.
+    { title = L["Professions"], width = 20, cell = 16, titleWidth = 120, gap = 16, id = "professions" },
+    { title = "", width = 30, id = "professions" },
+    { title = "", width = 20, cell = 16, gap = 6, id = "professions" },
+    { title = "", width = 30, id = "professions" },
     { title = L["Mail"], width = 60, gap = 16, sort = "mail", id = "mail" },
     -- Free slots of all slots (bags without the keyring; bank tabs as last visited), as
     -- Altoholic shows them; pointing at one lists each bag (a player's request, 2026-11-19).
@@ -158,6 +161,43 @@ function ns.ProfCells(c)
     local n1, s1 = Cell(c.prof1)
     local n2, s2 = Cell(c.prof2)
     return n1, s1, n2, s2
+end
+
+-- The overview's four profession cells: icon, skill, icon, skill (the names take room the
+-- other columns need; owner, 2026-11-24, after a player asked for a narrower window). An
+-- icon's text is kept per profession, so a refresh builds none; a profession without one
+-- (Recipes.lua's ns.ProfessionArt finds none) shows its first three letters.
+local profIcons = {}
+local function ProfIcon(name)
+    local text = profIcons[name]
+    if text then return text end
+    local icon = ns.ProfessionArt and select(2, ns.ProfessionArt(name))
+    if not icon then return LIGHT .. name:sub(1, 3) .. "|r" end
+    text = "|T" .. icon .. ":14:14:0:0:64:64:5:59:5:59|t"
+    profIcons[name] = text
+    return text
+end
+
+function ns.ProfIconCells(c)
+    local p = c.profs
+    if not p then return GREY .. "?|r", "", "", "" end
+    if not c.prof1 and not c.prof2 then return GREY .. "-|r", "", "", "" end
+    local function Cell(name)
+        if not name then return "", "" end
+        return ProfIcon(name), tostring(p[name] or "?")
+    end
+    local i1, s1 = Cell(c.prof1)
+    local i2, s2 = Cell(c.prof2)
+    return i1, s1, i2, s2
+end
+
+-- Gold in the overview's narrow column: whole gold with the coin ("1,234" and the gold
+-- icon); under a gold, silver and copper as the game writes them.
+local GOLD_ICON = "|TInterface\\MoneyFrame\\UI-GoldIcon:0:0:2:0|t"
+local BigNumber = BreakUpLargeNumbers or tostring
+function ns.GoldShort(copper)
+    if copper >= 10000 then return BigNumber(floor(copper / 10000)) .. GOLD_ICON end
+    return GetCoinTextureString(copper)
 end
 
 -- Time until the soonest valuable mail expires; blank if none, "?" if the mailbox
@@ -574,7 +614,7 @@ local function CreateCells(parent, font)
     for i, col in ipairs(COLUMNS) do
         local fs = parent:CreateFontString(nil, "OVERLAY", font)
         ns.SkinText(fs)
-        fs:SetWidth(col.width - 8)
+        fs:SetWidth(col.cell or col.width - 8)
         fs:SetJustifyH(col.right and "RIGHT" or col.center and "CENTER" or "LEFT")
         fs:SetWordWrap(false)
         cells[i] = fs
@@ -1033,7 +1073,7 @@ function Refresh()
             -- A total only when there's something to add up: one character's is on their row,
             -- unless the group is collapsed.
             local sum = hidden or count[group] > 1
-            head.gold:SetText(sum and GetCoinTextureString(gold[group]) or "")
+            head.gold:SetText(sum and ns.GoldShort(gold[group]) or "")
             head.texts[13]:SetText(sum and SpaceSum("bags", group) or "")
             head.texts[14]:SetText(sum and SpaceSum("bank", group) or "")
             head:Show()
@@ -1055,8 +1095,8 @@ function Refresh()
         local points, rank = ns.LegacyCells(c)
         cells[5]:SetText(rank)
         cells[6]:SetText(points)
-        cells[7]:SetText(c.money and GetCoinTextureString(c.money) or (GREY .. "?|r"))
-        local n1, s1, n2, s2 = ns.ProfCells(c)
+        cells[7]:SetText(c.money and ns.GoldShort(c.money) or (GREY .. "?|r"))
+        local n1, s1, n2, s2 = ns.ProfIconCells(c)
         cells[8]:SetText(n1)
         cells[9]:SetText(s1)
         cells[10]:SetText(n2)
@@ -1399,6 +1439,7 @@ local function CreateWindow()
     for i, fs in ipairs(f.titles) do
         local col = COLUMNS[i]
         fs:SetText(col.title)
+        if col.titleWidth then fs:SetWidth(col.titleWidth) end
         if col.sort then
             -- The title is a button: click to order by this column, again to turn it round.
             local b = CreateFrame("Button", nil, header)
