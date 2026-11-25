@@ -219,7 +219,7 @@ test("Escape closes the window on top first, then the overview", function()
     eq(AltsForeverBagsFrame:IsShown(), true)
     eq(pressEscape(), true)
     eq(AltsForeverBagsFrame:IsShown(), false, "the windows on top close")
-    eq(AltsForeverGearFrame:IsShown(), false)
+    eq(AltsForeverCharacterFrame:IsShown(), false)
     eq(AltsForeverFrame:IsShown(), true, "the overview stays")
     eq(pressEscape(), true)
     eq(AltsForeverFrame:IsShown(), false, "and closes on the next press")
@@ -1128,4 +1128,40 @@ test("the Full in column: how long until rested XP is full, orange outside an in
     eq(cell(of("Aldric"), 4), O .. "40d 0h|r", "you: none yet, outside an inn, if you logged out now")
     click("restedFull")
     eq(overviewNames(), "High, Low, Aldric, Far", "full already first, then soonest; max level last")
+end)
+
+test("a one-time hint that columns can be hidden: shown on the first opening only, gone once used", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.login(overviewAlts())
+    SlashCmdList.ALTSFOREVER("")
+    local f = AltsForeverFrame
+    local hint = f.hint
+    assert(hint and hint:IsShown(), "shown the first time")
+    eq(hint.text:GetText(), "Tip: right-click the column titles to choose which columns show.")
+    -- The words wrap to the box, which is as tall as they are (measured as it shows), with
+    -- the game's tip arrow pointing up at the titles.
+    eq(hint.text.width, 196)
+    hint.text.stringHeight = 42
+    hint:Hide(); hint:Show()
+    eq(hint:GetHeight(), 72, "two lines and the padding: nothing cut off")
+    eq(hint.arrow.point[1], "BOTTOM")
+    eq(ns.db.columnsHintSeen, true, "remembered as soon as it shows")
+    columnsMenu("Gold")
+    eq(hint:IsShown(), false, "using the columns menu puts it away")
+    f:Hide()
+    f:Show()
+    eq(hint:IsShown(), false, "not again")
+    -- Closed with its cross, and not shown to a saved file that has seen it.
+    wow.load(FILES)
+    local saved = overviewAlts()
+    wow.login(saved)
+    SlashCmdList.ALTSFOREVER("")
+    AltsForeverFrame.hint.close.scripts.OnClick(AltsForeverFrame.hint.close)
+    eq(AltsForeverFrame.hint:IsShown(), false, "the cross closes it")
+    wow.load(FILES)
+    saved.columnsHintSeen = true
+    wow.login(saved)
+    SlashCmdList.ALTSFOREVER("")
+    eq(AltsForeverFrame.hint, nil, "never made for a file that has seen it")
 end)

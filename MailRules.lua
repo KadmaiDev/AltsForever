@@ -170,12 +170,7 @@ local Changed -- below: refreshes the mailbox and the window
 
 -- Whether two characters share a mailbox world: the same ruleset and faction (unknown
 -- counts as the same, as ns.Elsewhere does).
-local function SameWorld(a, b)
-    if a.realm and b.realm and a.realm ~= b.realm and ns.RulesetOf(a.realm) ~= ns.RulesetOf(b.realm) then
-        return false
-    end
-    return not (a.faction and b.faction and a.faction ~= b.faction)
-end
+local SameWorld = ns.SameWorld -- Core.lua
 
 -- Sends a rule's items to `key` (on) or stops sending them to `key` (off). `example` is an
 -- item the rule covers, for a category's icon. Turning it on replaces the name in key's

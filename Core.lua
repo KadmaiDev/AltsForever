@@ -215,6 +215,7 @@ local CHAR_FIELDS = {
     layout = "table", profs = "table", profMax = "table", recipes = "table", crafts = "table",
     reps = "table", duraSlots = "table", saves = "table", saveKills = "table",
     account = "string", runs = "table", recipesAt = "table", links = "table", cooldowns = "table",
+    skills = "table",
 }
 local DB_FIELDS = {
     icons = "table", goldDays = "table", goldDaysBy = "table", factions = "table",
@@ -228,6 +229,7 @@ local DB_FIELDS = {
     inspectAnvilsOff = "boolean", overviewSort = "string", overviewSortRev = "boolean",
     windows = "table", pinned = "table", hiddenColumns = "table",
     mailRules = "table", mailFillOff = "boolean", mailPackOff = "boolean", weights = "table",
+    columnsHintSeen = "boolean", otherCharsOff = "boolean", otherGold = "boolean",
 }
 
 -- Keeps only entries whose key and value are of these types (value nil = any).
@@ -252,6 +254,7 @@ local function RepairChar(c)
     if c.recipes then KeepOnly(c.recipes, "string", "table") end
     if c.crafts then KeepOnly(c.crafts, "string", "table") end
     if c.recipesAt then KeepOnly(c.recipesAt, "string", "number") end
+    if c.skills then KeepOnly(c.skills, "number", "number") end
     if c.cooldowns then
         KeepOnly(c.cooldowns, "string", "table")
         for prof, t in pairs(c.cooldowns) do
@@ -435,6 +438,15 @@ end
 
 -- Out of mail's reach from the character you're on: another ruleset or the other faction
 -- (each known for both).
+-- Whether two characters share a world: mail and trade reach each other (the same ruleset
+-- when both realms are known, and the same faction when both are known).
+function ns.SameWorld(a, b)
+    if a.realm and b.realm and a.realm ~= b.realm and ns.RulesetOf(a.realm) ~= ns.RulesetOf(b.realm) then
+        return false
+    end
+    return not (a.faction and b.faction and a.faction ~= b.faction)
+end
+
 function ns.Elsewhere(c)
     local me = ns.char
     if not me or c == me then return false end
@@ -453,6 +465,22 @@ function ns.SetOtherRulesets(on)
     ns.db.otherRulesets = on and true or nil
     ns.InvalidateCache()
     if ns.UpgradesChanged then ns.UpgradesChanged() end
+end
+
+-- The overview has its own two (a player's request, 2026-11-25: gold from characters you
+-- can't trade with made the totals wrong): their rows (shown unless db.otherCharsOff) and
+-- their gold in totals (counted only with db.otherGold).
+function ns.OtherCharsShown() return not ns.db.otherCharsOff end
+function ns.OtherGoldCounted() return ns.db.otherGold == true end
+
+function ns.SetOtherChars(on)
+    ns.db.otherCharsOff = not on or nil
+    if ns.RefreshOverview then ns.RefreshOverview() end
+end
+
+function ns.SetOtherGold(on)
+    ns.db.otherGold = on and true or nil
+    if ns.RefreshOverview then ns.RefreshOverview() end
 end
 
 -- Which ruleset the game says it's running ("pvp", "rp", "hardcore", "normal"), as Nova
@@ -765,7 +793,19 @@ function commands.skillups()
     TipPrint(ns.db.skillupsOff and L["Skill-up details in tooltips off."] or L["Skill-up details in tooltips on."])
 end
 
-function commands.rulesets()
+-- /af rulesets: in tooltips; /af rulesets overview: their rows; /af rulesets gold: their
+-- gold in totals.
+function commands.rulesets(arg)
+    arg = (arg or ""):lower():match("^%s*(%a*)") or ""
+    if arg == "overview" then
+        ns.SetOtherChars(not ns.OtherCharsShown())
+        return Print(ns.OtherCharsShown() and L["Characters on other rulesets or factions are shown in the overview."]
+            or L["Characters on other rulesets or factions are hidden in the overview."])
+    elseif arg == "gold" then
+        ns.SetOtherGold(not ns.OtherGoldCounted())
+        return Print(ns.OtherGoldCounted() and L["Gold totals include characters on other rulesets or factions."]
+            or L["Gold totals count only characters you can mail from here."])
+    end
     ns.SetOtherRulesets(not ns.OtherRulesetsOn())
     TipPrint(ns.OtherRulesetsOn() and L["Characters on other rulesets or factions are shown in tooltips."]
         or L["Characters on other rulesets or factions are hidden in tooltips."])

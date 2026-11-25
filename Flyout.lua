@@ -207,7 +207,18 @@ local function Glyph(b, side, inside)
     g.inside = inside
     -- Beside a side column the anvil sits at the slot's top, with its chevrons under it:
     -- there's only an anvil's width between the left column and the window's edge.
-    if inside then
+    -- "stack" (the character window's Character page, Sheets.lua): inside the columns, the
+    -- chevrons under the anvil, so the facts between keep their room.
+    local stack = inside == "stack"
+    if stack then
+        if side == "left" then
+            g:SetPoint("TOPLEFT", b, "TOPRIGHT", 3, 0)
+        elseif side == "right" then
+            g:SetPoint("TOPRIGHT", b, "TOPLEFT", -3, 0)
+        else
+            g:SetPoint("TOP", b, "BOTTOM", 0, -2)
+        end
+    elseif inside then
         local gap = _G.EllesmereUI and 24 or 5
         if side == "left" then
             g:SetPoint("TOPLEFT", b, "TOPRIGHT", gap, 1)
@@ -233,9 +244,9 @@ local function Glyph(b, side, inside)
     -- beside it, they went past the window's edge); beside it under the weapons.
     -- Inside (the inspect window) always beside it, on the row of the item level: EllesmereUI
     -- writes the item's enchant on the row below (owner's screenshot, 2026-11-11).
-    if side == "bottom" or (inside and side == "left") then
+    if side == "bottom" or (inside and not stack and side == "left") then
         g.tier:SetPoint("LEFT", g, "RIGHT", -3, -2)
-    elseif inside then
+    elseif inside and not stack then
         g.tier:SetPoint("RIGHT", g, "LEFT", 3, -2)
     else
         g.tier:SetPoint("TOP", g, "BOTTOM", 0, 3)
@@ -263,7 +274,7 @@ function ns.AnvilsOn() return not ns.db.anvilsOff end
 -- and binds when equipped.
 local function Group(list, into)
     for _, e in ipairs(list) do
-        if e.boe and not e.at and e.slot then
+        if e.boe and not e.at and not e.train and e.slot then
             local t = into[e.slot]
             if not t then
                 t = {}
@@ -298,6 +309,26 @@ local function Mark(prefix, lists, who)
         local g = panel.glyph
         if g and g:IsShown() then ShowPanel(g) else HidePanel() end
     end
+end
+
+-- The character window's Character page (Sheets.lua) uses the same anvils and panel.
+ns.GroupCraftable = Group
+function ns.CraftSlotGlyph(b, side) return Glyph(b, side, "stack") end
+function ns.SetCraftGlyph(g, slot, lists, who)
+    local has = lists[slot] ~= nil
+    g.slot, g.lists, g.who = slot, lists, who
+    g:SetShown(has)
+    if has then g.tier:SetTexture(ns.GainTexture(lists[slot][1].gain)) end -- best first
+end
+-- After the page's anvils are set: an open panel follows its own, or closes.
+function ns.FollowCraftPanel(owner)
+    local g = panel and panel:IsShown() and panel.glyph
+    if not g or g:GetParent():GetParent() ~= owner then return end
+    if g:IsShown() then ShowPanel(g) else HidePanel() end
+end
+function ns.HideCraftPanel(owner)
+    local g = panel and panel.glyph
+    if g and g:GetParent():GetParent() == owner then HidePanel() end
 end
 
 local function RefreshDoll()
@@ -453,11 +484,13 @@ end
 function ns.CharacterSheetChanged()
     RefreshDoll()
     RefreshInspect()
+    if ns.CharacterFactsChanged then ns.CharacterFactsChanged() end -- the character window's anvils
 end
 
 function ns.SetAnvils(on)
     ns.db.anvilsOff = not on or nil
     RefreshDoll()
+    if ns.CharacterFactsChanged then ns.CharacterFactsChanged() end
 end
 
 function ns.SetInspectAnvils(on)

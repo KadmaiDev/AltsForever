@@ -1,6 +1,6 @@
 -- Alts Forever gear: records what each character is wearing (item links per slot, so
--- suffixes and enchants survive) and durability, and shows it in a character-sheet
--- style panel opened by clicking a character in the overview.
+-- suffixes and enchants survive) and durability, shown on the character window's
+-- Character page (Sheets.lua), opened by clicking a character in the overview.
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
@@ -13,19 +13,14 @@ local GetItemInfoInstant = C_Item.GetItemInfoInstant
 
 local GREY = "|cff9d9d9d"
 local LOW_DURABILITY = 20
-local PANEL_WIDTH = 440
 
--- Slot IDs with the names GetInventorySlotInfo knows them by (for the empty-slot art),
--- laid out like the game's character panel.
+-- The slots read (Sheets.lua lays them out, with the names GetInventorySlotInfo knows).
 local SLOT_NAMES = {
     [1] = "HeadSlot", [2] = "NeckSlot", [3] = "ShoulderSlot", [4] = "ShirtSlot", [5] = "ChestSlot",
     [6] = "WaistSlot", [7] = "LegsSlot", [8] = "FeetSlot", [9] = "WristSlot", [10] = "HandsSlot",
     [11] = "Finger0Slot", [12] = "Finger1Slot", [13] = "Trinket0Slot", [14] = "Trinket1Slot",
     [15] = "BackSlot", [16] = "MainHandSlot", [17] = "SecondaryHandSlot", [18] = "RangedSlot", [19] = "TabardSlot",
 }
-local LEFT = { 1, 2, 3, 15, 5, 4, 19, 9 }
-local RIGHT = { 10, 6, 7, 8, 11, 12, 13, 14 }
-local BOTTOM = { 16, 17, 18 }
 
 ---------------------------------------------------------------------------
 -- Recording
@@ -87,142 +82,10 @@ function ns.DurabilityText(pct)
     return color .. pct .. "%|r"
 end
 
----------------------------------------------------------------------------
--- Panel
----------------------------------------------------------------------------
-local panel, buttons, shownKey
-
-local function Hover(button)
-    if not button.link then return end
-    GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
-    GameTooltip:SetHyperlink(button.link)
-    GameTooltip:Show()
-end
-
-local function Click(button)
-    -- Shift-click links the item in chat, like the game's own panels.
-    if button.link and IsModifiedClick() then HandleModifiedItemClick(button.link) end
-end
-
-local function CreateSlot(slot, x, y, nameSide)
-    local b = CreateFrame("Button", nil, panel)
-    b:SetSize(36, 36)
-    b:SetPoint("TOPLEFT", panel, "TOPLEFT", x, y)
-    b.icon = b:CreateTexture(nil, "ARTWORK")
-    b.icon:SetAllPoints()
-    local hl = b:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetAllPoints()
-    hl:SetColorTexture(1, 1, 1, 0.15)
-    ns.SkinItemSlot(b)
-    if nameSide then
-        b.name = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        ns.SkinText(b.name)
-        b.name:SetWidth(150)
-        b.name:SetWordWrap(false)
-        if nameSide == "RIGHT" then
-            b.name:SetPoint("LEFT", b, "RIGHT", 6, 0)
-            b.name:SetJustifyH("LEFT")
-        else
-            b.name:SetPoint("RIGHT", b, "LEFT", -6, 0)
-            b.name:SetJustifyH("RIGHT")
-        end
-    end
-    local ok, _, emptyTexture = pcall(GetInventorySlotInfo, SLOT_NAMES[slot])
-    b.emptyArt = ok and emptyTexture or nil
-    b.slot = slot
-    b:SetScript("OnEnter", Hover)
-    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    b:SetScript("OnClick", Click)
-    buttons[slot] = b
-end
-
-local function CreatePanel()
-    local f = ns.NewWindow("AltsForeverGearFrame")
-    panel = f
-    buttons = {}
-    f:SetSize(PANEL_WIDTH, 450)
-    f:SetFrameStrata("HIGH")
-    -- Comes to the front when clicked or opened, so our windows never draw through each other.
-    f:SetToplevel(true)
-    f:HookScript("OnShow", f.Raise)
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
-    f:SetClampedToScreen(true)
-    f.title = f.TitleText or f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    if not f.TitleText then f.title:SetPoint("TOP", 0, -6) end
-
-    for i, slot in ipairs(LEFT) do CreateSlot(slot, 14, -34 - (i - 1) * 42, "RIGHT") end
-    for i, slot in ipairs(RIGHT) do CreateSlot(slot, PANEL_WIDTH - 14 - 36, -34 - (i - 1) * 42, "LEFT") end
-    for i, slot in ipairs(BOTTOM) do CreateSlot(slot, PANEL_WIDTH / 2 - 64 + (i - 1) * 46, -34 - 8 * 42 - 4) end
-
-    f.footer = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    f.footer:SetPoint("BOTTOM", f, "BOTTOM", 0, 14)
-    f.empty = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    f.empty:SetPoint("CENTER")
-    f.empty:SetText(GREY .. L["No gear recorded yet.\nLog in on this character once."] .. "|r")
-
-    ns.EscapeCloses(f)
-    ns.SkinWindow(f)
-    f:Hide()
-    ns.GamepadWindow(f)
-    ns.ScaleWindow(f)
-end
-
-local function Fill()
-    local c = ns.db.chars[shownKey]
-    if not c then return panel:Hide() end
-    local gear = c.gear
-    panel.title:SetText(ns.ColoredName(shownKey, c) .. (c.ilvl and (GREY .. "  " .. L["ilvl %s"]:format(c.ilvl) .. "|r") or ""))
-    panel.empty:SetShown(not gear)
-    for slot, b in pairs(buttons) do
-        local link = gear and gear[slot]
-        b.link = link
-        local id, _, _, _, icon = nil, nil, nil, nil, nil
-        if link then id, _, _, _, icon = GetItemInfoInstant(link) end
-        if icon then
-            b.icon:SetTexture(icon)
-            ns.SlotQuality(b, id and C_Item.GetItemQualityByID and C_Item.GetItemQualityByID(id))
-        elseif not ns.SlotEmpty(b, b.emptyArt) then
-            b.icon:SetTexture(b.emptyArt)
-        end
-        local pct = c.duraSlots and c.duraSlots[slot]
-        -- Nearly broken items are tinted red, as on the game's own panel.
-        if pct and pct < LOW_DURABILITY then b.icon:SetVertexColor(1, 0.3, 0.3) else b.icon:SetVertexColor(1, 1, 1) end
-        if b.name then b.name:SetText(link and ns.LinkName(link) or "") end
-    end
-    panel.footer:SetText(gear and (L["Lowest durability: %s"]:format(ns.DurabilityText(c.dura))) or "")
-end
-
-local function Num(x) return type(x) == "number" and not issecretvalue(x) and x end
-
--- Opens the gear panel for a character, beside the overview if it's open; clicking
--- the same character again closes it. With `beside` (the search), next to that window on
--- `side` ("LEFT" or "RIGHT"), or the other side if there's no room on the screen.
+-- The gear is shown on the character window's Character page (Sheets.lua). Clicking the
+-- same character again closes it; with `beside` (the search), next to that window.
 function ns.ShowGear(key, beside, side)
-    if not panel then CreatePanel() end
-    if panel:IsShown() and shownKey == key and not beside then return panel:Hide() end
-    shownKey = key
-    panel:ClearAllPoints()
-    if beside then
-        local width, screen = panel:GetWidth(), UIParent:GetWidth() / ns.WindowScale()
-        local left, right = Num(beside:GetLeft()), Num(beside:GetRight())
-        if side == "RIGHT" and right and width and right + 4 + width > screen then side = "LEFT" end
-        if side == "LEFT" and left and width and left - 4 - width < 0 then side = "RIGHT" end
-        if side == "LEFT" then
-            panel:SetPoint("TOPRIGHT", beside, "TOPLEFT", -4, 0)
-        else
-            panel:SetPoint("TOPLEFT", beside, "TOPRIGHT", 4, 0)
-        end
-    elseif AltsForeverFrame and AltsForeverFrame:IsShown() then
-        panel:SetPoint("TOPLEFT", AltsForeverFrame, "TOPRIGHT", 4, 0)
-    else
-        panel:SetPoint("CENTER")
-    end
-    Fill()
-    panel:Show()
+    return ns.ShowCharacter(key, "character", nil, false, beside, side)
 end
 
 function ns.StartGear()
@@ -242,7 +105,7 @@ function ns.StartGear()
         end
         -- Upgrades depend on the links only, not on durability ticks.
         if changed and ns.UpgradesChanged then ns.UpgradesChanged() end
-        if panel and panel:IsShown() and shownKey == ns.charKey then Fill() end
+        if ns.CharacterWindowChanged then ns.CharacterWindowChanged() end
     end
     Retry = function()
         waiting = false

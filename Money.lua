@@ -131,10 +131,18 @@ function ns.AddMoneyLines(tt)
     end
     sort(order, ByMoney)
 
+    -- Characters you can't mail count towards the total only if the player says so (shown
+    -- below it or not).
+    local away = 0
+    if ns.OtherGoldCounted() then
+        for key, c in pairs(chars) do
+            if key ~= ns.charKey and c.money and c.money > 0 and ns.Elsewhere(c) then away = away + c.money end
+        end
+    end
     local mine = ns.char.money or 0
     tt:AddLine(L["Gold"], 1, 0.82, 0)
-    if n > 0 then
-        tt:AddDoubleLine(L["Total"], Coins(total + mine), 1, 0.82, 0, 1, 1, 1)
+    if n > 0 or away > 0 then
+        tt:AddDoubleLine(L["Total"], Coins(total + mine + away), 1, 0.82, 0, 1, 1, 1)
     end
     tt:AddDoubleLine(ns.ColoredName(ns.charKey, ns.char), Coins(mine), 1, 1, 1, 1, 1, 1)
     for i = 1, n do

@@ -27,6 +27,11 @@ function ns.Standing(value)
     return 1, THRESHOLDS[1], THRESHOLDS[2]
 end
 
+-- A level's name (the game's word) and colour as "rrggbb".
+function ns.StandingLabel(level)
+    return _G["FACTION_STANDING_LABEL" .. level] or LABELS[level], COLORS[level]
+end
+
 -- "Honored 27%" in the level's colour; Exalted on its own.
 function ns.StandingText(value)
     local level, low, high = ns.Standing(value)
@@ -286,6 +291,7 @@ function ns.StartReputation()
         pending = false
         ns.ScanReputation(char)
         if panel and panel:IsShown() then Fill() end
+        if ns.CharacterWindowChanged then ns.CharacterWindowChanged() end
     end
     ns.On("UPDATE_FACTION", function()
         if pending or not C_Timer then return end

@@ -976,8 +976,115 @@ function ns.FillColumnsMenu(menu)
     end
 end
 
+-- A one-time hint that columns can be hidden (owner, 2026-11-25: players kept missing it).
+-- Our own callout under the titles, not Blizzard's HelpTip, whose shared frames would run
+-- our code in theirs. Shown the first time the overview opens after this was added, once
+-- per saved file (db.columnsHintSeen is set as it shows); it goes when closed, when the
+-- columns menu is used, or with the window.
+local function HideHint()
+    if frame and frame.hint then frame.hint:Hide() end
+end
+
+-- The game's help-tip art (Blizzard_HelpPlate.xml, forever branch: GlowBoxTemplate and
+-- GlowBoxArrowTemplate), drawn from its texture files and coordinates by our own code, so
+-- nothing of Blizzard's tip system runs.
+local PARTS = "Interface\\TalentFrame\\TalentFrame-Parts"
+local HORIZ = "Interface\\TalentFrame\\TalentFrame-Horizontal2"
+local VERT = "Interface\\TalentFrame\\TalentFrame-Vertical2"
+local HINT_W, HINT_TEXT_W = 240, 196
+
+local function HintPart(h, layer, sub, file, l, r, t, b, w, ht)
+    local tex = h:CreateTexture(nil, layer, nil, sub)
+    tex:SetTexture(file)
+    tex:SetTexCoord(l, r, t, b)
+    if w then tex:SetSize(w, ht) end
+    return tex
+end
+
+local function MakeHint(f)
+    local h = CreateFrame("Frame", nil, f)
+    h:SetFrameLevel(f:GetFrameLevel() + 40)
+    h:SetWidth(HINT_W)
+    -- Under the titles, a little in, so the arrow points up at them.
+    h:SetPoint("TOPLEFT", f.header, "BOTTOMLEFT", 90, -17)
+    h:EnableMouse(true)
+    -- The box: dark gold fading to black, with a yellow glow round it.
+    local bg = h:CreateTexture(nil, "BACKGROUND")
+    bg:SetPoint("TOPLEFT", 1, -1)
+    bg:SetPoint("BOTTOMRIGHT", -1, 1)
+    bg:SetColorTexture(1, 1, 1, 1)
+    if bg.SetGradient and CreateColor then
+        pcall(bg.SetGradient, bg, "VERTICAL", CreateColor(0, 0, 0, 1), CreateColor(0.23, 0.19, 0, 1))
+    else
+        bg:SetColorTexture(0.1, 0.08, 0, 1)
+    end
+    local tl = HintPart(h, "BACKGROUND", -1, PARTS, 0.91796875, 0.96093750, 0.65625000, 0.67773438, 11, 11)
+    tl:SetPoint("TOPLEFT", -6, 6)
+    local tr = HintPart(h, "BACKGROUND", -1, PARTS, 0.12890625, 0.17187500, 0.96679688, 0.98828125, 11, 11)
+    tr:SetPoint("TOPRIGHT", 6, 6)
+    local bl = HintPart(h, "BACKGROUND", -1, PARTS, 0.30859375, 0.35156250, 0.96679688, 0.98828125, 11, 11)
+    bl:SetPoint("BOTTOMLEFT", -6, -6)
+    local br = HintPart(h, "BACKGROUND", -1, PARTS, 0.94921875, 0.99218750, 0.32226563, 0.34375000, 11, 11)
+    br:SetPoint("BOTTOMRIGHT", 6, -6)
+    local top = HintPart(h, "BACKGROUND", -1, HORIZ, 0, 1, 0.29687500, 0.33984375)
+    top:SetPoint("TOPLEFT", tl, "TOPRIGHT")
+    top:SetPoint("BOTTOMRIGHT", tr, "BOTTOMLEFT")
+    local bottom = HintPart(h, "BACKGROUND", -1, HORIZ, 0, 1, 0.24609375, 0.28906250)
+    bottom:SetPoint("TOPLEFT", bl, "TOPRIGHT")
+    bottom:SetPoint("BOTTOMRIGHT", br, "BOTTOMLEFT")
+    local left = HintPart(h, "BACKGROUND", -1, VERT, 0.25781250, 0.30078125, 0, 1)
+    left:SetPoint("TOPLEFT", tl, "BOTTOMLEFT")
+    left:SetPoint("BOTTOMRIGHT", bl, "TOPRIGHT")
+    local right = HintPart(h, "BACKGROUND", -1, VERT, 0.20703125, 0.25000000, 0, 1)
+    right:SetPoint("TOPLEFT", tr, "BOTTOMLEFT")
+    right:SetPoint("BOTTOMRIGHT", br, "TOPRIGHT")
+    for _, t in ipairs({ tl, tr, bl, br, top, bottom, left, right }) do t:SetBlendMode("ADD") end
+    -- The arrow over the box, pointing up at the titles, with its glow.
+    local arrow = HintPart(h, "ARTWORK", 0, PARTS, 0.78515625, 0.99218750, 0.58789063, 0.54687500, 53, 21)
+    arrow:SetPoint("BOTTOM", h, "TOPLEFT", 46, -3)
+    local glow = HintPart(h, "BORDER", 0, PARTS, 0.40625000, 0.66015625, 0.82812500, 0.77343750, 65, 28)
+    glow:SetPoint("BOTTOM", arrow, "BOTTOM", 0, 0)
+    glow:SetBlendMode("ADD")
+    glow:SetAlpha(0.5)
+    h.arrow = arrow
+    -- The words, wrapped to the box; it's as tall as they need, measured once shown (a UI
+    -- addon may change the font first).
+    local text = h:CreateFontString(nil, "OVERLAY", "GameFontHighlightLeft")
+    text:SetPoint("TOPLEFT", 15, -15)
+    text:SetWidth(HINT_TEXT_W)
+    text:SetJustifyH("LEFT")
+    text:SetJustifyV("TOP")
+    text:SetWordWrap(true)
+    text:SetText(L["Tip: right-click the column titles to choose which columns show."])
+    ns.SkinText(text)
+    h.text = text
+    local close = CreateFrame("Button", nil, h, "UIPanelCloseButton")
+    close:SetSize(22, 22)
+    close:SetPoint("TOPRIGHT", 2, 2)
+    close:SetScript("OnClick", HideHint)
+    h.close = close
+    local function Fit()
+        local height = text:GetStringHeight()
+        if type(height) ~= "number" or issecretvalue(height) or height <= 0 then height = 28 end
+        h:SetHeight(height + 30)
+    end
+    h:SetScript("OnShow", Fit)
+    Fit()
+    h:Hide()
+    f.hint = h
+end
+
+local function MaybeHint(f)
+    local db = ns.db
+    if db.columnsHintSeen then return end
+    db.columnsHintSeen = true
+    if not f.hint then MakeHint(f) end
+    f.hint:Show()
+end
+
 local function ColumnsMenu(owner)
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+    HideHint()
     ns.OpenMenu(owner, function(_, root)
         root:CreateTitle(L["Columns"])
         ns.FillColumnsMenu(root)
@@ -1096,13 +1203,41 @@ function SpaceSum(which, group)
     return free and ns.SpaceCell(free, spaceTotal[which][group]) or ""
 end
 
+-- The overview's own list: ns.OverviewOrder without other rulesets and factions when the
+-- player hides them (the bags menu, search and export keep everyone). Reused.
+local kept = {}
+local function ShownKeys(chars)
+    local keys = ns.OverviewOrder()
+    local split = ns.overviewSplit
+    if ns.OtherCharsShown() then return keys, split, 0 end
+    for i = #kept, 1, -1 do kept[i] = nil end
+    local away, first, many = 0, nil, false
+    for _, key in ipairs(keys) do
+        local c = chars[key]
+        if ns.Elsewhere(c) then
+            away = away + 1
+        else
+            kept[#kept + 1] = key
+            local g = Group(c)
+            if first == nil then first = g elseif g ~= first then many = true end
+        end
+    end
+    -- Only one group left (yours): no headings.
+    return kept, split and many, away
+end
+
 function Refresh()
     if AutoChanged() then return ApplyColumns() end -- lays the window out again, then refreshes
     local now = time()
     local chars = ns.db.chars
-    local keys = ns.OverviewOrder()
-    local split = ns.overviewSplit
+    local keys, split, away = ShownKeys(chars)
+    local countAll = ns.OtherGoldCounted()
     local total, played = 0, 0
+    -- Gold over every character, shown or not: only those you can mail from here, unless
+    -- the player counts the rest too.
+    for _, c in pairs(chars) do
+        if c.money and (countAll or not ns.Elsewhere(c)) then total = total + c.money end
+    end
     -- Gold and characters per group, for the headings.
     local gold, count = {}, {}
     if split then
@@ -1174,7 +1309,6 @@ function Refresh()
         cells[20]:SetText(c.zone or (GREY .. "?|r"))
         cells[21]:SetText(ns.PlayedText(c, now))
         cells[22]:SetText(ns.SeenText(key, c, now))
-        total = total + (c.money or 0)
         played = played + (ns.PlayedNow(c, now) or 0)
         row:SetShown(not hidden)
     end
@@ -1183,10 +1317,12 @@ function Refresh()
     -- With only one character there's nothing to compare yet: say how to add the others.
     frame.credit:SetText(#keys == 1 and (GREY .. L["Log in on your other characters once to add them here."] .. "|r")
         or L["Alts Forever by Kadmai"])
-    -- Split by ruleset, each heading has its gold: one total would mix what can't be traded.
-    footer:SetText((instances and (instances .. "     ") or "")
+    -- Gold only from characters you can mail from here, unless the player counts the rest
+    -- too; each group's heading has its own.
+    footer:SetText((away > 0 and (GREY .. L["%d on other rulesets or factions hidden"]:format(away) .. "|r     ") or "")
+        .. (instances and (instances .. "     ") or "")
         .. L["Total played: %s"]:format(ns.FormatPlayed(played))
-        .. (split and "" or ("     " .. L["Total gold: %s"]:format(GetCoinTextureString(total)))))
+        .. "     " .. L["Total gold: %s"]:format(GetCoinTextureString(total)))
     frame:SetHeight(54 + y + 32)
 end
 
@@ -1656,9 +1792,10 @@ local function CreateWindow()
         ns.PruneSaves(time())
         MarkSort()
         Refresh()
+        MaybeHint(self)
     end)
     f:SetScript("OnHide", function()
-        if AltsForeverGearFrame then AltsForeverGearFrame:Hide() end
+        HideHint()
         if AltsForeverRepFrame then AltsForeverRepFrame:Hide() end
     end)
     -- Escape closes it, like Blizzard's own windows.
@@ -1743,6 +1880,7 @@ end
 
 -- `sorted`: the order was changed, so the arrow beside the column titles moves too.
 function ns.RefreshOverview(sorted)
+    if ns.CharacterFactsChanged then ns.CharacterFactsChanged() end -- the same facts, Sheets.lua
     if not (frame and frame:IsShown()) then return end
     if sorted then MarkSort() end
     Refresh()
@@ -1751,6 +1889,7 @@ end
 function ns.StartOverview()
     -- Keep an open window current; a closed or never-opened one costs nothing.
     local function Update()
+        if ns.CharacterFactsChanged then ns.CharacterFactsChanged() end
         if frame and frame:IsShown() then Refresh() end
     end
     for _, event in ipairs({ "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "PLAYER_MONEY", "ZONE_CHANGED_NEW_AREA", "SKILL_LINES_CHANGED" }) do

@@ -218,6 +218,8 @@ local MEANING = { [0] = L["Always a skill-up"], [1] = L["Usually a skill-up"], [
 
 local frame
 local shownKey, shownProf, selected
+local shownSheet = "professions" -- the page shown: an ns.SHEETS id (Sheets.lua) or "professions"
+local sheetPages = {}            -- [id] = that page's frame, made when first shown
 local searchText = ""
 local filters = {}
 local collapsed = {} -- category names folded away (this session)
@@ -615,6 +617,7 @@ local function MakeList(f)
             pad:SetShown(on)
         end
         f:HookScript("OnShow", Which)
+        f.whichFilter = Which
         -- The Gamepad UI switched on or off with the window open.
         ns.On("INPUT_DEVICE_INTERFACE_TRANSITION", function()
             if f:IsShown() then Which() end
@@ -874,16 +877,18 @@ end
 ---------------------------------------------------------------------------
 local function TabClick(tab, button, upInside)
     if upInside == false or (button and button ~= "LeftButton") then return end
-    if tab.prof and tab.prof ~= shownProf then
-        shownProf, selected, offset = tab.prof, nil, 0
-        Fill()
-    end
+    local sheet = tab.sheet or "professions"
+    if sheet == shownSheet and (tab.sheet or tab.prof == shownProf) then return end
+    shownSheet = sheet
+    if tab.prof and tab.prof ~= shownProf then shownProf, selected, offset = tab.prof, nil, 0 end
+    if SOUNDKIT and SOUNDKIT.IG_CHARACTER_INFO_TAB then PlaySound(SOUNDKIT.IG_CHARACTER_INFO_TAB) end
+    Fill()
 end
 
 local function TabEnter(tab)
-    if not tab.prof then return end
+    if not tab.label then return end
     GameTooltip:SetOwner(tab, "ANCHOR_RIGHT", -4, -4)
-    GameTooltip:AddLine(tab.prof)
+    GameTooltip:AddLine(tab.label)
     GameTooltip:Show()
 end
 
@@ -910,31 +915,55 @@ local function MakeTab(f, i)
         tab:SetScript("OnEnter", TabEnter)
         tab:SetScript("OnLeave", function() GameTooltip:Hide() end)
     end
-    if i == 1 then
-        tab:SetPoint("TOPLEFT", f, "TOPRIGHT", 0, -60)
-    else
-        tab:SetPoint("TOPLEFT", f.tabs[i - 1], "BOTTOMLEFT", 0, -2)
-    end
     f.tabs[i] = tab
     return tab
 end
 
+-- The tabs down the right edge: the character window's pages (Sheets.lua), then a gap and
+-- one per profession. Returns the professions' list (ns.RecipeTabs).
+-- Also notes in frame.tabsBottom how far down the tabs reach, so the window can be made at
+-- least that tall (a character with many professions ran past the shorter pages' bottom:
+-- owner's screenshot, 2026-11-25).
+local TABS_TOP, TAB_H = 60, 44
 local function ShowTabs(c)
     local list = ns.RecipeTabs(c)
-    for i, p in ipairs(list) do
-        local tab = frame.tabs[i] or MakeTab(frame, i)
-        local _, icon = Art(p.name)
-        tab.prof = p.name
-        tab.icon:SetTexture(icon or QUESTION)
-        tab:SetChecked(p.name == shownProf)
+    local n = 0
+    local bottom = TABS_TOP
+    local function Place(tab, gap)
+        local h = tab:GetHeight()
+        if type(h) ~= "number" or issecretvalue(h) or h <= 0 then h = TAB_H end
+        bottom = bottom + h + (n == 0 and 0 or (gap and 14 or 2))
+        n = n + 1
+        tab:ClearAllPoints()
+        if n == 1 then
+            tab:SetPoint("TOPLEFT", frame, "TOPRIGHT", 0, -TABS_TOP)
+        else
+            tab:SetPoint("TOPLEFT", frame.tabs[n - 1], "BOTTOMLEFT", 0, gap and -14 or -2)
+        end
         tab:Show()
     end
-    for i = #list + 1, #frame.tabs do frame.tabs[i]:Hide() end
+    for _, def in ipairs(ns.SHEETS or {}) do
+        local tab = frame.tabs[n + 1] or MakeTab(frame, n + 1)
+        tab.sheet, tab.prof, tab.label = def.id, nil, def.label
+        tab.icon:SetTexture(def.icon(c) or QUESTION)
+        tab:SetChecked(shownSheet == def.id)
+        Place(tab)
+    end
+    for i, p in ipairs(list) do
+        local tab = frame.tabs[n + 1] or MakeTab(frame, n + 1)
+        local _, icon = Art(p.name)
+        tab.sheet, tab.prof, tab.label = nil, p.name, p.name
+        tab.icon:SetTexture(icon or QUESTION)
+        tab:SetChecked(shownSheet == "professions" and p.name == shownProf)
+        Place(tab, i == 1 and n > 0)
+    end
+    for i = n + 1, #frame.tabs do frame.tabs[i]:Hide() end
+    frame.tabsBottom = bottom + 12
     return list
 end
 
--- Characters with any profession, in the overview's order and, as there, headed by
--- ruleset and faction when you have more than one group.
+-- Every character, in the overview's order and, as there, headed by ruleset and faction
+-- when you have more than one group. The page shown stays.
 local function HasProfessions(c) return c.profs and next(c.profs) ~= nil end
 
 local function PickCharacter(owner)
@@ -944,15 +973,13 @@ local function PickCharacter(owner)
         local group
         for _, key in ipairs(ns.OverviewOrder()) do
             local c = chars[key]
-            if HasProfessions(c) then
-                if ns.overviewSplit and ns.GroupKey(c, byRealm, byFaction) ~= group then
-                    if group then root:CreateDivider() end
-                    group = ns.GroupKey(c, byRealm, byFaction)
-                    root:CreateTitle(ns.GroupLabel(c, byRealm, byFaction))
-                end
-                root:CreateRadio(ns.ColoredName(key, c), function(k) return k == shownKey end,
-                    function(k) ns.ShowRecipes(k, shownProf, true) end, key)
+            if ns.overviewSplit and ns.GroupKey(c, byRealm, byFaction) ~= group then
+                if group then root:CreateDivider() end
+                group = ns.GroupKey(c, byRealm, byFaction)
+                root:CreateTitle(ns.GroupLabel(c, byRealm, byFaction))
             end
+            root:CreateRadio(ns.ColoredName(key, c), function(k) return k == shownKey end,
+                function(k) ns.ShowCharacter(k, shownSheet, shownProf, true) end, key)
         end
     end)
 end
@@ -983,19 +1010,48 @@ local function SetArt(prof)
     end
 end
 
+-- One of Sheets.lua's pages: made the first time, then filled for the character.
+local function FillSheet(c)
+    local def
+    for _, d in ipairs(ns.SHEETS or {}) do if d.id == shownSheet then def = d end end
+    if not def then
+        shownSheet = "professions"
+        return false
+    end
+    local page = sheetPages[def.id]
+    for id, other in pairs(sheetPages) do other:SetShown(id == def.id) end
+    frame.profPage:Hide()
+    -- Smaller, as the game's character window, but never shorter than the side tabs.
+    frame:SetSize(ns.SHEET_WIDTH or WIDTH, max(ns.SHEET_HEIGHT or HEIGHT, frame.tabsBottom or 0))
+    frame.sheetBg:Show()
+    if frame.pageBg then frame.pageBg:Hide() end
+    if frame.page then frame.page:Hide() end
+    SetTitle(def.title(shownKey, c))
+    SetPortrait(def.icon(c))
+    def.fill(page, shownKey, c)
+    return true
+end
+
 function Fill()
     if not frame then return end
     local c = shownKey and ns.db.chars[shownKey]
     if not c then return frame:Hide() end
     frame.who:SetText(ns.ShortName(shownKey, c))
     local tabs = ShowTabs(c)
+    if shownSheet ~= "professions" and FillSheet(c) then return end
+    for _, page in pairs(sheetPages) do page:Hide() end
+    frame:SetSize(WIDTH, max(HEIGHT, frame.tabsBottom or 0))
+    frame.profPage:Show()
+    frame.sheetBg:Hide()
+    if frame.pageBg then frame.pageBg:Show() end
+    if frame.page then frame.page:Show() end
     local found
     for _, p in ipairs(tabs) do if p.name == shownProf then found = p end end
     if not found then
         found = tabs[1]
         shownProf, selected, offset = found and found.name, nil, 0
         if found then
-            for _, tab in ipairs(frame.tabs) do tab:SetChecked(tab.prof == shownProf) end
+            for _, tab in ipairs(frame.tabs) do tab:SetChecked(tab.prof ~= nil and tab.prof == shownProf) end
         end
     end
     local d = frame.details
@@ -1053,13 +1109,13 @@ function Fill()
 end
 
 local function CreateWindow()
-    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverRecipesFrame", UIParent, "PortraitFrameTemplate")
+    local ok, f = pcall(CreateFrame, "Frame", "AltsForeverCharacterFrame", UIParent, "PortraitFrameTemplate")
     if ok and type(f.TitleContainer) == "table" then
         f.TitleText = f.TitleContainer.TitleText
         f.portraitShown = true
     else
-        ok, f = pcall(CreateFrame, "Frame", "AltsForeverRecipesFrame", UIParent, "BasicFrameTemplateWithInset")
-        if not ok then f = CreateFrame("Frame", "AltsForeverRecipesFrame", UIParent, "BackdropTemplate") end
+        ok, f = pcall(CreateFrame, "Frame", "AltsForeverCharacterFrame", UIParent, "BasicFrameTemplateWithInset")
+        if not ok then f = CreateFrame("Frame", "AltsForeverCharacterFrame", UIParent, "BackdropTemplate") end
     end
     frame = f
     f:SetSize(WIDTH, HEIGHT)
@@ -1086,15 +1142,43 @@ local function CreateWindow()
         f.page = f:CreateTexture(nil, "BACKGROUND", nil, 2)
         if Atlas(f.page, "Profession-Background-Template2", true) then f.page:SetPoint("TOPLEFT", 3, -21) end
     end
-    MakeRankBar(f)
-    MakeList(f)
-    MakeDetails(f)
+    -- The other pages' background: the professions art belongs to the professions only.
+    f.sheetBg = f:CreateTexture(nil, "BACKGROUND", nil, 1)
+    f.sheetBg:SetPoint("TOPLEFT", 4, -58)
+    f.sheetBg:SetPoint("BOTTOMRIGHT", -4, 4)
+    f.sheetBg:SetColorTexture(0, 0, 0, Flat() and 0.25 or 0.35)
+    f.sheetBg:Hide()
+    -- The professions page: its parts are kept on the window too, where the code finds them.
+    local prof = CreateFrame("Frame", nil, f)
+    prof:SetAllPoints(f)
+    MakeRankBar(prof)
+    MakeList(prof)
+    MakeDetails(prof)
+    for _, part in ipairs({ "rank", "list", "details", "rows", "area", "slider", "pageUp", "pageDown",
+        "filter", "filterMenu", "search", "padFilter" }) do
+        f[part] = prof[part]
+    end
+    f.profPage = prof
+    -- As the window or the page shows: the rank bar's fill animation (one started while
+    -- hidden never runs) and which filter button (the Gamepad UI may have changed).
+    local function Shown()
+        if not prof:IsVisible() then return end
+        local anim = f.rank.anim
+        if anim and f.rank.fillAtlas then
+            anim:Stop()
+            anim:Play()
+        end
+        if prof.whichFilter then prof.whichFilter() end
+    end
+    prof:HookScript("OnShow", Shown)
+    f:HookScript("OnShow", Shown)
     f.tabs = {}
 
     -- Whose professions: the character, right of the rank bar.
     local who = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
     who:SetSize(96, 22)
     who:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -38)
+    who:SetFrameLevel(prof:GetFrameLevel() + 20)
     who:SetScript("OnClick", PickCharacter)
     who:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -1116,44 +1200,76 @@ local function CreateWindow()
     f:Hide()
     f:SetPoint("CENTER")
     local sounds = SOUNDKIT or {}
+    -- The game's sounds: the professions window's on a profession, the character window's
+    -- on the other pages.
+    local closing
     f:HookScript("OnShow", function()
-        if sounds.UI_PROFESSIONS_WINDOW_OPEN then PlaySound(sounds.UI_PROFESSIONS_WINDOW_OPEN) end
-        -- The rank bar's fill animation: one started while the window was hidden never runs.
-        local anim = f.rank.anim
-        if anim and f.rank.fillAtlas then
-            anim:Stop()
-            anim:Play()
-        end
+        local open = shownSheet == "professions" and sounds.UI_PROFESSIONS_WINDOW_OPEN or sounds.IG_CHARACTER_INFO_OPEN
+        closing = shownSheet == "professions" and sounds.UI_PROFESSIONS_WINDOW_CLOSE or sounds.IG_CHARACTER_INFO_CLOSE
+        if open then PlaySound(open) end
     end)
-    f:HookScript("OnHide", function() if sounds.UI_PROFESSIONS_WINDOW_CLOSE then PlaySound(sounds.UI_PROFESSIONS_WINDOW_CLOSE) end end)
+    f:HookScript("OnHide", function() if closing then PlaySound(closing) end end)
+    -- Every page now, while the window is still hidden: a frame made inside an open window
+    -- would have the controller's navigator rebuild it from our code.
+    for _, def in ipairs(ns.SHEETS or {}) do
+        local page = CreateFrame("Frame", nil, f)
+        page:SetAllPoints(f)
+        def.build(page)
+        page:Hide()
+        sheetPages[def.id] = page
+    end
     ns.GamepadWindow(f)
     ns.ScaleWindow(f)
 end
 
--- Opens a character's professions (at `prof`, else the one shown before or their first);
--- the same again closes it. `keep`: switch to them without closing (the character picker).
-function ns.ShowRecipes(key, prof, keep)
+local function Num(x) return type(x) == "number" and not issecretvalue(x) and x end
+
+-- Opens the character window on a character and page: `sheet` an ns.SHEETS id or
+-- "professions" (at `prof`, else the one shown before or their first). The same again
+-- closes it; `keep` switches without closing (the character picker, the cooldowns).
+-- With `beside` (the search), next to that window on `side` ("LEFT"/"RIGHT"), or the other
+-- side if the screen has no room there.
+function ns.ShowCharacter(key, sheet, prof, keep, beside, side)
     local c = key and ns.db.chars[key]
     if not c then return end
     if not frame then CreateWindow() end
-    if frame:IsShown() and key == shownKey and (prof == nil or prof == shownProf) and not keep then
+    sheet = sheet or "character"
+    if frame:IsShown() and key == shownKey and sheet == shownSheet and not keep and not beside
+        and (sheet ~= "professions" or prof == nil or prof == shownProf) then
         return frame:Hide()
     end
     if key ~= shownKey then selected, offset = nil, 0 end
-    shownKey = key
+    shownKey, shownSheet = key, sheet
     if prof and prof ~= shownProf then shownProf, selected, offset = prof, nil, 0 end
     nameTries = 0
     Fill()
-    if not frame:IsShown() then
+    if beside then
+        frame:ClearAllPoints()
+        local width, screen = frame:GetWidth(), UIParent:GetWidth() / ns.WindowScale()
+        local left, right = Num(beside:GetLeft()), Num(beside:GetRight())
+        if side == "RIGHT" and right and width and right + 4 + width > screen then side = "LEFT" end
+        if side == "LEFT" and left and width and left - 4 - width < 0 then side = "RIGHT" end
+        if side == "LEFT" then
+            frame:SetPoint("TOPRIGHT", beside, "TOPLEFT", -4, 0)
+        else
+            frame:SetPoint("TOPLEFT", beside, "TOPRIGHT", 4, 0)
+        end
+        if not frame:IsShown() then frame:Show() end
+    elseif not frame:IsShown() then
         ns.PlaceWindow(frame)
         frame:Show()
     end
 end
 
--- The overview's button: the window on the character you're on, or if they have no
--- professions the first character who has; again closes it.
+-- A character's professions (the overview's cooldowns, the character menu, /af prof).
+function ns.ShowRecipes(key, prof, keep)
+    return ns.ShowCharacter(key, "professions", prof, keep)
+end
+
+-- The overview's button: the professions of the character you're on, or if they have none
+-- the first character who has; again closes it.
 function ns.ToggleRecipes()
-    if frame and frame:IsShown() then return frame:Hide() end
+    if frame and frame:IsShown() and shownSheet == "professions" then return frame:Hide() end
     local chars = ns.db.chars
     local key = ns.charKey
     if not (chars[key] and HasProfessions(chars[key])) then
@@ -1165,13 +1281,18 @@ function ns.ToggleRecipes()
             end
         end
     end
-    ns.ShowRecipes(key or ns.charKey)
+    ns.ShowCharacter(key or ns.charKey, "professions", nil, true)
 end
 
 -- A profession scan, bag change or sync while it's open: shown again.
 function ns.RecipesChanged()
     if frame and frame:IsShown() then Fill() end
 end
+ns.CharacterWindowChanged = ns.RecipesChanged -- gear, reputation, skills
 
--- For tests: the window, if made.
+-- For tests: the window, if made; the page shown and whose; one of the pages.
 function ns.RecipesWindow() return frame end
+function ns.CharacterWindowShown()
+    if frame and frame:IsShown() then return shownSheet, shownKey end
+end
+function ns.CharacterPage(id) return sheetPages[id] end

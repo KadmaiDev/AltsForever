@@ -208,7 +208,13 @@ test("the overview heads each ruleset with its gold; one ruleset, no headings", 
         if rawget(f, "label") and rawget(f, "gold") and f.shown then heads[#heads + 1] = f.label.text .. " " .. f.gold.text end
     end
     eq(table.concat(heads, " | "), "Normal 4000c | PvP  | Not sorted yet (log in on them once) ", "a total only for two or more")
-    assert(not AltsForeverFrame.footer.text:find("gold", 1, true), "no mixed gold total")
+    -- The footer's total counts only characters you can mail (not Grim Tusk on PvP).
+    local footer = AltsForeverFrame.footer.text
+    local gold = 0
+    for key, c in pairs(AltsForeverDB.chars) do
+        if key ~= "Grim Tusk" then gold = gold + (c.money or 0) end
+    end
+    assert(footer:find("Total gold: " .. gold .. "c", 1, true), footer)
     -- One ruleset only: as before.
     wow.load(FILES)
     wow.now = NOW
@@ -226,8 +232,55 @@ end)
 test("the setting is in the options menu", function()
     local ns = rulesetStart()
     ns.ShowOptionsMenu(UIParent)
-    wow.menuItem("Show other rulesets and factions").setSelected()
+    wow.menuItem("Other rulesets and factions", "Show in tooltips").setSelected()
     eq(AltsForeverDB.otherRulesets, true)
+    wow.menuItem("Other rulesets and factions", "Show in the overview").setSelected()
+    eq(AltsForeverDB.otherCharsOff, true)
+    wow.menuItem("Other rulesets and factions", "Count in gold totals").setSelected()
+    eq(AltsForeverDB.otherGold, true)
+end)
+
+test("the overview can hide other rulesets and factions; their gold counts only if asked", function()
+    local ns = rulesetStart()
+    local chars = AltsForeverDB.chars
+    chars["Grim Tusk"].money = 50000
+    local mine = 0
+    for key, c in pairs(chars) do
+        if key ~= "Grim Tusk" then mine = mine + (c.money or 0) end
+    end
+    SlashCmdList.ALTSFOREVER("")
+    local footer = AltsForeverFrame.footer.text
+    assert(footer:find("Total gold: " .. mine .. "c", 1, true), "only what can be mailed: " .. footer)
+    -- Hidden: Grim Tusk's row goes, the footer says one is hidden.
+    SlashCmdList.ALTSFOREVER("rulesets overview")
+    eq(AltsForeverDB.otherCharsOff, true)
+    local names = {}
+    for _, row in ipairs(overviewRows()) do names[#names + 1] = cell(row, 1) end
+    assert(not table.concat(names, " "):find("Grim", 1, true), table.concat(names, " "))
+    eq(#names, 3)
+    footer = AltsForeverFrame.footer.text
+    assert(footer:find("1 on other rulesets or factions hidden", 1, true), footer)
+    -- Counted: the total includes Grim Tusk's gold (rows still hidden).
+    SlashCmdList.ALTSFOREVER("rulesets gold")
+    eq(AltsForeverDB.otherGold, true)
+    footer = AltsForeverFrame.footer.text
+    assert(footer:find("Total gold: " .. (mine + 50000) .. "c", 1, true), footer)
+    -- Back to showing everyone.
+    SlashCmdList.ALTSFOREVER("rulesets overview")
+    eq(AltsForeverDB.otherCharsOff, nil)
+    eq(#overviewRows(), 4)
+    assert(not AltsForeverFrame.footer.text:find("hidden", 1, true))
+    -- The bag gold tooltip's Total follows the same setting.
+    ns.SetOtherRulesets(true)
+    local tt = wow.tooltip()
+    ns.AddMoneyLines(tt)
+    local text = textOf(tt.lines)
+    assert(text:find("Total = " .. (mine + 50000) .. "c", 1, true), text)
+    SlashCmdList.ALTSFOREVER("rulesets gold")
+    tt = wow.tooltip()
+    ns.AddMoneyLines(tt)
+    text = textOf(tt.lines)
+    assert(text:find("Total = " .. mine .. "c", 1, true), text)
 end)
 
 -- Mail never crosses factions either: the other faction is kept apart the same way.

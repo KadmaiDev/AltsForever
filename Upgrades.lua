@@ -282,6 +282,134 @@ local RANGED = { INVTYPE_RANGED = true, INVTYPE_RANGEDRIGHT = true, INVTYPE_THRO
 local OFF_HAND_ITEMS = { INVTYPE_SHIELD = true, INVTYPE_HOLDABLE = true }
 
 ---------------------------------------------------------------------------
+-- Weapon and armour skills
+---------------------------------------------------------------------------
+-- What each character has trained (a player's request, 2026-11-25: a mage was offered a
+-- sword she can learn but hadn't). Forever has Classic's skills list (C_SkillInfo):
+-- GetSkillLineInfoByID(id) gives { name, rank, maxRank } for a trained skill and nil for one
+-- that isn't (probed on a level 6 mage 2026-11-25: Staves 136 20/30, Wands 228 1/30,
+-- Unarmed 162 1/30, Defense 95 21/30, Cloth 415 1/1; Swords 43, Two-Handed Swords 55 and
+-- Daggers 173 nil). The other IDs are Classic's, assumed the same.
+-- c.skills = { [skillID] = rank * 1000 + maxRank }, nil until read.
+local WEAPON_SKILL = { [0] = 44, [1] = 172, [2] = 45, [3] = 46, [4] = 54, [5] = 160, [6] = 229,
+    [7] = 43, [8] = 55, [10] = 136, [13] = 473, [15] = 173, [16] = 176, [18] = 226, [19] = 228 }
+local ARMOR_SKILL = { [1] = 415, [2] = 414, [3] = 413, [4] = 293, [6] = 433 }
+local DEFENSE_SKILL, UNARMED_SKILL = 95, 162
+-- The order they're listed in (weapon subclass order, then Unarmed and Defense).
+local WEAPON_ORDER = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 13, 15, 16, 18, 19 }
+local ARMOR_ORDER = { 1, 2, 3, 4, 6 }
+local readSkills = {} -- reused
+local skillsSoon = false -- a read is queued (StartUpgrades)
+
+local function ReadSkill(id)
+    local s = C_SkillInfo.GetSkillLineInfoByID(id)
+    if type(s) ~= "table" then return end
+    local rank, most = s.rank, s.maxRank
+    if issecretvalue(rank) or issecretvalue(most) or type(rank) ~= "number" or type(most) ~= "number" then return end
+    readSkills[id] = rank * 1000 + most
+end
+
+-- Reads the character you're on. Every character has Defense, so without it the list isn't
+-- ready and nothing changes. Returns true when which skills are trained changed (ranks
+-- alone don't change any upgrade).
+function ns.ScanCombatSkills(c)
+    if not (C_SkillInfo and C_SkillInfo.GetSkillLineInfoByID and c) then return false end
+    wipe(readSkills)
+    ReadSkill(DEFENSE_SKILL)
+    if not readSkills[DEFENSE_SKILL] then return false end
+    ReadSkill(UNARMED_SKILL)
+    for _, id in pairs(WEAPON_SKILL) do ReadSkill(id) end
+    for _, id in pairs(ARMOR_SKILL) do ReadSkill(id) end
+    local skills = c.skills
+    local changed = not skills
+    if skills then
+        for id in pairs(skills) do if not readSkills[id] then changed = true end end
+        for id in pairs(readSkills) do if not skills[id] then changed = true end end
+        wipe(skills)
+    else
+        skills = {}
+        c.skills = skills
+    end
+    for id, v in pairs(readSkills) do skills[id] = v end
+    return changed
+end
+
+-- Whether a character hasn't trained the skill an item needs. False when their skills
+-- aren't known (not logged in since this was added): the class table alone decides then.
+local function Missing(c, id)
+    local skills = c.skills
+    return id ~= nil and skills ~= nil and skills[DEFENSE_SKILL] ~= nil and not skills[id]
+end
+
+local function Untrained(c, info)
+    if info.class == WEAPON_CLASS then return Missing(c, WEAPON_SKILL[info.sub]) end
+    if info.class == ARMOR_CLASS then return Missing(c, ARMOR_SKILL[info.sub]) end
+    return false
+end
+
+local function SubName(class, sub, fallback)
+    local name = C_Item.GetItemSubClassInfo and C_Item.GetItemSubClassInfo(class, sub)
+    return type(name) == "string" and name ~= "" and name or fallback
+end
+
+-- Defense and Unarmed have no item category: their names come from the skills list of the
+-- character you're on (every character has both), remembered for the session.
+local skillNames = {}
+local function SkillName(id, fallback)
+    if not skillNames[id] and C_SkillInfo and C_SkillInfo.GetSkillLineInfoByID then
+        local s = C_SkillInfo.GetSkillLineInfoByID(id)
+        local name = type(s) == "table" and s.name
+        if type(name) == "string" and not issecretvalue(name) and name ~= "" then skillNames[id] = name end
+    end
+    return skillNames[id] or fallback
+end
+
+-- A character's weapon skills and armour, for the character window's Skills tab: two lists
+-- of { name, rank, max, weapon, untrained, at }, each sorted by name as the game's own
+-- Skills tab is, trained first. Weapons hold Defense and Unarmed too, then the weapons
+-- their class can learn but hasn't (untrained, no rank); `weapon` marks a real weapon
+-- skill (Defense and Unarmed aren't). Armour: what's trained (1/1), then what the class
+-- wears but hasn't trained, with `at` the level it comes at if that's above theirs.
+-- nil when their skills haven't been read. Fresh tables: only for a window being filled.
+local function ByName(a, b)
+    if (a.untrained or false) ~= (b.untrained or false) then return not a.untrained end
+    return a.name < b.name
+end
+
+function ns.CombatSkills(c)
+    local skills = c and c.skills
+    if not (skills and skills[DEFENSE_SKILL]) then return nil end
+    local cls = CLASSES[c.class]
+    local weapons, armour = {}, {}
+    local function Add(list, id, name, weapon)
+        if not name then return end
+        local v = skills[id]
+        if v then
+            list[#list + 1] = { name = name, rank = floor(v / 1000), max = v % 1000, weapon = weapon }
+        end
+        return v ~= nil
+    end
+    for _, sub in ipairs(WEAPON_ORDER) do
+        local name = SubName(WEAPON_CLASS, sub)
+        if not Add(weapons, WEAPON_SKILL[sub], name, true) and name and cls and cls.weapons[sub] then
+            weapons[#weapons + 1] = { name = name, weapon = true, untrained = true }
+        end
+    end
+    Add(weapons, UNARMED_SKILL, SkillName(UNARMED_SKILL, L["Unarmed"]))
+    Add(weapons, DEFENSE_SKILL, SkillName(DEFENSE_SKILL, L["Defense"]))
+    for _, sub in ipairs(ARMOR_ORDER) do
+        local name = SubName(ARMOR_CLASS, sub)
+        local from = cls and cls.armor[sub]
+        if not Add(armour, ARMOR_SKILL[sub], name) and name and from then
+            armour[#armour + 1] = { name = name, untrained = true, at = c.level and from > c.level and from or nil }
+        end
+    end
+    table.sort(weapons, ByName)
+    table.sort(armour, ByName)
+    return weapons, armour
+end
+
+---------------------------------------------------------------------------
 -- Settings and roles
 ---------------------------------------------------------------------------
 local version = 0 -- bumped when anything an upgrade depends on changes
@@ -627,7 +755,8 @@ end
 
 -- For one character: the gain, as a % of the score of everything they wear (NEW if nothing
 -- they wear scores yet), whether the slot is empty, the level they can wear it from if
--- that's above theirs, and the slot it does best in; nil if it's no upgrade for them, false
+-- that's above theirs, the slot it does best in, and true if they haven't trained its
+-- weapon or armour skill; nil if it's no upgrade for them, false
 -- if some of their gear isn't loaded yet. Against the whole gear score, not the item it
 -- replaces: low-level gear often has only armour, which scores next to nothing, so +1
 -- Agility over it read as +583% (the owner's report, 2026-10-16).
@@ -701,7 +830,10 @@ local function Compare(c, info, link)
     -- Any real gain shows, the small ones as one arrow (a 1% cut-off hid valid boots and
     -- capes on a level 16 alt, the owner's report 2026-10-16).
     if not best or (best <= 0 and not empty) then return nil end -- anything beats an empty slot
-    return best, empty, need > level and need or nil, bestSlot
+    -- Still listed when it needs training first (the owner, 2026-11-25), greyed like a level
+    -- they haven't reached; a level not reached is said instead (they can't train it yet).
+    local at = need > level and need or nil
+    return best, empty, at, bestSlot, not at and Untrained(c, info) or nil
 end
 
 ---------------------------------------------------------------------------
@@ -759,13 +891,15 @@ local function Build(info, link, onlyYou, recipeID, tt, data)
         local ok = (not onlyYou or key == ns.charKey) and not ns.Hidden(c)
         if ok and recipeID then ok = ns.RecipeOpenTo(c, tt, recipeID, data) end
         if ok then
-            local gain, empty, at = Compare(c, info, link)
+            local gain, empty, at, _, train = Compare(c, info, link)
             if gain then
                 rows = rows + 1
                 rowKey[rows], rowGain[rows] = key, gain
                 local text = SlotName(info.loc) .. " · " .. ns.GainLabel(gain, empty)
                 if at then
                     text = GREY .. text .. " · " .. L["at level %d"]:format(at) .. "|r"
+                elseif train then
+                    text = GREY .. text .. " · " .. L["needs training"] .. "|r"
                 else
                     text = GREEN .. text .. "|r"
                 end
@@ -871,11 +1005,13 @@ end
 -- you can mail make things for you (another ruleset or faction can't).
 local ARMOR_TYPES = { 1, 2, 3, 4 } -- cloth, leather, mail, plate
 
-local function Heaviest(cls, level)
+-- With the character's skills known, a type they haven't trained doesn't count (plate at
+-- 40 needs a visit to the trainer).
+local function Heaviest(cls, level, c)
     local best
     for _, sub in ipairs(ARMOR_TYPES) do
         local from = cls.armor[sub]
-        if from and from <= level then best = sub end
+        if from and from <= level and not Missing(c, ARMOR_SKILL[sub]) then best = sub end
     end
     return best
 end
@@ -905,22 +1041,29 @@ local function Better(a, b)
     return a.id < b.id
 end
 
--- Fills `out` with { id, link, gain, empty, at, slot (where it does best), boe, key (who
+-- Fills `out` with { id, link, gain, empty, at, slot (where it does best), train (its skill
+-- isn't trained), boe, key (who
 -- crafts it), prof }, best gain first, and returns it and whether some item data is still
 -- loading (ask again shortly). slot nil: every slot. Runs when the flyout or character
 -- sheet opens, never per frame. With `who` ({ class, level, gear, spec }: a player being
 -- inspected, Flyout.lua) it's judged for them: only what binds when equipped, as nothing
 -- else can be handed over, and nothing that needs a profession (theirs aren't known).
-function ns.CraftableUpgrades(slot, out, who)
+-- `who`: someone other than you (an inspected player, or with `whoKey` one of your other
+-- characters, whose crafters are then the characters who can mail them).
+function ns.CraftableUpgrades(slot, out, who, whoKey)
     out = out or {}
     wipe(out)
     local me, myKey = who or ns.char, ns.charKey
     local cls = me and CLASSES[me.class]
     if not (cls and me.level and me.gear) then return out, false end
-    local heaviest = Heaviest(cls, me.level)
+    local heaviest = Heaviest(cls, me.level, me)
     local keys = {}
     for key, c in pairs(ns.db.chars) do
-        if key == myKey or (c.crafts and not ns.Elsewhere(c)) then keys[#keys + 1] = key end
+        if whoKey then
+            if c.crafts and ns.SameWorld(c, me) then keys[#keys + 1] = key end
+        elseif key == myKey or (c.crafts and not ns.Elsewhere(c)) then
+            keys[#keys + 1] = key
+        end
     end
     table.sort(keys, function(a, b)
         if (a == myKey) ~= (b == myKey) then return a == myKey end -- your own recipes first
@@ -948,12 +1091,12 @@ function ns.CraftableUpgrades(slot, out, who)
                             pending = true
                         elseif info and (info.bind == BIND_ON_EQUIP or (key == myKey and not who)) then
                             done[id] = true
-                            local gain, empty, at, best = Compare(me, info, link)
+                            local gain, empty, at, best, train = Compare(me, info, link)
                             if gain == false then
                                 pending = true
                             elseif gain then
                                 out[#out + 1] = { id = id, link = link, gain = gain, empty = empty, at = at, slot = best,
-                                    boe = info.bind == BIND_ON_EQUIP, key = key, prof = prof }
+                                    train = train, boe = info.bind == BIND_ON_EQUIP, key = key, prof = prof }
                             end
                         end
                     end
@@ -1014,4 +1157,20 @@ function ns.StartUpgrades()
         TooltipDataProcessor.AddTooltipPostCall(spell, OnSpell)
     end
     if C_Timer and C_Timer.After then C_Timer.After(10, Prewarm) end
+    -- Weapon skills: at login (again 5 s later, in case the list wasn't ready) and once per
+    -- burst of SKILL_LINES_CHANGED, which fires at every weapon skill-up in a fight.
+    local function Skills()
+        skillsSoon = false
+        if ns.ScanCombatSkills(ns.char) then ns.UpgradesChanged() end
+        if ns.CharacterWindowChanged then ns.CharacterWindowChanged() end -- ranks on the Skills page
+    end
+    Skills()
+    if C_Timer and C_Timer.After then
+        C_Timer.After(5, Skills)
+        ns.On("SKILL_LINES_CHANGED", function()
+            if skillsSoon then return end
+            skillsSoon = true
+            C_Timer.After(5, Skills)
+        end)
+    end
 end

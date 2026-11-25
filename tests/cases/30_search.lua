@@ -631,7 +631,7 @@ test("a worn item opens their gear on the far side of the search from the bags w
     f.GetLeft, f.GetRight = function() return 800 end, function() return 1280 end
     searchType("linked")
     box.scripts.OnEnterPressed(box)
-    local gear = AltsForeverGearFrame
+    local gear = AltsForeverCharacterFrame
     eq(gear:IsShown(), true)
     eq(f:IsShown(), true, "the search stays open")
     eq(gear.point[1], "TOPLEFT")

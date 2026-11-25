@@ -224,12 +224,13 @@ test("the profession window shows an offline alt's recipes as the game's window 
     wow.login(smithAlt())
     ns.ShowCharacterMenu(UIParent, "Vesp Ash")
     wow.menuItem("Professions").fn()
-    local f = AltsForeverRecipesFrame
+    local f = AltsForeverCharacterFrame
     eq(f:IsShown(), true)
     eq(f.titleText, "Blacksmithing")
     eq(f.rank.text:GetText():find("120", 1, true) ~= nil, true)
     eq(f.who:GetText(), "[PALADIN]Vesp", "first name only: a full one didn't fit")
-    eq(f.tabs[1].prof, "Blacksmithing"); eq(f.tabs[2].prof, "Cooking"); eq(f.tabs[3], nil)
+    eq(f.tabs[1].sheet, "character"); eq(f.tabs[2].sheet, "reputation"); eq(f.tabs[3].sheet, "skills")
+    eq(f.tabs[4].prof, "Blacksmithing"); eq(f.tabs[5].prof, "Cooking"); eq(f.tabs[6], nil)
     eq(recipeRows(f), "# Weapon Stones | Rough Sharpening Stone [3]  | # Camping | Sharpening Wheel [1]  | "
         .. "# Mail Chestguards | Rough Bronze Cuirass [1] ^ | # Other | old recipe")
     -- The first recipe is shown: made two at a time, its reagent from the bags.
@@ -269,7 +270,7 @@ test("the profession window shows an offline alt's recipes as the game's window 
     f.search:SetText("")
     f.search.scripts.OnTextChanged(f.search, true)
     -- Cooking was never opened on them.
-    f.tabs[2].scripts.OnClick(f.tabs[2])
+    f.tabs[5].scripts.OnClick(f.tabs[5])
     eq(f.titleText, "Cooking")
     eq(recipeRows(f), "")
     eq(d.empty:GetText():find("hasn't opened Cooking", 1, true) ~= nil, true)
@@ -299,20 +300,20 @@ test("the profession window: reagent names still loading, a character without pr
     wow.login(saved)
     wow.timers = {}
     ns.ShowRecipes("Vesp Ash")
-    local f = AltsForeverRecipesFrame
+    local f = AltsForeverCharacterFrame
     eq(f.details.slots[1].name:GetText(), "3/1 ", "name not loaded yet")
     eq(#wow.timers, 1, "filled again a second later")
     wow.itemNames[ROUGH_STONE_ITEM] = "Rough Stone"
     wow.timers[1]()
     eq(f.details.slots[1].name:GetText(), "3/1 Rough Stone")
-    -- No professions: not in the character menu, nor the window's picker.
+    -- No professions: greyed in the character menu; the window's picker lists everyone, as
+    -- it's the character window now.
     ns.ShowCharacterMenu(UIParent, "Tarn Moon")
     eq(wow.menuItem("Professions").enabled, false)
     f.who.scripts.OnClick(f.who)
     local names = {}
     for _, item in ipairs(wow.menu.items) do if item.kind == "radio" then names[#names + 1] = item.text end end
-    eq(#names, 1)
-    eq(names[1]:find("Vesp Ash", 1, true) ~= nil, true)
+    eq(#names, 3)
     ns.ShowRecipes("Tarn Moon")
     eq(f.details.empty:GetText(), "Tarn Moon has no professions.")
     eq(f.rank:IsShown(), false)
@@ -345,9 +346,9 @@ test("professions whose icon wasn't recorded: icons and gathering told apart by 
     local line, icon = ns.ProfessionArt("Mining")
     eq(line, 186); eq(icon, "Interface\\Icons\\Trade_Mining")
     ns.ShowRecipes("Vesp Ash")
-    local f = AltsForeverRecipesFrame
-    eq(f.tabs[2].icon.texture, "Interface\\Icons\\Trade_Mining")
-    eq(f.tabs[1].icon.texture, 134400, "no name from the game for Blacksmithing here: the question mark")
+    local f = AltsForeverCharacterFrame
+    eq(f.tabs[5].icon.texture, "Interface\\Icons\\Trade_Mining")
+    eq(f.tabs[4].icon.texture, 134400, "no name from the game for Blacksmithing here: the question mark")
     -- The rank bar: the fill played as the game's flipbook (2 columns, 2 rows of 34), shown
     -- through a mask at 120/150; played again only when the skill or profession changes.
     local bar = f.rank

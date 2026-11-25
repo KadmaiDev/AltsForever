@@ -18,7 +18,7 @@ test("with the Gamepad UI on, our windows report to Blizzard's focus manager, an
     ns.ToggleReputation()
     ns.ShowGear("Tarn Moon")
     ns.OpenIconPicker("bags")
-    eq(focusCalls(), "shown AltsForeverFrame, shown AltsForeverBagsFrame, shown AltsForeverRepFrame, shown AltsForeverGearFrame, shown AltsForeverIconPicker")
+    eq(focusCalls(), "shown AltsForeverFrame, shown AltsForeverBagsFrame, shown AltsForeverRepFrame, shown AltsForeverCharacterFrame, shown AltsForeverIconPicker")
     -- B: Blizzard calls the window's close handler.
     local bags = AltsForeverBagsFrame
     eq(bags:SmartNavigationCloseHandler(), true, "handled")
@@ -84,9 +84,9 @@ test("A on an overview row opens that character's menu: Gear, Bags, Bank, Profes
     row:OnSmartNavClick()
     local texts = {}
     for _, item in ipairs(wow.menu.items) do texts[#texts + 1] = item.text end
-    eq(table.concat(texts, " | "), "[DRUID]Tarn Moon | Gear | Bags | Bank | Mail | Professions | Upgrade role | Upgrade weights... | Pin to top | Forget Tarn Moon...")
-    wow.menuItem("Gear").fn()
-    eq(AltsForeverGearFrame:IsShown(), true)
+    eq(table.concat(texts, " | "), "[DRUID]Tarn Moon | Character | Reputation | Skills | Bags | Bank | Mail | Professions | Upgrade role | Upgrade weights... | Pin to top | Forget Tarn Moon...")
+    wow.menuItem("Character").fn()
+    eq(AltsForeverCharacterFrame:IsShown(), true)
 end)
 
 test("lists a controller can't scroll get page buttons; hover-only rows can be reached", function()
@@ -210,7 +210,7 @@ test("with the Gamepad UI on, a menu of ours is our own window, never the game's
     local items = padMenu(ns)
     eq(items[1].text, "[DRUID]Tarn Moon", "the title first")
     eq(items[1].row, nil, "a title can't be pressed")
-    eq(items[2].text, "Gear")
+    eq(items[2].text, "Character")
     eq(padRow(ns, "Professions"):IsEnabled(), false, "no professions: greyed out")
     assert(padRow(ns, "Upgrade role").text:GetText():find("ChatFrameExpandArrow", 1, true), "a sub-list is marked")
 
@@ -221,7 +221,7 @@ test("with the Gamepad UI on, a menu of ours is our own window, never the game's
     assert(padRow(ns, "Automatic").text:GetText():find("UI-RadioButton", 1, true), "radio choices")
     eq(m:SmartNavigationCloseHandler(), true)
     eq(m:IsShown(), true, "B: back to the first list")
-    assert(padRow(ns, "Gear"))
+    assert(padRow(ns, "Character"))
     padRow(ns, "Upgrade role").scripts.OnClick(padRow(ns, "Upgrade role"))
     local tank = padRow(ns, "Healer")
     tank.scripts.OnClick(tank)
@@ -232,18 +232,20 @@ test("with the Gamepad UI on, a menu of ours is our own window, never the game's
     m:SmartNavigationCloseHandler()
     eq(m:IsShown(), false, "B on the first list closes it")
     row:OnSmartNavClick()
-    padRow(ns, "Gear").scripts.OnClick(padRow(ns, "Gear"))
+    padRow(ns, "Character").scripts.OnClick(padRow(ns, "Character"))
     eq(m:IsShown(), false)
-    eq(AltsForeverGearFrame:IsShown(), true, "a button does its job")
+    eq(AltsForeverCharacterFrame:IsShown(), true, "a button does its job")
 
     -- Tick boxes stay open and show the change; mouse players get the game's menu as ever.
     ns.ShowOptionsMenu(nil, true)
-    local tick = padRow(ns, "Show other rulesets")
+    local sub = padRow(ns, "Other rulesets and factions")
+    sub.scripts.OnClick(sub)
+    local tick = padRow(ns, "Show in tooltips")
     assert(tick.text:GetText():find("UI-CheckBox-Up", 1, true), "not ticked")
     tick.scripts.OnClick(tick)
     eq(AltsForeverDB.otherRulesets, true)
     eq(m:IsShown(), true, "a tick box leaves the menu open")
-    assert(padRow(ns, "Show other rulesets").text:GetText():find("UI-CheckBox-Check", 1, true), "now ticked")
+    assert(padRow(ns, "Show in tooltips").text:GetText():find("UI-CheckBox-Check", 1, true), "now ticked")
     m:Hide()
     wow.gamepadUI = false
     ns.ShowOptionsMenu(nil, true)
@@ -266,7 +268,7 @@ test("with the Gamepad UI on, the professions window's filter is a plain button 
     wow.gamepadUI = true
     wow.login({ v = 2, chars = { ["Vesp Ash"] = alt("Vesp Ash", "PALADIN", { profs = { Cooking = 50 }, recipes = { Cooking = {} } }) } })
     ns.ShowRecipes("Vesp Ash")
-    local f = AltsForeverRecipesFrame
+    local f = AltsForeverCharacterFrame
     eq(f:IsShown(), true)
     eq(f.padFilter:IsShown(), true, "our button")
     eq(f.filter:IsShown(), false, "not the game's dropdown")

@@ -724,3 +724,110 @@ test("upgrade weights: a Weights... button beside Show upgrades on the Options p
     eq(AltsForeverWeightsFrame:IsShown(), true, "opens with upgrades off too: the anvils use the weights")
     eq(AltsForeverWeightsFrame.roleButton:GetText(), "Caster · Priest, Shaman, Mage, Warlock, Druid", "your own role")
 end)
+
+-- Weapon and armour skills (a player's request, 2026-11-25) ---------------------------
+
+-- Aldric (the level 24 mage you log in as) has Staves, Wands, Unarmed, Defense and Cloth.
+function skMage()
+    return { [95] = { "Defense", 100, 120 }, [136] = { "Staves", 80, 120 }, [228] = { "Wands", 120, 120 },
+        [162] = { "Unarmed", 1, 120 }, [415] = { "Cloth", 1, 1 } }
+end
+
+-- upStart with the skills list the game gives you at login (nil: not ready).
+function skStart(chars, skills)
+    local ns = wow.load(FILES)
+    for id, def in pairs(UP_ITEMS) do wow.item(id, def[1], def[2]) end
+    wow.skills = skills
+    wow.login({ v = 2, chars = chars or {} })
+    return ns
+end
+
+function skRunTimers()
+    local fns = wow.timers
+    wow.timers = {}
+    for _, fn in ipairs(fns) do fn() end
+end
+
+test("weapon skills are read at login: trained ones with rank and maximum, nothing while the list isn't ready", function()
+    local ns = skStart({}, skMage())
+    local s = ns.char.skills
+    eq(s[136], 80120, "Staves 80/120")
+    eq(s[95], 100120, "Defense")
+    eq(s[415], 1001, "Cloth")
+    eq(s[43], nil, "Swords not trained")
+    ns = skStart({}, nil)
+    eq(ns.char.skills, nil, "no Defense: the list isn't ready, nothing stored")
+    wow.skills = skMage()
+    skRunTimers() -- read again 5 s after login
+    eq(ns.char.skills[136], 80120)
+end)
+
+test("learning a weapon skill is picked up once per burst of skill changes", function()
+    local ns = skStart({}, skMage())
+    local before = ns.UpgradesVersion()
+    wow.skills[43] = { "Swords", 1, 120 }
+    wow.fire("SKILL_LINES_CHANGED")
+    wow.fire("SKILL_LINES_CHANGED")
+    local waiting = 0
+    for _, fn in ipairs(wow.timers) do if wow.delays[fn] == 5 then waiting = waiting + 1 end end
+    skRunTimers()
+    eq(ns.char.skills[43], 1120, "Swords learned")
+    assert(ns.UpgradesVersion() > before, "upgrades worked out again")
+    before = ns.UpgradesVersion()
+    wow.skills[43] = { "Swords", 2, 120 }
+    wow.fire("SKILL_LINES_CHANGED")
+    skRunTimers()
+    eq(ns.char.skills[43], 2120, "the rank is kept current")
+    eq(ns.UpgradesVersion(), before, "a rank going up changes no upgrade")
+end)
+
+test("a weapon whose skill isn't trained is still listed, greyed as needing training", function()
+    upItems()
+    local sword = upItem(5090, "Arcane Blade", { class = 2, sub = 7, loc = "INVTYPE_WEAPON", bind = 2,
+        stats = { ITEM_MOD_INTELLECT_SHORT = 10 } })
+    local staff = upItem(5091, "Arcane Staff", { class = 2, sub = 10, loc = "INVTYPE_2HWEAPON", bind = 2,
+        stats = { ITEM_MOD_INTELLECT_SHORT = 10 } })
+    local swords = skMage()
+    swords[43] = { "Swords", 1, 120 }
+    local learned = {}
+    for id, v in pairs(swords) do learned[id] = v[2] * 1000 + v[3] end
+    skStart({
+        ["Mira Swift"] = alt("Mira Swift", "MAGE", { level = 24, gear = {}, skills = learned }),
+        ["Old Save"] = alt("Old Save", "MAGE", { level = 24, gear = {} }),
+    }, skMage())
+    local rows = upHover(5090, sword)
+    assert(rows:find("[MAGE]Aldric = One-Hand · ^^^ · empty slot · needs training", 1, true), rows)
+    assert(rows:find("[MAGE]Mira Swift = One-Hand · ^^^ · empty slot\n", 1, true)
+        or rows:find("[MAGE]Mira Swift = One-Hand · ^^^ · empty slot$"), rows)
+    assert(rows:find("[MAGE]Old Save = One-Hand · ^^^ · empty slot", 1, true), rows)
+    assert(not rows:find("Old Save = [^\n]*training"), "skills not read yet: the class table decides")
+    rows = upHover(5091, staff)
+    assert(not rows:find("training", 1, true), rows)
+end)
+
+test("armour not trained says so; a level not reached is said instead", function()
+    upItems()
+    local plate = upItem(5092, "Iron Breastplate", { sub = 4, loc = "INVTYPE_CHEST", level = 35, bind = 2,
+        stats = { ITEM_MOD_STRENGTH_SHORT = 10 } })
+    local function Skills(plateToo)
+        local s = { [95] = 200201, [415] = 1001, [414] = 1001, [413] = 1001, [433] = 1001 }
+        if plateToo then s[293] = 1001 end
+        return s
+    end
+    skStart({
+        ["Old Guard"] = alt("Old Guard", "WARRIOR", { level = 42, gear = {}, skills = Skills(false) }),
+        ["Trained Guard"] = alt("Trained Guard", "WARRIOR", { level = 42, gear = {}, skills = Skills(true) }),
+        ["Young Guard"] = alt("Young Guard", "WARRIOR", { level = 37, gear = {}, skills = Skills(false) }),
+    }, skMage())
+    eq(upHover(5092, plate), "[WARRIOR]Old Guard = Chest · ^^^ · empty slot · needs training\n"
+        .. "[WARRIOR]Trained Guard = Chest · ^^^ · empty slot\n"
+        .. "[WARRIOR]Young Guard = Chest · ^^^ · empty slot · at level 40")
+end)
+
+test("damaged skills are repaired at load", function()
+    local ns = skStart({ ["Mira Swift"] = alt("Mira Swift", "MAGE", { skills = { [95] = 1005, x = 3, [43] = "y" } }) }, nil)
+    local s = ns.db.chars["Mira Swift"].skills
+    eq(s[95], 1005)
+    eq(s.x, nil)
+    eq(s[43], nil)
+end)

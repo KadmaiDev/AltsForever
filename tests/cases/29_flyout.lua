@@ -474,3 +474,85 @@ test("an inspected player's spec comes from the inspect config's points per tab"
     C_Traits.HasValidInspectData = nil
     eq(select(2, ns.InspectSpec()), false, "a client without it")
 end)
+
+test("the character window's Character page: anvils for what can be crafted for the character shown", function()
+    local ns = flyStart()
+    ns.db.chars["Brom"] = alt("Brom", "WARRIOR", { level = 24, gear = {}, realm = "Realm" })
+    ns.db.chars["Far Brom"] = alt("Far Brom", "WARRIOR", { level = 24, gear = {}, realm = "Elsewhere" })
+    local calls, real = 0, ns.CraftableUpgrades
+    ns.CraftableUpgrades = function(...) calls = calls + 1 return real(...) end
+    ns.ShowCharacter("Brom")
+    local page = ns.CharacterPage("character")
+    local hands = page.slots[10].craft
+    eq(hands:IsShown(), true, "Smith can mail Brom his mail gloves")
+    eq(hands.tier.texture, "Interface\\AddOns\\AltsForever\\media\\up3.tga")
+    eq(hands.point[1], "TOPRIGHT", "inside the right-hand column, clear of the window's edge")
+    eq(page.slots[15].craft.point[1], "TOPLEFT", "inside the left-hand column")
+    eq(page.slots[1].craft:IsShown(), false, "the helm needs level 28")
+    hands.scripts.OnEnter(hands)
+    local text = {}
+    for _, line in ipairs(GameTooltip.lines) do text[#text + 1] = tostring(line[1]) .. " | " .. tostring(line[2]) end
+    text = table.concat(text, "\n")
+    assert(text:find("Linked Gloves", 1, true) and text:find("Smith", 1, true), text)
+    assert(not text:find("Far Gloves", 1, true), "Far Away is in another world from Brom\n" .. text)
+    -- Worked out once: refills (money, the minute timer) reuse it.
+    local n = calls
+    ns.CharacterFactsChanged()
+    ns.CharacterFactsChanged()
+    eq(calls, n, "no new work on a refill")
+    -- Click: the items beside it; closing the window closes them.
+    hands.scripts.OnClick(hands)
+    eq(AltsForeverCraftPanel:IsShown(), true)
+    page:Hide()
+    eq(AltsForeverCraftPanel:IsShown(), false)
+    -- Another world: only crafters there count.
+    ns.ShowCharacter("Far Brom", "character", nil, true)
+    hands.scripts.OnEnter(hands)
+    text = {}
+    for _, line in ipairs(GameTooltip.lines) do text[#text + 1] = tostring(line[1]) end
+    text = table.concat(text, "\n")
+    assert(text:find("Far Gloves", 1, true) and not text:find("Linked Gloves", 1, true), text)
+    -- The anvils' own setting covers these too.
+    ns.SetAnvils(false)
+    eq(hands:IsShown(), false)
+    ns.SetAnvils(true)
+    eq(hands:IsShown(), true)
+end)
+
+test("the Character page's craft panel follows a character switch and the anvils setting while it stays open", function()
+    local ns = flyStart()
+    PaperDollFrame:Hide() -- the game's sheet closed: only our page can move the panel
+    ns.db.chars["Brom"] = alt("Brom", "WARRIOR", { level = 24, gear = {}, realm = "Realm" })
+    ns.db.chars["Far Brom"] = alt("Far Brom", "WARRIOR", { level = 24, gear = {}, realm = "Elsewhere" })
+    ns.ShowCharacter("Brom")
+    local hands = ns.CharacterPage("character").slots[10].craft
+    hands.scripts.OnClick(hands)
+    local panel = AltsForeverCraftPanel
+    local function shownIds()
+        local ids = {}
+        for _, child in ipairs({ panel:GetChildren() }) do
+            if child:IsShown() and child.entry then ids[#ids + 1] = child.entry.id end
+        end
+        return table.concat(ids, ",")
+    end
+    eq(shownIds(), "6001", "Smith's Linked Gloves for Brom")
+    ns.ShowCharacter("Far Brom", "character", nil, true) -- the picker: the same page stays shown
+    eq(panel:IsShown(), true)
+    eq(shownIds(), "6005", "Far Brom's list now, not Brom's")
+    ns.SetAnvils(false)
+    eq(panel:IsShown(), false, "anvils off: the panel goes with them")
+end)
+
+test("the Character page's upgrades: while item data loads, each upgrade state gets its own few tries", function()
+    local ns = flyStart()
+    ns.db.chars["Brom"] = alt("Brom", "WARRIOR", { level = 24, gear = {}, realm = "Realm" })
+    local calls, state = 0, 1
+    ns.CraftableUpgrades = function(_, out) calls = calls + 1 return out or {}, true end -- always still loading
+    ns.UpgradesVersion = function() return state end
+    ns.ShowCharacter("Brom")
+    for _ = 1, 10 do ns.CharacterFactsChanged() end
+    eq(calls, 5, "five tries, then it stops asking")
+    state = 2
+    for _ = 1, 10 do ns.CharacterFactsChanged() end
+    eq(calls, 10, "a new state starts again with five")
+end)

@@ -29,7 +29,7 @@ test("with EllesmereUI, every window takes its look when first created", functio
     local row = overviewRows()[1]
     assert(skinnedWith("Font", row.cells[1]), "row text in the player's font")
     row.scripts.OnClick(row) -- gear panel
-    assert(skinnedWith("Shell", AltsForeverGearFrame), "gear panel")
+    assert(skinnedWith("Shell", AltsForeverCharacterFrame), "gear panel")
     AltsForeverFrame.repButton.scripts.OnClick(AltsForeverFrame.repButton)
     assert(skinnedWith("Shell", AltsForeverRepFrame), "reputation panel")
     -- Every icon button in the overview's title bar: square, with EllesmereUI's border.
@@ -246,13 +246,13 @@ test("with ElvUI, every window takes its look when first created", function()
     assert(skinnedWith("FontTemplate", f.credit), "text the window already had")
     local row = overviewRows()[1]
     row.scripts.OnClick(row)
-    assert(skinnedWith("HandleFrame", AltsForeverGearFrame), "gear panel")
+    assert(skinnedWith("HandleFrame", AltsForeverCharacterFrame), "gear panel")
     local icons, slots = {}, 0
     for _, name in ipairs(OVERVIEW_ICONS) do icons[f[name]] = true end
     for _, call in ipairs(wow.skinned) do
         if call[1] == "CreateBackdrop" and not icons[call[2]] then slots = slots + 1 end
     end
-    eq(slots, 19, "every gear slot")
+    eq(slots, 27, "every gear slot, and the professions page's 8 reagent slots made with the window")
     f.repButton.scripts.OnClick(f.repButton)
     assert(skinnedWith("HandleFrame", AltsForeverRepFrame), "reputation panel")
 end)
