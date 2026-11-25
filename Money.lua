@@ -345,23 +345,25 @@ local function FoldGoldGroups(db)
     end
 end
 
-function ns.StartMoney()
-    local char = ns.char
-
-    -- Local time's offset from UTC, so days start at local midnight. The UTC fields are read
-    -- back as local time with today's daylight saving, or summer days started an hour off.
-    local now = time()
-    local utc = date("!*t", now)
-    utc.isdst = date("*t", now).isdst
-    dayOffset = now - time(utc)
+-- The gold history this character's group adds to. A group made here while the realm or
+-- faction wasn't known yet is remembered (`guessed`), so it can go once they are; so is
+-- the main history claimed for one (`guessedMain`), so the right group claims it instead.
+local guessed, guessedMain
+local function PickDays(char)
     local db = ns.db
-    FoldGoldGroups(db)
     local group = GoldGroup(char.realm, char.faction)
+    local known = char.realm and char.faction
     db.goldDays = db.goldDays or {}
-    if not db.goldGroup and ns.RichestGroup(char) then db.goldGroup = group end
+    if not db.goldGroup and ns.RichestGroup(char) then
+        db.goldGroup = group
+        if not known then guessedMain = true end
+    end
     if db.goldGroup ~= group then
         db.goldDaysBy = db.goldDaysBy or {}
-        db.goldDaysBy[group] = db.goldDaysBy[group] or {}
+        if not db.goldDaysBy[group] then
+            db.goldDaysBy[group] = {}
+            if not known then guessed = group end
+        end
         days = db.goldDaysBy[group]
     else
         db.goldGroup = group
@@ -375,6 +377,34 @@ function ns.StartMoney()
             if next(db.goldDaysBy) == nil then db.goldDaysBy = nil end
         end
     end
+end
+
+-- The realm or faction became known after login (Core.lua): today's reading moves to the
+-- right group, and a group made only for the unknown one goes.
+function ns.MoneyWorldKnown()
+    local char, by = ns.char, ns.db.goldDaysBy
+    if not (days and char) then return end
+    if guessed and by and by[guessed] == days then
+        by[guessed] = nil
+        if next(by) == nil then ns.db.goldDaysBy = nil end
+    end
+    if guessedMain then ns.db.goldGroup = nil end
+    guessed, guessedMain = nil, nil
+    PickDays(char)
+    if char.money then RecordDay() end
+end
+
+function ns.StartMoney()
+    local char = ns.char
+
+    -- Local time's offset from UTC, so days start at local midnight. The UTC fields are read
+    -- back as local time with today's daylight saving, or summer days started an hour off.
+    local now = time()
+    local utc = date("!*t", now)
+    utc.isdst = date("*t", now).isdst
+    dayOffset = now - time(utc)
+    FoldGoldGroups(ns.db)
+    PickDays(char)
 
     local function Update()
         local m = GetMoney()

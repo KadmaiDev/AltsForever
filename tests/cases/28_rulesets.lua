@@ -44,6 +44,54 @@ test("each character's ruleset is recorded at login; a secret or empty one is ig
     eq(AltsForeverDB.chars["Aldric"].realm, nil)
 end)
 
+-- A player's new characters stayed "Not sorted yet" with no realm saved (2026-11-25).
+test("a realm the game can't name at login is read when the world loads, and the character sorted", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.player.realm = nil
+    wow.money = 1000
+    wow.login(rulesetAlts())
+    eq(ns.char.realm, nil, "nothing to read yet")
+    for group in pairs(AltsForeverDB.goldDaysBy or {}) do eq(group:sub(1, 1) ~= "|", true, "only a guess: " .. group) end
+    wow.player.realm = PVE
+    wow.fire("PLAYER_ENTERING_WORLD", true, false)
+    eq(ns.char.realm, PVE)
+    eq(AltsForeverDB.goldGroup, PVE .. "|Alliance", "the history claimed by the real group, not the guess")
+    for group in pairs(AltsForeverDB.goldDaysBy or {}) do eq(group:sub(1, 1) ~= "|", true, "guess left behind: " .. group) end
+    local today
+    for day in pairs(AltsForeverDB.goldDays) do today = day end
+    eq(AltsForeverDB.goldDays[today], 4200, "today's reading in the right group")
+    eq(ns.RulesetLabel(ns.char.realm), "Normal")
+end)
+
+test("a realm still unreadable when the world loads is asked again a few seconds later", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.player.realm = nil
+    wow.money = 500
+    -- Gold history already kept for another group: the guess gets a group of its own.
+    wow.login({ v = 2, goldGroup = "rp|Horde", goldDays = {}, chars = {} })
+    wow.fire("PLAYER_ENTERING_WORLD", true, false)
+    runTimers()
+    runTimers()
+    eq(ns.char.realm, nil)
+    wow.player.realm = "CAMWOWUS2Realm12RP"
+    runTimers()
+    eq(ns.char.realm, "CAMWOWUS2Realm12RP", "still asked after two misses")
+    eq(AltsForeverDB.chars["Aldric"].realm, "CAMWOWUS2Realm12RP", "saved")
+    eq(AltsForeverDB.goldDaysBy["|Alliance"], nil, "the guess's group went")
+    eq(next(AltsForeverDB.goldDaysBy["rp|Alliance"]) ~= nil, true, "today's reading in the right one")
+end)
+
+test("without a normalized realm name, the shown one is used without its spaces", function()
+    local ns = wow.load(FILES)
+    GetNormalizedRealmName = function() return nil end
+    GetRealmName = function() return "CAMWOW US2 Realm 12 RP" end
+    wow.login({ v = 2, chars = {} })
+    eq(ns.char.realm, "CAMWOWUS2Realm12RP")
+    eq(ns.RulesetOf(ns.char.realm), "rp")
+end)
+
 test("ruleset names: from the realm name, the same for two realms of one ruleset", function()
     local ns = rulesetStart()
     eq(ns.RulesetLabel(PVP), "PvP")

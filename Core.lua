@@ -402,9 +402,19 @@ end
 -- nothing disappears until they log in once. Mail never crosses factions either, on any
 -- ruleset, so the other faction is treated the same way.
 ---------------------------------------------------------------------------
+-- Else the realm's display name without its spaces and hyphens, as the game makes the
+-- normalized one ("CAMWOW AU1 Realm 1 PvE" -> "CAMWOWAU1Realm1PvE"); nil if neither answers.
+local function Readable(text)
+    if issecretvalue(text) then return nil end
+    if type(text) == "string" and text ~= "" then return text end
+end
+
 function ns.PlayerRealm()
-    local realm = GetNormalizedRealmName and GetNormalizedRealmName()
-    if type(realm) == "string" and not issecretvalue(realm) and realm ~= "" then return realm end
+    local realm = Readable(GetNormalizedRealmName and GetNormalizedRealmName())
+    if realm then return realm end
+    local shown = Readable(GetRealmName and GetRealmName())
+    realm = shown and shown:gsub("[%s%-]", "")
+    if realm and realm ~= "" then return realm end
 end
 
 local RULESET_NAMES = { normal = L["Normal"], pvp = L["PvP"], rp = L["Roleplaying"], hardcore = L["Hardcore"] }
@@ -610,7 +620,8 @@ function ns.InitChar(db, name, class, faction, realm)
         c = {}
         db.chars[key] = c
     end
-    c.name, c.class, c.faction = name, class, faction
+    c.name, c.class = name, class
+    c.faction = faction or c.faction
     if realm then
         c.realm = realm
         local ruleset = ns.PlayerRuleset()
@@ -674,7 +685,43 @@ ns.On("PLAYER_LOGIN", function()
     ns.StartGamepad()
     ns.StartItemNames()
     ns.Welcome(newChar, betaGone)
+    ns.WatchWorld()
 end)
+
+-- The realm (and faction) may not be readable yet at login: a player's new characters
+-- stayed "Not sorted yet" in the overview across sessions, with no realm in the saved file
+-- (2026-11-25; not seen by us). Until both are known they're asked again as each loading
+-- screen ends and a few times in the first minute; once known, everything that groups
+-- characters is told.
+local worldTries = 0
+local function WorldKnown()
+    local c = ns.char
+    if not c or c.realm and c.faction then return true end
+    local realm, faction = ns.PlayerRealm(), UnitFactionGroup("player")
+    if issecretvalue(faction) or faction == "" then faction = nil end
+    if not (realm and not c.realm or faction and not c.faction) then return false end
+    ns.InitChar(ns.db, ns.charKey, c.class, faction, realm)
+    if ns.InvalidateCache then ns.InvalidateCache() end
+    if ns.MoneyWorldKnown then ns.MoneyWorldKnown() end
+    if ns.UpgradesChanged then ns.UpgradesChanged() end
+    if ns.RefreshOverview then ns.RefreshOverview() end
+    return c.realm and c.faction and true or false
+end
+
+-- Stays registered once done (ns.Off would drop every handler of the event): returns at once.
+local worldDone
+local function TryWorld()
+    if worldDone then return end
+    if WorldKnown() then worldDone = true return end
+    worldTries = worldTries + 1
+    if worldTries <= 4 and C_Timer and C_Timer.After then C_Timer.After(worldTries * 5, TryWorld) end
+end
+
+function ns.WatchWorld()
+    if ns.char.realm and ns.char.faction then return end
+    ns.On("PLAYER_ENTERING_WORLD", TryWorld)
+    if C_Timer and C_Timer.After then C_Timer.After(2, TryWorld) end
+end
 
 -- A few seconds after login (after the game's own login messages): on a fresh install,
 -- how to use Alts Forever, once; on a character seen for the first time, that it's now
