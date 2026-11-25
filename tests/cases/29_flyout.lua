@@ -518,3 +518,41 @@ test("the character window's Character page: anvils for what can be crafted for 
     ns.SetAnvils(true)
     eq(hands:IsShown(), true)
 end)
+
+test("the Character page's craft panel follows a character switch and the anvils setting while it stays open", function()
+    local ns = flyStart()
+    PaperDollFrame:Hide() -- the game's sheet closed: only our page can move the panel
+    ns.db.chars["Brom"] = alt("Brom", "WARRIOR", { level = 24, gear = {}, realm = "Realm" })
+    ns.db.chars["Far Brom"] = alt("Far Brom", "WARRIOR", { level = 24, gear = {}, realm = "Elsewhere" })
+    ns.ShowCharacter("Brom")
+    local hands = ns.CharacterPage("character").slots[10].craft
+    hands.scripts.OnClick(hands)
+    local panel = AltsForeverCraftPanel
+    local function shownIds()
+        local ids = {}
+        for _, child in ipairs({ panel:GetChildren() }) do
+            if child:IsShown() and child.entry then ids[#ids + 1] = child.entry.id end
+        end
+        return table.concat(ids, ",")
+    end
+    eq(shownIds(), "6001", "Smith's Linked Gloves for Brom")
+    ns.ShowCharacter("Far Brom", "character", nil, true) -- the picker: the same page stays shown
+    eq(panel:IsShown(), true)
+    eq(shownIds(), "6005", "Far Brom's list now, not Brom's")
+    ns.SetAnvils(false)
+    eq(panel:IsShown(), false, "anvils off: the panel goes with them")
+end)
+
+test("the Character page's upgrades: while item data loads, each upgrade state gets its own few tries", function()
+    local ns = flyStart()
+    ns.db.chars["Brom"] = alt("Brom", "WARRIOR", { level = 24, gear = {}, realm = "Realm" })
+    local calls, state = 0, 1
+    ns.CraftableUpgrades = function(_, out) calls = calls + 1 return out or {}, true end -- always still loading
+    ns.UpgradesVersion = function() return state end
+    ns.ShowCharacter("Brom")
+    for _ = 1, 10 do ns.CharacterFactsChanged() end
+    eq(calls, 5, "five tries, then it stops asking")
+    state = 2
+    for _ = 1, 10 do ns.CharacterFactsChanged() end
+    eq(calls, 10, "a new state starts again with five")
+end)

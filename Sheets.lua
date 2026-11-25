@@ -484,6 +484,7 @@ end
 -- refill (items arriving refill the page), up to MAX_TRIES times for the same state.
 local MAX_TRIES = 5
 local craftState, craftLists, craftAll, craftTries = {}, {}, {}, {}
+local triesFor = {} -- the state craftTries[key] counts for: a new one gets its own tries
 local NONE = {}
 
 local function CraftLists(key, c)
@@ -502,7 +503,8 @@ local function CraftLists(key, c)
     end
     craftAll[key] = all
     ns.GroupCraftable(all, lists)
-    local tries = pending and (craftTries[key] or 0) + 1 or 0
+    if triesFor[key] ~= state then craftTries[key], triesFor[key] = 0, state end
+    local tries = pending and craftTries[key] + 1 or 0
     craftTries[key] = tries
     craftState[key] = (not pending or tries >= MAX_TRIES) and state or nil
     return lists
@@ -532,6 +534,8 @@ local function FillCharacter(page, key, c)
         -- Nearly broken items are tinted red, as on the game's own panel.
         if pct and pct < LOW_DURABILITY then b.icon:SetVertexColor(1, 0.3, 0.3) else b.icon:SetVertexColor(1, 1, 1) end
     end
+    -- An open craft panel follows its anvil: another character's list now, or closed.
+    if ns.FollowCraftPanel then ns.FollowCraftPanel(page) end
     local facts = ns.CharacterFacts(key, c, time())
     for i, line in ipairs(page.facts) do
         local f = facts[i]
