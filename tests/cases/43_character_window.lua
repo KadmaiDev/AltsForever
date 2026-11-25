@@ -111,6 +111,24 @@ test("the Reputation page lists the character's standings by name, coloured by s
     eq(page.list.empty:GetText(), "Tarn Moon has no reputation recorded yet.")
 end)
 
+test("Reputation bars take the game's darker bar colours, and their text is outlined", function()
+    local ns = cwStart()
+    ns.ShowCharacter("Vesp Ash", "reputation")
+    local rows = {}
+    for _, row in ipairs(ns.CharacterPage("reputation").list.rows) do
+        if row:IsShown() and row.bar:IsShown() then rows[row.label:GetText()] = row.bar end
+    end
+    -- No FACTION_BAR_COLORS in the fake: retail's values.
+    eq(table.concat(rows["Darkspear Trolls"].barColour, ","), "0.8,0.3,0.22")
+    eq(table.concat(rows["Undercity"].barColour, ","), "0,0.6,0.1")
+    eq(rows["Undercity"].text.font[3], "OUTLINE")
+    -- The game's own table wins when it's there.
+    FACTION_BAR_COLORS = { [4] = { r = 0.5, g = 0.4, b = 0.1 } }
+    eq(table.concat({ ns.StandingBarColour(4) }, ","), "0.5,0.4,0.1")
+    eq(table.concat({ ns.StandingBarColour(5) }, ","), "0,0.6,0.1")
+    FACTION_BAR_COLORS = nil
+end)
+
 test("the Character page: gear in the game's layout, and what's known about them between", function()
     local ns = cwStart()
     ns.ShowCharacter("Vesp Ash")

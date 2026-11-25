@@ -294,6 +294,9 @@ function M.load(files)
     function frameMethods:GetTop() return self.rect and self.rect[3] end
     function frameMethods:GetBottom() return self.rect and self.rect[4] end
     function frameMethods:SetMinMaxValues(lo, hi) self.min, self.max = lo, hi end
+    function frameMethods:SetStatusBarColor(r, g, b) self.barColour = { r, g, b } end
+    function frameMethods:GetFont() if self.font then return unpack(self.font) end end
+    function frameMethods:SetFont(path, size, flags) self.font = { path, size, flags } return true end
     function frameMethods:GetValue() return self.value end
     function frameMethods:SetValue(v)
         v = math.max(self.min or v, math.min(self.max or v, v))
@@ -352,8 +355,11 @@ function M.load(files)
         self.normalTexture.texture = t
     end
     function frameMethods:GetText() return self.text end
-    function frameMethods:CreateFontString()
+    -- A font string's font, from its template ("font:GameFontNormal", size 10), so code
+    -- that reads and re-sets it can be checked.
+    function frameMethods:CreateFontString(_, _, template)
         local fs = newObject("FontString")
+        fs.font = { "font:" .. tostring(template), 10, "" }
         self.regions = self.regions or {}
         self.regions[#self.regions + 1] = fs
         return fs

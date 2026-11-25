@@ -32,6 +32,23 @@ function ns.StandingLabel(level)
     return _G["FACTION_STANDING_LABEL" .. level] or LABELS[level], COLORS[level]
 end
 
+-- A level's bar fill: the game's own (FACTION_BAR_COLORS, as its Reputation window uses),
+-- darker than the text colours above so white text on the bar stays readable (owner's
+-- screenshot 2026-11-25: white on bright yellow and green was hard to read). The fallback
+-- is retail's values for the same table.
+local BAR_COLORS = {
+    { 0.8, 0.3, 0.22 }, { 0.8, 0.3, 0.22 }, { 0.75, 0.27, 0 }, { 0.9, 0.7, 0 },
+    { 0, 0.6, 0.1 }, { 0, 0.6, 0.1 }, { 0, 0.6, 0.1 }, { 0, 0.6, 0.1 },
+}
+function ns.StandingBarColour(level)
+    local c = type(FACTION_BAR_COLORS) == "table" and FACTION_BAR_COLORS[level]
+    if type(c) == "table" and type(c.r) == "number" and type(c.g) == "number" and type(c.b) == "number" then
+        return c.r, c.g, c.b
+    end
+    c = BAR_COLORS[level] or BAR_COLORS[4]
+    return c[1], c[2], c[3]
+end
+
 -- "Honored 27%" in the level's colour; Exalted on its own.
 function ns.StandingText(value)
     local level, low, high = ns.Standing(value)
