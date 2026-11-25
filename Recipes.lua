@@ -1010,12 +1010,6 @@ local function FillSheet(c)
         return false
     end
     local page = sheetPages[def.id]
-    if not page then
-        page = CreateFrame("Frame", nil, frame)
-        page:SetAllPoints(frame)
-        def.build(page)
-        sheetPages[def.id] = page
-    end
     for id, other in pairs(sheetPages) do other:SetShown(id == def.id) end
     frame.profPage:Hide()
     frame:SetWidth(ns.SHEET_WIDTH or WIDTH) -- narrower, as the game's character window
@@ -1205,6 +1199,15 @@ local function CreateWindow()
         if open then PlaySound(open) end
     end)
     f:HookScript("OnHide", function() if closing then PlaySound(closing) end end)
+    -- Every page now, while the window is still hidden: a frame made inside an open window
+    -- would have the controller's navigator rebuild it from our code.
+    for _, def in ipairs(ns.SHEETS or {}) do
+        local page = CreateFrame("Frame", nil, f)
+        page:SetAllPoints(f)
+        def.build(page)
+        page:Hide()
+        sheetPages[def.id] = page
+    end
     ns.GamepadWindow(f)
     ns.ScaleWindow(f)
 end

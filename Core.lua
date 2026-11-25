@@ -438,6 +438,15 @@ end
 
 -- Out of mail's reach from the character you're on: another ruleset or the other faction
 -- (each known for both).
+-- Whether two characters share a world: mail and trade reach each other (the same ruleset
+-- when both realms are known, and the same faction when both are known).
+function ns.SameWorld(a, b)
+    if a.realm and b.realm and a.realm ~= b.realm and ns.RulesetOf(a.realm) ~= ns.RulesetOf(b.realm) then
+        return false
+    end
+    return not (a.faction and b.faction and a.faction ~= b.faction)
+end
+
 function ns.Elsewhere(c)
     local me = ns.char
     if not me or c == me then return false end

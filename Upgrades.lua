@@ -1048,7 +1048,9 @@ end
 -- sheet opens, never per frame. With `who` ({ class, level, gear, spec }: a player being
 -- inspected, Flyout.lua) it's judged for them: only what binds when equipped, as nothing
 -- else can be handed over, and nothing that needs a profession (theirs aren't known).
-function ns.CraftableUpgrades(slot, out, who)
+-- `who`: someone other than you (an inspected player, or with `whoKey` one of your other
+-- characters, whose crafters are then the characters who can mail them).
+function ns.CraftableUpgrades(slot, out, who, whoKey)
     out = out or {}
     wipe(out)
     local me, myKey = who or ns.char, ns.charKey
@@ -1057,7 +1059,11 @@ function ns.CraftableUpgrades(slot, out, who)
     local heaviest = Heaviest(cls, me.level, me)
     local keys = {}
     for key, c in pairs(ns.db.chars) do
-        if key == myKey or (c.crafts and not ns.Elsewhere(c)) then keys[#keys + 1] = key end
+        if whoKey then
+            if c.crafts and ns.SameWorld(c, me) then keys[#keys + 1] = key end
+        elseif key == myKey or (c.crafts and not ns.Elsewhere(c)) then
+            keys[#keys + 1] = key
+        end
     end
     table.sort(keys, function(a, b)
         if (a == myKey) ~= (b == myKey) then return a == myKey end -- your own recipes first

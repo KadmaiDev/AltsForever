@@ -474,3 +474,47 @@ test("an inspected player's spec comes from the inspect config's points per tab"
     C_Traits.HasValidInspectData = nil
     eq(select(2, ns.InspectSpec()), false, "a client without it")
 end)
+
+test("the character window's Character page: anvils for what can be crafted for the character shown", function()
+    local ns = flyStart()
+    ns.db.chars["Brom"] = alt("Brom", "WARRIOR", { level = 24, gear = {}, realm = "Realm" })
+    ns.db.chars["Far Brom"] = alt("Far Brom", "WARRIOR", { level = 24, gear = {}, realm = "Elsewhere" })
+    local calls, real = 0, ns.CraftableUpgrades
+    ns.CraftableUpgrades = function(...) calls = calls + 1 return real(...) end
+    ns.ShowCharacter("Brom")
+    local page = ns.CharacterPage("character")
+    local hands = page.slots[10].craft
+    eq(hands:IsShown(), true, "Smith can mail Brom his mail gloves")
+    eq(hands.tier.texture, "Interface\\AddOns\\AltsForever\\media\\up3.tga")
+    eq(hands.point[1], "TOPRIGHT", "inside the right-hand column, clear of the window's edge")
+    eq(page.slots[15].craft.point[1], "TOPLEFT", "inside the left-hand column")
+    eq(page.slots[1].craft:IsShown(), false, "the helm needs level 28")
+    hands.scripts.OnEnter(hands)
+    local text = {}
+    for _, line in ipairs(GameTooltip.lines) do text[#text + 1] = tostring(line[1]) .. " | " .. tostring(line[2]) end
+    text = table.concat(text, "\n")
+    assert(text:find("Linked Gloves", 1, true) and text:find("Smith", 1, true), text)
+    assert(not text:find("Far Gloves", 1, true), "Far Away is in another world from Brom\n" .. text)
+    -- Worked out once: refills (money, the minute timer) reuse it.
+    local n = calls
+    ns.CharacterFactsChanged()
+    ns.CharacterFactsChanged()
+    eq(calls, n, "no new work on a refill")
+    -- Click: the items beside it; closing the window closes them.
+    hands.scripts.OnClick(hands)
+    eq(AltsForeverCraftPanel:IsShown(), true)
+    page:Hide()
+    eq(AltsForeverCraftPanel:IsShown(), false)
+    -- Another world: only crafters there count.
+    ns.ShowCharacter("Far Brom", "character", nil, true)
+    hands.scripts.OnEnter(hands)
+    text = {}
+    for _, line in ipairs(GameTooltip.lines) do text[#text + 1] = tostring(line[1]) end
+    text = table.concat(text, "\n")
+    assert(text:find("Far Gloves", 1, true) and not text:find("Linked Gloves", 1, true), text)
+    -- The anvils' own setting covers these too.
+    ns.SetAnvils(false)
+    eq(hands:IsShown(), false)
+    ns.SetAnvils(true)
+    eq(hands:IsShown(), true)
+end)

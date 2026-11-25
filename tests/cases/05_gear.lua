@@ -20,7 +20,7 @@ function gearPanelSlots()
     local slots = {}
     for _, f in ipairs(wow.frames) do
         local slot = rawget(f, "slot")
-        if slot then slots[slot] = f end
+        if slot and not rawget(f, "lists") then slots[slot] = f end -- not the anvils beside them
     end
     return slots
 end

@@ -403,7 +403,7 @@ local function SlotClick(b)
     if b.link and IsModifiedClick() then HandleModifiedItemClick(b.link) end
 end
 
-local function MakeSlot(page, slot, x, y)
+local function MakeSlot(page, slot, x, y, side)
     local b = CreateFrame("Button", nil, page)
     b:SetSize(SLOT, SLOT)
     b:SetPoint("TOPLEFT", page, "TOPLEFT", x, y)
@@ -419,21 +419,27 @@ local function MakeSlot(page, slot, x, y)
     b:SetScript("OnEnter", SlotEnter)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
     b:SetScript("OnClick", SlotClick)
+    -- The anvil for craftable upgrades (Flyout.lua's), made with the page, hidden till needed.
+    if ns.CraftSlotGlyph then
+        b.craft = ns.CraftSlotGlyph(b, side)
+        b.craft:Hide()
+    end
     page.slots[slot] = b
 end
 
 local function BuildCharacter(page)
     page.slots = {}
     local top = TOP - 6
-    for i, slot in ipairs(LEFT) do MakeSlot(page, slot, 16, top - (i - 1) * SLOT_GAP) end
-    for i, slot in ipairs(RIGHT) do MakeSlot(page, slot, WIDTH - 16 - SLOT, top - (i - 1) * SLOT_GAP) end
+    for i, slot in ipairs(LEFT) do MakeSlot(page, slot, 16, top - (i - 1) * SLOT_GAP, "left") end
+    for i, slot in ipairs(RIGHT) do MakeSlot(page, slot, WIDTH - 16 - SLOT, top - (i - 1) * SLOT_GAP, "right") end
     for i, slot in ipairs(BOTTOM) do
-        MakeSlot(page, slot, WIDTH / 2 - (SLOT * 3 + 10 * 2) / 2 + (i - 1) * (SLOT + 10), top - 8 * SLOT_GAP - 6)
+        MakeSlot(page, slot, WIDTH / 2 - (SLOT * 3 + 10 * 2) / 2 + (i - 1) * (SLOT + 10), top - 8 * SLOT_GAP - 6, "bottom")
     end
+    page:HookScript("OnHide", function() if ns.HideCraftPanel then ns.HideCraftPanel(page) end end)
     -- The facts: a label and its value per line, between the two columns of slots, each in
     -- a space of its own so a long value (a hearthstone place in another language) is cut
     -- short rather than running into the label or the gear names; hovering shows it whole.
-    local left = 16 + SLOT + 14
+    local left = 16 + SLOT + 3 + 18 + 8 -- past the slot and its anvil
     local right = WIDTH - left
     page.facts = {}
     for i = 1, FACT_LINES do
@@ -472,12 +478,43 @@ local function Tick()
     if ns.CharacterWindowShown() == "character" then ns.CharacterWindowChanged() end
 end
 
+-- Craftable upgrades per slot for a character (as the character sheet's anvils: wearable
+-- now, bind on equip, from characters who can mail them), worked out once per character
+-- and upgrade state, not on every refill. Item data still loading: tried again on the next
+-- refill (items arriving refill the page), up to MAX_TRIES times for the same state.
+local MAX_TRIES = 5
+local craftState, craftLists, craftAll, craftTries = {}, {}, {}, {}
+local NONE = {}
+
+local function CraftLists(key, c)
+    if not (ns.CraftableUpgrades and ns.AnvilsOn and ns.AnvilsOn()) then return NONE end
+    local state = ns.UpgradesVersion() .. ":" .. (ns.craftVersion or 0) .. ":" .. (c.level or 0)
+    local lists = craftLists[key]
+    if lists and craftState[key] == state then return lists end
+    lists = lists or {}
+    craftLists[key] = lists
+    wipe(lists)
+    local all, pending
+    if key == ns.charKey then
+        all, pending = ns.CraftableUpgrades(nil, craftAll[key])
+    else
+        all, pending = ns.CraftableUpgrades(nil, craftAll[key], c, key)
+    end
+    craftAll[key] = all
+    ns.GroupCraftable(all, lists)
+    local tries = pending and (craftTries[key] or 0) + 1 or 0
+    craftTries[key] = tries
+    craftState[key] = (not pending or tries >= MAX_TRIES) and state or nil
+    return lists
+end
+
 local function FillCharacter(page, key, c)
     if not ticking and C_Timer then
         ticking = true
         C_Timer.After(TICK, Tick)
     end
     local gear = c.gear
+    local lists = CraftLists(key, c)
     page.empty:SetShown(not gear)
     for slot, b in pairs(page.slots) do
         local link = gear and gear[slot]
@@ -490,6 +527,7 @@ local function FillCharacter(page, key, c)
         elseif not ns.SlotEmpty(b, b.emptyArt) then
             b.icon:SetTexture(b.emptyArt)
         end
+        if b.craft then ns.SetCraftGlyph(b.craft, slot, lists, key ~= ns.charKey and c or nil) end
         local pct = c.duraSlots and c.duraSlots[slot]
         -- Nearly broken items are tinted red, as on the game's own panel.
         if pct and pct < LOW_DURABILITY then b.icon:SetVertexColor(1, 0.3, 0.3) else b.icon:SetVertexColor(1, 1, 1) end
