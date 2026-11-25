@@ -161,6 +161,14 @@ test("the character pages are narrow, as the game's character window; profession
     eq(f:GetWidth(), 673, "a profession: the full professions window"); eq(f:GetHeight(), 594)
     f.tabs[1].scripts.OnClick(f.tabs[1])
     eq(f:GetWidth(), 440); eq(f:GetHeight(), 484)
+    -- Six professions: nine side tabs reach past 484, so the window grows to hold them.
+    local c = ns.db.chars["Vesp Ash"]
+    c.profs.Tailoring, c.profs["First Aid"], c.profs.Alchemy = 50, 60, 70
+    ns.ShowCharacter("Vesp Ash", "character", nil, true)
+    local shown = 0
+    for _, tab in ipairs(f.tabs) do if tab:IsShown() then shown = shown + 1 end end
+    eq(shown, 9)
+    eq(f:GetHeight(), 60 + 9 * 44 + 7 * 2 + 14 + 12, "the tabs' bottom and a margin")
 end)
 
 test("the character menu opens each page; the same page again from a row closes it", function()

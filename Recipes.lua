@@ -921,14 +921,22 @@ end
 
 -- The tabs down the right edge: the character window's pages (Sheets.lua), then a gap and
 -- one per profession. Returns the professions' list (ns.RecipeTabs).
+-- Also notes in frame.tabsBottom how far down the tabs reach, so the window can be made at
+-- least that tall (a character with many professions ran past the shorter pages' bottom:
+-- owner's screenshot, 2026-11-25).
+local TABS_TOP, TAB_H = 60, 44
 local function ShowTabs(c)
     local list = ns.RecipeTabs(c)
     local n = 0
+    local bottom = TABS_TOP
     local function Place(tab, gap)
+        local h = tab:GetHeight()
+        if type(h) ~= "number" or issecretvalue(h) or h <= 0 then h = TAB_H end
+        bottom = bottom + h + (n == 0 and 0 or (gap and 14 or 2))
         n = n + 1
         tab:ClearAllPoints()
         if n == 1 then
-            tab:SetPoint("TOPLEFT", frame, "TOPRIGHT", 0, -60)
+            tab:SetPoint("TOPLEFT", frame, "TOPRIGHT", 0, -TABS_TOP)
         else
             tab:SetPoint("TOPLEFT", frame.tabs[n - 1], "BOTTOMLEFT", 0, gap and -14 or -2)
         end
@@ -950,6 +958,7 @@ local function ShowTabs(c)
         Place(tab, i == 1 and n > 0)
     end
     for i = n + 1, #frame.tabs do frame.tabs[i]:Hide() end
+    frame.tabsBottom = bottom + 12
     return list
 end
 
@@ -1012,7 +1021,8 @@ local function FillSheet(c)
     local page = sheetPages[def.id]
     for id, other in pairs(sheetPages) do other:SetShown(id == def.id) end
     frame.profPage:Hide()
-    frame:SetSize(ns.SHEET_WIDTH or WIDTH, ns.SHEET_HEIGHT or HEIGHT) -- smaller, as the game's character window
+    -- Smaller, as the game's character window, but never shorter than the side tabs.
+    frame:SetSize(ns.SHEET_WIDTH or WIDTH, max(ns.SHEET_HEIGHT or HEIGHT, frame.tabsBottom or 0))
     frame.sheetBg:Show()
     if frame.pageBg then frame.pageBg:Hide() end
     if frame.page then frame.page:Hide() end
@@ -1030,7 +1040,7 @@ function Fill()
     local tabs = ShowTabs(c)
     if shownSheet ~= "professions" and FillSheet(c) then return end
     for _, page in pairs(sheetPages) do page:Hide() end
-    frame:SetSize(WIDTH, HEIGHT)
+    frame:SetSize(WIDTH, max(HEIGHT, frame.tabsBottom or 0))
     frame.profPage:Show()
     frame.sheetBg:Hide()
     if frame.pageBg then frame.pageBg:Show() end
