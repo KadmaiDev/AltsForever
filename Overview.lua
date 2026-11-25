@@ -13,6 +13,7 @@ local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
 local GREY = "|cff9d9d9d"
 -- Something to do on that character: rested filling slowly, Legacy points to spend.
 local ATTENTION = "|cffff8000"
+local SKILL_BEHIND = 25 -- weapon skill points behind its maximum before it shows orange
 local MAX_PROFESSION = 300 -- the last rank's maximum on Forever (Classic ruleset)
 local ROW_HEIGHT = 20
 local COLUMNS = {
@@ -611,6 +612,20 @@ local function RowTooltip(row)
         for _, r in ipairs(cooldowns) do
             tt:AddDoubleLine(ns.CooldownName(r), ns.CooldownText(r[2], now), 1, 0.82, 0, 1, 1, 1)
         end
+    end
+    -- Weapon skills and armour trained (a player's request, 2026-11-25). A weapon skill more
+    -- than 5 levels' worth behind its maximum is orange; Unarmed and Defense never are
+    -- (most characters never punch, and casters' Defense always lags).
+    local skills, armour = ns.CombatSkills(c)
+    if skills then
+        tt:AddLine(" ")
+        tt:AddLine(L["Weapon skills"], 1, 0.82, 0)
+        for _, r in ipairs(skills) do
+            local text = r[2] .. "/" .. r[3]
+            if r[4] and r[2] + SKILL_BEHIND < r[3] then text = ATTENTION .. text .. "|r" end
+            tt:AddDoubleLine(r[1], text, 1, 1, 1, 1, 1, 1)
+        end
+        if armour then tt:AddDoubleLine(L["Armor"], armour, 1, 0.82, 0, 1, 1, 1) end
     end
     ns.AddLockoutLines(tt, c, now)
     tt:AddLine(" ")

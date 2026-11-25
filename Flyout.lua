@@ -263,7 +263,7 @@ function ns.AnvilsOn() return not ns.db.anvilsOff end
 -- and binds when equipped.
 local function Group(list, into)
     for _, e in ipairs(list) do
-        if e.boe and not e.at and e.slot then
+        if e.boe and not e.at and not e.train and e.slot then
             local t = into[e.slot]
             if not t then
                 t = {}

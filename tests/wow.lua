@@ -172,6 +172,15 @@ function M.load(files)
         local p = M.profs[i]
         return p[1], p.icon or 136243, p[2], p[3] or 150, 0, 0, p.line
     end
+    -- The skills list (weapons, armour, Defense): M.skills = { [skillID] = { name, rank, max } }
+    -- for what's trained; nil = the list isn't ready (nothing at all comes back).
+    M.skills = nil
+    C_SkillInfo = {
+        GetSkillLineInfoByID = function(id)
+            local s = M.skills and M.skills[id]
+            return s and { skillID = id, name = s[1], rank = s[2], maxRank = s[3], isHeader = false }
+        end,
+    }
     local ts = function() return M.tradeskill end
     -- Profession names by skill line, in the client's language (M.skillLineNames).
     M.skillLineNames = { [356] = "Fishing", [182] = "Herbalism", [393] = "Skinning", [186] = "Mining" }
@@ -552,7 +561,9 @@ function M.load(files)
         IsBound = function(loc) local s = slotData(loc.bag, loc.slot) return s and s.bound or false end,
         GetItemClassInfo = function(class) return ({ [4] = "Armor", [7] = "Trade Goods" })[class] end,
         GetItemSubClassInfo = function(class, sub)
-            return ({ ["7:5"] = "Cloth", ["7:7"] = "Metal & Stone", ["7:9"] = "Herb", ["7:11"] = "Other", ["4:1"] = "Cloth" })[class .. ":" .. sub]
+            return ({ ["7:5"] = "Cloth", ["7:7"] = "Metal & Stone", ["7:9"] = "Herb", ["7:11"] = "Other", ["4:1"] = "Cloth",
+                ["4:2"] = "Leather", ["4:3"] = "Mail", ["4:4"] = "Plate", ["4:6"] = "Shields", ["2:7"] = "One-Handed Swords",
+                ["2:10"] = "Staves", ["2:15"] = "Daggers", ["2:19"] = "Wands" })[class .. ":" .. sub]
         end,
         GetItemQualityByID = function(id) return M.itemQuality[id] end,
         GetItemMaxStackSizeByID = function(id) return (M.items[id] or {}).stack end,

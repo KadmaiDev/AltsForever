@@ -215,6 +215,7 @@ local CHAR_FIELDS = {
     layout = "table", profs = "table", profMax = "table", recipes = "table", crafts = "table",
     reps = "table", duraSlots = "table", saves = "table", saveKills = "table",
     account = "string", runs = "table", recipesAt = "table", links = "table", cooldowns = "table",
+    skills = "table",
 }
 local DB_FIELDS = {
     icons = "table", goldDays = "table", goldDaysBy = "table", factions = "table",
@@ -252,6 +253,7 @@ local function RepairChar(c)
     if c.recipes then KeepOnly(c.recipes, "string", "table") end
     if c.crafts then KeepOnly(c.crafts, "string", "table") end
     if c.recipesAt then KeepOnly(c.recipesAt, "string", "number") end
+    if c.skills then KeepOnly(c.skills, "number", "number") end
     if c.cooldowns then
         KeepOnly(c.cooldowns, "string", "table")
         for prof, t in pairs(c.cooldowns) do
