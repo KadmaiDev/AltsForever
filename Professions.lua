@@ -424,9 +424,15 @@ function ns.ScanRecipes(c)
     if window ~= prof and not (c.profs and c.profs[window]) then
         c.recipes[window], c.crafts[window] = nil, nil
         if c.recipesAt then c.recipesAt[window] = nil end
-        if c.cooldowns then
-            c.cooldowns[window] = nil
-            if next(c.cooldowns) == nil then c.cooldowns = nil end
+        -- Cooldowns move rather than go: a recorded one that's ready, or one the game can't
+        -- read right now, would not come back from a fresh reading (peer review).
+        local old = c.cooldowns and c.cooldowns[window]
+        if old then
+            local t = c.cooldowns[prof] or {}
+            for name, at in pairs(old) do
+                if t[name] == nil then t[name] = at end
+            end
+            c.cooldowns[prof], c.cooldowns[window] = t, nil
         end
     end
     -- The skill the colours above were read at: once it moves on, they may be out of date.

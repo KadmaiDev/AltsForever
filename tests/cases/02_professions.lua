@@ -143,6 +143,25 @@ test("a differently named profession found by the game's name for its skill line
     eq(lines[3][2], "|cffffd100Can learn|r")
 end)
 
+test("cooldowns recorded under the window's name move to the skill list's name, ready or unreadable", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.profs = { { "Costura", 260, 300, line = 197 } }
+    wow.login(nil)
+    local c = ns.char
+    c.recipes = { ["Sastrería"] = { ["paño lunar"] = true, ["tela de hechizo"] = true } }
+    c.cooldowns = { ["Sastrería"] = { ["Paño lunar"] = NOW - 3600, ["Tela de hechizo"] = NOW + 7200 } }
+    wow.tradeskill.prof, wow.tradeskill.line = "Sastrería", 197
+    wow.tradeskill.recipes = {
+        [3101] = { name = "Paño lunar", learned = true }, -- ready: the game gives no cooldown
+        [3102] = { name = "Tela de hechizo", learned = true, cd = "?" }, -- unreadable now
+    }
+    wow.fire("TRADE_SKILL_SHOW")
+    eq(c.cooldowns["Sastrería"], nil, "nothing left under the window's name")
+    eq(c.cooldowns.Costura["Paño lunar"], NOW - 3600, "still ready")
+    eq(c.cooldowns.Costura["Tela de hechizo"], NOW + 7200, "kept while unreadable")
+end)
+
 test("recipe tooltip: only characters with the profession, you first, then by status", function()
     wow.load(FILES)
     wow.profs = { { "Engineering", 80 } }
