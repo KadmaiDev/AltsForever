@@ -10,6 +10,7 @@ if ns.disabled then return end -- another copy of Alts Forever is running (Core.
 local L = ns.L
 
 local CreateFrame, GameTooltip = CreateFrame, GameTooltip
+local floor = math.floor
 local max, min, ipairs, pairs, type, sort, tostring, tonumber = math.max, math.min, ipairs, pairs, type, table.sort, tostring, tonumber
 local issecretvalue = issecretvalue or function() return false end
 local GetItemInfoInstant = C_Item.GetItemInfoInstant
@@ -114,7 +115,11 @@ end
 -- rows as far as the page allows; the mouse wheel and the page arrows scroll it.
 ---------------------------------------------------------------------------
 local ROW_H, HEAD_H, GAP = 24, 25, 2
-local PER_PAGE = 15 -- rows that fit: (HEIGHT - 64 - 14) / (ROW_H + GAP)
+-- Rows shown fill the page: (window height - 64 - 14) / (ROW_H + GAP), 15 at the usual
+-- height; the window grows for a character with many side tabs, and the list with it.
+-- MAX_ROWS are made with the page (never later, inside an open window: the controller's
+-- navigator would rebuild it from our code).
+local MAX_ROWS = 24
 local BAR_W = 200
 
 local function HasAtlas(name)
@@ -126,7 +131,7 @@ local function Flat() return ns.SkinFlat and ns.SkinFlat() or false end
 local function ListRows(list)
     local shown, n = list.shown, 0
     for i = list.offset + 1, #shown do
-        if n == PER_PAGE then break end
+        if n == list.perPage then break end
         n = n + 1
         local row, e = list.rows[n], shown[i]
         row.entry = e
@@ -157,8 +162,8 @@ local function ListRows(list)
         end
         row:Show()
     end
-    for i = n + 1, PER_PAGE do list.rows[i]:Hide() end
-    local more = #shown > PER_PAGE
+    for i = n + 1, MAX_ROWS do list.rows[i]:Hide() end
+    local more = #shown > list.perPage
     list.up:SetShown(more)
     list.down:SetShown(more)
 end
@@ -176,12 +181,12 @@ local function Flatten(list)
             shown[#shown + 1] = e
         end
     end
-    list.offset = max(0, min(list.offset, #shown - PER_PAGE))
+    list.offset = max(0, min(list.offset, #shown - list.perPage))
     ListRows(list)
 end
 
 local function Scroll(list, by)
-    list.offset = max(0, min(#list.shown - PER_PAGE, list.offset + by))
+    list.offset = max(0, min(#list.shown - list.perPage, list.offset + by))
     ListRows(list)
 end
 
@@ -260,7 +265,8 @@ local function MakeList(page)
     list:SetPoint("TOPLEFT", page, "TOPLEFT", 16, TOP)
     list:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -28, 14)
     list.entries, list.shown, list.collapsed, list.offset, list.rows = {}, {}, {}, 0, {}
-    for i = 1, PER_PAGE do
+    list.perPage = MAX_ROWS
+    for i = 1, MAX_ROWS do
         local row = MakeRow(list)
         if i == 1 then
             row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, 0)
@@ -271,10 +277,10 @@ local function MakeList(page)
     end
     list:EnableMouseWheel(true)
     list:SetScript("OnMouseWheel", function(self, delta) Scroll(self, -delta * 3) end)
-    list.up = ns.PageButton(page, true, function() Scroll(list, -(PER_PAGE - 2)) end)
+    list.up = ns.PageButton(page, true, function() Scroll(list, -(list.perPage - 2)) end)
     list.up:SetSize(16, 16)
     list.up:SetPoint("TOPRIGHT", page, "TOPRIGHT", -8, TOP)
-    list.down = ns.PageButton(page, false, function() Scroll(list, PER_PAGE - 2) end)
+    list.down = ns.PageButton(page, false, function() Scroll(list, list.perPage - 2) end)
     list.down:SetSize(16, 16)
     list.down:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -8, 14)
     list.empty = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -287,6 +293,10 @@ end
 
 -- New entries for the list; folded headings stay folded (for the session).
 local function SetEntries(list, entries, emptyText, keepOffset)
+    -- As many rows as the window's height holds now.
+    local h = list:GetParent():GetParent():GetHeight()
+    if type(h) ~= "number" or issecretvalue(h) or h <= 0 then h = HEIGHT end
+    list.perPage = max(5, min(MAX_ROWS, floor((h - 64 - 14) / (ROW_H + GAP))))
     list.entries = entries
     if not keepOffset then list.offset = 0 end
     list.empty:SetText(emptyText or "")

@@ -169,6 +169,11 @@ test("the character pages are narrow, as the game's character window; profession
     for _, tab in ipairs(f.tabs) do if tab:IsShown() then shown = shown + 1 end end
     eq(shown, 9)
     eq(f:GetHeight(), 60 + 9 * 44 + 7 * 2 + 14 + 12, "the tabs' bottom and a margin")
+    -- The lists fill the taller window: (496 - 78) / 26 = 16 rows, not 15.
+    ns.ShowCharacter("Vesp Ash", "skills", nil, true)
+    local rows = 0
+    for _, row in ipairs(ns.CharacterPage("skills").list.rows) do if row:IsShown() then rows = rows + 1 end end
+    eq(rows, 16)
 end)
 
 test("the character menu opens each page; the same page again from a row closes it", function()
