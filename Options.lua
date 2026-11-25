@@ -621,7 +621,10 @@ function ns.ShowCharacterMenu(owner, key)
     if not (c and MenuUtil and MenuUtil.CreateContextMenu) then return end
     ns.OpenMenu(owner, function(_, root)
         root:CreateTitle(ns.ColoredName(key, c))
-        root:CreateButton(L["Gear"], function() ns.ShowGear(key) end)
+        -- The character window's pages (Sheets.lua), then their professions there.
+        root:CreateButton(L["Character"], function() ns.ShowCharacter(key, "character", nil, true) end)
+        root:CreateButton(L["Reputation"], function() ns.ShowCharacter(key, "reputation", nil, true) end)
+        root:CreateButton(L["Skills"], function() ns.ShowCharacter(key, "skills", nil, true) end)
         root:CreateButton(L["Bags"], function() ns.ShowBags(key, "bags") end)
         root:CreateButton(L["Bank"], function() ns.ShowBags(key, "bank") end)
         root:CreateButton(L["Mail"], function() ns.ShowBags(key, "mail") end)

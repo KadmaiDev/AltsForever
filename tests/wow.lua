@@ -563,7 +563,9 @@ function M.load(files)
         GetItemSubClassInfo = function(class, sub)
             return ({ ["7:5"] = "Cloth", ["7:7"] = "Metal & Stone", ["7:9"] = "Herb", ["7:11"] = "Other", ["4:1"] = "Cloth",
                 ["4:2"] = "Leather", ["4:3"] = "Mail", ["4:4"] = "Plate", ["4:6"] = "Shields", ["2:7"] = "One-Handed Swords",
-                ["2:10"] = "Staves", ["2:15"] = "Daggers", ["2:19"] = "Wands" })[class .. ":" .. sub]
+                ["2:10"] = "Staves", ["2:15"] = "Daggers", ["2:19"] = "Wands",
+                ["2:0"] = "One-Handed Axes", ["2:1"] = "Two-Handed Axes", ["2:4"] = "One-Handed Maces", ["2:5"] = "Two-Handed Maces",
+                ["2:6"] = "Polearms", ["2:8"] = "Two-Handed Swords" })[class .. ":" .. sub]
         end,
         GetItemQualityByID = function(id) return M.itemQuality[id] end,
         GetItemMaxStackSizeByID = function(id) return (M.items[id] or {}).stack end,

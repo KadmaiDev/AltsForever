@@ -7,6 +7,15 @@ function itemLink(id, name, color)
     return (color or "|cff1eff00") .. "|Hitem:" .. id .. "::::::|h[" .. name .. "]|h|r"
 end
 
+-- The Character page's facts as "Label = value" lines (Sheets.lua).
+function characterFacts(ns)
+    local out = {}
+    for _, line in ipairs(ns.CharacterPage("character").facts) do
+        if line[1].text and line[1].text ~= "" then out[#out + 1] = line[1].text .. " = " .. line[2].text end
+    end
+    return table.concat(out, "\n")
+end
+
 function gearPanelSlots()
     local slots = {}
     for _, f in ipairs(wow.frames) do
@@ -131,7 +140,7 @@ test("durability changes alone don't count as an upgrade change; a new item does
     wow.durability[1] = { 30, 50 }
     wow.fire("UPDATE_INVENTORY_DURABILITY")
     eq(ns.UpgradesVersion(), v, "durability only")
-    eq(AltsForeverGearFrame.footer.text, "Lowest durability: |cffffffff60%|r", "the gear panel still follows it")
+    assert(characterFacts(ns):find("Lowest durability = |cffffffff60%|r", 1, true), "the Character page still follows it")
     wow.fire("PLAYER_EQUIPMENT_CHANGED", 1)
     eq(ns.UpgradesVersion(), v, "the same item")
     wow.gearLinks[1], wow.inventory[1] = itemLink(3005, "Better Hat"), 3005
@@ -163,7 +172,7 @@ test("item link names keep their quality colour but lose the brackets", function
 end)
 
 test("clicking a character in the overview opens their gear", function()
-    wow.load(FILES)
+    local ns = wow.load(FILES)
     local saved = { v = 2, chars = {
         ["Brakka"] = alt("Brakka", "HUNTER", { level = 20, ilvl = 11,
             gear = { [1] = itemLink(3000, "Hunting Cap"), [16] = itemLink(3001, "Copper Claymore") },
@@ -172,30 +181,31 @@ test("clicking a character in the overview opens their gear", function()
     wow.login(saved)
     SlashCmdList.ALTSFOREVER("")
     clickRow("Brakka")
-    local panel = AltsForeverGearFrame
+    local panel = AltsForeverCharacterFrame
     eq(panel:IsShown(), true)
-    eq(panel.title.text, "[HUNTER]Brakka|cff9d9d9d  ilvl 11|r")
+    eq(panel.titleText, "[HUNTER]Brakka")
+    assert(characterFacts(ns):find("Item level = 11", 1, true), characterFacts(ns))
     local slots = gearPanelSlots()
     eq(slots[1].icon.texture, "icon:3000"); eq(slots[1].name.text, "|cff1eff00Hunting Cap|r")
     eq(slots[5].icon.texture, "empty:ChestSlot", "empty slots show the slot art")
     eq(slots[16].icon.tint[2], 0.3, "nearly broken items are tinted red")
     eq(slots[1].icon.tint[2], 1)
-    eq(panel.footer.text, "Lowest durability: |cffff202010%|r")
-    eq(panel.empty.shown, false)
+    assert(characterFacts(ns):find("Lowest durability = |cffff202010%|r", 1, true), characterFacts(ns))
+    eq(ns.CharacterPage("character").empty.shown, false)
     clickRow("Brakka")
     eq(panel:IsShown(), false, "clicking the same character again closes it")
 end)
 
 test("gear panel for a character with nothing recorded says so", function()
-    wow.load(FILES)
+    local ns = wow.load(FILES)
     wow.login({ v = 2, chars = { ["New"] = alt("New", "ROGUE", { level = 5 }) } })
     SlashCmdList.ALTSFOREVER("")
     clickRow("New")
-    eq(AltsForeverGearFrame.empty.shown, true)
+    eq(ns.CharacterPage("character").empty.shown, true)
     eq(gearPanelSlots()[1].icon.texture, "empty:HeadSlot")
 end)
 
-test("hovering a slot shows the item, shift-click links it, closing the overview closes gear", function()
+test("hovering a slot shows the item, shift-click links it; the character window outlives the overview", function()
     wow.load(FILES)
     wow.gearLinks[1] = itemLink(3000, "Hunting Cap")
     wow.login(nil)
@@ -210,7 +220,7 @@ test("hovering a slot shows the item, shift-click links it, closing the overview
     head.scripts.OnClick(head)
     eq(wow.chatLinks[1], wow.gearLinks[1])
     SlashCmdList.ALTSFOREVER("")
-    eq(AltsForeverGearFrame:IsShown(), false)
+    eq(AltsForeverCharacterFrame:IsShown(), true, "a window of its own now, as the professions window always was")
 end)
 
 test("an open gear panel for you updates when you change gear", function()

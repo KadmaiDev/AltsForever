@@ -824,27 +824,6 @@ test("armour not trained says so; a level not reached is said instead", function
         .. "[WARRIOR]Young Guard = Chest · ^^^ · empty slot · at level 40")
 end)
 
-test("the overview's row tooltip lists weapon skills, orange when well behind, and armour", function()
-    local ns = skStart({}, skMage())
-    local rows, armour = ns.CombatSkills(ns.char)
-    local text = {}
-    for _, r in ipairs(rows) do text[#text + 1] = r[1] .. " " .. r[2] .. "/" .. r[3] end
-    eq(table.concat(text, ", "), "Staves 80/120, Wands 120/120, Unarmed 1/120, Defense 100/120")
-    eq(armour, "Cloth")
-    SlashCmdList.ALTSFOREVER("")
-    local row = overviewRows()[1]
-    row.scripts.OnEnter(row)
-    local all = {}
-    for _, l in ipairs(GameTooltip.lines) do all[#all + 1] = table.concat(l, " = ") end
-    all = table.concat(all, "\n")
-    assert(all:find("Weapon skills", 1, true), all)
-    assert(all:find("Staves = |cffff800080/120|r", 1, true), "40 behind: orange\n" .. all)
-    assert(all:find("Wands = 120/120", 1, true), all)
-    assert(all:find("Unarmed = 1/120", 1, true), "Unarmed never orange\n" .. all)
-    assert(all:find("Defense = 100/120", 1, true), all)
-    assert(all:find("Armor = Cloth", 1, true), all)
-end)
-
 test("damaged skills are repaired at load", function()
     local ns = skStart({ ["Mira Swift"] = alt("Mira Swift", "MAGE", { skills = { [95] = 1005, x = 3, [43] = "y" } }) }, nil)
     local s = ns.db.chars["Mira Swift"].skills

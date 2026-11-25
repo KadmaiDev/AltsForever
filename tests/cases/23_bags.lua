@@ -509,7 +509,7 @@ test("our windows come to the front when opened or clicked, so they never draw t
     ns.ShowBags(nil, "bags")
     ns.ToggleReputation()
     ns.ShowGear("Tarn Moon")
-    for _, name in ipairs({ "AltsForeverFrame", "AltsForeverBagsFrame", "AltsForeverRepFrame", "AltsForeverGearFrame" }) do
+    for _, name in ipairs({ "AltsForeverFrame", "AltsForeverBagsFrame", "AltsForeverRepFrame", "AltsForeverCharacterFrame" }) do
         local f = _G[name]
         eq(f.toplevel, true, name .. ": raised when clicked")
         assert((f.raised or 0) > 0, name .. ": raised when opened")

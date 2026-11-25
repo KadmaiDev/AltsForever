@@ -364,26 +364,49 @@ local function SkillName(id, fallback)
     return skillNames[id] or fallback
 end
 
--- A character's weapon skills as { name, rank, max, weapon } rows (weapons in the game's order,
--- then Unarmed and Defense) and their armour as one list of names ("Cloth, Leather,
--- Shield"); nil when not read yet. Rows are fresh tables: only for a tooltip being shown.
+-- A character's weapon skills and armour, for the character window's Skills tab: two lists
+-- of { name, rank, max, weapon, untrained, at }, each sorted by name as the game's own
+-- Skills tab is, trained first. Weapons hold Defense and Unarmed too, then the weapons
+-- their class can learn but hasn't (untrained, no rank); `weapon` marks a real weapon
+-- skill (Defense and Unarmed aren't). Armour: what's trained (1/1), then what the class
+-- wears but hasn't trained, with `at` the level it comes at if that's above theirs.
+-- nil when their skills haven't been read. Fresh tables: only for a window being filled.
+local function ByName(a, b)
+    if (a.untrained or false) ~= (b.untrained or false) then return not a.untrained end
+    return a.name < b.name
+end
+
 function ns.CombatSkills(c)
     local skills = c and c.skills
     if not (skills and skills[DEFENSE_SKILL]) then return nil end
-    local rows = {}
-    local function Add(id, name, weapon)
+    local cls = CLASSES[c.class]
+    local weapons, armour = {}, {}
+    local function Add(list, id, name, weapon)
+        if not name then return end
         local v = skills[id]
-        if v and name then rows[#rows + 1] = { name, floor(v / 1000), v % 1000, weapon } end
+        if v then
+            list[#list + 1] = { name = name, rank = floor(v / 1000), max = v % 1000, weapon = weapon }
+        end
+        return v ~= nil
     end
-    for _, sub in ipairs(WEAPON_ORDER) do Add(WEAPON_SKILL[sub], SubName(WEAPON_CLASS, sub), true) end
-    Add(UNARMED_SKILL, SkillName(UNARMED_SKILL, L["Unarmed"]))
-    Add(DEFENSE_SKILL, SkillName(DEFENSE_SKILL, L["Defense"]))
-    local armour
+    for _, sub in ipairs(WEAPON_ORDER) do
+        local name = SubName(WEAPON_CLASS, sub)
+        if not Add(weapons, WEAPON_SKILL[sub], name, true) and name and cls and cls.weapons[sub] then
+            weapons[#weapons + 1] = { name = name, weapon = true, untrained = true }
+        end
+    end
+    Add(weapons, UNARMED_SKILL, SkillName(UNARMED_SKILL, L["Unarmed"]))
+    Add(weapons, DEFENSE_SKILL, SkillName(DEFENSE_SKILL, L["Defense"]))
     for _, sub in ipairs(ARMOR_ORDER) do
-        local name = skills[ARMOR_SKILL[sub]] and SubName(ARMOR_CLASS, sub)
-        if name then armour = armour and (armour .. ", " .. name) or name end
+        local name = SubName(ARMOR_CLASS, sub)
+        local from = cls and cls.armor[sub]
+        if not Add(armour, ARMOR_SKILL[sub], name) and name and from then
+            armour[#armour + 1] = { name = name, untrained = true, at = c.level and from > c.level and from or nil }
+        end
     end
-    return rows, armour
+    table.sort(weapons, ByName)
+    table.sort(armour, ByName)
+    return weapons, armour
 end
 
 ---------------------------------------------------------------------------
@@ -1133,6 +1156,7 @@ function ns.StartUpgrades()
     local function Skills()
         skillsSoon = false
         if ns.ScanCombatSkills(ns.char) then ns.UpgradesChanged() end
+        if ns.CharacterWindowChanged then ns.CharacterWindowChanged() end -- ranks on the Skills page
     end
     Skills()
     if C_Timer and C_Timer.After then

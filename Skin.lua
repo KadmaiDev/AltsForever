@@ -330,7 +330,7 @@ if EllesmereUI and EllesmereUI.RegisterSkin then
         skin = S
         if S.OnLooksChanged then S.OnLooksChanged(Recolour) end
         -- Runs at login, before our windows exist; skin any that are already open.
-        for _, name in ipairs({ "AltsForeverFrame", "AltsForeverGearFrame", "AltsForeverRepFrame" }) do
+        for _, name in ipairs({ "AltsForeverFrame", "AltsForeverRepFrame" }) do
             if _G[name] then ns.SkinWindow(_G[name]) end
         end
     end)

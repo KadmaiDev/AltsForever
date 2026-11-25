@@ -1,3 +1,10 @@
+## Alts Forever 1.12.0 (not yet released)
+
+- **One window per character:** a character's gear, reputation, skills and professions are now one window with tabs down its side, as the game's own character window has: **Character** (their gear as on the character sheet, with level, rested XP, gold, item level, durability, zone, hearthstone, time played and the like between), **Reputation**, **Skills**, then a tab per profession, with the professions window's look. Click a character in the overview for it, or pick a page from a character's right-click menu; the character button at the top switches character and stays on the same page. It replaces the separate gear panel and professions window.
+- **Skills, as in the game's Skills tab:** every character's professions, secondary professions, weapon skills and armour, with their ranks as bars. Weapons and armour their class could use but they haven't trained show as **Not trained** (or the level they can learn it at), and hovering a weapon skill says how far it is behind the most for their level. Weapon skills are read each time a character logs in. Thanks to the player who asked.
+- **Upgrades they haven't trained for:** an upgrade a character can't use until a weapon master teaches them the skill (or, for armour, until they learn it) is still listed in item tooltips, in grey with "needs training", and the character sheet's anvils leave it out. Characters who haven't logged in since are judged by their class as before.
+- **Columns you can hide:** the first time you open the overview, a short tip points out that right-clicking the column titles chooses which columns show. It shows once.
+
 ## Alts Forever 1.11.0
 
 - **A narrower overview:** each main profession now shows as its icon and skill instead of its name, and gold shows to the whole gold with the coin ("1,234"). Hover a row for the professions' names and gold to the copper. With every column shown the window is about 130 pixels narrower, even with the new secondary profession columns below. Thanks to the player who asked.

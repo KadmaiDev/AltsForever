@@ -184,15 +184,15 @@ test("the overview's Cooldowns column: ready, how many, or the soonest; sorts; p
     assert(tip:find("Click to open their professions", 1, true), tip)
     b.scripts.OnLeave(b)
     b.scripts.OnClick(b, "LeftButton")
-    eq(AltsForeverRecipesFrame:IsShown(), true)
-    eq(AltsForeverRecipesFrame.titleText, "Tailoring", "the profession of the first one listed")
+    eq(AltsForeverCharacterFrame:IsShown(), true)
+    eq(AltsForeverCharacterFrame.titleText, "Tailoring", "the profession of the first one listed")
     -- A character with none: the row's own tooltip and click.
     b = cooldownButton(rowOf("Aldric"))
     b.scripts.OnEnter(b)
     tip = tipText()
     assert(tip:find("Level 24", 1, true) and not tip:find("Click to open their professions", 1, true), tip)
     b.scripts.OnClick(b, "LeftButton")
-    eq(AltsForeverGearFrame:IsShown(), true, "their gear, as the row's click")
+    eq(AltsForeverCharacterFrame:IsShown(), true, "their gear, as the row's click")
 end)
 
 test("the open overview turns a cooldown to Ready when its time comes, only while the column shows", function()

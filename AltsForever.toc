@@ -35,6 +35,7 @@ MailRules.lua
 Money.lua
 Professions.lua
 Recipes.lua
+Sheets.lua
 Character.lua
 Talents.lua
 Columns.lua
