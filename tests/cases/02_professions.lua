@@ -87,6 +87,81 @@ test("learning a recipe adds it, but only to a profession already scanned", func
     eq(ns.char.recipes.Tailoring, nil, "a partial list would wrongly say 'not learned'")
 end)
 
+-- A Spanish client (a player's report, 2026-11-25): the skill list says "Costura", the
+-- profession window and its recipes "Sastrería". Matched by skill line (197).
+local function sastreria()
+    wow.tradeskill.prof = "Sastrería"
+    wow.tradeskill.recipes = {
+        [3001] = { name = "Madeja de paño de seda", learned = true, item = 4305 },
+        [3002] = { name = "Rueca", learned = false },
+    }
+    wow.fire("TRADE_SKILL_SHOW")
+end
+
+test("a profession the window names differently from the skill list is read under the skill list's name", function()
+    local ns = wow.load(FILES)
+    wow.profs = { { "Costura", 218, 225, line = 197 }, { "Encantamiento", 100, line = 333 } }
+    wow.login(nil)
+    local c = ns.char
+    wow.tradeskill.line = 197 -- the window's skill line
+    sastreria()
+    eq(c.recipes["Sastrería"], nil, "not under the window's name")
+    eq(c.recipes.Costura["madeja de paño de seda"], true)
+    eq(c.crafts.Costura[4305], "madeja de paño de seda")
+    eq(c.recipesAt.Costura, 218)
+    assert(ns.db.recipeInfo.Costura["madeja de paño de seda"], "recipe facts under the same name")
+    eq(ns.ProfKey(c, "Sastrería"), "Costura")
+    eq(ns.ProfKey(c, "Encantamiento"), "Encantamiento")
+    for _, p in ipairs(ns.AltProfessions(c)) do
+        if p.name == "Costura" then eq(p.scanned, true, "the character window's tab has its recipes") end
+    end
+    -- Learning one, named by the window's name, goes to the same list.
+    wow.tradeskill.recipes[3002].learned = true
+    wow.fire("NEW_RECIPE_LEARNED", 3002)
+    eq(c.recipes.Costura.rueca, true)
+end)
+
+test("a differently named profession found by the game's name for its skill line; old copy dropped; tooltips match", function()
+    local ns = wow.load(FILES)
+    wow.profs = { { "Costura", 218, 225, line = 197 } }
+    wow.skillLineNames[197] = "Sastrería" -- no skill line from the window: the game's name for the line
+    local text = wow.recipeItem(6000, "Patrón: Rueca", "Sastrería", 200)
+    wow.login(nil)
+    local c = ns.char
+    -- Read under the window's name by 1.12.0.
+    c.recipes = { ["Sastrería"] = { ["madeja de paño de seda"] = true } }
+    c.crafts = { ["Sastrería"] = { [4305] = "madeja de paño de seda" } }
+    c.recipesAt = { ["Sastrería"] = 210 }
+    sastreria()
+    eq(c.recipes["Sastrería"], nil, "the old copy goes")
+    eq(c.crafts["Sastrería"], nil)
+    eq(c.recipesAt["Sastrería"], nil)
+    eq(c.recipes.Costura["madeja de paño de seda"], true)
+    -- The recipe's tooltip says "Requires Sastrería (200)": the character's Costura answers.
+    local lines = wow.hover(GameTooltip, 6000, text)
+    eq(lines[2][1], "Sastrería (200)")
+    eq(lines[3][2], "|cffffd100Can learn|r")
+end)
+
+test("cooldowns recorded under the window's name move to the skill list's name, ready or unreadable", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.profs = { { "Costura", 260, 300, line = 197 } }
+    wow.login(nil)
+    local c = ns.char
+    c.recipes = { ["Sastrería"] = { ["paño lunar"] = true, ["tela de hechizo"] = true } }
+    c.cooldowns = { ["Sastrería"] = { ["Paño lunar"] = NOW - 3600, ["Tela de hechizo"] = NOW + 7200 } }
+    wow.tradeskill.prof, wow.tradeskill.line = "Sastrería", 197
+    wow.tradeskill.recipes = {
+        [3101] = { name = "Paño lunar", learned = true }, -- ready: the game gives no cooldown
+        [3102] = { name = "Tela de hechizo", learned = true, cd = "?" }, -- unreadable now
+    }
+    wow.fire("TRADE_SKILL_SHOW")
+    eq(c.cooldowns["Sastrería"], nil, "nothing left under the window's name")
+    eq(c.cooldowns.Costura["Paño lunar"], NOW - 3600, "still ready")
+    eq(c.cooldowns.Costura["Tela de hechizo"], NOW + 7200, "kept while unreadable")
+end)
+
 test("recipe tooltip: only characters with the profession, you first, then by status", function()
     wow.load(FILES)
     wow.profs = { { "Engineering", 80 } }

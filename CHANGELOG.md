@@ -1,3 +1,7 @@
+## Alts Forever 1.12.1
+
+- **Professions the game names two ways:** some game clients call a profession by one name in the skills list and another in the profession window (a Spanish client says "Costura" in one and "Sastrería" in the other for Tailoring). Alts Forever took them for two professions, so that profession's recipes never showed: its tab said "Not scanned" and recipe tooltips couldn't find it. Professions are now matched by skill line, which is the same in every language. Open the profession's window once on each character it affected. Thanks to the player who reported it and ran the checks.
+
 ## Alts Forever 1.12.0
 
 - **One window per character:** a character's gear, reputation, skills and professions are now one window with tabs down its side, as the game's own character window has: **Character** (their gear as on the character sheet, with level, rested XP, gold, item level, durability, zone, hearthstone, time played and the like between), **Reputation**, **Skills**, then a tab per profession, with the professions window's look. Click a character in the overview for it, or pick a page from a character's right-click menu; the character button at the top switches character and stays on the same page. It replaces the separate gear panel and professions window.

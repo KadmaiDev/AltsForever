@@ -189,7 +189,7 @@ function M.load(files)
         IsTradeSkillReady = function() return ts().ready end,
         IsTradeSkillLinked = function() return ts().linked end,
         IsTradeSkillGuild = function() return ts().guild end,
-        GetBaseProfessionInfo = function() return ts().prof and { professionName = ts().prof } end,
+        GetBaseProfessionInfo = function() return ts().prof and { professionName = ts().prof, professionID = ts().line } end,
         GetAllRecipeIDs = function()
             local ids = {}
             for id in pairs(ts().recipes) do ids[#ids + 1] = id end
