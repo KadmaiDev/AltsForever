@@ -12,7 +12,7 @@ test("minimap compartment: click opens the overview, right-click the options men
     AltsForever_OnAddonCompartmentClick("AltsForever", "RightButton", UIParent)
     local texts = {}
     for _, item in ipairs(wow.menu.items) do texts[#texts + 1] = item.text end
-    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Bags and bank | Search... | Show other rulesets and factions | Settings...")
+    eq(table.concat(texts, " | "), "Alts Forever | Open overview | Bags and bank | Search... | Other rulesets and factions | Settings...")
     wow.menuItem("Open overview").fn()
     eq(AltsForeverFrame:IsShown(), true)
     wow.menuItem("Open overview").fn()
@@ -38,7 +38,7 @@ test("options menu: only what's switched while playing, then Settings...; withou
     SlashCmdList.ALTSFOREVER("")
     AltsForeverFrame.cog.scripts.OnClick(AltsForeverFrame.cog)
     eq(wow.menuItem("Show skill-up details"), nil, "set once: on the Options page")
-    local box = wow.menuItem("Show other rulesets and factions")
+    local box = wow.menuItem("Other rulesets and factions", "Show in tooltips")
     eq(box.kind, "checkbox"); eq(box.isSelected(), false)
     box.setSelected()
     eq(AltsForeverDB.otherRulesets, true)
@@ -52,7 +52,7 @@ test("options menu: only what's switched while playing, then Settings...; withou
     eq(box.kind, "checkbox"); eq(box.isSelected(), true)
     box.setSelected()
     eq(AltsForeverDB.skillupsOff, true); eq(box.isSelected(), false)
-    eq(#wow.menu.items, 4 + 17, "the title, Open overview, Bags and bank, Search..., the seventeen settings")
+    eq(#wow.menu.items, 4 + 19, "the title, Open overview, Bags and bank, Search..., the nineteen settings")
 end)
 
 test("right-click a character in the overview to forget them, after confirming", function()

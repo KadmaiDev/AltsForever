@@ -224,6 +224,8 @@ local function StatsSelected() return ns.StatsOn() end
 local function LegacySelected() return ns.LegacyRemindersOn() end
 local function RulesetsSelected() return ns.OtherRulesetsOn() end
 local function ToggleRulesets() ns.SetOtherRulesets(not ns.OtherRulesetsOn()) end
+local function OtherCharsSelected() return ns.OtherCharsShown() end
+local function OtherGoldSelected() return ns.OtherGoldCounted() end
 local function ItemNamesSelected() return ns.ItemNamesOn() end
 local function MinimapSelected() return ns.MinimapButtonOn() end
 
@@ -301,11 +303,15 @@ local SETTINGS = {
     { L["Legacy reminders"], LegacySelected, function(on) ns.SetLegacyReminders(on) end,
         L["Says in chat when the character you log in on has Legacy points to spend, and when you earn one. Same as /af legacy on or off."], section = "extras" },
     { L["Show other rulesets and factions"], RulesetsSelected, function(on) ns.SetOtherRulesets(on) end,
-        L["Tooltips also list your characters on other rulesets (Normal, PvP...) and the other faction, under their own heading. They can't trade or mail with this one, so they're hidden by default; the overview always shows everyone. Same as /af rulesets."], section = "tooltips", sub = true },
+        L["Tooltips also list your characters on other rulesets (Normal, PvP...) and the other faction, under their own heading. They can't trade or mail with this one, so they're hidden by default; the overview has its own settings for them. Same as /af rulesets."], section = "tooltips", sub = true },
     { L["Save item names for use outside the game"], ItemNamesSelected, function(on) ns.SetItemNames(on) end,
         L["Off by default. Only for reading Alts Forever's saved file (AltsForever.lua in your WTF folder) with other programs: it saves the name and quality of every item your characters have when you log out. It adds nothing in the game and uses a little more memory, so leave it off unless you need it. Same as /af itemnames."], section = "extras" },
     { L["Show minimap button"], MinimapSelected, function(on) ns.SetMinimapButton(on) end,
         L["Same as /af minimap. Alts Forever is also in the minimap's addon menu."], section = "display" },
+    { L["Overview: show other rulesets and factions"], OtherCharsSelected, function(on) ns.SetOtherChars(on) end,
+        L["The overview lists your characters on other rulesets (Normal, PvP...) and the other faction too, under their own headings. Untick to see only the characters you can mail from here. Same as /af rulesets overview."], section = "display" },
+    { L["Count other rulesets and factions in gold totals"], OtherGoldSelected, function(on) ns.SetOtherGold(on) end,
+        L["Off by default: gold totals in the overview and on your bag money count only characters you can mail from here, since gold can't be sent to another ruleset or faction. Each group's heading in the overview still shows its own gold. Same as /af rulesets gold."], section = "display" },
 }
 
 local function RefreshCanvas(f)
@@ -595,7 +601,13 @@ function ns.ShowOptionsMenu(owner, fromOverview)
         -- Only what's switched back and forth while playing; the set-once settings are on
         -- the Options page (the owner's call, 2026-10-16: the menu had grown to 15 entries).
         -- Without a page (its registration failed), the menu has them all instead.
-        root:CreateCheckbox(L["Show other rulesets and factions"], RulesetsSelected, ToggleRulesets)
+        -- Characters you can't trade with: in tooltips, in the overview, in gold totals.
+        local worlds = root:CreateButton(L["Other rulesets and factions"])
+        worlds:CreateCheckbox(L["Show in tooltips"], RulesetsSelected, ToggleRulesets)
+        worlds:CreateCheckbox(L["Show in the overview"], OtherCharsSelected,
+            function() ns.SetOtherChars(not ns.OtherCharsShown()) end)
+        worlds:CreateCheckbox(L["Count in gold totals"], OtherGoldSelected,
+            function() ns.SetOtherGold(not ns.OtherGoldCounted()) end)
         -- From the overview's cog only: it's about the windows, and the other menus stay short.
         if fromOverview then
             ns.FillColumnsMenu(root:CreateButton(L["Columns"]))

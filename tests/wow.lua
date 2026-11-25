@@ -989,9 +989,16 @@ function M.timePlayed(total, thisLevel)
 end
 
 -- The item with this text in the last menu built.
-function M.menuItem(text)
+-- menuItem("A") finds a top-level entry; menuItem("Sub", "A") one inside the submenu "Sub".
+function M.menuItem(text, inner)
     for _, item in ipairs(M.menu and M.menu.items or {}) do
-        if item.text == text then return item end
+        if item.text == text then
+            if inner == nil then return item end
+            for _, sub in ipairs(item.items or {}) do
+                if sub.text == inner then return sub end
+            end
+            return nil
+        end
     end
 end
 

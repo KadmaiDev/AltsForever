@@ -238,12 +238,14 @@ test("with the Gamepad UI on, a menu of ours is our own window, never the game's
 
     -- Tick boxes stay open and show the change; mouse players get the game's menu as ever.
     ns.ShowOptionsMenu(nil, true)
-    local tick = padRow(ns, "Show other rulesets")
+    local sub = padRow(ns, "Other rulesets and factions")
+    sub.scripts.OnClick(sub)
+    local tick = padRow(ns, "Show in tooltips")
     assert(tick.text:GetText():find("UI-CheckBox-Up", 1, true), "not ticked")
     tick.scripts.OnClick(tick)
     eq(AltsForeverDB.otherRulesets, true)
     eq(m:IsShown(), true, "a tick box leaves the menu open")
-    assert(padRow(ns, "Show other rulesets").text:GetText():find("UI-CheckBox-Check", 1, true), "now ticked")
+    assert(padRow(ns, "Show in tooltips").text:GetText():find("UI-CheckBox-Check", 1, true), "now ticked")
     m:Hide()
     wow.gamepadUI = false
     ns.ShowOptionsMenu(nil, true)

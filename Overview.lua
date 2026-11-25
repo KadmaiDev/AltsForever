@@ -1203,13 +1203,41 @@ function SpaceSum(which, group)
     return free and ns.SpaceCell(free, spaceTotal[which][group]) or ""
 end
 
+-- The overview's own list: ns.OverviewOrder without other rulesets and factions when the
+-- player hides them (the bags menu, search and export keep everyone). Reused.
+local kept = {}
+local function ShownKeys(chars)
+    local keys = ns.OverviewOrder()
+    local split = ns.overviewSplit
+    if ns.OtherCharsShown() then return keys, split, 0 end
+    for i = #kept, 1, -1 do kept[i] = nil end
+    local away, first, many = 0, nil, false
+    for _, key in ipairs(keys) do
+        local c = chars[key]
+        if ns.Elsewhere(c) then
+            away = away + 1
+        else
+            kept[#kept + 1] = key
+            local g = Group(c)
+            if first == nil then first = g elseif g ~= first then many = true end
+        end
+    end
+    -- Only one group left (yours): no headings.
+    return kept, split and many, away
+end
+
 function Refresh()
     if AutoChanged() then return ApplyColumns() end -- lays the window out again, then refreshes
     local now = time()
     local chars = ns.db.chars
-    local keys = ns.OverviewOrder()
-    local split = ns.overviewSplit
+    local keys, split, away = ShownKeys(chars)
+    local countAll = ns.OtherGoldCounted()
     local total, played = 0, 0
+    -- Gold over every character, shown or not: only those you can mail from here, unless
+    -- the player counts the rest too.
+    for _, c in pairs(chars) do
+        if c.money and (countAll or not ns.Elsewhere(c)) then total = total + c.money end
+    end
     -- Gold and characters per group, for the headings.
     local gold, count = {}, {}
     if split then
@@ -1281,7 +1309,6 @@ function Refresh()
         cells[20]:SetText(c.zone or (GREY .. "?|r"))
         cells[21]:SetText(ns.PlayedText(c, now))
         cells[22]:SetText(ns.SeenText(key, c, now))
-        total = total + (c.money or 0)
         played = played + (ns.PlayedNow(c, now) or 0)
         row:SetShown(not hidden)
     end
@@ -1290,10 +1317,12 @@ function Refresh()
     -- With only one character there's nothing to compare yet: say how to add the others.
     frame.credit:SetText(#keys == 1 and (GREY .. L["Log in on your other characters once to add them here."] .. "|r")
         or L["Alts Forever by Kadmai"])
-    -- Split by ruleset, each heading has its gold: one total would mix what can't be traded.
-    footer:SetText((instances and (instances .. "     ") or "")
+    -- Gold only from characters you can mail from here, unless the player counts the rest
+    -- too; each group's heading has its own.
+    footer:SetText((away > 0 and (GREY .. L["%d on other rulesets or factions hidden"]:format(away) .. "|r     ") or "")
+        .. (instances and (instances .. "     ") or "")
         .. L["Total played: %s"]:format(ns.FormatPlayed(played))
-        .. (split and "" or ("     " .. L["Total gold: %s"]:format(GetCoinTextureString(total)))))
+        .. "     " .. L["Total gold: %s"]:format(GetCoinTextureString(total)))
     frame:SetHeight(54 + y + 32)
 end
 

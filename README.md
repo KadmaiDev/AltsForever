@@ -92,7 +92,8 @@ Install it from CurseForge, or link or copy this folder to `<WoW Forever>\Interf
 
 Each ruleset (Normal, PvP, Roleplaying, Hardcore) has its own auction house and mail, and mail never crosses factions, so characters on another ruleset or the other faction can't trade with yours. Alts Forever notes each character's ruleset when you log in on them:
 
-- The overview groups your characters by ruleset and faction (e.g. "Normal · Horde"), each with its own gold total. Click a group's heading to collapse it; it stays collapsed until you click it again.
+- The overview groups your characters by ruleset and faction (e.g. "Normal · Horde"), each with its own gold total. Click a group's heading to collapse it; it stays collapsed until you click it again. Untick **Overview: show other rulesets and factions** (or `/af rulesets overview`) to list only the characters you can mail.
+- Gold totals (the overview's footer and the Total on your bag gold) count only characters you can mail, since gold can't be sent anywhere else. Tick **Count other rulesets and factions in gold totals** (or `/af rulesets gold`) to count everyone.
 - Item and gold tooltips, Can craft, skill-ups, upgrades and the XP and reputation bars list only characters you can mail. Turn on **Show other rulesets and factions** (or `/af rulesets`) to see the others too, in grey (they can't trade with you) under their own heading and total.
 - Send to alt and Waylaid Crates only ever count characters you can mail.
 
@@ -104,7 +105,7 @@ Your beta characters don't carry over to the live game, so the first time you lo
 
 ## Settings
 
-Options > AddOns > Alts Forever has every setting, with a short explanation of each: what tooltips show and their icons on the left, the extras, minimap button and window size on the right. The minimap button's right-click menu and the cog in the overview keep to what you switch while playing (Open overview, Bags and bank, Show other rulesets and factions) and Settings... for the rest, and every setting has a slash command. **Window size** makes Alts Forever's windows bigger or smaller (50% to 300%), on top of the game's UI scale: handy if you play at a small UI scale. With EllesmereUI, it follows EllesmereUI's Window Scale until you choose a size of your own (`/af scale eui` to follow it again).
+Options > AddOns > Alts Forever has every setting, with a short explanation of each: what tooltips show and their icons on the left, the extras, minimap button and window size on the right. The minimap button's right-click menu and the cog in the overview keep to what you switch while playing (Open overview, Bags and bank, Other rulesets and factions: in tooltips, in the overview, in gold totals) and Settings... for the rest, and every setting has a slash command. **Window size** makes Alts Forever's windows bigger or smaller (50% to 300%), on top of the game's UI scale: handy if you play at a small UI scale. With EllesmereUI, it follows EllesmereUI's Window Scale until you choose a size of your own (`/af scale eui` to follow it again).
 
 ## Commands
 
@@ -134,6 +135,8 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af tooltips` | Turn everything Alts Forever adds to tooltips on or off. `/af crafting`, `/af recipes`, `/af crates`, `/af gold` and `/af bars` turn Can craft on items, recipe status on recipes, Waylaid Crate materials, your alts' gold on the bag money, and your alts on the XP and reputation bars on or off |
 | `/af counts` | Turn the item counts in tooltips on or off, e.g. if Baganator or Bagnon already shows them (Can craft, skill-ups, upgrades and crates stay) |
 | `/af rulesets` | Show or hide your characters on other rulesets (Normal, PvP...) or the other faction in tooltips; hidden by default |
+| `/af rulesets overview` | Show or hide them in the overview; shown by default |
+| `/af rulesets gold` | Count their gold in gold totals or not; not counted by default |
 | `/af legacy` | List each character's Legacy points to spend and Well Rested rank; `/af legacy on` or `off` turns the chat reminders on or off |
 | `/af role Full Name role` | Choose what a character's upgrades are judged by: `melee`, `ranged`, `caster`, `healer`, `tank` or `feral` (whichever their class has), or `auto` to follow their talents |
 | `/af sendmail` | Turn the send-to-alt arrow and your mail rules at the mailbox on or off |
