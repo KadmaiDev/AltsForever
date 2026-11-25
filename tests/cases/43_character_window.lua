@@ -61,8 +61,7 @@ test("the Skills page lists professions, weapon skills and armour as the game's 
         .. " | # Weapon skills | Defense = 200 / 220 | One-Handed Maces = 180 / 220 | Two-Handed Maces = 210 / 220"
         .. " | One-Handed Axes = |cff9d9d9dNot trained|r | One-Handed Swords = |cff9d9d9dNot trained|r"
         .. " | Polearms = |cff9d9d9dNot trained|r | Two-Handed Axes = |cff9d9d9dNot trained|r | Two-Handed Swords = |cff9d9d9dNot trained|r"
-        .. " | # Armor proficiencies | Cloth = 1 / 1 | Leather = 1 / 1 | Mail = 1 / 1 | Shields = 1 / 1",
-        "19 rows fit; Plate, untrained, is the 20th")
+        .. " | # Armor proficiencies", "15 rows fit; the armour comes on the next page")
 end)
 
 test("the Skills page: headings fold away, the list scrolls, untrained armour says when it comes", function()
@@ -74,13 +73,16 @@ test("the Skills page: headings fold away, the list scrolls, untrained armour sa
     local first = list.rows[1]
     first.scripts.OnClick(first) -- fold Professions
     assert(sheetRows(page):find("^# Professions | # Secondary professions"), sheetRows(page))
+    list.scripts.OnMouseWheel(list, -1)
     assert(sheetRows(page):find("Plate = |cff9d9d9dat level 40|r", 1, true), sheetRows(page))
+    list.scripts.OnMouseWheel(list, 1) -- back to the top
     first.scripts.OnClick(first)
     ns.db.chars["Vesp Ash"].level = 44
     ns.ShowCharacter("Vesp Ash", "skills", nil, true)
     eq(list.down:IsShown(), true, "more rows than fit: the page arrows show")
     list.scripts.OnMouseWheel(list, -1)
-    eq(list.offset, 1, "as far as the last row")
+    list.scripts.OnMouseWheel(list, -1)
+    eq(list.offset, 5, "as far as the last row")
     assert(sheetRows(page):find("Plate = |cff9d9d9dNot trained|r$"), sheetRows(page))
     -- Hovering a weapon skill says how far behind it is; an untrained one, where to learn it.
     for _, row in ipairs(list.rows) do
@@ -154,11 +156,11 @@ test("the character pages are narrow, as the game's character window; profession
     local ns = cwStart()
     ns.ShowCharacter("Vesp Ash", "skills")
     local f = AltsForeverCharacterFrame
-    eq(f:GetWidth(), 440)
+    eq(f:GetWidth(), 440); eq(f:GetHeight(), 484)
     f.tabs[4].scripts.OnClick(f.tabs[4])
-    eq(f:GetWidth(), 673, "a profession: the full professions window")
+    eq(f:GetWidth(), 673, "a profession: the full professions window"); eq(f:GetHeight(), 594)
     f.tabs[1].scripts.OnClick(f.tabs[1])
-    eq(f:GetWidth(), 440)
+    eq(f:GetWidth(), 440); eq(f:GetHeight(), 484)
 end)
 
 test("the character menu opens each page; the same page again from a row closes it", function()

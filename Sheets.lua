@@ -18,6 +18,10 @@ local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
 local GREY, ATTENTION = "|cff9d9d9d", "|cffff8000"
 local WIDTH = 440                       -- the window's on these pages (professions keep 673)
 ns.SHEET_WIDTH = WIDTH
+-- and its height: just past the Character page's weapons and their anvils, so these pages
+-- aren't left with an empty band at the bottom (professions keep 594).
+local HEIGHT = 484
+ns.SHEET_HEIGHT = HEIGHT
 local TOP = -64                         -- where a page's content starts, under the title bar
 local QUESTION = 134400                 -- INV_Misc_QuestionMark
 
@@ -110,7 +114,7 @@ end
 -- rows as far as the page allows; the mouse wheel and the page arrows scroll it.
 ---------------------------------------------------------------------------
 local ROW_H, HEAD_H, GAP = 24, 25, 2
-local PER_PAGE = 19 -- rows that fit: (594 - 64 - 14) / (ROW_H + GAP)
+local PER_PAGE = 15 -- rows that fit: (HEIGHT - 64 - 14) / (ROW_H + GAP)
 local BAR_W = 200
 
 local function HasAtlas(name)
@@ -275,7 +279,7 @@ local function MakeList(page)
     list.down:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -8, 14)
     list.empty = page:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     list.empty:SetPoint("CENTER", page, "CENTER", 0, 20)
-    list.empty:SetWidth(420)
+    list.empty:SetWidth(WIDTH - 60)
     ns.SkinText(list.empty)
     page.list = list
     return list
@@ -378,7 +382,7 @@ local LEFT = { 1, 2, 3, 15, 5, 4, 19, 9 }
 local RIGHT = { 10, 6, 7, 8, 11, 12, 13, 14 }
 local BOTTOM = { 16, 17, 18 }
 local SLOT, SLOT_GAP = 36, 44
-local FACT_LINES = 18
+local FACT_LINES = 16 -- above the weapons
 local LABEL_W = 110 -- a fact's label; its value has the rest of the line
 local TICK = 60     -- seconds between refills of an open Character page
 

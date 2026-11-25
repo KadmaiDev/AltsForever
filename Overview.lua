@@ -1006,7 +1006,7 @@ local function MakeHint(f)
     h:SetFrameLevel(f:GetFrameLevel() + 40)
     h:SetWidth(HINT_W)
     -- Under the titles, a little in, so the arrow points up at them.
-    h:SetPoint("TOPLEFT", f.header, "BOTTOMLEFT", 90, -24)
+    h:SetPoint("TOPLEFT", f.header, "BOTTOMLEFT", 90, -17)
     h:EnableMouse(true)
     -- The box: dark gold fading to black, with a yellow glow round it.
     local bg = h:CreateTexture(nil, "BACKGROUND")
