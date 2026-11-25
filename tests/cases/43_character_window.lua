@@ -167,3 +167,45 @@ test("the character menu opens each page; the same page again from a row closes 
     clickRow("Vesp Ash")
     eq(AltsForeverCharacterFrame:IsShown(), false, "again: closed")
 end)
+
+test("an open Character page follows your money, XP and zone, and its times each minute", function()
+    local ns = wow.load(FILES)
+    wow.money = 10000
+    wow.login(nil)
+    runTimers()
+    ns.ShowCharacter(ns.charKey)
+    local before = characterFacts(ns)
+    wow.money = 987654
+    wow.fire("PLAYER_MONEY")
+    local after = characterFacts(ns)
+    assert(after ~= before and after:find("98", 1, true), after)
+    wow.stats.xp = 9100
+    wow.fire("PLAYER_XP_UPDATE", "player")
+    assert(characterFacts(ns):find("|cff9d9d9d91%|r", 1, true), characterFacts(ns))
+    wow.stats.zone = "Ironforge"
+    wow.fire("ZONE_CHANGED_NEW_AREA")
+    assert(characterFacts(ns):find("Zone = Ironforge", 1, true), characterFacts(ns))
+    -- A bag scan tells the overview; the page hears it too (its Bags line).
+    ns.RefreshOverview()
+    -- One minute timer at a time while it shows; none left running once it's closed.
+    local ticks = 0
+    for _, fn in ipairs(wow.timers) do if wow.delays[fn] == 60 then ticks = ticks + 1 end end
+    eq(ticks, 1, "one refill timer, however many fills")
+    AltsForeverCharacterFrame:Hide()
+    runTimers()
+    ticks = 0
+    for _, fn in ipairs(wow.timers) do if wow.delays[fn] == 60 then ticks = ticks + 1 end end
+    eq(ticks, 0, "closed: the timer isn't renewed")
+end)
+
+test("a Character page fact too long for its space is cut short, and shows whole on hover", function()
+    local ns = cwStart()
+    ns.ShowCharacter("Vesp Ash")
+    local line = ns.CharacterPage("character").facts[1]
+    line.hover.scripts.OnEnter(line.hover)
+    eq(#GameTooltip.lines, 0, "nothing cut: no tooltip")
+    line[2].truncated = true
+    line.hover.scripts.OnEnter(line.hover)
+    eq(GameTooltip.lines[1][1], "Level")
+    eq(GameTooltip.lines[2][1], line[2]:GetText())
+end)

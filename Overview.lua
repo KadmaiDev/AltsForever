@@ -1806,6 +1806,7 @@ end
 
 -- `sorted`: the order was changed, so the arrow beside the column titles moves too.
 function ns.RefreshOverview(sorted)
+    if ns.CharacterFactsChanged then ns.CharacterFactsChanged() end -- the same facts, Sheets.lua
     if not (frame and frame:IsShown()) then return end
     if sorted then MarkSort() end
     Refresh()
@@ -1814,6 +1815,7 @@ end
 function ns.StartOverview()
     -- Keep an open window current; a closed or never-opened one costs nothing.
     local function Update()
+        if ns.CharacterFactsChanged then ns.CharacterFactsChanged() end
         if frame and frame:IsShown() then Refresh() end
     end
     for _, event in ipairs({ "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "PLAYER_MONEY", "ZONE_CHANGED_NEW_AREA", "SKILL_LINES_CHANGED" }) do

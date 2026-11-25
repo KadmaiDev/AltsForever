@@ -24,6 +24,13 @@ local QUESTION = 134400                 -- INV_Misc_QuestionMark
 -- What the pages show (no UI)
 ---------------------------------------------------------------------------
 -- The Character page's facts as { label, value } pairs; anything not known is left out.
+-- Your own facts changed (money, XP, zone, a bag or bank scan...): an open Character page
+-- showing you is filled again. Called wherever the overview is told, and costs nothing
+-- with the window closed or on another page or character.
+function ns.CharacterFactsChanged()
+    if ns.CharacterWindowShown() == "character" then ns.CharacterWindowChanged() end
+end
+
 function ns.CharacterFacts(key, c, now)
     local rows = {}
     local function Add(label, value)
@@ -371,6 +378,17 @@ local RIGHT = { 10, 6, 7, 8, 11, 12, 13, 14 }
 local BOTTOM = { 16, 17, 18 }
 local SLOT, SLOT_GAP, NAME_W = 36, 44, 140
 local FACT_LINES = 18
+local LABEL_W = 104 -- a fact's label; its value has the rest of the line
+local TICK = 60     -- seconds between refills of an open Character page
+
+-- A fact cut short shows whole on hover.
+local function FactEnter(self)
+    if not (self.value:IsTruncated() or self.label:IsTruncated()) then return end
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(self.label:GetText())
+    GameTooltip:AddLine(self.value:GetText(), 1, 1, 1, true)
+    GameTooltip:Show()
+end
 
 local function SlotEnter(b)
     if not b.link then return end
@@ -424,20 +442,33 @@ local function BuildCharacter(page)
     for i, slot in ipairs(BOTTOM) do
         MakeSlot(page, slot, WIDTH / 2 - (SLOT * 3 + 10 * 2) / 2 + (i - 1) * (SLOT + 10), top - 8 * SLOT_GAP - 6)
     end
-    -- The facts: a label and its value per line, between the two columns of names.
+    -- The facts: a label and its value per line, between the two columns of names, each in
+    -- a space of its own so a long value (a hearthstone place in another language) is cut
+    -- short rather than running into the label or the gear names; hovering shows it whole.
     local left = 16 + SLOT + 6 + NAME_W + 14
     local right = WIDTH - left
     page.facts = {}
     for i = 1, FACT_LINES do
+        local y = top - 4 - (i - 1) * 19
         local label = page:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        label:SetPoint("TOPLEFT", page, "TOPLEFT", left, top - 4 - (i - 1) * 19)
+        label:SetPoint("TOPLEFT", page, "TOPLEFT", left, y)
+        label:SetWidth(LABEL_W)
         label:SetJustifyH("LEFT")
+        label:SetWordWrap(false)
         local value = page:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        value:SetPoint("TOPRIGHT", page, "TOPLEFT", right, top - 4 - (i - 1) * 19)
+        value:SetPoint("TOPRIGHT", page, "TOPLEFT", right, y)
+        value:SetWidth(right - left - LABEL_W - 4)
         value:SetJustifyH("RIGHT")
+        value:SetWordWrap(false)
         ns.SkinText(label)
         ns.SkinText(value)
-        page.facts[i] = { label, value }
+        local hover = CreateFrame("Frame", nil, page)
+        hover:SetPoint("TOPLEFT", page, "TOPLEFT", left, y + 2)
+        hover:SetSize(right - left, 17)
+        hover:SetScript("OnEnter", FactEnter)
+        hover:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        hover.label, hover.value = label, value
+        page.facts[i] = { label, value, hover = hover }
     end
     page.empty = page:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     page.empty:SetPoint("BOTTOM", page, "BOTTOM", 0, 24)
@@ -445,7 +476,19 @@ local function BuildCharacter(page)
     ns.SkinText(page.empty)
 end
 
+-- While the Character page shows, its times (rested, hearthstone, played, last seen) move
+-- on: refilled each minute, one timer at a time, none once it's closed or left.
+local ticking = false
+local function Tick()
+    ticking = false
+    if ns.CharacterWindowShown() == "character" then ns.CharacterWindowChanged() end
+end
+
 local function FillCharacter(page, key, c)
+    if not ticking and C_Timer then
+        ticking = true
+        C_Timer.After(TICK, Tick)
+    end
     local gear = c.gear
     page.empty:SetShown(not gear)
     for slot, b in pairs(page.slots) do
