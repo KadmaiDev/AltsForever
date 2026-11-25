@@ -1018,6 +1018,7 @@ local function FillSheet(c)
     end
     for id, other in pairs(sheetPages) do other:SetShown(id == def.id) end
     frame.profPage:Hide()
+    frame:SetWidth(ns.SHEET_WIDTH or WIDTH) -- narrower, as the game's character window
     frame.sheetBg:Show()
     if frame.pageBg then frame.pageBg:Hide() end
     if frame.page then frame.page:Hide() end
@@ -1035,6 +1036,7 @@ function Fill()
     local tabs = ShowTabs(c)
     if shownSheet ~= "professions" and FillSheet(c) then return end
     for _, page in pairs(sheetPages) do page:Hide() end
+    frame:SetWidth(WIDTH)
     frame.profPage:Show()
     frame.sheetBg:Hide()
     if frame.pageBg then frame.pageBg:Show() end

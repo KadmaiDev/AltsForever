@@ -313,6 +313,7 @@ function M.load(files)
     function frameMethods:SetChecked(on) self.checked = on end
     function frameMethods:GetChecked() return self.checked end
     function frameMethods:IsTruncated() return self.truncated == true end
+    function frameMethods:GetStringHeight() return self.stringHeight end
     function frameMethods:GetPoint() if self.point then return unpack(self.point) end end
     function frameMethods:Show()
         local was = self.shown

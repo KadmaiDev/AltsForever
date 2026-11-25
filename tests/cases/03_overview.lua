@@ -1139,6 +1139,13 @@ test("a one-time hint that columns can be hidden: shown on the first opening onl
     local hint = f.hint
     assert(hint and hint:IsShown(), "shown the first time")
     eq(hint.text:GetText(), "Tip: right-click the column titles to choose which columns show.")
+    -- The words wrap to the box, which is as tall as they are (measured as it shows), with
+    -- the game's tip arrow pointing up at the titles.
+    eq(hint.text.width, 196)
+    hint.text.stringHeight = 42
+    hint:Hide(); hint:Show()
+    eq(hint:GetHeight(), 72, "two lines and the padding: nothing cut off")
+    eq(hint.arrow.point[1], "BOTTOM")
     eq(ns.db.columnsHintSeen, true, "remembered as soon as it shows")
     columnsMenu("Gold")
     eq(hint:IsShown(), false, "using the columns menu puts it away")

@@ -16,7 +16,8 @@ local GetItemInfoInstant = C_Item.GetItemInfoInstant
 local GetCoinTextureString = C_CurrencyInfo.GetCoinTextureString
 
 local GREY, ATTENTION = "|cff9d9d9d", "|cffff8000"
-local WIDTH = 673                       -- the window's (Recipes.lua)
+local WIDTH = 440                       -- the window's on these pages (professions keep 673)
+ns.SHEET_WIDTH = WIDTH
 local TOP = -64                         -- where a page's content starts, under the title bar
 local QUESTION = 134400                 -- INV_Misc_QuestionMark
 
@@ -110,7 +111,7 @@ end
 ---------------------------------------------------------------------------
 local ROW_H, HEAD_H, GAP = 24, 25, 2
 local PER_PAGE = 19 -- rows that fit: (594 - 64 - 14) / (ROW_H + GAP)
-local BAR_W = 260
+local BAR_W = 200
 
 local function HasAtlas(name)
     return C_Texture and C_Texture.GetAtlasInfo and name and C_Texture.GetAtlasInfo(name) ~= nil
@@ -376,9 +377,9 @@ local SLOT_NAMES = {
 local LEFT = { 1, 2, 3, 15, 5, 4, 19, 9 }
 local RIGHT = { 10, 6, 7, 8, 11, 12, 13, 14 }
 local BOTTOM = { 16, 17, 18 }
-local SLOT, SLOT_GAP, NAME_W = 36, 44, 140
+local SLOT, SLOT_GAP = 36, 44
 local FACT_LINES = 18
-local LABEL_W = 104 -- a fact's label; its value has the rest of the line
+local LABEL_W = 110 -- a fact's label; its value has the rest of the line
 local TICK = 60     -- seconds between refills of an open Character page
 
 -- A fact cut short shows whole on hover.
@@ -402,7 +403,7 @@ local function SlotClick(b)
     if b.link and IsModifiedClick() then HandleModifiedItemClick(b.link) end
 end
 
-local function MakeSlot(page, slot, x, y, nameSide)
+local function MakeSlot(page, slot, x, y)
     local b = CreateFrame("Button", nil, page)
     b:SetSize(SLOT, SLOT)
     b:SetPoint("TOPLEFT", page, "TOPLEFT", x, y)
@@ -412,19 +413,6 @@ local function MakeSlot(page, slot, x, y, nameSide)
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.15)
     ns.SkinItemSlot(b)
-    if nameSide then
-        b.name = page:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        ns.SkinText(b.name)
-        b.name:SetWidth(NAME_W)
-        b.name:SetWordWrap(false)
-        if nameSide == "RIGHT" then
-            b.name:SetPoint("LEFT", b, "RIGHT", 6, 0)
-            b.name:SetJustifyH("LEFT")
-        else
-            b.name:SetPoint("RIGHT", b, "LEFT", -6, 0)
-            b.name:SetJustifyH("RIGHT")
-        end
-    end
     local ok, _, emptyTexture = pcall(GetInventorySlotInfo, SLOT_NAMES[slot])
     b.emptyArt = ok and emptyTexture or nil
     b.slot = slot
@@ -437,15 +425,15 @@ end
 local function BuildCharacter(page)
     page.slots = {}
     local top = TOP - 6
-    for i, slot in ipairs(LEFT) do MakeSlot(page, slot, 16, top - (i - 1) * SLOT_GAP, "RIGHT") end
-    for i, slot in ipairs(RIGHT) do MakeSlot(page, slot, WIDTH - 16 - SLOT, top - (i - 1) * SLOT_GAP, "LEFT") end
+    for i, slot in ipairs(LEFT) do MakeSlot(page, slot, 16, top - (i - 1) * SLOT_GAP) end
+    for i, slot in ipairs(RIGHT) do MakeSlot(page, slot, WIDTH - 16 - SLOT, top - (i - 1) * SLOT_GAP) end
     for i, slot in ipairs(BOTTOM) do
         MakeSlot(page, slot, WIDTH / 2 - (SLOT * 3 + 10 * 2) / 2 + (i - 1) * (SLOT + 10), top - 8 * SLOT_GAP - 6)
     end
-    -- The facts: a label and its value per line, between the two columns of names, each in
+    -- The facts: a label and its value per line, between the two columns of slots, each in
     -- a space of its own so a long value (a hearthstone place in another language) is cut
     -- short rather than running into the label or the gear names; hovering shows it whole.
-    local left = 16 + SLOT + 6 + NAME_W + 14
+    local left = 16 + SLOT + 14
     local right = WIDTH - left
     page.facts = {}
     for i = 1, FACT_LINES do
@@ -505,7 +493,6 @@ local function FillCharacter(page, key, c)
         local pct = c.duraSlots and c.duraSlots[slot]
         -- Nearly broken items are tinted red, as on the game's own panel.
         if pct and pct < LOW_DURABILITY then b.icon:SetVertexColor(1, 0.3, 0.3) else b.icon:SetVertexColor(1, 1, 1) end
-        if b.name then b.name:SetText(link and ns.LinkName(link) or "") end
     end
     local facts = ns.CharacterFacts(key, c, time())
     for i, line in ipairs(page.facts) do

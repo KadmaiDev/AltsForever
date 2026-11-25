@@ -985,46 +985,91 @@ local function HideHint()
     if frame and frame.hint then frame.hint:Hide() end
 end
 
+-- The game's help-tip art (Blizzard_HelpPlate.xml, forever branch: GlowBoxTemplate and
+-- GlowBoxArrowTemplate), drawn from its texture files and coordinates by our own code, so
+-- nothing of Blizzard's tip system runs.
+local PARTS = "Interface\\TalentFrame\\TalentFrame-Parts"
+local HORIZ = "Interface\\TalentFrame\\TalentFrame-Horizontal2"
+local VERT = "Interface\\TalentFrame\\TalentFrame-Vertical2"
+local HINT_W, HINT_TEXT_W = 240, 196
+
+local function HintPart(h, layer, sub, file, l, r, t, b, w, ht)
+    local tex = h:CreateTexture(nil, layer, nil, sub)
+    tex:SetTexture(file)
+    tex:SetTexCoord(l, r, t, b)
+    if w then tex:SetSize(w, ht) end
+    return tex
+end
+
 local function MakeHint(f)
     local h = CreateFrame("Frame", nil, f)
     h:SetFrameLevel(f:GetFrameLevel() + 40)
-    h:SetWidth(270)
-    h:SetPoint("TOPLEFT", f.header, "BOTTOMLEFT", 60, -6)
+    h:SetWidth(HINT_W)
+    -- Under the titles, a little in, so the arrow points up at them.
+    h:SetPoint("TOPLEFT", f.header, "BOTTOMLEFT", 90, -24)
     h:EnableMouse(true)
+    -- The box: dark gold fading to black, with a yellow glow round it.
     local bg = h:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(0.05, 0.05, 0.05, 0.95)
-    -- A 1 px gold edge, and a small gold notch pointing up at the titles.
-    local function Edge(a, b, w, hgt)
-        local t = h:CreateTexture(nil, "BORDER")
-        t:SetColorTexture(1, 0.82, 0, 0.9)
-        t:SetPoint(a)
-        t:SetPoint(b)
-        if w then t:SetWidth(w) else t:SetHeight(hgt) end
+    bg:SetPoint("TOPLEFT", 1, -1)
+    bg:SetPoint("BOTTOMRIGHT", -1, 1)
+    bg:SetColorTexture(1, 1, 1, 1)
+    if bg.SetGradient and CreateColor then
+        pcall(bg.SetGradient, bg, "VERTICAL", CreateColor(0, 0, 0, 1), CreateColor(0.23, 0.19, 0, 1))
+    else
+        bg:SetColorTexture(0.1, 0.08, 0, 1)
     end
-    Edge("TOPLEFT", "TOPRIGHT", nil, 1)
-    Edge("BOTTOMLEFT", "BOTTOMRIGHT", nil, 1)
-    Edge("TOPLEFT", "BOTTOMLEFT", 1)
-    Edge("TOPRIGHT", "BOTTOMRIGHT", 1)
-    local notch = h:CreateTexture(nil, "BORDER")
-    notch:SetColorTexture(1, 0.82, 0, 0.9)
-    notch:SetSize(8, 6)
-    notch:SetPoint("BOTTOMLEFT", h, "TOPLEFT", 20, 0)
-    local text = h:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    text:SetPoint("TOPLEFT", 10, -9)
-    text:SetPoint("RIGHT", h, "RIGHT", -26, 0)
+    local tl = HintPart(h, "BACKGROUND", -1, PARTS, 0.91796875, 0.96093750, 0.65625000, 0.67773438, 11, 11)
+    tl:SetPoint("TOPLEFT", -6, 6)
+    local tr = HintPart(h, "BACKGROUND", -1, PARTS, 0.12890625, 0.17187500, 0.96679688, 0.98828125, 11, 11)
+    tr:SetPoint("TOPRIGHT", 6, 6)
+    local bl = HintPart(h, "BACKGROUND", -1, PARTS, 0.30859375, 0.35156250, 0.96679688, 0.98828125, 11, 11)
+    bl:SetPoint("BOTTOMLEFT", -6, -6)
+    local br = HintPart(h, "BACKGROUND", -1, PARTS, 0.94921875, 0.99218750, 0.32226563, 0.34375000, 11, 11)
+    br:SetPoint("BOTTOMRIGHT", 6, -6)
+    local top = HintPart(h, "BACKGROUND", -1, HORIZ, 0, 1, 0.29687500, 0.33984375)
+    top:SetPoint("TOPLEFT", tl, "TOPRIGHT")
+    top:SetPoint("BOTTOMRIGHT", tr, "BOTTOMLEFT")
+    local bottom = HintPart(h, "BACKGROUND", -1, HORIZ, 0, 1, 0.24609375, 0.28906250)
+    bottom:SetPoint("TOPLEFT", bl, "TOPRIGHT")
+    bottom:SetPoint("BOTTOMRIGHT", br, "BOTTOMLEFT")
+    local left = HintPart(h, "BACKGROUND", -1, VERT, 0.25781250, 0.30078125, 0, 1)
+    left:SetPoint("TOPLEFT", tl, "BOTTOMLEFT")
+    left:SetPoint("BOTTOMRIGHT", bl, "TOPRIGHT")
+    local right = HintPart(h, "BACKGROUND", -1, VERT, 0.20703125, 0.25000000, 0, 1)
+    right:SetPoint("TOPLEFT", tr, "BOTTOMLEFT")
+    right:SetPoint("BOTTOMRIGHT", br, "TOPRIGHT")
+    for _, t in ipairs({ tl, tr, bl, br, top, bottom, left, right }) do t:SetBlendMode("ADD") end
+    -- The arrow over the box, pointing up at the titles, with its glow.
+    local arrow = HintPart(h, "ARTWORK", 0, PARTS, 0.78515625, 0.99218750, 0.58789063, 0.54687500, 53, 21)
+    arrow:SetPoint("BOTTOM", h, "TOPLEFT", 46, -3)
+    local glow = HintPart(h, "BORDER", 0, PARTS, 0.40625000, 0.66015625, 0.82812500, 0.77343750, 65, 28)
+    glow:SetPoint("BOTTOM", arrow, "BOTTOM", 0, 0)
+    glow:SetBlendMode("ADD")
+    glow:SetAlpha(0.5)
+    h.arrow = arrow
+    -- The words, wrapped to the box; it's as tall as they need, measured once shown (a UI
+    -- addon may change the font first).
+    local text = h:CreateFontString(nil, "OVERLAY", "GameFontHighlightLeft")
+    text:SetPoint("TOPLEFT", 15, -15)
+    text:SetWidth(HINT_TEXT_W)
     text:SetJustifyH("LEFT")
+    text:SetJustifyV("TOP")
+    text:SetWordWrap(true)
     text:SetText(L["Tip: right-click the column titles to choose which columns show."])
     ns.SkinText(text)
     h.text = text
     local close = CreateFrame("Button", nil, h, "UIPanelCloseButton")
-    close:SetSize(20, 20)
-    close:SetPoint("TOPRIGHT", 0, 0)
+    close:SetSize(22, 22)
+    close:SetPoint("TOPRIGHT", 2, 2)
     close:SetScript("OnClick", HideHint)
     h.close = close
-    local height = text:GetStringHeight()
-    if type(height) ~= "number" or issecretvalue(height) or height <= 0 then height = 24 end
-    h:SetHeight(height + 18)
+    local function Fit()
+        local height = text:GetStringHeight()
+        if type(height) ~= "number" or issecretvalue(height) or height <= 0 then height = 28 end
+        h:SetHeight(height + 30)
+    end
+    h:SetScript("OnShow", Fit)
+    Fit()
     h:Hide()
     f.hint = h
 end

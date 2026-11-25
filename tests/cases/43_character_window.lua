@@ -150,6 +150,17 @@ test("the side tabs: the three pages, then each profession; the picker keeps the
     eq(shown, 3, "no professions: just the three pages")
 end)
 
+test("the character pages are narrow, as the game's character window; professions keep their width", function()
+    local ns = cwStart()
+    ns.ShowCharacter("Vesp Ash", "skills")
+    local f = AltsForeverCharacterFrame
+    eq(f:GetWidth(), 440)
+    f.tabs[4].scripts.OnClick(f.tabs[4])
+    eq(f:GetWidth(), 673, "a profession: the full professions window")
+    f.tabs[1].scripts.OnClick(f.tabs[1])
+    eq(f:GetWidth(), 440)
+end)
+
 test("the character menu opens each page; the same page again from a row closes it", function()
     local ns = cwStart()
     SlashCmdList.ALTSFOREVER("")
