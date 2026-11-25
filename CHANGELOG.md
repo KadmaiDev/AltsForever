@@ -1,3 +1,8 @@
+## Alts Forever 1.12.2 (not yet released)
+
+- **Silver back in the overview:** characters with under 100 gold show their gold and silver again ("12g 45s"); from 100 gold it's still whole gold, to keep the window narrow. Thanks to the player who asked.
+- **Easier to read reputation bars:** the Reputation page's bars take the game's own reputation colours, darker than before, and the text on them is outlined, so it no longer gets lost on bright yellow and green.
+
 ## Alts Forever 1.12.1
 
 - **Professions the game names two ways:** some game clients call a profession by one name in the skills list and another in the profession window (a Spanish client says "Costura" in one and "Sastrería" in the other for Tailoring). Alts Forever took them for two professions, so that profession's recipes never showed: its tab said "Not scanned" and recipe tooltips couldn't find it. Professions are now matched by skill line, which is the same in every language. Open the profession's window once on each character it affected. Thanks to the player who reported it and ran the checks.

@@ -30,7 +30,8 @@ local COLUMNS = {
     -- values under wider titles, so both are centred.
     { title = L["Well Rested"], width = 84, center = true, sort = "wellRested", id = "wellrested" },
     { title = L["Legacy"], width = 60, center = true, sort = "legacy", id = "legacy" },
-    -- Whole gold only (ns.GoldShort): the row tooltip has it to the copper.
+    -- Whole gold from 100, gold and silver below (ns.GoldShort): the row tooltip has it
+    -- to the copper.
     { title = L["Gold"], width = 70, right = true, sort = "gold", id = "gold" },
     -- Each main profession gets its icon and its skill (ns.ProfIconCells), so the skill
     -- numbers line up; the row tooltip names them. The gap separates it from the
@@ -247,12 +248,15 @@ function ns.LineSkill(c, line)
     return nil
 end
 
--- Gold in the overview's narrow column: whole gold with the coin ("1,234" and the gold
--- icon); under a gold, silver and copper as the game writes them.
+-- Gold in the overview's narrow column: from 100 gold, whole gold with the coin ("1,234"
+-- and the gold icon); under that, gold and silver (copper dropped), as the game writes
+-- them; under a gold, silver and copper. A player missed the silver at low levels
+-- (2026-11-25, after 1.11.0 cut it to whole gold); "99g 99s" is no wider than "12,345g".
 local GOLD_ICON = "|TInterface\\MoneyFrame\\UI-GoldIcon:0:0:2:0|t"
 local BigNumber = BreakUpLargeNumbers or tostring
 function ns.GoldShort(copper)
-    if copper >= 10000 then return BigNumber(floor(copper / 10000)) .. GOLD_ICON end
+    if copper >= 1000000 then return BigNumber(floor(copper / 10000)) .. GOLD_ICON end
+    if copper >= 10000 then return GetCoinTextureString(copper - copper % 100) end
     return GetCoinTextureString(copper)
 end
 
