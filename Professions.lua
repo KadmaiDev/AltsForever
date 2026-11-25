@@ -114,6 +114,66 @@ local function ProfessionName(info)
     return info and (info.professionName or info.parentProfessionName)
 end
 
+-- Some clients name one profession two ways: on a Spanish client (a player's report,
+-- 2026-11-25) the skill list (GetProfessionInfo, whose names every record here is kept under)
+-- says "Costura" while the profession window and its recipes say "Sastrería". Names are
+-- matched by skill line, the same in every language: db.profArt (the skill list's names, and
+-- any other name found on the same line), else the game's name for each line (Recipes.lua).
+local function LineOfName(name)
+    if not ns.ProfessionArt then return nil end
+    return (ns.ProfessionArt(name))
+end
+
+-- The name a character's records use for a profession the game called `name`: the same,
+-- unless they have none by that name but one on the same skill line.
+function ns.ProfKey(c, name)
+    local profs = c and c.profs
+    if name == nil or not profs or profs[name] then return name end
+    local line = LineOfName(name)
+    if line then
+        for own in pairs(profs) do
+            if LineOfName(own) == line then return own end
+        end
+    end
+    return name
+end
+
+-- Whether the game calls skill line `line` `name`, by either of its names for a line.
+local function LineCalled(line, name)
+    local ok, n = pcall(TS.GetTradeSkillDisplayName or error, line)
+    if ok and not issecretvalue(n) and n == name then return true end
+    local info
+    ok, info = pcall(TS.GetProfessionInfoBySkillLineID or error, line)
+    n = ok and type(info) == "table" and ProfessionName(info)
+    if issecretvalue(n) then return false end
+    return n == name
+end
+
+-- The open window's profession: the name the character's records use for it, then the name
+-- the window and its recipes go by. When they differ, the window's name joins db.profArt on
+-- the same line, so recipe tooltips that use it find the profession too.
+local function WindowProfession(c)
+    local base = TS.GetBaseProfessionInfo()
+    local name = ProfessionName(base)
+    if issecretvalue(name) or type(name) ~= "string" then return nil end
+    local profs = c.profs
+    if not profs or profs[name] then return name, name end
+    local line = base.professionID
+    if issecretvalue(line) or type(line) ~= "number" then line = nil end
+    for own in pairs(profs) do
+        local ownLine = LineOfName(own)
+        if ownLine and (ownLine == line or LineCalled(ownLine, name)) then
+            local art = ns.db.profArt
+            if not (art and art[name]) then
+                ns.db.profArt = art or {}
+                ns.db.profArt[name] = art and art[own] or (ownLine .. ";")
+            end
+            return own, name
+        end
+    end
+    return name, name
+end
+
 -- The item a recipe makes, or nil (enchants make none). The schematic's field name
 -- is the retail one, undocumented on Forever, so the recipe's item link is the fallback.
 local function OutputItem(recipeID, s)
@@ -306,8 +366,13 @@ end
 -- skipped, which keeps this to tens of calls instead of the list's hundreds.
 function ns.ScanRecipes(c)
     if not TS.IsTradeSkillReady() or TS.IsTradeSkillLinked() or TS.IsTradeSkillGuild() then return false end
-    local prof = ProfessionName(TS.GetBaseProfessionInfo())
+    -- Stored under `prof`; the window's recipes name it `window` (usually the same).
+    local prof, window = WindowProfession(c)
     if not prof then return false end
+    local function Mine(id)
+        local n = ProfessionName(TS.GetProfessionInfoByRecipeID(id))
+        return n ~= nil and (n == window or n == prof)
+    end
     local stored = StoredNames(prof)
     local ids = TS.GetAllRecipeIDs()
     local mine, found = {}, false
@@ -318,7 +383,7 @@ function ns.ScanRecipes(c)
         if r and r.name then
             local lname = r.name:lower()
             if r.learned or stored[lname] then
-                if ProfessionName(TS.GetProfessionInfoByRecipeID(id)) == prof then
+                if Mine(id) then
                     found, mine[lname] = true, true
                     RecordCategory(cats, r.categoryID)
                     if r.learned then
@@ -338,7 +403,7 @@ function ns.ScanRecipes(c)
     end
     -- Nothing of this profession checked yet (nothing learned or stored): make sure the
     -- list really is this profession's before recording it as empty.
-    if not found and unchecked and ProfessionName(TS.GetProfessionInfoByRecipeID(unchecked)) == prof then
+    if not found and unchecked and Mine(unchecked) then
         found = true
     end
     if not found then return false end -- the wrong list: try again on the next update
@@ -354,6 +419,16 @@ function ns.ScanRecipes(c)
     end
     for item, lname in pairs(crafts) do made[item] = lname end
     c.recipes[prof], c.crafts[prof] = known, made
+    -- Read under the window's own name before (1.12.0 and earlier, where the names differ):
+    -- that copy goes, as the profession now has its recipes under the character's name.
+    if window ~= prof and not (c.profs and c.profs[window]) then
+        c.recipes[window], c.crafts[window] = nil, nil
+        if c.recipesAt then c.recipesAt[window] = nil end
+        if c.cooldowns then
+            c.cooldowns[window] = nil
+            if next(c.cooldowns) == nil then c.cooldowns = nil end
+        end
+    end
     -- The skill the colours above were read at: once it moves on, they may be out of date.
     -- Read now (a skill-up from crafting may not have been picked up yet).
     ns.ScanSkills(c)
@@ -368,7 +443,7 @@ end
 
 function ns.RecipeLearned(c, recipeID)
     local r = TS.GetRecipeInfo(recipeID)
-    local prof = ProfessionName(TS.GetProfessionInfoByRecipeID(recipeID))
+    local prof = ns.ProfKey(c, ProfessionName(TS.GetProfessionInfoByRecipeID(recipeID)))
     local learned = prof and c.recipes and c.recipes[prof]
     -- Only add to a profession we've scanned; a partial list would read as "not learned".
     if not (learned and r and r.name) then return end
@@ -510,7 +585,7 @@ local function WatchLearned(recipeID)
     if not cdProf then return end
     local r = TS.GetRecipeInfo(recipeID)
     if not (r and r.name and r.learned ~= false) then return end
-    if ProfessionName(TS.GetProfessionInfoByRecipeID(recipeID)) ~= cdProf then return end
+    if ns.ProfKey(cdChar, ProfessionName(TS.GetProfessionInfoByRecipeID(recipeID))) ~= cdProf then return end
     cdIDs[recipeID] = r.name
     CooldownsRead()
 end
@@ -745,9 +820,10 @@ local function ParseRecipe(tt, id, data)
 end
 
 local function Status(c, p)
-    local skill = c.profs and c.profs[p.prof]
+    local prof = ns.ProfKey(c, p.prof)
+    local skill = c.profs and c.profs[prof]
     if not skill then return nil end
-    local known = c.recipes and c.recipes[p.prof]
+    local known = c.recipes and c.recipes[prof]
     if known and known[p.name] then return KNOWN end
     if skill < p.req then return NEEDS_SKILL, skill end
     if not known then return NOT_SCANNED end

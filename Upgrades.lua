@@ -770,7 +770,7 @@ local function Compare(c, info, link)
     if need > level + LEVEL_AHEAD then return nil end
     if info.classes and not ClassAllowed(info.classes, c.class) then return nil end
     for _, r in ipairs(info.requires or {}) do
-        local skill = c.profs and c.profs[r[1]]
+        local skill = c.profs and c.profs[ns.ProfKey(c, r[1])]
         if not (skill and skill >= r[2]) then return nil end
     end
     local role = ns.RoleOf(c)
