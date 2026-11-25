@@ -229,6 +229,7 @@ local DB_FIELDS = {
     inspectAnvilsOff = "boolean", overviewSort = "string", overviewSortRev = "boolean",
     windows = "table", pinned = "table", hiddenColumns = "table",
     mailRules = "table", mailFillOff = "boolean", mailPackOff = "boolean", weights = "table",
+    columnsHintSeen = "boolean",
 }
 
 -- Keeps only entries whose key and value are of these types (value nil = any).

@@ -1129,3 +1129,32 @@ test("the Full in column: how long until rested XP is full, orange outside an in
     click("restedFull")
     eq(overviewNames(), "High, Low, Aldric, Far", "full already first, then soonest; max level last")
 end)
+
+test("a one-time hint that columns can be hidden: shown on the first opening only, gone once used", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.login(overviewAlts())
+    SlashCmdList.ALTSFOREVER("")
+    local f = AltsForeverFrame
+    local hint = f.hint
+    assert(hint and hint:IsShown(), "shown the first time")
+    eq(hint.text:GetText(), "Tip: right-click the column titles to choose which columns show.")
+    eq(ns.db.columnsHintSeen, true, "remembered as soon as it shows")
+    columnsMenu("Gold")
+    eq(hint:IsShown(), false, "using the columns menu puts it away")
+    f:Hide()
+    f:Show()
+    eq(hint:IsShown(), false, "not again")
+    -- Closed with its cross, and not shown to a saved file that has seen it.
+    wow.load(FILES)
+    local saved = overviewAlts()
+    wow.login(saved)
+    SlashCmdList.ALTSFOREVER("")
+    AltsForeverFrame.hint.close.scripts.OnClick(AltsForeverFrame.hint.close)
+    eq(AltsForeverFrame.hint:IsShown(), false, "the cross closes it")
+    wow.load(FILES)
+    saved.columnsHintSeen = true
+    wow.login(saved)
+    SlashCmdList.ALTSFOREVER("")
+    eq(AltsForeverFrame.hint, nil, "never made for a file that has seen it")
+end)

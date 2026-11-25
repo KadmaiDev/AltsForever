@@ -229,6 +229,7 @@ L["Click to show these characters."] = "Klicken, um diese Charaktere anzuzeigen.
 L["Click to hide these characters."] = "Klicken, um diese Charaktere auszublenden."
 L["Columns"] = "Spalten"
 L["Show all columns"] = "Alle Spalten anzeigen"
+L["Tip: right-click the column titles to choose which columns show."] = "Tipp: Ein Rechtsklick auf die Spaltentitel wählt, welche Spalten angezeigt werden."
 L["Secondary professions"] = "Sekundäre Berufe"
 L["Right-click to choose which columns are shown."] = "Rechtsklick, um die angezeigten Spalten zu wählen."
 L["Every overview column is shown."] = "Alle Spalten der Übersicht werden angezeigt."

@@ -991,8 +991,70 @@ function ns.FillColumnsMenu(menu)
     end
 end
 
+-- A one-time hint that columns can be hidden (owner, 2026-11-25: players kept missing it).
+-- Our own callout under the titles, not Blizzard's HelpTip, whose shared frames would run
+-- our code in theirs. Shown the first time the overview opens after this was added, once
+-- per saved file (db.columnsHintSeen is set as it shows); it goes when closed, when the
+-- columns menu is used, or with the window.
+local function HideHint()
+    if frame and frame.hint then frame.hint:Hide() end
+end
+
+local function MakeHint(f)
+    local h = CreateFrame("Frame", nil, f)
+    h:SetFrameLevel(f:GetFrameLevel() + 40)
+    h:SetWidth(270)
+    h:SetPoint("TOPLEFT", f.header, "BOTTOMLEFT", 60, -6)
+    h:EnableMouse(true)
+    local bg = h:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0.05, 0.05, 0.05, 0.95)
+    -- A 1 px gold edge, and a small gold notch pointing up at the titles.
+    local function Edge(a, b, w, hgt)
+        local t = h:CreateTexture(nil, "BORDER")
+        t:SetColorTexture(1, 0.82, 0, 0.9)
+        t:SetPoint(a)
+        t:SetPoint(b)
+        if w then t:SetWidth(w) else t:SetHeight(hgt) end
+    end
+    Edge("TOPLEFT", "TOPRIGHT", nil, 1)
+    Edge("BOTTOMLEFT", "BOTTOMRIGHT", nil, 1)
+    Edge("TOPLEFT", "BOTTOMLEFT", 1)
+    Edge("TOPRIGHT", "BOTTOMRIGHT", 1)
+    local notch = h:CreateTexture(nil, "BORDER")
+    notch:SetColorTexture(1, 0.82, 0, 0.9)
+    notch:SetSize(8, 6)
+    notch:SetPoint("BOTTOMLEFT", h, "TOPLEFT", 20, 0)
+    local text = h:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    text:SetPoint("TOPLEFT", 10, -9)
+    text:SetPoint("RIGHT", h, "RIGHT", -26, 0)
+    text:SetJustifyH("LEFT")
+    text:SetText(L["Tip: right-click the column titles to choose which columns show."])
+    ns.SkinText(text)
+    h.text = text
+    local close = CreateFrame("Button", nil, h, "UIPanelCloseButton")
+    close:SetSize(20, 20)
+    close:SetPoint("TOPRIGHT", 0, 0)
+    close:SetScript("OnClick", HideHint)
+    h.close = close
+    local height = text:GetStringHeight()
+    if type(height) ~= "number" or issecretvalue(height) or height <= 0 then height = 24 end
+    h:SetHeight(height + 18)
+    h:Hide()
+    f.hint = h
+end
+
+local function MaybeHint(f)
+    local db = ns.db
+    if db.columnsHintSeen then return end
+    db.columnsHintSeen = true
+    if not f.hint then MakeHint(f) end
+    f.hint:Show()
+end
+
 local function ColumnsMenu(owner)
     if not (MenuUtil and MenuUtil.CreateContextMenu) then return end
+    HideHint()
     ns.OpenMenu(owner, function(_, root)
         root:CreateTitle(L["Columns"])
         ns.FillColumnsMenu(root)
@@ -1671,8 +1733,10 @@ local function CreateWindow()
         ns.PruneSaves(time())
         MarkSort()
         Refresh()
+        MaybeHint(self)
     end)
     f:SetScript("OnHide", function()
+        HideHint()
         if AltsForeverGearFrame then AltsForeverGearFrame:Hide() end
         if AltsForeverRepFrame then AltsForeverRepFrame:Hide() end
     end)
