@@ -114,6 +114,8 @@ local function BuildPanel()
     -- With a controller, A on an anvil opens it with focus inside, and B closes it.
     ns.GamepadWindow(panel)
     ns.ScaleWindow(panel)
+    -- A fight closes it, as our windows, though the character sheet stays open.
+    ns.ClosesInCombat(panel)
 end
 
 local function HidePanel()

@@ -102,20 +102,35 @@ end
 -- Combat closes every window of ours, as EllesmereUI closes its options (owner, 2026-11-26).
 -- Registered with the first window, so nothing listens until one exists.
 local closesInCombat = false
+local combatOnly = {} -- closed in combat, but not by Escape (the anvils' crafting list)
 local function CloseForCombat()
     for _, f in ipairs(escapeWindows) do
+        if f:IsShown() then f:Hide() end
+    end
+    for _, f in ipairs(combatOnly) do
         if f:IsShown() then f:Hide() end
     end
     if overviewWindow and overviewWindow:IsShown() then overviewWindow:Hide() end
 end
 
+local function ListenForCombat()
+    if closesInCombat then return end
+    closesInCombat = true
+    ns.On("PLAYER_REGEN_DISABLED", CloseForCombat)
+end
+
+-- A panel of ours that a fight should close but Escape needn't, once, when it's made: the
+-- character sheet's crafting list, which may be the only one of ours ever made (Codex
+-- review, 2026-11-26).
+function ns.ClosesInCombat(f)
+    ListenForCombat()
+    combatOnly[#combatOnly + 1] = f
+end
+
 -- Each window of ours that Escape should close, once, when it's created; `overview` for the
 -- overview, which closes only once the others have. Starting a fight closes them all.
 function ns.EscapeCloses(f, overview)
-    if not closesInCombat then
-        closesInCombat = true
-        ns.On("PLAYER_REGEN_DISABLED", CloseForCombat)
-    end
+    ListenForCombat()
     if not UISpecialFrames then
         if overview then overviewWindow = f else escapeWindows[#escapeWindows + 1] = f end
         return
