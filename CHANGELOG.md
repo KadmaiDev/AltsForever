@@ -1,6 +1,7 @@
 ## Alts Forever 1.13.0 (not yet released)
 
 - **Export your items:** the Export window (the note button in the overview, or `/af export`) has a fourth format, **Items**: every item in each character's bags, bank, mailbox and worn gear, one row per item with the character, where it is, its name, quality, count and item ID, ready to paste into Excel or Google Sheets. Items the game hasn't loaded yet fill in a second or two after the window opens. Thanks to the player who asked.
+- **Windows close in combat:** the close button (X) on Alts Forever's windows did nothing during a fight (the game refused it with "Interface action failed because of an AddOn"); it now closes them, in combat too. And starting a fight now closes every Alts Forever window, as EllesmereUI closes its options, so none is left over the screen while you fight. They can still be opened during a fight.
 
 ## Alts Forever 1.12.2
 

@@ -211,6 +211,68 @@ function pressEscape()
     return found
 end
 
+-- Every window of ours, open at once (the overview first, the others on top).
+local function openAllWindows(ns)
+    ns.ToggleOverview(true)
+    runTimers()
+    ns.ShowBags("Tarn Moon", "bags")
+    ns.ShowGear("Tarn Moon")
+    ns.ToggleExport()
+    ns.ToggleLockouts()
+    ns.ToggleReputation()
+    ns.ToggleSearch()
+    ns.ToggleSync(true)
+    ns.ToggleMailRules(true)
+    ns.ShowWeights("tank")
+    ns.OpenIconPicker("bags")
+    runTimers()
+    return { AltsForeverFrame, AltsForeverBagsFrame, AltsForeverCharacterFrame, AltsForeverExportFrame,
+        AltsForeverLockoutsFrame, AltsForeverRepFrame, AltsForeverSearchFrame, AltsForeverSyncFrame,
+        AltsForeverMailRulesFrame, AltsForeverWeightsFrame, AltsForeverIconPicker }
+end
+
+test("a window's close button works in combat: it hides the window itself, not through the game's panel code", function()
+    local ns = wow.load(FILES)
+    wow.login({ v = 2, chars = { ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { level = 20, bags = {} }) } })
+    local windows = openAllWindows(ns)
+    wow.inCombat = true
+    for _, f in ipairs(windows) do
+        local close
+        for _, b in ipairs(wow.frames) do
+            if b.parent == f and (b.template == "UIPanelCloseButton" or b.template == "UIPanelCloseButtonDefaultAnchors") then
+                close = b
+            end
+        end
+        assert(close, f.frameName .. " has a close button")
+        f:Show()
+        close.scripts.OnClick(close)
+        eq(f:IsShown(), false, f.frameName .. " closed by its button in combat")
+    end
+    eq(wow.blockedActions, nil, "no blocked action")
+    wow.inCombat = false
+end)
+
+test("starting a fight closes every window of ours, as EllesmereUI closes its options", function()
+    local ns = wow.load(FILES)
+    wow.login({ v = 2, chars = { ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { level = 20, bags = {} }) } })
+    local windows = openAllWindows(ns)
+    for _, f in ipairs(windows) do eq(f:IsShown(), true, f.frameName .. " open before the fight") end
+    wow.inCombat = true
+    wow.fire("PLAYER_REGEN_DISABLED")
+    runTimers()
+    for _, f in ipairs(windows) do eq(f:IsShown(), false, f.frameName .. " closed when the fight starts") end
+    eq(pressEscape(), false, "nothing of ours left for Escape")
+    -- They open again in combat if asked for, and Escape still closes them in order.
+    ns.ToggleOverview(true)
+    runTimers()
+    ns.ShowBags("Tarn Moon", "bags")
+    eq(AltsForeverFrame:IsShown(), true)
+    pressEscape()
+    eq(AltsForeverBagsFrame:IsShown(), false)
+    eq(AltsForeverFrame:IsShown(), true)
+    wow.inCombat = false
+end)
+
 test("Escape closes the window on top first, then the overview", function()
     local ns = wow.load(FILES)
     wow.login({ v = 2, chars = { ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { level = 20, bags = {} }) } })
