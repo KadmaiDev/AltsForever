@@ -244,6 +244,38 @@ test("other rulesets and factions on Shift: their characters join the tooltip wh
     wow.shift = false
 end)
 
+test("other rulesets on Shift: gold and XP bar tooltips show them whether or not Shift is held, and stay put when it changes", function()
+    local ns, bar = tipsStart()
+    AltsForeverDB.chars["Zug Zug"] = alt("Zug Zug", "SHAMAN", { faction = "Horde", money = 9000, level = 12, xp = 1, xpMax = 100 })
+    ns.InvalidateCache()
+    local function gold()
+        GameTooltip:Hide()
+        ContainerFrameCombinedBagsGoldButton:Enter()
+        return textOf(GameTooltip.lines):find("Zug Zug", 1, true) ~= nil
+    end
+    local function xp()
+        GameTooltip:Hide()
+        bar.scripts.OnEnter(bar)
+        return textOf(GameTooltip.lines):find("Zug Zug", 1, true) ~= nil
+    end
+    eq(gold(), false, "Never: hidden"); eq(xp(), false)
+    pickMode("rulesets", "shift")
+    eq(gold(), true, "Shift: gold shows them without Shift held, as with Always")
+    eq(xp(), true)
+    -- Shift pressed and let go while the gold tooltip stays open: nothing to redraw, and
+    -- nothing changes the next time either.
+    ContainerFrameCombinedBagsGoldButton:Enter()
+    wow.shift = true
+    wow.fire("MODIFIER_STATE_CHANGED", "LSHIFT", 1)
+    assert(textOf(GameTooltip.lines):find("Zug Zug", 1, true))
+    wow.shift = false
+    wow.fire("MODIFIER_STATE_CHANGED", "LSHIFT", 0)
+    assert(textOf(GameTooltip.lines):find("Zug Zug", 1, true))
+    eq(gold(), true); eq(xp(), true)
+    pickMode("rulesets", "never")
+    eq(gold(), false); eq(xp(), false)
+end)
+
 test("/af shift lists every part's choice, and /af shift <part> puts one on Shift or back", function()
     shiftStart()
     SlashCmdList.ALTSFOREVER("shift")

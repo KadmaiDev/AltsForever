@@ -388,11 +388,13 @@ local function Shows(db, part, held)
 end
 function ns.TipShows(part) return Shows(ns.db, part, IsShiftKeyDown()) end
 
--- Other rulesets and factions in tooltips: shown with the setting, and with it on Shift only
--- while Shift is held. The lists that hold them are cached (counts, Can craft, skill-ups,
+-- Other rulesets and factions in item tooltips: shown with the setting, and with it on Shift
+-- only while Shift is held. The lists that hold them are cached (counts, Can craft, skill-ups,
 -- upgrades), so a change of Shift with that choice rebuilds them once (ns.SyncTipShift,
--- called before a tooltip is built); without it nothing is read. ns.Hidden, outside
--- tooltips (search, the bags window's arrows), counts them whenever they're not Never.
+-- called before an item or trainer tooltip is built); without it nothing is read. Everywhere
+-- else ns.Hidden counts them whenever they're not Never: search, the bags window's arrows,
+-- and the gold and XP/reputation bar tooltips, which are built only on hover and so couldn't
+-- follow a Shift pressed while they're open (Codex review, 2026-11-26).
 local othersHeld = false
 function ns.SyncTipShift()
     local shift = ns.db.tipShift

@@ -53,12 +53,11 @@ end
 -- This session's stats (when turned on), then your other characters still levelling:
 -- level, XP and rested XP.
 function ns.AddXPLines(tt, fresh)
-    ns.SyncTipShift() -- other rulesets on Shift (Tooltip.lua)
     local chars, maxLevel, now = ns.db.chars, ns.MaxLevel(), time()
     local rows = {}
     for _, key in ipairs(ns.OverviewOrder()) do
         local c = chars[key]
-        if key ~= ns.charKey and not ns.TipHidden(c) and c.level and c.level < maxLevel then
+        if key ~= ns.charKey and not ns.Hidden(c) and c.level and c.level < maxLevel then
             local xp = (c.xp and c.xpMax and c.xpMax > 0) and (GREY .. floor(c.xp * 100 / c.xpMax) .. "%|r") or ""
             rows[#rows + 1] = { ns.ListName(key, c), tostring(c.level), xp, ns.RestedText(c, now) }
         end

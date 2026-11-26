@@ -712,12 +712,14 @@ test("upgrade weights window: shows a role's weights, takes a typed one, Reset p
     eq(f.roleButton:GetText(), "Caster · Priest, Shaman, Mage, Warlock, Druid", "/af weights alone: your own role (a mage)")
 end)
 
-test("upgrade weights: an Upgrade weights... button under the tooltip parts on the Options page opens the window", function()
+test("upgrade weights: an Upgrade weights... button under the anvil boxes on the Options page opens the window", function()
     upStart()
     showOptionsPage()
     local f = AltsForeverOptionsPanel
     local b = f.weights
     eq(b:GetText(), "Upgrade weights...")
+    local _, rel = b:GetPoint()
+    eq(rel.label.text, "Show craftable upgrades when inspecting a player", "under the anvil boxes")
     b.scripts.OnEnter(b)
     assert(GameTooltip.lines[2][1]:find("/af weights", 1, true))
     pickMode("upgrades", "never")

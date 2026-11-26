@@ -281,9 +281,9 @@ local SETTINGS = {
     { L["Show alts on the XP and reputation bars"], BarsSelected, function(on) ns.SetBars(on) end,
         L["Hovering your XP bar lists your characters still levelling, and the reputation bar their standing with the faction you're watching. Same as /af bars."], section = "tooltipsMore", sub = true },
     { L["Show craftable upgrades on the character sheet"], AnvilsSelected, function(on) ns.SetAnvils(on) end,
-        L["An anvil beside a slot on your character sheet means you or an alt can craft an upgrade for it that you can wear now and that binds when equipped. Hover or click it to see which. Same as /af anvils."], section = "extras" },
+        L["An anvil beside a slot on your character sheet means you or an alt can craft an upgrade for it that you can wear now and that binds when equipped. Hover or click it to see which. Same as /af anvils."], section = "upgrades" },
     { L["Show craftable upgrades when inspecting a player"], InspectAnvilsSelected, function(on) ns.SetInspectAnvils(on) end,
-        L["An anvil beside a slot in the inspect window means you or an alt can craft an upgrade for that player that they can wear now and that binds when equipped. Hover or click it to see which. Same as /af inspect."], section = "extras" },
+        L["An anvil beside a slot in the inspect window means you or an alt can craft an upgrade for that player that they can wear now and that binds when equipped. Hover or click it to see which. Same as /af inspect."], section = "upgrades" },
     { L["Send mail to alts"], SendToAltSelected, function(on) ns.SetSendToAlt(on) end,
         L["An arrow next to the To box at the mailbox to pick one of your characters, and your mail rules. Same as /af sendmail."], section = "extras" },
     { L["Show session stats"], StatsSelected, function(on) ns.SetStats(on) end,
@@ -309,7 +309,7 @@ local TIP_HELP = {
     crafting = L["Item tooltips name which of your characters can craft the item. /af crafting turns it on or off."],
     skillups = L["On materials, the recipes your characters can still skill up with (Skill-ups). Never also leaves skill-ups out of Can craft and the overview. /af skillups turns it on or off."],
     recipes = L["Recipe tooltips say whether each of your characters knows the recipe, can learn it or needs more skill. /af recipes turns it on or off."],
-    upgrades = L["Item tooltips name which of your characters an item would be an upgrade for, judged by their talents. Right-click a character in the overview to change their role; Upgrade weights... below changes what each stat is worth. /af upgrades turns it on or off."],
+    upgrades = L["Item tooltips name which of your characters an item would be an upgrade for, judged by their talents. Right-click a character in the overview to change their role; Upgrade weights..., under the anvil boxes, changes what each stat is worth. /af upgrades turns it on or off."],
     crates = L["A Waylaid Crate's tooltip shows how much of each material it asks for your characters have. /af crates turns it on or off."],
     rulesets = L["Tooltips also list your characters on other rulesets (Normal, PvP...) and the other faction, under their own heading. They can't trade or mail with this one, so they're Never by default; the overview has its own settings for them. /af rulesets turns it on or off."],
 }
@@ -411,9 +411,9 @@ end
 -- The grid of tooltip parts: a heading row (Always, Shift, Never over their columns), then a
 -- row per part with its name and three radio buttons. Indented under the box above it;
 -- returns the last row.
--- The names' width, and from one column's centre to the next: the grid ends ~310 px into
--- the page, as the left column's widest tick box did, clear of the right column.
-local GRID_LABEL, GRID_COL = 150, 40
+-- The names' width, and from one column's centre to the next: the grid ends ~350 px into
+-- the page, clear of the right column (~440 in the owner's screenshot, 2026-11-26).
+local GRID_LABEL, GRID_COL = 190, 40
 local function TipGrid(f, above)
     f.modes, f.modeHeads = {}, {}
     local head = CreateFrame("Frame", nil, f)
@@ -504,20 +504,7 @@ local function BuildCanvas(f)
     above = TipGrid(f, above)
     local indent
     above, indent = Checks(f, "tooltipsMore", above, INDENT)
-    -- Upgrade weights (Weights.lua), under the tooltip parts. Always clickable: the character
-    -- sheet's anvils use the weights too, with upgrades in tooltips off.
-    local b = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    b:SetSize(150, 22)
-    b:SetPoint("TOPLEFT", above, "BOTTOMLEFT", 4, -4)
-    b:SetText(L["Upgrade weights..."])
-    b:SetScript("OnClick", OpenWeightsFromOptions)
-    b:SetScript("OnEnter", function(self)
-        Tooltip(self, L["Upgrade weights"], L["What each stat is worth to each role when upgrades are judged; you can change any of them. Same as /af weights."])
-    end)
-    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    ns.SkinButton(b)
-    f.weights = b
-    local heading = Heading(f, L["Tooltip icons"], "TOPLEFT", b, "BOTTOMLEFT", 2 - indent - 4, -GAP)
+    local heading = Heading(f, L["Tooltip icons"], "TOPLEFT", above, "BOTTOMLEFT", 2 - indent, -GAP)
     f.icons = {}
     local row = heading
     for i, place in ipairs(ns.ICON_PLACES) do
@@ -536,7 +523,21 @@ local function BuildCanvas(f)
 
     -- Right column, from the page's middle: extras, then the minimap button and window size.
     local extras = Heading(f, L["Extras"], "TOPLEFT", f, "TOP", 10, TOP)
-    above = Checks(f, "extras", extras)
+    above = Checks(f, "upgrades", extras)
+    -- Upgrade weights (Weights.lua), under the two anvil boxes, with the upgrade settings.
+    -- Always clickable: the anvils use the weights too, with upgrades in tooltips Never.
+    local b = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    b:SetSize(150, 22)
+    b:SetPoint("TOPLEFT", above, "BOTTOMLEFT", INDENT + 4, -2)
+    b:SetText(L["Upgrade weights..."])
+    b:SetScript("OnClick", OpenWeightsFromOptions)
+    b:SetScript("OnEnter", function(self)
+        Tooltip(self, L["Upgrade weights"], L["What each stat is worth to each role when upgrades are judged; you can change any of them. Same as /af weights."])
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ns.SkinButton(b)
+    f.weights = b
+    above = Checks(f, "extras", b, INDENT + 4)
     local display = Heading(f, L["Minimap and windows"], "TOPLEFT", above, "BOTTOMLEFT", 2, -GAP)
     above = Checks(f, "display", display)
     -- Window size: a slider in 5% steps with the size beside it (as EllesmereUI's Window

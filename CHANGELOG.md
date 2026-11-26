@@ -1,6 +1,6 @@
 ## Alts Forever 1.13.0 (not yet released)
 
-- **Choose what item tooltips show, and what waits for Shift:** on the Options page, each part of item tooltips is now **Always**, **Shift** or **Never**: item counts, the Total line, Can craft, Skill-ups, recipe status, upgrades, Waylaid Crate materials, and other rulesets and factions. Put the long parts on Shift and the tooltip stays short until you hold Shift. `/af shift` lists the choices and `/af shift <part>` puts one on Shift. Your current settings carry over (on is Always, off is Never), and the Total line can now be turned off too. Upgrade weights... now sits under the tooltip parts. Thanks to the player who asked for Skill-ups and the Total on Shift.
+- **Choose what item tooltips show, and what waits for Shift:** on the Options page, each part of item tooltips is now **Always**, **Shift** or **Never**: item counts, the Total line, Can craft, Skill-ups, recipe status, upgrades, Waylaid Crate materials, and other rulesets and factions. Put the long parts on Shift and the tooltip stays short until you hold Shift. `/af shift` lists the choices and `/af shift <part>` puts one on Shift. Your current settings carry over (on is Always, off is Never), and the Total line can now be turned off too. Upgrade weights... now sits under the two craftable-upgrade boxes. Other rulesets on Shift applies to item tooltips; the gold and XP bar tooltips show them unless set to Never. Thanks to the player who asked for Skill-ups and the Total on Shift.
 
 ## Alts Forever 1.12.2
 
