@@ -411,9 +411,10 @@ end
 -- The grid of tooltip parts: a heading row (Always, Shift, Never over their columns), then a
 -- row per part with its name and three radio buttons. Indented under the box above it;
 -- returns the last row.
--- The names' width, and from one column's centre to the next: the grid ends ~350 px into
--- the page, clear of the right column (~440 in the owner's screenshot, 2026-11-26).
-local GRID_LABEL, GRID_COL = 190, 40
+-- The names' width, and from one column's centre to the next. "Other rulesets and factions"
+-- is ~143 wide in English (owner's screenshot, 2026-11-26); the grid then ends ~50 short of
+-- the right column, which starts a little past the page's middle (RIGHT_COLUMN).
+local GRID_LABEL, GRID_COL = 165, 40
 local function TipGrid(f, above)
     f.modes, f.modeHeads = {}, {}
     local head = CreateFrame("Frame", nil, f)
@@ -468,6 +469,7 @@ end
 -- logo, title and Open overview across the top, then two columns. Left: what tooltips
 -- show and their icons. Right: the extras, then the minimap button and window size.
 local TOP, GAP = -100, 20
+local RIGHT_COLUMN = 34 -- from the page's middle: room after the tooltip grid
 
 local function BuildCanvas(f)
     local logo = f:CreateTexture(nil, "ARTWORK")
@@ -522,7 +524,7 @@ local function BuildCanvas(f)
     end
 
     -- Right column, from the page's middle: extras, then the minimap button and window size.
-    local extras = Heading(f, L["Extras"], "TOPLEFT", f, "TOP", 10, TOP)
+    local extras = Heading(f, L["Extras"], "TOPLEFT", f, "TOP", RIGHT_COLUMN, TOP)
     above = Checks(f, "upgrades", extras)
     -- Upgrade weights (Weights.lua), under the two anvil boxes, with the upgrade settings.
     -- Always clickable: the anvils use the weights too, with upgrades in tooltips Never.
