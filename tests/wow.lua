@@ -23,7 +23,7 @@ local KNOWN_EVENTS = {
     TIME_PLAYED_MSG = true, UNIT_NAME_UPDATE = true, UPDATE_FACTION = true,
     TRAIT_CONFIG_UPDATED = true, TRAIT_TREE_CURRENCY_INFO_UPDATED = true, GET_ITEM_INFO_RECEIVED = true,
     UPDATE_INSTANCE_INFO = true, ENCOUNTER_END = true, BOSS_KILL = true, CHAT_MSG_ADDON = true, CHAT_MSG_SYSTEM = true,
-    PLAYER_REGEN_ENABLED = true, UNIT_SPELLCAST_SUCCEEDED = true,
+    PLAYER_REGEN_ENABLED = true, MODIFIER_STATE_CHANGED = true, UNIT_SPELLCAST_SUCCEEDED = true,
 }
 
 -- Resets every global and loads the addon files fresh. Returns the addon namespace.
@@ -275,6 +275,8 @@ function M.load(files)
     function frameMethods:GetParent() return self.parent end
     function frameMethods:SetParent(p) self.parent = p end
     function frameMethods:GetName() return self.frameName end
+    function frameMethods:IsForbidden() return false end
+    function frameMethods:GetScript(name) return self.scripts[name] end
     function frameMethods:SetEnabled(on) self.enabled = on and true or false end
     function frameMethods:IsEnabled() return self.enabled ~= false end
     -- A DropdownButton's menu: kept so tests can open it as the game would.

@@ -1,3 +1,7 @@
+## Alts Forever 1.13.0 (not yet released)
+
+- **Shorter item tooltips, the rest with Shift:** tick **Skill-ups and totals only while Shift is held** on the Options page (or type `/af shift`) and item tooltips leave out the Skill-ups lines on materials and the Total line above your characters' counts until you hold Shift. Off by default. Thanks to the player who asked.
+
 ## Alts Forever 1.12.2
 
 - **Silver back in the overview:** characters with under 100 gold show their gold and silver again ("12g 45s"); from 100 gold it's still whole gold, to keep the window narrow. Thanks to the player who asked.

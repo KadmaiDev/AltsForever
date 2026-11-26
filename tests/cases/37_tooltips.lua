@@ -95,7 +95,7 @@ test("Options page: the tooltip parts sit indented under Show Alts Forever in to
     local master = f.checks[1]
     eq(master.label.text, "Show Alts Forever in tooltips")
     local subs = {}
-    for i = 2, 9 do subs[#subs + 1] = f.checks[i] end
+    for i = 2, 10 do subs[#subs + 1] = f.checks[i] end
     eq(master.point[4], -2)
     eq(subs[1].point[4], 20, "indented under it")
     eq(subs[2].point[4], 0, "then in line with the one above")
@@ -110,12 +110,13 @@ test("Options page: the tooltip parts sit indented under Show Alts Forever in to
     eq(AltsForeverDB.tooltipsOff, true)
     for _, check in ipairs(subs) do
         eq(check:IsEnabled(), false, check.label.text)
-        eq(check:GetChecked(), check ~= rulesets, "keeps its tick (other rulesets is off by default)")
+        local offByDefault = check == rulesets or check.label.text == "Skill-ups and totals only while Shift is held"
+        eq(check:GetChecked(), not offByDefault, "keeps its tick (other rulesets and Shift only are off by default)")
     end
     master:SetChecked(true)
     master.scripts.OnClick(master)
     for _, check in ipairs(subs) do eq(check:IsEnabled(), true) end
-    eq(f.checks[10]:IsEnabled(), true, "the extras are never greyed")
+    eq(f.checks[11]:IsEnabled(), true, "the extras are never greyed")
 end)
 
 test("Can craft and recipe status: the old single switch turns both off, then each turns on by itself and stays", function()
@@ -145,4 +146,78 @@ test("Can craft and recipe status are two boxes on the Options page, each with i
     eq(craft.isSelected(), false); eq(recipe.isSelected(), true)
     recipe.setSelected()
     eq(AltsForeverDB.recipeTipsOff, true)
+end)
+
+-- Skill-ups and the Total line only while Shift is held (a player's request, 2026-11-26).
+test("Skill-ups and totals only while Shift is held: shorter item tooltips, the full ones with Shift", function()
+    wow.load(FILES)
+    wow.profs = { { "Engineering", 80 } }
+    local saved = recipeAlts()
+    saved.recipeInfo = { Engineering = { ["mechanical squirrel"] = "100;Mechanical Squirrel;,2589:2" } }
+    saved.chars["Brakka"].crafts = { Engineering = { [SQUIRREL_ITEM] = "mechanical squirrel" } }
+    saved.chars["Brakka"].profs.Engineering = 90
+    saved.chars["Brakka"].bags = { [LINEN] = 4 }
+    wow.setBag(0, 16, { { LINEN, 3 } })
+    wow.login(saved)
+    local function shown()
+        local text = textOf(wow.hover(GameTooltip, LINEN))
+        return (text:find("Total = 7", 1, true) and "total" or "-") .. " "
+            .. (text:find("Skill-ups", 1, true) and "skillups" or "-") .. " "
+            .. (text:find("Brakka", 1, true) and "counts" or "-")
+    end
+    eq(shown(), "total skillups counts", "off by default: everything shows")
+    eq(pageBox("Skill-ups and totals only while Shift is held").isSelected(), false)
+
+    pageBox("Skill-ups and totals only while Shift is held").setSelected()
+    eq(AltsForeverDB.shiftDetails, true)
+    eq(shown(), "- - counts", "without Shift: no Total, no Skill-ups; each character's count stays")
+    wow.shift = true
+    eq(shown(), "total skillups counts", "Shift held: all of it")
+    wow.shift = false
+    eq(shown(), "- - counts")
+
+    -- The columns still line up under the names when the Total line is left out.
+    local lines = wow.hover(GameTooltip, LINEN)
+    assert(not textOf(lines):find("Total", 1, true))
+
+    SlashCmdList.ALTSFOREVER("shift")
+    eq(AltsForeverDB.shiftDetails, nil, "/af shift turns it off")
+    assert(wow.printed[#wow.printed]:find("always shown", 1, true), wow.printed[#wow.printed])
+    eq(shown(), "total skillups counts")
+    SlashCmdList.ALTSFOREVER("shift")
+    eq(AltsForeverDB.shiftDetails, true)
+    assert(wow.printed[#wow.printed]:find("only while Shift is held", 1, true))
+end)
+
+test("Shift pressed over a slot in a window of ours redraws its tooltip; the game's own are left alone", function()
+    local ns = wow.load(FILES)
+    wow.setBag(0, 4, { [1] = { 100, 20 } })
+    wow.login(nil)
+    AltsForeverDB.shiftDetails = true
+    SlashCmdList.ALTSFOREVER("bags")
+    local slot = AltsForeverBagsFrame.slots[1]
+    slot.scripts.OnEnter(slot)
+    eq(GameTooltip.itemID, 100)
+    GameTooltip.itemID = nil
+    wow.fire("MODIFIER_STATE_CHANGED", "LSHIFT", 1)
+    eq(GameTooltip.itemID, 100, "hovered again: redrawn with Shift")
+    GameTooltip.itemID = nil
+    wow.fire("MODIFIER_STATE_CHANGED", "LCTRL", 1)
+    eq(GameTooltip.itemID, nil, "other keys do nothing")
+
+    -- A tooltip of the game's: nothing of ours runs.
+    local theirs = CreateFrame("Button", "ContainerFrame1Item1", UIParent)
+    local entered = 0
+    theirs:SetScript("OnEnter", function() entered = entered + 1 end)
+    GameTooltip:SetOwner(theirs)
+    GameTooltip:Show()
+    wow.fire("MODIFIER_STATE_CHANGED", "LSHIFT", 0)
+    eq(entered, 0)
+
+    -- Setting off: ours aren't redrawn either.
+    AltsForeverDB.shiftDetails = nil
+    slot.scripts.OnEnter(slot)
+    GameTooltip.itemID = nil
+    wow.fire("MODIFIER_STATE_CHANGED", "RSHIFT", 1)
+    eq(GameTooltip.itemID, nil)
 end)

@@ -216,6 +216,7 @@ local function CratesSelected() return ns.CratesOn() end
 local function GoldTipSelected() return ns.GoldTipOn() end
 local function BarsSelected() return ns.BarsOn() end
 local function SkillupsSelected() return ns.SkillupsOn() end
+local function ShiftDetailsSelected() return ns.ShiftDetailsOn() end
 local function UpgradesSelected() return ns.UpgradesOn() end
 local function AnvilsSelected() return ns.AnvilsOn() end
 local function InspectAnvilsSelected() return ns.InspectAnvilsOn() end
@@ -284,6 +285,8 @@ local SETTINGS = {
         L["Recipe tooltips say whether each of your characters knows the recipe, can learn it or needs more skill. Same as /af recipes."], section = "tooltips", sub = true },
     { L["Show skill-up details"], SkillupsSelected, function(on) ns.SetSkillups(on) end,
         L["Show which characters can still skill up: in Can craft, on materials (Skill-ups) and in the overview. Same as /af skillups."], section = "tooltips", sub = true },
+    { L["Skill-ups and totals only while Shift is held"], ShiftDetailsSelected, function(on) ns.SetShiftDetails(on) end,
+        L["Off by default. Keeps item tooltips short: the Skill-ups lines on materials and the Total line above your characters' counts show only while you hold Shift. Same as /af shift."], section = "tooltips", sub = true },
     { L["Show upgrades"], UpgradesSelected, function(on) ns.SetUpgrades(on) end,
         L["Item tooltips name which of your characters an item would be an upgrade for, judged by their talents. Right-click a character in the overview to change their role; Weights... beside this box changes what each stat is worth. Same as /af upgrades."], section = "tooltips", sub = true, weights = true },
     { L["Show Waylaid Crate materials"], CratesSelected, function(on) ns.SetCrates(on) end,

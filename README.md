@@ -61,7 +61,7 @@ Hovering a recipe (pattern, schematic, formula...) lists your characters who hav
 
 <img src="media/mail-alt.png" alt="The Send Mail window with the Alts arrow open, listing characters to send to" width="340">
 
-**Skill-ups across your alts:** "Can craft" marks characters who'd still get a skill-up from making the item ("Tarnia Moonwhisper · skill-ups to 115"), and hovering a material lists the recipes your characters can still skill up with it, under "Skill-ups" ("Heavy Linen Bandage   Tarnia · to 115"): you first, then your other characters, 2 recipes each with the most skill-ups left, up to 6 lines. The overview's row tooltip counts each profession's recipes that still give skill-ups, or says "train to skill up" for a character at their rank's maximum (e.g. 75/75), who is left out of the skill-up lines until they train. It all comes from the game when a profession window is opened; `/af skillups` turns it off.
+**Skill-ups across your alts:** "Can craft" marks characters who'd still get a skill-up from making the item ("Tarnia Moonwhisper · skill-ups to 115"), and hovering a material lists the recipes your characters can still skill up with it, under "Skill-ups" ("Heavy Linen Bandage   Tarnia · to 115"): you first, then your other characters, 2 recipes each with the most skill-ups left, up to 6 lines. The overview's row tooltip counts each profession's recipes that still give skill-ups, or says "train to skill up" for a character at their rank's maximum (e.g. 75/75), who is left out of the skill-up lines until they train. It all comes from the game when a profession window is opened; `/af skillups` turns it off. To keep item tooltips short, tick **Skill-ups and totals only while Shift is held** (or `/af shift`): the Skill-ups lines and the Total line then show only while you hold Shift.
 
 ![Recipe tooltips showing Known, Can learn and Needs skill, and a Can craft line](media/professions.png)
 
@@ -134,6 +134,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af mail` | List every character's soonest mail expiry |
 | `/af list` | List stored characters |
 | `/af skillups` | Turn the skill-up details in tooltips on or off |
+| `/af shift` | Show the Skill-ups lines and the Total line in item tooltips only while Shift is held, or always |
 | `/af upgrades` | Turn upgrades in item tooltips on or off |
 | `/af anvils` | Show or hide the anvils on your character sheet that mark craftable upgrades |
 | `/af itemnames` | Save item names and qualities in the saved file when you log out, only for reading it outside the game (off by default) |

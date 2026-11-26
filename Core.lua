@@ -225,7 +225,7 @@ local DB_FIELDS = {
     bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
     account = "string", tooltipsOff = "boolean", countsOff = "boolean", craftTipsOff = "boolean",
     canCraftOff = "boolean", recipeTipsOff = "boolean",
-    cratesOff = "boolean", goldTipOff = "boolean", barsOff = "boolean", recipeCategories = "table", profArt = "table",
+    cratesOff = "boolean", shiftDetails = "boolean", goldTipOff = "boolean", barsOff = "boolean", recipeCategories = "table", profArt = "table",
     inspectAnvilsOff = "boolean", overviewSort = "string", overviewSortRev = "boolean",
     windows = "table", pinned = "table", hiddenColumns = "table",
     mailRules = "table", mailFillOff = "boolean", mailPackOff = "boolean", weights = "table",
@@ -824,6 +824,12 @@ end
 function commands.crates()
     ns.SetCrates(not ns.CratesOn())
     TipPrint(ns.CratesOn() and L["Waylaid Crate materials in tooltips on."] or L["Waylaid Crate materials in tooltips off."])
+end
+
+function commands.shift()
+    ns.SetShiftDetails(not ns.ShiftDetailsOn())
+    TipPrint(ns.ShiftDetailsOn() and L["Skill-ups and totals in item tooltips only while Shift is held."]
+        or L["Skill-ups and totals in item tooltips always shown."])
 end
 
 function commands.gold()

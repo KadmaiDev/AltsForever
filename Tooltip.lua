@@ -341,6 +341,11 @@ function ns.CraftTipsOn() return not ns.db.canCraftOff end
 function ns.SetCraftTips(on) ns.db.canCraftOff = not on or nil end
 function ns.RecipeTipsOn() return not ns.db.recipeTipsOff end
 function ns.SetRecipeTips(on) ns.db.recipeTipsOff = not on or nil end
+-- The Skill-ups section and the Total line only while Shift is held (a player's request,
+-- 2026-11-26, after Profession Master's "Extend on Shift": shorter tooltips). Off by default.
+function ns.ShiftDetailsOn() return ns.db.shiftDetails == true end
+function ns.SetShiftDetails(on) ns.db.shiftDetails = on and true or nil end
+local function Details() return not ns.db.shiftDetails or IsShiftKeyDown() end
 -- The Waylaid Crate materials grid.
 function ns.CratesOn() return not ns.db.cratesOff end
 function ns.SetCrates(on) ns.db.cratesOff = not on or nil end
@@ -385,7 +390,8 @@ function ns.AddLines(tt, id)
     tt:AddLine(" ")
     local first = tt.NumLines and tt:NumLines() + 1
     -- With one character the total would just repeat their count.
-    if rows > 1 then
+    local total = rows > 1 and Details()
+    if total then
         tt:AddDoubleLine(TOTAL, e.total + curCount, 1, 0.82, 0, 1, 1, 1)
     end
     if curCount > 0 then
@@ -415,7 +421,7 @@ function ns.AddLines(tt, id)
         end
     end
     st.e, st.id, st.cur = e, id, curCount > 0
-    st.row = first + (rows > 1 and 1 or 0)
+    st.row = first + (total and 1 or 0)
     Apply(tt)
 end
 
@@ -433,14 +439,39 @@ local function OnItem(tt, data)
         if not db.recipeTipsOff then ns.AddRecipeLines(tt, id, data) end
         ns.AddUpgradeLines(tt, id, data)
         if not db.canCraftOff then ns.AddCraftLines(tt, id) end
-        ns.AddSkillupLines(tt, id)
+        if Details() then ns.AddSkillupLines(tt, id) end
         if not db.cratesOff then ns.AddCrateLines(tt, id, data) end
         if not db.countsOff then ns.AddLines(tt, id) end
     end
 end
 
+-- Whether a frame is one of ours (it or a parent is named AltsForever...).
+local function Ours(f)
+    for _ = 1, 8 do
+        if not f or (f.IsForbidden and f:IsForbidden()) then return false end
+        local name = f.GetName and f:GetName()
+        if type(name) == "string" and name:find("^AltsForever") then return true end
+        f = f.GetParent and f:GetParent()
+    end
+    return false
+end
+
+-- Shift pressed or let go with "only while Shift is held" on: the game's bag and character
+-- slots redraw their tooltip every 0.2 s by themselves (their UpdateTooltip), so only a
+-- tooltip shown by a window of ours is redrawn here, by hovering its owner again. Blizzard's
+-- other tooltips are left alone: redrawing them from our code would taint them.
+local function OnModifier(key)
+    if not ns.db.shiftDetails or (key ~= "LSHIFT" and key ~= "RSHIFT") then return end
+    if not GameTooltip:IsShown() or GameTooltip:IsForbidden() then return end
+    local owner = GameTooltip:GetOwner()
+    if not Ours(owner) then return end
+    local enter = owner.GetScript and owner:GetScript("OnEnter")
+    if type(enter) == "function" then enter(owner) end
+end
+
 function ns.StartTooltip()
     ns.RefreshPlaceLabels()
+    ns.On("MODIFIER_STATE_CHANGED", OnModifier)
     if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall then
         TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, OnItem)
     else
