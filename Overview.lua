@@ -1605,7 +1605,7 @@ local function CreateWindow()
             tile = true, tileSize = 32, edgeSize = 32,
             insets = { left = 8, right = 8, top = 8, bottom = 8 },
         })
-        local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+        local close = ns.CloseHides(CreateFrame("Button", nil, f, "UIPanelCloseButton"))
         close:SetPoint("TOPRIGHT", -4, -4)
     end
     frame = f

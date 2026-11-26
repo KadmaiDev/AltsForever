@@ -1,3 +1,7 @@
+## Alts Forever 1.13.0 (not yet released)
+
+- **Windows close in combat:** the close button (X) on Alts Forever's windows did nothing during a fight (the game refused it with "Interface action failed because of an AddOn"); it now closes them, in combat too. And starting a fight now closes every Alts Forever window, as EllesmereUI closes its options, so none is left over the screen while you fight. They can still be opened during a fight.
+
 ## Alts Forever 1.12.2
 
 - **Silver back in the overview:** characters with under 100 gold show their gold and silver again ("12g 45s"); from 100 gold it's still whole gold, to keep the window narrow. Thanks to the player who asked.

@@ -91,6 +91,17 @@ local issecretvalue = issecretvalue or function() return false end
 -- older BasicFrameTemplateWithInset, which draws the grey frame from before Forever; it is
 -- still the fallback if this client lacks the new one, and a bare frame after that
 -- (f.plainFrame: the caller gives it a backdrop if it wants one).
+local function HideParent(self) self:GetParent():Hide() end
+
+-- The game's close button hides its window through HideUIPanel, which refuses an addon's
+-- window in combat ("Interface action failed because of an AddOn"; Blizzard_UIParentPanelManager
+-- CheckProtectedFunctionsAllowed): the owner couldn't close the overview mid-fight, 2026-11-26.
+-- Our windows aren't UI panels, so ours just hide their window, in combat too.
+function ns.CloseHides(button)
+    if button and button.SetScript then button:SetScript("OnClick", HideParent) end
+    return button
+end
+
 function ns.NewWindow(name)
     local ok, f = pcall(CreateFrame, "Frame", name, UIParent, "DefaultPanelTemplate")
     if ok and type(f.TitleContainer) == "table" then
@@ -100,7 +111,7 @@ function ns.NewWindow(name)
             close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
             close:SetPoint("TOPRIGHT", 0, 3)
         end
-        f.CloseButton = close
+        f.CloseButton = ns.CloseHides(close)
         local inset, box = pcall(CreateFrame, "Frame", nil, f, "InsetFrameTemplate")
         if inset then
             box:SetPoint("TOPLEFT", 4, -24)
@@ -117,6 +128,7 @@ function ns.NewWindow(name)
         f = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
         f.plainFrame = true
     end
+    ns.CloseHides(f.CloseButton or _G[name .. "CloseButton"])
     return f
 end
 

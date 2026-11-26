@@ -99,10 +99,27 @@ local function UpdateEscapeLater()
     C_Timer.After(0, UpdateEscape)
 end
 
+-- Combat closes every window of ours, as EllesmereUI closes its options (owner, 2026-11-26).
+-- Registered with the first window, so nothing listens until one exists.
+local closesInCombat = false
+local function CloseForCombat()
+    for _, f in ipairs(escapeWindows) do
+        if f:IsShown() then f:Hide() end
+    end
+    if overviewWindow and overviewWindow:IsShown() then overviewWindow:Hide() end
+end
+
 -- Each window of ours that Escape should close, once, when it's created; `overview` for the
--- overview, which closes only once the others have.
+-- overview, which closes only once the others have. Starting a fight closes them all.
 function ns.EscapeCloses(f, overview)
-    if not UISpecialFrames then return end
+    if not closesInCombat then
+        closesInCombat = true
+        ns.On("PLAYER_REGEN_DISABLED", CloseForCombat)
+    end
+    if not UISpecialFrames then
+        if overview then overviewWindow = f else escapeWindows[#escapeWindows + 1] = f end
+        return
+    end
     if overview then
         overviewWindow = f
         if not escapeStandIn then
