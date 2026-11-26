@@ -1,4 +1,4 @@
-## Alts Forever 1.12.2 (not yet released)
+## Alts Forever 1.12.2
 
 - **Silver back in the overview:** characters with under 100 gold show their gold and silver again ("12g 45s"); from 100 gold it's still whole gold, to keep the window narrow. Thanks to the player who asked.
 - **New characters sorted into their ruleset and faction:** if the game hadn't said which realm a character is on by the time Alts Forever started, the character stayed under "Not sorted yet" in the overview, every session. It's now asked again as the world loads and a few times in the first minute, and the realm's shown name is used if the game gives no other. Gold history kept for such a character joins its group's once the realm is known. Thanks to the player who reported it.
