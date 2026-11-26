@@ -23,7 +23,7 @@ local KNOWN_EVENTS = {
     TIME_PLAYED_MSG = true, UNIT_NAME_UPDATE = true, UPDATE_FACTION = true,
     TRAIT_CONFIG_UPDATED = true, TRAIT_TREE_CURRENCY_INFO_UPDATED = true, GET_ITEM_INFO_RECEIVED = true,
     UPDATE_INSTANCE_INFO = true, ENCOUNTER_END = true, BOSS_KILL = true, CHAT_MSG_ADDON = true, CHAT_MSG_SYSTEM = true,
-    PLAYER_REGEN_ENABLED = true, MODIFIER_STATE_CHANGED = true, UNIT_SPELLCAST_SUCCEEDED = true,
+    PLAYER_REGEN_ENABLED = true, PLAYER_REGEN_DISABLED = true, MODIFIER_STATE_CHANGED = true, UNIT_SPELLCAST_SUCCEEDED = true,
 }
 
 -- Resets every global and loads the addon files fresh. Returns the addon namespace.
@@ -397,6 +397,24 @@ function M.load(files)
             f.TitleContainer.TitleText = newObject("FontString")
             f.NineSlice = newObject("Frame")
             f.NineSlice.level = 500
+        end
+        -- The game's close button: HideUIPanel on its parent, which an addon's window is refused
+        -- in combat (Blizzard_UIParentPanelManager CheckProtectedFunctionsAllowed).
+        local function BlizzardClose(b)
+            b.scripts.OnClick = function(self)
+                if M.inCombat then M.blockedActions = (M.blockedActions or 0) + 1 return end
+                self:GetParent():Hide()
+            end
+        end
+        if template == "UIPanelCloseButton" or template == "UIPanelCloseButtonDefaultAnchors" then
+            BlizzardClose(f)
+        elseif template == "BasicFrameTemplateWithInset" or template == "PortraitFrameTemplate" then
+            -- Window templates with the game's close button built in.
+            f.CloseButton = newObject("Button")
+            f.CloseButton.parent = f
+            f.CloseButton.template = "UIPanelCloseButton"
+            BlizzardClose(f.CloseButton)
+            M.frames[#M.frames + 1] = f.CloseButton
         end
         return f
     end

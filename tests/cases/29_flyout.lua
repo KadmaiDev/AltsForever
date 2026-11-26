@@ -102,6 +102,15 @@ test("the character sheet puts an anvil beside slots with a craftable upgrade yo
     PaperDollFrame:Hide()
     eq(panel:IsShown(), false, "closes with the character sheet")
     PaperDollFrame:Show()
+    -- A fight starting closes it though the sheet stays open: the only panel of ours made.
+    eq(AltsForeverFrame, nil, "no other window of ours made")
+    hands.scripts.OnClick(hands)
+    eq(panel:IsShown(), true)
+    wow.fire("PLAYER_REGEN_DISABLED")
+    eq(panel:IsShown(), false, "closed by the fight")
+    eq(PaperDollFrame:IsShown(), true, "the game's sheet left alone")
+    hands.scripts.OnClick(hands)
+    eq(panel:IsShown(), true, "opens again after")
     -- Their own setting: /af anvils, the menu. Show upgrades (the tooltips) doesn't touch them.
     ns.SetUpgrades(false)
     eq(hands:IsShown(), true, "tooltips' upgrades off: the anvils stay")
