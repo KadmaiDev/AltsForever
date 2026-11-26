@@ -10,7 +10,9 @@ A World of Warcraft: Forever addon that adds a total and a per-character breakdo
 
 Locations are shown as icons: a linen bag (bags), banker (bank), mailbox (mail) and white shirt (wearing). You can pick your own icons, or words instead, with `/af icons`.
 
-The current character always comes first. Other characters are sorted by count. Already have counts from a bag addon such as Baganator? Turn ours off with **Show item counts** in the options (or `/af counts`); everything else in the tooltip stays. Rather keep the game's tooltips as they are? Untick **Show Alts Forever in tooltips** (or `/af tooltips`): nothing is added to any tooltip, while the overview, bags, search and everything you open yourself still work. The boxes under it turn each part on or off.
+The current character always comes first. Other characters are sorted by count. Already have counts from a bag addon such as Baganator? Set **Item counts** to Never in the options (or `/af counts`); everything else in the tooltip stays. Rather keep the game's tooltips as they are? Untick **Show Alts Forever in tooltips** (or `/af tooltips`): nothing is added to any tooltip, while the overview, bags, search and everything you open yourself still work.
+
+**Choose what item tooltips show, and what waits for Shift:** under that box, each part of item tooltips (item counts, the Total line, Can craft, Skill-ups, recipe status, upgrades, Waylaid Crate materials, other rulesets and factions) can be **Always**, **Shift** (only while you hold Shift) or **Never**. Put the long parts on Shift to keep tooltips short and see them when you want. `/af shift` lists the choices; `/af shift total` puts one part on Shift, or back to Always.
 
 Hovering the money at the bottom of your bags lists each character's gold and the total, laid out the same way (also in ElvUI's bags, and in EllesmereUI's when its own gold tracking is turned off). Hovering the **experience bar** lists your other characters still levelling, with their level, XP and rested XP, and hovering the **reputation bar** lists their standing with the faction you're watching.
 
@@ -61,7 +63,7 @@ Hovering a recipe (pattern, schematic, formula...) lists your characters who hav
 
 <img src="media/mail-alt.png" alt="The Send Mail window with the Alts arrow open, listing characters to send to" width="340">
 
-**Skill-ups across your alts:** "Can craft" marks characters who'd still get a skill-up from making the item ("Tarnia Moonwhisper · skill-ups to 115"), and hovering a material lists the recipes your characters can still skill up with it, under "Skill-ups" ("Heavy Linen Bandage   Tarnia · to 115"): you first, then your other characters, 2 recipes each with the most skill-ups left, up to 6 lines. The overview's row tooltip counts each profession's recipes that still give skill-ups, or says "train to skill up" for a character at their rank's maximum (e.g. 75/75), who is left out of the skill-up lines until they train. It all comes from the game when a profession window is opened; `/af skillups` turns it off. To keep item tooltips short, tick **Skill-ups and totals only while Shift is held** (or `/af shift`): the Skill-ups lines and the Total line then show only while you hold Shift.
+**Skill-ups across your alts:** "Can craft" marks characters who'd still get a skill-up from making the item ("Tarnia Moonwhisper · skill-ups to 115"), and hovering a material lists the recipes your characters can still skill up with it, under "Skill-ups" ("Heavy Linen Bandage   Tarnia · to 115"): you first, then your other characters, 2 recipes each with the most skill-ups left, up to 6 lines. The overview's row tooltip counts each profession's recipes that still give skill-ups, or says "train to skill up" for a character at their rank's maximum (e.g. 75/75), who is left out of the skill-up lines until they train. It all comes from the game when a profession window is opened; `/af skillups` turns it off, and the options can put the Skill-ups lines on Shift.
 
 ![Recipe tooltips showing Known, Can learn and Needs skill, and a Can craft line](media/professions.png)
 
@@ -99,7 +101,7 @@ Each ruleset (Normal, PvP, Roleplaying, Hardcore) has its own auction house and 
 
 - The overview groups your characters by ruleset and faction (e.g. "Normal · Horde"), each with its own gold total. Click a group's heading to collapse it; it stays collapsed until you click it again. Untick **Overview: show other rulesets and factions** (or `/af rulesets overview`) to list only the characters you can mail.
 - Gold totals (the overview's footer and the Total on your bag gold) count only characters you can mail, since gold can't be sent anywhere else. Tick **Count other rulesets and factions in gold totals** (or `/af rulesets gold`) to count everyone.
-- Item and gold tooltips, Can craft, skill-ups, upgrades and the XP and reputation bars list only characters you can mail. Turn on **Show other rulesets and factions** (or `/af rulesets`) to see the others too, in grey (they can't trade with you) under their own heading and total.
+- Item and gold tooltips, Can craft, skill-ups, upgrades and the XP and reputation bars list only characters you can mail. Set **Other rulesets and factions** to Always or Shift in the options (or `/af rulesets`) to see the others too, in grey (they can't trade with you) under their own heading and total.
 - Send to alt and Waylaid Crates only ever count characters you can mail.
 
 Characters you haven't logged in on since updating count as being on yours until you do.
@@ -134,7 +136,7 @@ Everything below can also be done by clicking: **click the Alts Forever minimap 
 | `/af mail` | List every character's soonest mail expiry |
 | `/af list` | List stored characters |
 | `/af skillups` | Turn the skill-up details in tooltips on or off |
-| `/af shift` | Show the Skill-ups lines and the Total line in item tooltips only while Shift is held, or always |
+| `/af shift` | List what each part of item tooltips is set to (Always, Shift or Never); `/af shift <part>` puts one on Shift or back to Always (counts, total, crafting, skillups, recipes, upgrades, crates, rulesets) |
 | `/af upgrades` | Turn upgrades in item tooltips on or off |
 | `/af anvils` | Show or hide the anvils on your character sheet that mark craftable upgrades |
 | `/af itemnames` | Save item names and qualities in the saved file when you log out, only for reading it outside the game (off by default) |

@@ -61,13 +61,14 @@ end
 -- Your other characters' standing with the faction you're watching, for the
 -- reputation bar's tooltip: standing, how far into it, and the numbers.
 function ns.AddRepLines(tt, fresh)
+    ns.SyncTipShift() -- other rulesets on Shift (Tooltip.lua)
     local d = R and R.GetWatchedFactionData and R.GetWatchedFactionData()
     local id = d and d.factionID
     if issecretvalue(id) or not id or id == 0 then return false end
     local rows = {}
     for _, key in ipairs(ns.OverviewOrder()) do
         local c = ns.db.chars[key]
-        local value = key ~= ns.charKey and not ns.Hidden(c) and c.reps and c.reps[id]
+        local value = key ~= ns.charKey and not ns.TipHidden(c) and c.reps and c.reps[id]
         if value then
             local level, low, high = ns.Standing(value)
             local color = "|cff" .. COLORS[level]

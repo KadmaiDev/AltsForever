@@ -17,7 +17,7 @@ test("the Options page is built the first time the Options window shows it", fun
     assert(f.built and f.logo, "not blank on the first visit")
 end)
 
-test("Options > AddOns > Alts Forever: logo, Open overview, and the twenty settings as tick boxes", function()
+test("Options > AddOns > Alts Forever: logo, Open overview, and the twelve settings as tick boxes", function()
     wow.load(FILES)
     wow.login(nil)
     eq(wow.settings.name, "Alts Forever")
@@ -25,9 +25,9 @@ test("Options > AddOns > Alts Forever: logo, Open overview, and the twenty setti
     eq(f.logo.texture, "Interface\\AddOns\\AltsForever\\media\\logo.tga", "the full logo")
     local names = {}
     for _, check in ipairs(f.checks) do names[#names + 1] = check.label.text end
-    eq(table.concat(names, " | "), "Show Alts Forever in tooltips | Show item counts | Show Can craft | Show recipe status | Show skill-up details | Skill-ups and totals only while Shift is held | Show upgrades | Show Waylaid Crate materials | Show alts' gold on bag money | Show alts on the XP and reputation bars | Show craftable upgrades on the character sheet | Show craftable upgrades when inspecting a player | Send mail to alts | Show session stats | Legacy reminders | Show other rulesets and factions | Save item names for use outside the game | Show minimap button | Overview: show other rulesets and factions | Count other rulesets and factions in gold totals")
+    eq(table.concat(names, " | "), "Show Alts Forever in tooltips | Show alts' gold on bag money | Show alts on the XP and reputation bars | Show craftable upgrades on the character sheet | Show craftable upgrades when inspecting a player | Send mail to alts | Show session stats | Legacy reminders | Save item names for use outside the game | Show minimap button | Overview: show other rulesets and factions | Count other rulesets and factions in gold totals")
     -- The tick boxes show and change the same settings as the menu and commands.
-    local stats, minimap = f.checks[14], f.checks[18]
+    local stats, minimap = f.checks[7], f.checks[10]
     eq(stats:GetChecked(), false, "session stats off by default")
     eq(minimap:GetChecked(), true)
     stats:SetChecked(true)

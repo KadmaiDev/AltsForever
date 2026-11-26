@@ -999,16 +999,19 @@ end
 
 -- The item with this text in the last menu built.
 -- menuItem("A") finds a top-level entry; menuItem("Sub", "A") one inside the submenu "Sub".
-function M.menuItem(text, inner)
-    for _, item in ipairs(M.menu and M.menu.items or {}) do
-        if item.text == text then
-            if inner == nil then return item end
-            for _, sub in ipairs(item.items or {}) do
-                if sub.text == inner then return sub end
-            end
-            return nil
+-- A menu entry by its text, and an entry inside it by each further text.
+function M.menuItem(...)
+    local items, found = M.menu and M.menu.items or {}, nil
+    for i = 1, select("#", ...) do
+        local text = select(i, ...)
+        found = nil
+        for _, item in ipairs(items) do
+            if item.text == text then found = item break end
         end
+        if not found then return nil end
+        items = found.items or {}
     end
+    return found
 end
 
 return M

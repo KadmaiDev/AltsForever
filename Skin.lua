@@ -146,6 +146,12 @@ function ns.SkinCheck(c)
     end
 end
 
+-- A radio button (the Options page's tooltip grid). ElvUI has its own look for them;
+-- EllesmereUI's API has none, so they keep the game's.
+function ns.SkinRadio(b)
+    if b and not skin and Elv() and elvS.HandleRadioButton then pcall(elvS.HandleRadioButton, elvS, b) end
+end
+
 -- An item slot (the gear panel's, the craft panel's, the bags window's). With EllesmereUI,
 -- the look of its bags and character sheet (owner, 2026-10-16: our windows looked different
 -- beside them): the icon squared by its API, a 1 px edge we colour by quality, an outlined

@@ -1,6 +1,6 @@
 ## Alts Forever 1.13.0 (not yet released)
 
-- **Shorter item tooltips, the rest with Shift:** tick **Skill-ups and totals only while Shift is held** on the Options page (or type `/af shift`) and item tooltips leave out the Skill-ups lines on materials and the Total line above your characters' counts until you hold Shift. Off by default. Thanks to the player who asked.
+- **Choose what item tooltips show, and what waits for Shift:** on the Options page, each part of item tooltips is now **Always**, **Shift** or **Never**: item counts, the Total line, Can craft, Skill-ups, recipe status, upgrades, Waylaid Crate materials, and other rulesets and factions. Put the long parts on Shift and the tooltip stays short until you hold Shift. `/af shift` lists the choices and `/af shift <part>` puts one on Shift. Your current settings carry over (on is Always, off is Never), and the Total line can now be turned off too. Upgrade weights... now sits under the tooltip parts. Thanks to the player who asked for Skill-ups and the Total on Shift.
 
 ## Alts Forever 1.12.2
 

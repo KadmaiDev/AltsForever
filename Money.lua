@@ -111,7 +111,7 @@ function ns.AddMoneyLines(tt)
     local byRealm, byFaction = ns.GroupParts()
     for key, c in pairs(chars) do
         local m = c.money
-        if m and m > 0 and key ~= ns.charKey and not ns.Hidden(c) then
+        if m and m > 0 and key ~= ns.charKey and not ns.TipHidden(c) then
             if ns.Elsewhere(c) then
                 local gk = ns.GroupKey(c, byRealm, byFaction)
                 local g = others[gk]
@@ -165,7 +165,11 @@ function ns.AddMoneyLines(tt)
 end
 
 -- Off with "Show Alts Forever in tooltips" or "Show alts' gold on bag money" (Tooltip.lua).
-local function GoldShown() return ns.TooltipsOn() and ns.GoldTipOn() end
+local function GoldShown()
+    if not (ns.TooltipsOn() and ns.GoldTipOn()) then return false end
+    ns.SyncTipShift() -- other rulesets on Shift (Tooltip.lua)
+    return true
+end
 
 local function OnEnter(self)
     if not GoldShown() then return end

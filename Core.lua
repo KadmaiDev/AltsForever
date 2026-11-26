@@ -225,7 +225,7 @@ local DB_FIELDS = {
     bagsHeight = "number", wellRested = "number", exportFormat = "string", goldGroup = "string",
     account = "string", tooltipsOff = "boolean", countsOff = "boolean", craftTipsOff = "boolean",
     canCraftOff = "boolean", recipeTipsOff = "boolean",
-    cratesOff = "boolean", shiftDetails = "boolean", goldTipOff = "boolean", barsOff = "boolean", recipeCategories = "table", profArt = "table",
+    cratesOff = "boolean", totalOff = "boolean", tipShift = "table", goldTipOff = "boolean", barsOff = "boolean", recipeCategories = "table", profArt = "table",
     inspectAnvilsOff = "boolean", overviewSort = "string", overviewSortRev = "boolean",
     windows = "table", pinned = "table", hiddenColumns = "table",
     mailRules = "table", mailFillOff = "boolean", mailPackOff = "boolean", weights = "table",
@@ -653,6 +653,9 @@ ns.On("ADDON_LOADED", function(name)
     -- Until 1.9.1 one switch turned off both Can craft and recipe status: now two.
     if ns.db.craftTipsOff then ns.db.canCraftOff, ns.db.recipeTipsOff = true, true end
     ns.db.craftTipsOff = nil
+    -- The dev builds' single Shift switch (2026-11-26, never released): Skill-ups and Total.
+    if ns.db.shiftDetails == true then ns.db.tipShift = { skillups = true, total = true } end
+    ns.db.shiftDetails = nil
     -- Before login, so EllesmereUI's minimap finds it when it collects addon buttons.
     ns.CreateMinimapButton()
 end)
@@ -826,10 +829,21 @@ function commands.crates()
     TipPrint(ns.CratesOn() and L["Waylaid Crate materials in tooltips on."] or L["Waylaid Crate materials in tooltips off."])
 end
 
-function commands.shift()
-    ns.SetShiftDetails(not ns.ShiftDetailsOn())
-    TipPrint(ns.ShiftDetailsOn() and L["Skill-ups and totals in item tooltips only while Shift is held."]
-        or L["Skill-ups and totals in item tooltips always shown."])
+-- /af shift lists each part of item tooltips with its choice (Always, Shift, Never);
+-- /af shift <part> puts that part on Shift, or back to Always.
+local SHIFT_WORDS = { counts = "counts", total = "total", crafting = "crafting", craft = "crafting",
+    skillups = "skillups", recipes = "recipes", upgrades = "upgrades", crates = "crates", rulesets = "rulesets" }
+function commands.shift(arg)
+    local part = SHIFT_WORDS[(arg or ""):lower():match("^%s*(%a*)") or ""]
+    if part then
+        ns.SetTipMode(part, ns.TipMode(part) == "shift" and "always" or "shift")
+        return TipPrint(L["%s in item tooltips: %s."]:format(ns.TipPartName(part), ns.TipModeName(ns.TipMode(part))))
+    end
+    Print(L["Item tooltips (Always, Shift or Never):"])
+    for _, p in ipairs(ns.TIP_PARTS) do
+        Print("  " .. L["%s: %s"]:format(ns.TipPartName(p), ns.TipModeName(ns.TipMode(p))))
+    end
+    Print(L["/af shift <part> puts a part on Shift, or back to Always: counts, total, crafting, skillups, recipes, upgrades, crates, rulesets."])
 end
 
 function commands.gold()
@@ -1083,6 +1097,7 @@ function commands.help()
     Print(L["/af search (or /afs), with or without a name, finds an item on any of your characters, or who can craft it."])
     Print(L["/af tooltips turns everything Alts Forever adds to tooltips on or off. /af crafting, recipes, crates, gold and bars turn one part on or off."])
     Print(L["/af counts turns the item counts in tooltips on or off (if another addon, such as Baganator, already shows them)."])
+    Print(L["/af shift <part> puts a part on Shift, or back to Always: counts, total, crafting, skillups, recipes, upgrades, crates, rulesets."])
     Print(L["/af bags or /af bank, with a name for another character, shows their bags or bank slot by slot."])
     Print(L["/af prof, with a name for another character, shows their professions and recipes."])
     Print(L["/af icons picks the icons item tooltips use for bags, bank, mail and worn items."])
