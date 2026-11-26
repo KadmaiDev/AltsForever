@@ -178,7 +178,7 @@ local function ByLabel(a, b) return a.label < b.label end
 local function BuildOthers(id)
     local e, groups, byRealm, byFaction
     for key, c in pairs(ns.db.chars) do
-        if key ~= ns.charKey and not ns.Hidden(c) then
+        if key ~= ns.charKey and not ns.TipHidden(c) then
             local count, text, parts = ns.Describe(c, id)
             if count > 0 then
                 local list
@@ -341,6 +341,75 @@ function ns.CraftTipsOn() return not ns.db.canCraftOff end
 function ns.SetCraftTips(on) ns.db.canCraftOff = not on or nil end
 function ns.RecipeTipsOn() return not ns.db.recipeTipsOff end
 function ns.SetRecipeTips(on) ns.db.recipeTipsOff = not on or nil end
+-- Each part of item tooltips Always, only while Shift is held, or Never (a player asked for
+-- Skill-ups and the Total on Shift, 2026-11-26, after Profession Master's "Extend on Shift";
+-- the owner made it a choice per part). Never is each part's own off switch, so the slash
+-- commands and saves from before keep working; Shift is `db.tipShift[part] = true`.
+ns.TIP_PARTS = { "counts", "total", "crafting", "skillups", "recipes", "upgrades", "crates", "rulesets" }
+local OFF = { counts = "countsOff", total = "totalOff", crafting = "canCraftOff", skillups = "skillupsOff",
+    recipes = "recipeTipsOff", upgrades = "upgradesOff", crates = "cratesOff" }
+
+function ns.TipMode(part)
+    local db = ns.db
+    if part == "rulesets" then
+        if not db.otherRulesets then return "never" end
+    elseif db[OFF[part]] then
+        return "never"
+    end
+    return db.tipShift and db.tipShift[part] == true and "shift" or "always"
+end
+
+function ns.SetTipMode(part, mode)
+    local on = mode ~= "never"
+    if part == "counts" then ns.SetCounts(on)
+    elseif part == "total" then ns.db.totalOff = not on or nil
+    elseif part == "crafting" then ns.SetCraftTips(on)
+    elseif part == "skillups" then ns.SetSkillups(on)
+    elseif part == "recipes" then ns.SetRecipeTips(on)
+    elseif part == "upgrades" then ns.SetUpgrades(on)
+    elseif part == "crates" then ns.SetCrates(on)
+    elseif part == "rulesets" then ns.SetOtherRulesets(on)
+    else return end
+    local shift = ns.db.tipShift or {}
+    shift[part] = mode == "shift" or nil
+    ns.db.tipShift = next(shift) and shift or nil
+    ns.InvalidateCache()
+end
+
+-- Whether any part waits for Shift (the redraw on Shift is needed only then).
+function ns.AnyTipShift() return ns.db.tipShift ~= nil and next(ns.db.tipShift) ~= nil end
+
+-- Whether a part shows in the tooltip being built now. `held` is IsShiftKeyDown(), read
+-- once per tooltip by the caller.
+local function Shows(db, part, held)
+    if db[OFF[part]] then return false end
+    local shift = db.tipShift
+    return held or not (shift and shift[part] == true)
+end
+function ns.TipShows(part) return Shows(ns.db, part, IsShiftKeyDown()) end
+
+-- Other rulesets and factions in item tooltips: shown with the setting, and with it on Shift
+-- only while Shift is held. The lists that hold them are cached (counts, Can craft, skill-ups,
+-- upgrades), so a change of Shift with that choice rebuilds them once (ns.SyncTipShift,
+-- called before an item or trainer tooltip is built); without it nothing is read. Everywhere
+-- else ns.Hidden counts them whenever they're not Never: search, the bags window's arrows,
+-- and the gold and XP/reputation bar tooltips, which are built only on hover and so couldn't
+-- follow a Shift pressed while they're open (Codex review, 2026-11-26).
+local othersHeld = false
+function ns.SyncTipShift()
+    local shift = ns.db.tipShift
+    if not (shift and shift.rulesets == true) then return end
+    local held = IsShiftKeyDown() and true or false
+    if held ~= othersHeld then
+        othersHeld = held
+        ns.InvalidateCache()
+    end
+end
+function ns.TipHidden(c)
+    local db = ns.db
+    if db.otherRulesets and (othersHeld or not (db.tipShift and db.tipShift.rulesets == true)) then return false end
+    return ns.Elsewhere(c)
+end
 -- The Waylaid Crate materials grid.
 function ns.CratesOn() return not ns.db.cratesOff end
 function ns.SetCrates(on) ns.db.cratesOff = not on or nil end
@@ -385,7 +454,8 @@ function ns.AddLines(tt, id)
     tt:AddLine(" ")
     local first = tt.NumLines and tt:NumLines() + 1
     -- With one character the total would just repeat their count.
-    if rows > 1 then
+    local total = rows > 1 and ns.TipShows("total")
+    if total then
         tt:AddDoubleLine(TOTAL, e.total + curCount, 1, 0.82, 0, 1, 1, 1)
     end
     if curCount > 0 then
@@ -415,7 +485,7 @@ function ns.AddLines(tt, id)
         end
     end
     st.e, st.id, st.cur = e, id, curCount > 0
-    st.row = first + (rows > 1 and 1 or 0)
+    st.row = first + (total and 1 or 0)
     Apply(tt)
 end
 
@@ -430,17 +500,44 @@ local function OnItem(tt, data)
     end
     if id then
         local db = ns.db
-        if not db.recipeTipsOff then ns.AddRecipeLines(tt, id, data) end
-        ns.AddUpgradeLines(tt, id, data)
-        if not db.canCraftOff then ns.AddCraftLines(tt, id) end
-        ns.AddSkillupLines(tt, id)
-        if not db.cratesOff then ns.AddCrateLines(tt, id, data) end
-        if not db.countsOff then ns.AddLines(tt, id) end
+        local held = db.tipShift ~= nil and IsShiftKeyDown()
+        ns.SyncTipShift()
+        if Shows(db, "recipes", held) then ns.AddRecipeLines(tt, id, data) end
+        if Shows(db, "upgrades", held) then ns.AddUpgradeLines(tt, id, data) end
+        if Shows(db, "crafting", held) then ns.AddCraftLines(tt, id) end
+        if Shows(db, "skillups", held) then ns.AddSkillupLines(tt, id) end
+        if Shows(db, "crates", held) then ns.AddCrateLines(tt, id, data) end
+        if Shows(db, "counts", held) then ns.AddLines(tt, id) end
     end
+end
+
+-- Whether a frame is one of ours (it or a parent is named AltsForever...).
+local function Ours(f)
+    for _ = 1, 8 do
+        if not f or (f.IsForbidden and f:IsForbidden()) then return false end
+        local name = f.GetName and f:GetName()
+        if type(name) == "string" and name:find("^AltsForever") then return true end
+        f = f.GetParent and f:GetParent()
+    end
+    return false
+end
+
+-- Shift pressed or let go with a part on Shift: the game's bag and character
+-- slots redraw their tooltip every 0.2 s by themselves (their UpdateTooltip), so only a
+-- tooltip shown by a window of ours is redrawn here, by hovering its owner again. Blizzard's
+-- other tooltips are left alone: redrawing them from our code would taint them.
+local function OnModifier(key)
+    if not ns.AnyTipShift() or (key ~= "LSHIFT" and key ~= "RSHIFT") then return end
+    if not GameTooltip:IsShown() or GameTooltip:IsForbidden() then return end
+    local owner = GameTooltip:GetOwner()
+    if not Ours(owner) then return end
+    local enter = owner.GetScript and owner:GetScript("OnEnter")
+    if type(enter) == "function" then enter(owner) end
 end
 
 function ns.StartTooltip()
     ns.RefreshPlaceLabels()
+    ns.On("MODIFIER_STATE_CHANGED", OnModifier)
     if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall then
         TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, OnItem)
     else

@@ -88,34 +88,60 @@ test("Show Alts Forever in tooltips off: no upgrades on a trainer's recipes eith
     eq(upRows(wow.hoverTrainer(GameTooltip, 4, 8880, text)), "")
 end)
 
-test("Options page: the tooltip parts sit indented under Show Alts Forever in tooltips, greyed while it's off", function()
-    wow.load(FILES)
+-- The parts of item tooltips as a grid on the page, each Always, Shift or Never (the
+-- owner's idea, 2026-11-26, from a player's request for Skill-ups and the Total on Shift).
+local PARTS = "Item counts | Total line | Can craft | Skill-ups | Recipe status | Upgrades | Waylaid Crate materials | Other rulesets and factions"
+
+function gridState(f)
+    local out = {}
+    for _, part in ipairs(f.modes and AltsForeverOptionsPanel and { "counts", "total", "crafting", "skillups", "recipes", "upgrades", "crates", "rulesets" } or {}) do
+        local row, pick = f.modes[part], "-"
+        for _, mode in ipairs({ "always", "shift", "never" }) do
+            if row[mode]:GetChecked() then pick = pick == "-" and mode or pick .. "+" .. mode end
+        end
+        out[#out + 1] = pick
+    end
+    return table.concat(out, " ")
+end
+
+test("Options page: the tooltip parts are a grid under Show Alts Forever in tooltips, greyed while it's off", function()
+    local ns = wow.load(FILES)
     wow.login(nil)
     local f = showOptionsPage()
     local master = f.checks[1]
     eq(master.label.text, "Show Alts Forever in tooltips")
-    local subs = {}
-    for i = 2, 9 do subs[#subs + 1] = f.checks[i] end
-    eq(master.point[4], -2)
-    eq(subs[1].point[4], 20, "indented under it")
-    eq(subs[2].point[4], 0, "then in line with the one above")
-    local rulesets
-    for _, check in ipairs(f.checks) do
-        if check.label.text == "Show other rulesets and factions" then rulesets = check end
-    end
-    subs[#subs + 1] = rulesets
-    for _, check in ipairs(subs) do eq(check:IsEnabled(), true) end
+    local names = {}
+    for _, part in ipairs(ns.TIP_PARTS) do names[#names + 1] = f.modes[part].label.text end
+    eq(table.concat(names, " | "), PARTS)
+    eq(f.modeHeads[1].text .. " " .. f.modeHeads[2].text .. " " .. f.modeHeads[3].text, "Always Shift Never")
+    eq(gridState(f), "always always always always always always always never", "one choice each; other rulesets Never by default")
+    local gold = f.checks[2]
+    eq(gold.label.text, "Show alts' gold on bag money")
+    -- Hovering a choice says what the part is and what the choices mean.
+    local b = f.modes.total.shift
+    b.scripts.OnEnter(b)
+    eq(GameTooltip.lines[1][1], "Total line: Shift")
+    assert(GameTooltip.lines[2][1]:find("only while you hold Shift", 1, true), GameTooltip.lines[2][1])
+    -- A pick moves the one choice; the setting changes with it.
+    pickMode("total", "shift")
+    eq(AltsForeverDB.tipShift.total, true)
+    pickMode("counts", "never")
+    eq(AltsForeverDB.countsOff, true)
+    eq(gridState(f), "never shift always always always always always never")
+    -- Tooltips off: the grid and the boxes under it grey out, keeping their choices.
     master:SetChecked(false)
     master.scripts.OnClick(master)
     eq(AltsForeverDB.tooltipsOff, true)
-    for _, check in ipairs(subs) do
-        eq(check:IsEnabled(), false, check.label.text)
-        eq(check:GetChecked(), check ~= rulesets, "keeps its tick (other rulesets is off by default)")
+    for _, part in ipairs(ns.TIP_PARTS) do
+        for _, mode in ipairs({ "always", "shift", "never" }) do eq(f.modes[part][mode]:IsEnabled(), false, part) end
     end
+    eq(gold:IsEnabled(), false)
+    eq(gridState(f), "never shift always always always always always never")
     master:SetChecked(true)
     master.scripts.OnClick(master)
-    for _, check in ipairs(subs) do eq(check:IsEnabled(), true) end
-    eq(f.checks[10]:IsEnabled(), true, "the extras are never greyed")
+    eq(f.modes.counts.always:IsEnabled(), true)
+    eq(gold:IsEnabled(), true)
+    eq(f.checks[4]:IsEnabled(), true, "the extras are never greyed")
 end)
 
 test("Can craft and recipe status: the old single switch turns both off, then each turns on by itself and stays", function()
@@ -135,14 +161,180 @@ test("Can craft and recipe status: the old single switch turns both off, then ea
     eq(AltsForeverDB.recipeTipsOff, nil, "recipe status stays on after the next login")
 end)
 
-test("Can craft and recipe status are two boxes on the Options page, each with its own setting", function()
+test("Can craft and recipe status are two rows on the Options page, each with its own setting", function()
     wow.load(FILES)
     wow.login(nil)
     showOptionsPage()
-    local craft, recipe = pageBox("Show Can craft"), pageBox("Show recipe status")
-    craft.setSelected()
+    pickMode("crafting", "never")
     eq(AltsForeverDB.canCraftOff, true); eq(AltsForeverDB.recipeTipsOff, nil)
-    eq(craft.isSelected(), false); eq(recipe.isSelected(), true)
-    recipe.setSelected()
+    eq(pageMode("crafting", "never"):GetChecked(), true); eq(pageMode("recipes", "always"):GetChecked(), true)
+    pickMode("recipes", "never")
     eq(AltsForeverDB.recipeTipsOff, true)
+end)
+
+-- Skill-ups and the Total line only while Shift is held (a player's request, 2026-11-26).
+function shiftStart()
+    local ns = wow.load(FILES)
+    wow.profs = { { "Engineering", 80 } }
+    local saved = recipeAlts()
+    saved.recipeInfo = { Engineering = { ["mechanical squirrel"] = "100;Mechanical Squirrel;,2589:2" } }
+    saved.chars["Brakka"].crafts = { Engineering = { [SQUIRREL_ITEM] = "mechanical squirrel" } }
+    saved.chars["Brakka"].profs.Engineering = 90
+    saved.chars["Brakka"].bags = { [LINEN] = 4 }
+    -- On the other faction: shown only with "Other rulesets and factions".
+    saved.chars["Zug Zug"] = alt("Zug Zug", "SHAMAN", { faction = "Horde", bags = { [LINEN] = 2 } })
+    wow.setBag(0, 16, { { LINEN, 3 } })
+    wow.login(saved)
+    return ns
+end
+
+-- What the Linen Cloth tooltip shows now.
+function shiftShown()
+    local text = textOf(wow.hover(GameTooltip, LINEN))
+    local out = {}
+    if text:find("Brakka", 1, true) then out[#out + 1] = "counts" end
+    if text:find("Total = 7", 1, true) then out[#out + 1] = "total" end
+    if text:find("Skill-ups", 1, true) then out[#out + 1] = "skillups" end
+    if text:find("Zug Zug", 1, true) then out[#out + 1] = "others" end
+    return table.concat(out, " ")
+end
+
+test("tooltip parts on Shift: left out of item tooltips until Shift is held", function()
+    shiftStart()
+    eq(shiftShown(), "counts total skillups", "by default everything but other rulesets")
+    pickMode("total", "shift")
+    pickMode("skillups", "shift")
+    eq(AltsForeverDB.tipShift.total, true); eq(AltsForeverDB.tipShift.skillups, true)
+    eq(shiftShown(), "counts", "without Shift: no Total, no Skill-ups; each character's count stays")
+    wow.shift = true
+    eq(shiftShown(), "counts total skillups", "Shift held: all of it")
+    wow.shift = false
+    eq(shiftShown(), "counts")
+    -- Counts themselves on Shift: nothing from the counts until it's held.
+    pickMode("counts", "shift")
+    eq(shiftShown(), "")
+    wow.shift = true
+    eq(shiftShown(), "counts total skillups")
+    wow.shift = false
+    pickMode("counts", "always")
+    -- Never wins over Shift: back to Shift brings it back.
+    pickMode("skillups", "never")
+    eq(AltsForeverDB.skillupsOff, true); eq(AltsForeverDB.tipShift.skillups, nil)
+    wow.shift = true
+    eq(shiftShown(), "counts total")
+    wow.shift = false
+end)
+
+test("other rulesets and factions on Shift: their characters join the tooltip while it's held", function()
+    shiftStart()
+    pickMode("rulesets", "always")
+    eq(AltsForeverDB.otherRulesets, true)
+    eq(shiftShown(), "counts total skillups others")
+    pickMode("rulesets", "shift")
+    eq(AltsForeverDB.otherRulesets, true, "counted by search and the bags window as before")
+    eq(shiftShown(), "counts total skillups", "cached lines without them")
+    wow.shift = true
+    eq(shiftShown(), "counts total skillups others", "rebuilt once Shift is held")
+    wow.shift = false
+    eq(shiftShown(), "counts total skillups", "and again when let go")
+    pickMode("rulesets", "never")
+    eq(AltsForeverDB.otherRulesets, nil); eq(AltsForeverDB.tipShift, nil)
+    wow.shift = true
+    eq(shiftShown(), "counts total skillups")
+    wow.shift = false
+end)
+
+test("other rulesets on Shift: gold and XP bar tooltips show them whether or not Shift is held, and stay put when it changes", function()
+    local ns, bar = tipsStart()
+    AltsForeverDB.chars["Zug Zug"] = alt("Zug Zug", "SHAMAN", { faction = "Horde", money = 9000, level = 12, xp = 1, xpMax = 100 })
+    ns.InvalidateCache()
+    local function gold()
+        GameTooltip:Hide()
+        ContainerFrameCombinedBagsGoldButton:Enter()
+        return textOf(GameTooltip.lines):find("Zug Zug", 1, true) ~= nil
+    end
+    local function xp()
+        GameTooltip:Hide()
+        bar.scripts.OnEnter(bar)
+        return textOf(GameTooltip.lines):find("Zug Zug", 1, true) ~= nil
+    end
+    eq(gold(), false, "Never: hidden"); eq(xp(), false)
+    pickMode("rulesets", "shift")
+    eq(gold(), true, "Shift: gold shows them without Shift held, as with Always")
+    eq(xp(), true)
+    -- Shift pressed and let go while the gold tooltip stays open: nothing to redraw, and
+    -- nothing changes the next time either.
+    ContainerFrameCombinedBagsGoldButton:Enter()
+    wow.shift = true
+    wow.fire("MODIFIER_STATE_CHANGED", "LSHIFT", 1)
+    assert(textOf(GameTooltip.lines):find("Zug Zug", 1, true))
+    wow.shift = false
+    wow.fire("MODIFIER_STATE_CHANGED", "LSHIFT", 0)
+    assert(textOf(GameTooltip.lines):find("Zug Zug", 1, true))
+    eq(gold(), true); eq(xp(), true)
+    pickMode("rulesets", "never")
+    eq(gold(), false); eq(xp(), false)
+end)
+
+test("/af shift lists every part's choice, and /af shift <part> puts one on Shift or back", function()
+    shiftStart()
+    SlashCmdList.ALTSFOREVER("shift")
+    local text = table.concat(wow.printed, "\n")
+    assert(text:find("Item counts: Always", 1, true), text)
+    assert(text:find("Other rulesets and factions: Never", 1, true), text)
+    SlashCmdList.ALTSFOREVER("shift total")
+    eq(AltsForeverDB.tipShift.total, true)
+    assert(wow.printed[#wow.printed]:find("Total line in item tooltips: Shift.", 1, true), wow.printed[#wow.printed])
+    eq(shiftShown(), "counts skillups")
+    SlashCmdList.ALTSFOREVER("shift total")
+    eq(AltsForeverDB.tipShift, nil)
+    assert(wow.printed[#wow.printed]:find("Total line in item tooltips: Always.", 1, true))
+    -- A part that was Never goes to Shift.
+    SlashCmdList.ALTSFOREVER("skillups")
+    eq(AltsForeverDB.skillupsOff, true)
+    SlashCmdList.ALTSFOREVER("shift skillups")
+    eq(AltsForeverDB.skillupsOff, nil); eq(AltsForeverDB.tipShift.skillups, true)
+end)
+
+test("the dev builds' single Shift switch becomes Skill-ups and Total on Shift", function()
+    shiftStart()
+    local saved = AltsForeverDB
+    saved.shiftDetails = true
+    wow.load(FILES)
+    wow.login(saved)
+    eq(AltsForeverDB.shiftDetails, nil)
+    eq(AltsForeverDB.tipShift.skillups, true); eq(AltsForeverDB.tipShift.total, true)
+end)
+
+test("Shift pressed over a slot in a window of ours redraws its tooltip; the game's own are left alone", function()
+    local ns = wow.load(FILES)
+    wow.setBag(0, 4, { [1] = { 100, 20 } })
+    wow.login(nil)
+    AltsForeverDB.tipShift = { total = true }
+    SlashCmdList.ALTSFOREVER("bags")
+    local slot = AltsForeverBagsFrame.slots[1]
+    slot.scripts.OnEnter(slot)
+    eq(GameTooltip.itemID, 100)
+    GameTooltip.itemID = nil
+    wow.fire("MODIFIER_STATE_CHANGED", "LSHIFT", 1)
+    eq(GameTooltip.itemID, 100, "hovered again: redrawn with Shift")
+    GameTooltip.itemID = nil
+    wow.fire("MODIFIER_STATE_CHANGED", "LCTRL", 1)
+    eq(GameTooltip.itemID, nil, "other keys do nothing")
+
+    -- A tooltip of the game's: nothing of ours runs.
+    local theirs = CreateFrame("Button", "ContainerFrame1Item1", UIParent)
+    local entered = 0
+    theirs:SetScript("OnEnter", function() entered = entered + 1 end)
+    GameTooltip:SetOwner(theirs)
+    GameTooltip:Show()
+    wow.fire("MODIFIER_STATE_CHANGED", "LSHIFT", 0)
+    eq(entered, 0)
+
+    -- Setting off: ours aren't redrawn either.
+    AltsForeverDB.tipShift = nil
+    slot.scripts.OnEnter(slot)
+    GameTooltip.itemID = nil
+    wow.fire("MODIFIER_STATE_CHANGED", "RSHIFT", 1)
+    eq(GameTooltip.itemID, nil)
 end)

@@ -49,6 +49,23 @@ function pageBox(label)
     error("no tick box " .. label)
 end
 
+-- A part's radio button in the Options page's tooltip grid ("counts", "always"), and a
+-- click on it, as the player would.
+function pageMode(part, mode)
+    local page = AltsForeverOptionsPanel
+    page:Show()
+    page.scripts.OnShow(page) -- shows what's set now
+    local row = page.modes and page.modes[part]
+    if not row then error("no tooltip part " .. part) end
+    return row[mode]
+end
+
+function pickMode(part, mode)
+    local b = pageMode(part, mode)
+    b:SetChecked(true)
+    b.scripts.OnClick(b)
+end
+
 -- A saved character, in the stored shape.
 function alt(name, class, data)
     data.name, data.class = name, class

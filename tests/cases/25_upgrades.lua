@@ -204,6 +204,12 @@ test("a trainer's recipe (a spell tooltip) is judged on the item it makes; bind 
         if pc.kind == Enum.TooltipDataType.Spell then pc.fn(GameTooltip, { type = 1, id = 8880 }) end
     end
     eq(#GameTooltip.lines, 0)
+    -- Upgrades on Shift: the trainer's list too.
+    ns.SetTipMode("upgrades", "shift")
+    eq(upRows(wow.hoverTrainer(GameTooltip, 5, 8881)), "", "on Shift, not held")
+    wow.shift = true
+    eq(upRows(wow.hoverTrainer(GameTooltip, 5, 8881)), "[MAGE]Aldric = Back · ^^^ · empty slot", "Shift held")
+    wow.shift = false
     ns.SetUpgrades(false)
     eq(upRows(wow.hoverTrainer(GameTooltip, 4, 8880)), "", "setting off")
 end)
@@ -499,9 +505,15 @@ test("the setting turns upgrades off and on: /af upgrades, the menu and the Opti
     eq(AltsForeverDB.upgradesOff, true)
     eq(upHover(5001, items.gloves), "")
     ns.ShowOptionsMenu(UIParent)
-    pageBox("Show upgrades").setSelected()
+    pickMode("upgrades", "always")
     eq(AltsForeverDB.upgradesOff, nil)
     eq(upHover(5001, items.gloves), "[HUNTER]Tarn Moon = Hands · ^^^")
+    -- On Shift: only while it's held, the trainer's spell tooltips too.
+    pickMode("upgrades", "shift")
+    eq(upHover(5001, items.gloves), "")
+    wow.shift = true
+    eq(upHover(5001, items.gloves), "[HUNTER]Tarn Moon = Hands · ^^^")
+    wow.shift = false
 end)
 
 test("wearing one ring: a second of the same goes on the other finger, unless it's unique", function()
@@ -700,21 +712,17 @@ test("upgrade weights window: shows a role's weights, takes a typed one, Reset p
     eq(f.roleButton:GetText(), "Caster · Priest, Shaman, Mage, Warlock, Druid", "/af weights alone: your own role (a mage)")
 end)
 
-test("upgrade weights: a Weights... button beside Show upgrades on the Options page opens the window", function()
+test("upgrade weights: an Upgrade weights... button under the anvil boxes on the Options page opens the window", function()
     upStart()
-    pageBox("Show upgrades") -- builds the page
+    showOptionsPage()
     local f = AltsForeverOptionsPanel
     local b = f.weights
-    local label
-    for _, check in ipairs(f.checks) do
-        if check.label.text == "Show upgrades" then label = check.label end
-    end
+    eq(b:GetText(), "Upgrade weights...")
     local _, rel = b:GetPoint()
-    eq(rel, label, "beside the Show upgrades label")
-    eq(b:GetText(), "Weights...")
+    eq(rel.label.text, "Show craftable upgrades when inspecting a player", "under the anvil boxes")
     b.scripts.OnEnter(b)
     assert(GameTooltip.lines[2][1]:find("/af weights", 1, true))
-    pageBox("Show upgrades").setSelected()
+    pickMode("upgrades", "never")
     eq(AltsForeverDB.upgradesOff, true)
     wow.settingsShown = true
     wow.timers = {}

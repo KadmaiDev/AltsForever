@@ -864,7 +864,7 @@ local function BuildRows(p)
     Add(ns.charKey, ns.char)
     local first = rows -- the current character stays on top
     for key, c in pairs(ns.db.chars) do
-        if key ~= ns.charKey and not ns.Hidden(c) then Add(key, c) end
+        if key ~= ns.charKey and not ns.TipHidden(c) then Add(key, c) end
     end
     -- Insertion sort of everyone after the current character.
     for i = first + 2, rows do
@@ -914,7 +914,7 @@ local function Order()
     orderVer = ns.craftVersion
     wipe(order)
     for key, c in pairs(ns.db.chars) do
-        if key ~= ns.charKey and not ns.Hidden(c) then order[#order + 1] = key end
+        if key ~= ns.charKey and not ns.TipHidden(c) then order[#order + 1] = key end
     end
     sort(order)
     table.insert(order, 1, ns.charKey)

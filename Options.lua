@@ -288,34 +288,20 @@ end
 local SETTINGS = {
     { L["Show Alts Forever in tooltips"], TooltipsSelected, function(on) ns.SetTooltips(on) end,
         L["Everything Alts Forever adds to tooltips: item counts, Can craft and recipes, upgrades, Waylaid Crates, gold on your bag money and the XP and reputation bars. Untick it to leave tooltips as the game shows them; the overview, bags, bank, search and lockouts still work. The boxes under it turn each part on or off. Same as /af tooltips."], section = "tooltips" },
-    { L["Show item counts"], CountsSelected, function(on) ns.SetCounts(on) end,
-        L["Item tooltips list how many of the item each of your characters has, and where. Turn this off if another addon, such as Baganator, already shows them; Can craft, skill-ups, upgrades and crates stay. Same as /af counts."], section = "tooltips", sub = true },
-    { L["Show Can craft"], CraftTipsSelected, function(on) ns.SetCraftTips(on) end,
-        L["Item tooltips name which of your characters can craft the item. Same as /af crafting."], section = "tooltips", sub = true },
-    { L["Show recipe status"], RecipeTipsSelected, function(on) ns.SetRecipeTips(on) end,
-        L["Recipe tooltips say whether each of your characters knows the recipe, can learn it or needs more skill. Same as /af recipes."], section = "tooltips", sub = true },
-    { L["Show skill-up details"], SkillupsSelected, function(on) ns.SetSkillups(on) end,
-        L["Show which characters can still skill up: in Can craft, on materials (Skill-ups) and in the overview. Same as /af skillups."], section = "tooltips", sub = true },
-    { L["Show upgrades"], UpgradesSelected, function(on) ns.SetUpgrades(on) end,
-        L["Item tooltips name which of your characters an item would be an upgrade for, judged by their talents. Right-click a character in the overview to change their role; Weights... beside this box changes what each stat is worth. Same as /af upgrades."], section = "tooltips", sub = true, weights = true },
-    { L["Show Waylaid Crate materials"], CratesSelected, function(on) ns.SetCrates(on) end,
-        L["A Waylaid Crate's tooltip shows how much of each material it asks for your characters have. Same as /af crates."], section = "tooltips", sub = true },
     { L["Show alts' gold on bag money"], GoldTipSelected, function(on) ns.SetGoldTip(on) end,
-        L["Hovering the gold in your bags lists every character's gold and the total. Same as /af gold."], section = "tooltips", sub = true },
+        L["Hovering the gold in your bags lists every character's gold and the total. Same as /af gold."], section = "tooltipsMore", sub = true },
     { L["Show alts on the XP and reputation bars"], BarsSelected, function(on) ns.SetBars(on) end,
-        L["Hovering your XP bar lists your characters still levelling, and the reputation bar their standing with the faction you're watching. Same as /af bars."], section = "tooltips", sub = true },
+        L["Hovering your XP bar lists your characters still levelling, and the reputation bar their standing with the faction you're watching. Same as /af bars."], section = "tooltipsMore", sub = true },
     { L["Show craftable upgrades on the character sheet"], AnvilsSelected, function(on) ns.SetAnvils(on) end,
-        L["An anvil beside a slot on your character sheet means you or an alt can craft an upgrade for it that you can wear now and that binds when equipped. Hover or click it to see which. Same as /af anvils."], section = "extras" },
+        L["An anvil beside a slot on your character sheet means you or an alt can craft an upgrade for it that you can wear now and that binds when equipped. Hover or click it to see which. Same as /af anvils."], section = "upgrades" },
     { L["Show craftable upgrades when inspecting a player"], InspectAnvilsSelected, function(on) ns.SetInspectAnvils(on) end,
-        L["An anvil beside a slot in the inspect window means you or an alt can craft an upgrade for that player that they can wear now and that binds when equipped. Hover or click it to see which. Same as /af inspect."], section = "extras" },
+        L["An anvil beside a slot in the inspect window means you or an alt can craft an upgrade for that player that they can wear now and that binds when equipped. Hover or click it to see which. Same as /af inspect."], section = "upgrades" },
     { L["Send mail to alts"], SendToAltSelected, function(on) ns.SetSendToAlt(on) end,
         L["An arrow next to the To box at the mailbox to pick one of your characters, and your mail rules. Same as /af sendmail."], section = "extras" },
     { L["Show session stats"], StatsSelected, function(on) ns.SetStats(on) end,
         L["Off by default. Your XP bar shows this session's XP and time to level; your bag gold shows gold gained or lost this session, today and this week. Same as /af stats."], section = "extras" },
     { L["Legacy reminders"], LegacySelected, function(on) ns.SetLegacyReminders(on) end,
         L["Says in chat when the character you log in on has Legacy points to spend, and when you earn one. Same as /af legacy on or off."], section = "extras" },
-    { L["Show other rulesets and factions"], RulesetsSelected, function(on) ns.SetOtherRulesets(on) end,
-        L["Tooltips also list your characters on other rulesets (Normal, PvP...) and the other faction, under their own heading. They can't trade or mail with this one, so they're hidden by default; the overview has its own settings for them. Same as /af rulesets."], section = "tooltips", sub = true },
     { L["Save item names for use outside the game"], ItemNamesSelected, function(on) ns.SetItemNames(on) end,
         L["Off by default. Only for reading Alts Forever's saved file (AltsForever.lua in your WTF folder) with other programs: it saves the name and quality of every item your characters have when you log out. It adds nothing in the game and uses a little more memory, so leave it off unless you need it. Same as /af itemnames."], section = "extras" },
     { L["Show minimap button"], MinimapSelected, function(on) ns.SetMinimapButton(on) end,
@@ -326,16 +312,56 @@ local SETTINGS = {
         L["Off by default: gold totals in the overview and on your bag money count only characters you can mail from here, since gold can't be sent to another ruleset or faction. Each group's heading in the overview still shows its own gold. Same as /af rulesets gold."], section = "display" },
 }
 
+-- The parts of item tooltips, each Always, only with Shift, or Never (Tooltip.lua
+-- ns.TipMode): a grid of radio buttons on the page under "Show Alts Forever in tooltips".
+local MODES = { "always", "shift", "never" }
+local TIP_HELP = {
+    counts = L["Item tooltips list how many of the item each of your characters has, and where. Set it to Never if another addon, such as Baganator, already shows them; Can craft, skill-ups, upgrades and crates stay. /af counts turns it on or off."],
+    total = L["The Total line above your characters' counts in item tooltips."],
+    crafting = L["Item tooltips name which of your characters can craft the item. /af crafting turns it on or off."],
+    skillups = L["On materials, the recipes your characters can still skill up with (Skill-ups). Never also leaves skill-ups out of Can craft and the overview. /af skillups turns it on or off."],
+    recipes = L["Recipe tooltips say whether each of your characters knows the recipe, can learn it or needs more skill. /af recipes turns it on or off."],
+    upgrades = L["Item tooltips name which of your characters an item would be an upgrade for, judged by their talents. Right-click a character in the overview to change their role; Upgrade weights..., under the anvil boxes, changes what each stat is worth. /af upgrades turns it on or off."],
+    crates = L["A Waylaid Crate's tooltip shows how much of each material it asks for your characters have. /af crates turns it on or off."],
+    rulesets = L["Tooltips also list your characters on other rulesets (Normal, PvP...) and the other faction, under their own heading. They can't trade or mail with this one, so they're Never by default; the overview has its own settings for them. /af rulesets turns it on or off."],
+}
+
+function ns.TipPartName(part)
+    if part == "counts" then return L["Item counts"]
+    elseif part == "total" then return L["Total line"]
+    elseif part == "crafting" then return L["Can craft"]
+    elseif part == "skillups" then return L["Skill-ups"]
+    elseif part == "recipes" then return L["Recipe status"]
+    elseif part == "upgrades" then return L["Upgrades"]
+    elseif part == "crates" then return L["Waylaid Crate materials"]
+    elseif part == "rulesets" then return L["Other rulesets and factions"] end
+    return part
+end
+
+function ns.TipModeName(mode)
+    if mode == "shift" then return L["Shift"] elseif mode == "never" then return L["Never"] end
+    return L["Always"]
+end
+
 local function RefreshCanvas(f)
     local tips = ns.TooltipsOn()
     local shade = tips and 1 or 0.5
-    for i, check in ipairs(f.checks) do
+    for i, check in pairs(f.checks) do
         check:SetChecked(SETTINGS[i][2]() and true or false)
         if SETTINGS[i].sub then
             check:SetEnabled(tips)
             check.label:SetTextColor(shade, shade, shade)
         end
     end
+    for part, row in pairs(f.modes or {}) do
+        local mode = ns.TipMode(part)
+        for _, m in ipairs(MODES) do
+            row[m]:SetChecked(m == mode)
+            row[m]:SetEnabled(tips)
+        end
+        row.label:SetTextColor(shade, shade, shade)
+    end
+    for _, head in ipairs(f.modeHeads or {}) do head:SetAlpha(tips and 1 or 0.5) end
     if f.slider then
         f.filling = true -- setting it isn't the player moving it
         f.slider:SetValue(ns.WindowScale() * 100)
@@ -365,8 +391,9 @@ end
 -- The section's tick boxes under its heading; returns the last one and how far it's
 -- indented. A `sub` one is indented under the one before it.
 local INDENT = 20
-local function Checks(f, section, above)
-    local first, indent = true, 0 -- under the heading, rather than under another tick box
+local function Checks(f, section, above, aboveIndent)
+    -- Under the heading, rather than under another tick box (or a row indented by aboveIndent).
+    local first, indent = aboveIndent == nil, aboveIndent or 0
     for i, entry in ipairs(SETTINGS) do
         if entry.section == section then
             local check = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
@@ -393,10 +420,68 @@ local function Checks(f, section, above)
     return above, first and 0 or indent
 end
 
+-- The grid of tooltip parts: a heading row (Always, Shift, Never over their columns), then a
+-- row per part with its name and three radio buttons. Indented under the box above it;
+-- returns the last row.
+-- The names' width, and from one column's centre to the next. "Other rulesets and factions"
+-- is ~143 wide in English (owner's screenshot, 2026-11-26); the grid then ends ~50 short of
+-- the right column, which starts a little past the page's middle (RIGHT_COLUMN).
+local GRID_LABEL, GRID_COL = 165, 40
+local function TipGrid(f, above)
+    f.modes, f.modeHeads = {}, {}
+    local head = CreateFrame("Frame", nil, f)
+    head:SetSize(GRID_LABEL + 3 * GRID_COL, 16)
+    head:SetPoint("TOPLEFT", above, "BOTTOMLEFT", INDENT, -4)
+    for j, mode in ipairs(MODES) do
+        local fs = head:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        fs:SetPoint("CENTER", head, "LEFT", GRID_LABEL + (j - 0.5) * GRID_COL, 0)
+        fs:SetText(ns.TipModeName(mode))
+        ns.SkinText(fs)
+        f.modeHeads[j] = fs
+    end
+    local row = head
+    for _, part in ipairs(ns.TIP_PARTS) do
+        local r = CreateFrame("Frame", nil, f)
+        r:SetSize(GRID_LABEL + 3 * GRID_COL, 22)
+        r:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 0, row == head and -2 or 0)
+        local label = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        label:SetPoint("LEFT", r, "LEFT", 4, 0)
+        label:SetWidth(GRID_LABEL - 8)
+        label:SetJustifyH("LEFT")
+        label:SetText(ns.TipPartName(part))
+        ns.SkinText(label)
+        -- A long name (other languages) wraps to a second line; the row grows to hold it.
+        local h = label.GetStringHeight and label:GetStringHeight()
+        if type(h) == "number" and h + 6 > 22 then r:SetHeight(h + 6) end
+        local cells = { label = label, frame = r }
+        for j, mode in ipairs(MODES) do
+            local b = CreateFrame("CheckButton", nil, r, "UIRadioButtonTemplate")
+            b:SetSize(16, 16)
+            b:SetPoint("CENTER", r, "LEFT", GRID_LABEL + (j - 0.5) * GRID_COL, 0)
+            b.part, b.mode = part, mode
+            b:SetScript("OnClick", function()
+                ns.SetTipMode(part, mode)
+                RefreshCanvas(f)
+            end)
+            b:SetScript("OnEnter", function(self)
+                Tooltip(self, ns.TipPartName(part) .. ": " .. ns.TipModeName(mode),
+                    TIP_HELP[part] .. "\n\n" .. L["Always: in every item tooltip. Shift: only while you hold Shift. Never: left out. /af shift lists them all."])
+            end)
+            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            ns.SkinRadio(b)
+            cells[mode] = b
+        end
+        f.modes[part] = cells
+        row = r
+    end
+    return row
+end
+
 -- The page (the owner's redesign, 2026-10-16: one column had run off the bottom): the
 -- logo, title and Open overview across the top, then two columns. Left: what tooltips
 -- show and their icons. Right: the extras, then the minimap button and window size.
 local TOP, GAP = -100, 20
+local RIGHT_COLUMN = 34 -- from the page's middle: room after the tooltip grid
 
 local function BuildCanvas(f)
     local logo = f:CreateTexture(nil, "ARTWORK")
@@ -429,24 +514,10 @@ local function BuildCanvas(f)
 
     -- Left column: tooltips, then their icons.
     local tips = Heading(f, L["Tooltips"], "TOPLEFT", f, "TOPLEFT", 18, TOP)
-    local above, indent = Checks(f, "tooltips", tips)
-    -- Upgrade weights (Weights.lua), beside Show upgrades. Always clickable: the character
-    -- sheet's anvils use the weights too, with upgrades in tooltips off.
-    for i, entry in ipairs(SETTINGS) do
-        if entry.weights and f.checks[i] then
-            local b = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-            b:SetSize(110, 20)
-            b:SetPoint("LEFT", f.checks[i].label, "RIGHT", 12, 0)
-            b:SetText(L["Weights..."])
-            b:SetScript("OnClick", OpenWeightsFromOptions)
-            b:SetScript("OnEnter", function(self)
-                Tooltip(self, L["Upgrade weights"], L["What each stat is worth to each role when upgrades are judged; you can change any of them. Same as /af weights."])
-            end)
-            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-            ns.SkinButton(b)
-            f.weights = b
-        end
-    end
+    local above = Checks(f, "tooltips", tips)
+    above = TipGrid(f, above)
+    local indent
+    above, indent = Checks(f, "tooltipsMore", above, INDENT)
     local heading = Heading(f, L["Tooltip icons"], "TOPLEFT", above, "BOTTOMLEFT", 2 - indent, -GAP)
     f.icons = {}
     local row = heading
@@ -465,8 +536,22 @@ local function BuildCanvas(f)
     end
 
     -- Right column, from the page's middle: extras, then the minimap button and window size.
-    local extras = Heading(f, L["Extras"], "TOPLEFT", f, "TOP", 10, TOP)
-    above = Checks(f, "extras", extras)
+    local extras = Heading(f, L["Extras"], "TOPLEFT", f, "TOP", RIGHT_COLUMN, TOP)
+    above = Checks(f, "upgrades", extras)
+    -- Upgrade weights (Weights.lua), under the two anvil boxes, with the upgrade settings.
+    -- Always clickable: the anvils use the weights too, with upgrades in tooltips Never.
+    local b = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    b:SetSize(150, 22)
+    b:SetPoint("TOPLEFT", above, "BOTTOMLEFT", INDENT + 4, -2)
+    b:SetText(L["Upgrade weights..."])
+    b:SetScript("OnClick", OpenWeightsFromOptions)
+    b:SetScript("OnEnter", function(self)
+        Tooltip(self, L["Upgrade weights"], L["What each stat is worth to each role when upgrades are judged; you can change any of them. Same as /af weights."])
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    ns.SkinButton(b)
+    f.weights = b
+    above = Checks(f, "extras", b, INDENT + 4)
     local display = Heading(f, L["Minimap and windows"], "TOPLEFT", above, "BOTTOMLEFT", 2, -GAP)
     above = Checks(f, "display", display)
     -- Window size: a slider in 5% steps with the size beside it (as EllesmereUI's Window
@@ -631,8 +716,14 @@ function ns.ShowOptionsMenu(owner, fromOverview)
             root:CreateButton(L["Settings..."], function() ns.OpenSettings() end)
         else
             for _, entry in ipairs(SETTINGS) do
-                if entry[2] ~= RulesetsSelected then
-                    root:CreateCheckbox(entry[1], entry[2], function() entry[3](not entry[2]()) end)
+                root:CreateCheckbox(entry[1], entry[2], function() entry[3](not entry[2]()) end)
+            end
+            local parts = root:CreateButton(L["Item tooltips"])
+            for _, part in ipairs(ns.TIP_PARTS) do
+                local sub = parts:CreateButton(ns.TipPartName(part))
+                for _, mode in ipairs(MODES) do
+                    sub:CreateRadio(ns.TipModeName(mode), function() return ns.TipMode(part) == mode end,
+                        function() ns.SetTipMode(part, mode) end)
                 end
             end
         end
