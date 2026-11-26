@@ -499,6 +499,14 @@ test("the bags window resizes: width sets the columns, height how tall before it
     f.scripts.OnSizeChanged(f, f:GetWidth(), f:GetHeight())
     f.grip.scripts.OnMouseUp(f.grip)
     eq(AltsForeverDB.bagsCols, nil)
+    -- As narrow as the game's bank, 8 across, and no narrower.
+    eq(f.resizeBounds[1], 12 * 2 + 8 * 39 - 3, "the grip stops at 8")
+    f.grip.scripts.OnMouseDown(f.grip)
+    f:SetWidth(12 * 2 + 6 * 39 - 3)
+    f.scripts.OnSizeChanged(f, f:GetWidth(), f:GetHeight())
+    f.grip.scripts.OnMouseUp(f.grip)
+    eq(AltsForeverDB.bagsCols, 8)
+    eq(f:GetWidth(), 12 * 2 + 8 * 39 - 3)
 end)
 
 test("our windows come to the front when opened or clicked, so they never draw through each other", function()
@@ -709,11 +717,14 @@ test("with an item lit, Bags, Bank and Mail say how many the shown character has
     ns.char.bags[4306] = nil
     ns.ShowBags(ns.charKey, "bags", 4306)
     eq(texts(), "Bags | Bank | Mail")
-    -- The narrowest window: the row must fit inside it.
-    f.grip.scripts.OnMouseDown(f.grip)
-    f:SetWidth(12 * 2 + 10 * 39 - 3)
-    f.scripts.OnSizeChanged(f, f:GetWidth(), f:GetHeight())
-    f.grip.scripts.OnMouseUp(f.grip)
+    -- A narrow window (10 columns): the row must fit inside it.
+    local function width(n)
+        f.grip.scripts.OnMouseDown(f.grip)
+        f:SetWidth(12 * 2 + n * 39 - 3)
+        f.scripts.OnSizeChanged(f, f:GetWidth(), f:GetHeight())
+        f.grip.scripts.OnMouseUp(f.grip)
+    end
+    width(10)
     local room = f:GetWidth() - 12 * 2
     local function row()
         local w = f.who.width + 4 + f.bags.width + 4 + f.bank.width + 4 + f.mail.width + 4 + 24
@@ -730,9 +741,61 @@ test("with an item lit, Bags, Bank and Mail say how many the shown character has
     assert(f.who.width < 140 and f.who.width >= 80, "the character button gives up width: " .. f.who.width)
     eq(name.width, f.who.width - 16, "its name is cut to fit inside it")
     assert(row() <= room, "fits: " .. row() .. " of " .. room)
+    -- The narrowest (8 columns, as the game's bank): even with the character button at its
+    -- narrowest the numbers don't fit, so they go (the character menu has them).
+    width(8)
+    eq(f:GetWidth(), 12 * 2 + 8 * 39 - 3, "8 columns")
+    room = f:GetWidth() - 12 * 2
+    eq(texts(), "Bags | Bank | Mail", "numbers dropped")
+    eq(f.split.label.shown, false)
+    assert(f.who.width >= 80, "the character button: " .. f.who.width)
+    assert(row() <= room, "fits: " .. row() .. " of " .. room)
+    ns.ShowBags("Tarn Moon", "bags", 4306)
+    eq(texts(), "Bags | Bank | Mail")
+    assert(row() <= room, "fits: " .. row() .. " of " .. room)
+    width(10)
+    eq(texts(), "Bags (12) | Bank (40) | Mail (3)", "wider again: the numbers come back")
     -- Cleared: back to the words, and room for 'By bag' again.
     f.clear.scripts.OnClick(f.clear)
     eq(texts(), "Bags | Bank | Mail")
     eq(f.split.label.shown, true)
     eq(f.who.width, 140)
+end)
+
+test("the footer fits the narrowest window: the time line shortens to the time, then goes; a lit name is cut", function()
+    local ns = wow.load(FILES)
+    wow.ns = ns
+    wow.now = 2000000000
+    wow.itemNames[4306] = string.rep("x", 30)
+    wow.login({ v = 2, chars = {
+        ["Tarn Moon"] = alt("Tarn Moon", "DRUID", { bank = { [4306] = 40 }, bankAt = wow.now - 3 * 86400, money = 5 }),
+    } })
+    ns.ShowBags("Tarn Moon", "bank")
+    local f = AltsForeverBagsFrame
+    local function measure(fs) fs.GetStringWidth = function(self) return textWidth(self.text or "") end end
+    for _, fs in ipairs({ f.info, f.seen, f.stop, f.clear.text }) do measure(fs) end
+    f.money.GetStringWidth = function() return 120 end
+    local function width(n)
+        f.grip.scripts.OnMouseDown(f.grip)
+        f:SetWidth(12 * 2 + n * 39 - 3)
+        f.scripts.OnSizeChanged(f, f:GetWidth(), f:GetHeight())
+        f.grip.scripts.OnMouseUp(f.grip)
+    end
+    local full, ago = ns.L["Bank last visited: %s"]:format(ns.FormatAgo(3 * 86400)), ns.FormatAgo(3 * 86400)
+    local function seen() return (f.seen.text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") end
+    ns.ShowBags("Tarn Moon", "bank")
+    eq(seen(), full, "14 columns: the whole line")
+    width(8)
+    eq(seen(), ago, "8 columns: the time alone")
+    local room = f:GetWidth() - 12 * 2 - 2 - 14
+    assert(textWidth(f.info.text or "") + 20 + textWidth(f.seen.text) + 20 + 120 <= room, "fits")
+    -- Lit from the search: the name is cut to fit and the time line gives way.
+    ns.ShowBags("Tarn Moon", "bank", 4306)
+    eq(f.clear.text.width, 60, "the name cut short")
+    eq(f.clear.width, 80)
+    eq(seen(), "", "no room for the time")
+    width(14)
+    eq(f.clear.text.width, 0, "wider: the whole name")
+    eq(f.clear.width, textWidth(f.clear.text.text) + 20)
+    wow.now = nil
 end)

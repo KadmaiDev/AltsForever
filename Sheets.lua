@@ -206,6 +206,14 @@ local function RowEnter(row)
     GameTooltip:Show()
 end
 
+-- Text on a bar fill: outlined in whatever font it was given (EllesmereUI's own, or the
+-- game's), as a shadow set on the string itself may not draw with EllesmereUI's fonts.
+local function Outline(fs)
+    local path, size = fs:GetFont()
+    if issecretvalue(path) or issecretvalue(size) or not path then return end
+    fs:SetFont(path, size or 10, "OUTLINE")
+end
+
 local function MakeRow(list)
     local row = CreateFrame("Button", nil, list)
     row:SetWidth(WIDTH - 16 - 44)
@@ -257,6 +265,7 @@ local function MakeRow(list)
     row:SetScript("OnEnter", RowEnter)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     for _, fs in ipairs({ row.headText, row.label, bar.text }) do ns.SkinText(fs) end
+    Outline(bar.text)
     return row
 end
 
@@ -357,14 +366,12 @@ local function RepTip(tt, e)
     if r.level < 8 then tt:AddLine((r.value - r.low) .. " / " .. (r.high - r.low), 1, 1, 1) end
 end
 
-local function Hex(hex, from)
-    return tonumber(hex:sub(from, from + 1), 16) / 255
-end
 
 local function FillReputation(page, key, c)
     local entries = {}
     for _, r in ipairs(ns.ReputationRows(c)) do
-        local e = { label = r.name, row = r, tip = RepTip, r = Hex(r.colour, 1), g = Hex(r.colour, 3), b = Hex(r.colour, 5) }
+        local e = { label = r.name, row = r, tip = RepTip }
+        e.r, e.g, e.b = ns.StandingBarColour(r.level)
         if r.level < 8 then
             e.value, e.max = r.value - r.low, r.high - r.low
             e.text = r.label .. "  " .. (r.value - r.low) .. " / " .. (r.high - r.low)

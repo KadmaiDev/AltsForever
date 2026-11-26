@@ -164,7 +164,10 @@ test("the overview shows professions as icons and gold to the whole gold", funct
 
     local GOLD = "|TInterface\\MoneyFrame\\UI-GoldIcon:0:0:2:0|t"
     eq(ns.GoldShort(12345678), "1234" .. GOLD, "silver and copper left out")
-    eq(ns.GoldShort(10000), "1" .. GOLD)
+    eq(ns.GoldShort(1000000), "100" .. GOLD, "from 100 gold: whole gold")
+    eq(ns.GoldShort(999999), "999900c", "under 100 gold: gold and silver, copper dropped")
+    eq(ns.GoldShort(19999), "19900c", "1g 99s 99c shows its silver")
+    eq(ns.GoldShort(10000), "10000c")
     eq(ns.GoldShort(9999), "9999c", "under a gold: as the game writes it")
     BreakUpLargeNumbers = function(n) return "1,234" end
     ns = wow.load(FILES)
@@ -280,7 +283,7 @@ test("overview rows: you first, then by level; totals gold", function()
     eq(cell(rows[3], 1), "[PRIEST]High")
     eq(cell(rows[3], 3), "|cff4da6ff150%|r", "was already full")
     eq(cell(rows[3], 20), "Orgrimmar"); eq(cell(rows[3], 22), "3h ago")
-    eq(cell(rows[3], 7), "1|TInterface\\MoneyFrame\\UI-GoldIcon:0:0:2:0|t", "gold to the whole gold")
+    eq(cell(rows[3], 7), "10000c", "under 100 gold: gold and silver, as the game writes it")
     eq(cell(rows[4], 1), "[ROGUE]Low"); eq(cell(rows[4], 2), "12")
     eq(rows[4].pct.text, G .. "10%|r", "the percentage in its own cell, so they line up")
     eq(rows[2].pct.text, "", "none at max level")

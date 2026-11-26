@@ -1,3 +1,10 @@
+## Alts Forever 1.12.2 (not yet released)
+
+- **Silver back in the overview:** characters with under 100 gold show their gold and silver again ("12g 45s"); from 100 gold it's still whole gold, to keep the window narrow. Thanks to the player who asked.
+- **New characters sorted into their ruleset and faction:** if the game hadn't said which realm a character is on by the time Alts Forever started, the character stayed under "Not sorted yet" in the overview, every session. It's now asked again as the world loads and a few times in the first minute, and the realm's shown name is used if the game gives no other. Gold history kept for such a character joins its group's once the realm is known. Thanks to the player who reported it.
+- **Bags window down to 8 slots across:** drag it as narrow as the game's own bank, so a bank sorted in rows of 8 keeps its rows (it stopped at 10). At that width the Bags, Bank and Mail buttons leave out the lit item's count (the character menu still has it), and the footer shortens "Bank last visited: 3d ago" to "3d ago" when space is short. Thanks to the player who asked.
+- **Easier to read reputation bars:** the Reputation page's bars take the game's own reputation colours, darker than before, and the text on them is outlined, so it no longer gets lost on bright yellow and green.
+
 ## Alts Forever 1.12.1
 
 - **Professions the game names two ways:** some game clients call a profession by one name in the skills list and another in the profession window (a Spanish client says "Costura" in one and "Sastrería" in the other for Tailoring). Alts Forever took them for two professions, so that profession's recipes never showed: its tab said "Not scanned" and recipe tooltips couldn't find it. Professions are now matched by skill line, which is the same in every language. Open the profession's window once on each character it affected. Thanks to the player who reported it and ran the checks.

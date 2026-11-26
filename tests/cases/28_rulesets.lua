@@ -44,6 +44,109 @@ test("each character's ruleset is recorded at login; a secret or empty one is ig
     eq(AltsForeverDB.chars["Aldric"].realm, nil)
 end)
 
+-- A player's new characters stayed "Not sorted yet" with no realm saved (2026-11-25).
+test("a realm the game can't name at login is read when the world loads, and the character sorted", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.player.realm = nil
+    wow.money = 1000
+    wow.login(rulesetAlts())
+    eq(ns.char.realm, nil, "nothing to read yet")
+    for group in pairs(AltsForeverDB.goldDaysBy or {}) do eq(group:sub(1, 1) ~= "|", true, "only a guess: " .. group) end
+    wow.player.realm = PVE
+    wow.fire("PLAYER_ENTERING_WORLD", true, false)
+    eq(ns.char.realm, PVE)
+    eq(AltsForeverDB.goldGroup, PVE .. "|Alliance", "the history claimed by the real group, not the guess")
+    for group in pairs(AltsForeverDB.goldDaysBy or {}) do eq(group:sub(1, 1) ~= "|", true, "guess left behind: " .. group) end
+    local today
+    for day in pairs(AltsForeverDB.goldDays) do today = day end
+    eq(AltsForeverDB.goldDays[today], 4200, "today's reading in the right group")
+    eq(ns.RulesetLabel(ns.char.realm), "Normal")
+end)
+
+test("a realm still unreadable when the world loads is asked again a few seconds later", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.player.realm = nil
+    wow.money = 500
+    -- Gold history already kept for another group: the guess gets a group of its own.
+    wow.login({ v = 2, goldGroup = "rp|Horde", goldDays = {}, chars = {} })
+    wow.fire("PLAYER_ENTERING_WORLD", true, false)
+    runTimers()
+    runTimers()
+    eq(ns.char.realm, nil)
+    wow.player.realm = "CAMWOWUS2Realm12RP"
+    runTimers()
+    eq(ns.char.realm, "CAMWOWUS2Realm12RP", "still asked after two misses")
+    eq(AltsForeverDB.chars["Aldric"].realm, "CAMWOWUS2Realm12RP", "saved")
+    eq(AltsForeverDB.goldDaysBy["|Alliance"], nil, "the guess's group went")
+    eq(next(AltsForeverDB.goldDaysBy["rp|Alliance"]) ~= nil, true, "today's reading in the right one")
+end)
+
+-- Codex review, 2026-11-26: an empty faction read as known, so it was never asked again.
+test("an empty faction at login is unknown, and read when the world loads", function()
+    local ns = wow.load(FILES)
+    wow.player.faction = ""
+    wow.player.realm = PVE
+    wow.login({ v = 2, chars = { ["Aldric"] = alt("Aldric", "MAGE", { faction = "" }) } })
+    eq(ns.char.faction, nil, "not a faction")
+    eq(ns.char.realm, PVE)
+    wow.player.faction = "Horde"
+    wow.fire("PLAYER_ENTERING_WORLD", true, false)
+    eq(ns.char.faction, "Horde")
+    eq(AltsForeverDB.chars["Aldric"].faction, "Horde", "saved")
+    wow.player.faction = nil
+end)
+
+-- Codex review, 2026-11-26: before 1.12.2 such a character kept its gold history under the
+-- unknown group, every session, the main history too.
+test("gold history kept under an unknown realm in earlier sessions joins the group once known", function()
+    local day = math.floor(NOW / 86400) - 3
+    local function save()
+        return { v = 2, goldGroup = "|Alliance", goldDays = { [day] = 300, [day + 1] = 400 },
+            goldDaysBy = { ["|"] = { [day] = 50 }, ["|Horde"] = { [day] = 70 } },
+            chars = { ["Aldric"] = alt("Aldric", "MAGE", { faction = "Alliance", money = 400 }) } }
+    end
+    -- Read when the world loads.
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.player.realm = nil
+    wow.money = 500
+    wow.login(save())
+    wow.player.realm = PVE
+    wow.fire("PLAYER_ENTERING_WORLD", true, false)
+    local group = ns.char.realm and AltsForeverDB.goldGroup
+    eq(group ~= "|Alliance" and group:sub(-9), "|Alliance", "the main history is this group's now: " .. tostring(group))
+    eq(AltsForeverDB.goldDays[day], 300, "its earlier days kept")
+    eq(AltsForeverDB.goldDays[day + 1], 400)
+    local by = AltsForeverDB.goldDaysBy or {}
+    eq(by["|"], nil, "a group with nothing known goes too")
+    eq(by["|Horde"][day], 70, "another faction's stays")
+    -- Readable at login (the fallback): the same, at once.
+    ns = wow.load(FILES)
+    wow.player.realm = PVE
+    wow.login(save())
+    eq(AltsForeverDB.goldGroup ~= "|Alliance", true)
+    eq(AltsForeverDB.goldDays[day], 300)
+    -- Another character still unsorted there: theirs, left alone.
+    ns = wow.load(FILES)
+    local s = save()
+    s.chars["Brom"] = alt("Brom", "WARRIOR", { faction = "Alliance", money = 900 })
+    wow.login(s)
+    eq(AltsForeverDB.goldGroup, "|Alliance", "Brom still adds to it")
+    eq(AltsForeverDB.goldDaysBy["|"], nil, "but nobody's left in the group with nothing known")
+    wow.now = nil
+end)
+
+test("without a normalized realm name, the shown one is used without its spaces", function()
+    local ns = wow.load(FILES)
+    GetNormalizedRealmName = function() return nil end
+    GetRealmName = function() return "CAMWOW US2 Realm 12 RP" end
+    wow.login({ v = 2, chars = {} })
+    eq(ns.char.realm, "CAMWOWUS2Realm12RP")
+    eq(ns.RulesetOf(ns.char.realm), "rp")
+end)
+
 test("ruleset names: from the realm name, the same for two realms of one ruleset", function()
     local ns = rulesetStart()
     eq(ns.RulesetLabel(PVP), "PvP")
