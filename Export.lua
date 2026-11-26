@@ -5,7 +5,12 @@
 --  * "tabs": a header row and tab-separated columns, which paste into Google Sheets or
 --    Excel as columns;
 --  * "text": readable lines for notes or chat;
---  * "markdown": a table that Notion, Obsidian and the like turn into a real one.
+--  * "markdown": a table that Notion, Obsidian and the like turn into a real one;
+--  * "items": every item the characters have, one tab-separated row per character, place
+--    (bags, bank, mail, worn) and item, for a spreadsheet (a player's question, 2026-11-26:
+--    "export the bags/mail/bank of all my characters to csv"). Names and qualities are the
+--    game's, read as the window opens; nothing more is saved. Items the game hasn't loaded are
+--    asked for and the text made again a second later, up to NAME_TRIES times.
 -- The text is made when the window opens and let go when it closes.
 local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
@@ -21,16 +26,19 @@ local TAB = "\t"
 
 -- In the dropdown's order. CSV was considered and left out (owner, 2026-10-18): pasted, Excel
 -- splits only on tabs, and a comma decimal mark would need every value quoted.
-local FORMATS = { "tabs", "text", "markdown" }
-local NAMES = { tabs = L["Spreadsheet"], text = L["Text"], markdown = L["Markdown table"] }
+local FORMATS = { "tabs", "text", "markdown", "items" }
+local NAMES = { tabs = L["Spreadsheet"], text = L["Text"], markdown = L["Markdown table"], items = L["Items"] }
 local CHOICES = {
     tabs = L["Spreadsheet (Excel, Google Sheets)"],
     text = L["Text (notes, chat, documents)"],
     markdown = L["Markdown table (Notion, Obsidian)"],
+    items = L["Items in bags, bank, mail and worn (spreadsheet)"],
 }
 
 local frame, box, scroll
 local text -- what the box holds while open: typing in it puts this back
+local NAME_TRIES = 5 -- times the items text is made again while names are still loading
+local tries, tick = 0, 0
 
 -- Colour codes and icons out: the text leaves the game.
 function ns.PlainText(s)
@@ -186,8 +194,74 @@ local function Row(key, c, now, group)
     return concat(out, TAB)
 end
 
+-- The items format: where each character keeps things, in this order, named as the tooltips do.
+local ITEM_PLACES = { "bags", "bank", "mail", "equip" }
+local PLACE_WORDS = { bags = L["Bags"], bank = L["Bank"], mail = L["Mail"], equip = L["Worn"] }
+local IsSecret = issecretvalue or function() return false end
+local asked = {} -- items asked for since the window opened, so each is asked for once
+
+-- An item's name: the game's, else one saved by "Save item names" (/af itemnames); nil while
+-- the game hasn't loaded it, and then it's asked for.
+local function ItemName(id)
+    local name = C_Item.GetItemNameByID(id)
+    if not IsSecret(name) and type(name) == "string" and name ~= "" then return name end
+    name = ns.db.itemNames and ns.db.itemNames[id]
+    if type(name) == "string" then return name end
+    if not asked[id] and C_Item.RequestLoadItemDataByID then
+        asked[id] = true
+        C_Item.RequestLoadItemDataByID(id)
+    end
+end
+
+-- The quality in the game's words ("Uncommon"), blank when unknown.
+local function QualityWord(id)
+    local q = C_Item.GetItemQualityByID(id)
+    if IsSecret(q) or type(q) ~= "number" then return nil end
+    return _G["ITEM_QUALITY" .. q .. "_DESC"] or q
+end
+
+local function ByName(a, b)
+    if a.name ~= b.name then
+        if not a.name or not b.name then return b.name == nil end
+        return a.name < b.name
+    end
+    return a.id < b.id
+end
+
+-- One row per character, place and item, in the overview's order; within a place by name.
+-- Returns the text and how many items had no name yet.
+local function ItemsText(keys, chars, split, byRealm, byFaction)
+    local cols = { L["Character"], L["Place"], L["Item"], L["Quality"], L["Count"], L["Item ID"] }
+    if split then table.insert(cols, 1, L["Group"]) end
+    local lines, missing = { concat(cols, TAB) }, 0
+    for _, key in ipairs(keys) do
+        local c = chars[key]
+        local group = split and Cell(ns.GroupLabel(c, byRealm, byFaction))
+        for _, place in ipairs(ITEM_PLACES) do
+            local items = c[place]
+            if type(items) == "table" and next(items) then
+                local list = {}
+                for id, count in pairs(items) do
+                    if type(id) == "number" and type(count) == "number" and count > 0 then
+                        local name = ItemName(id)
+                        if not name then missing = missing + 1 end
+                        list[#list + 1] = { id = id, count = count, name = name }
+                    end
+                end
+                table.sort(list, ByName)
+                for _, e in ipairs(list) do
+                    local out = { Cell(key), PLACE_WORDS[place], Cell(e.name), Cell(QualityWord(e.id)), e.count, e.id }
+                    if group then table.insert(out, 1, group) end
+                    lines[#lines + 1] = concat(out, TAB)
+                end
+            end
+        end
+    end
+    return concat(lines, "\n"), missing
+end
+
 -- Every character, in the overview's order and groups (rulesets and factions), in one of
--- the FORMATS (default: the saved choice).
+-- the FORMATS (default: the saved choice). For "items", also how many items had no name yet.
 function ns.ExportText(format)
     format = format or ns.ExportFormat()
     local now = time()
@@ -196,6 +270,7 @@ function ns.ExportText(format)
     local byRealm, byFaction = ns.GroupParts()
     local split = byRealm or byFaction
     local lines = {}
+    if format == "items" then return ItemsText(keys, chars, split, byRealm, byFaction) end
     if format == "tabs" then
         lines[1] = Header(split)
         for _, key in ipairs(keys) do
@@ -249,13 +324,25 @@ function ns.ExportText(format)
     return concat(lines, "\n")
 end
 
-local function Fill()
-    frame.format:SetText(NAMES[ns.ExportFormat()])
-    text = ns.ExportText()
+-- again = made once more because item names were still loading: kept where it was scrolled to.
+local function Fill(again)
+    if not again then tries, asked = 0, {} end
+    tick = tick + 1
+    local format = ns.ExportFormat()
+    frame.format:SetText(NAMES[format])
+    local missing
+    text, missing = ns.ExportText(format)
     box:SetText(text)
     box:SetFocus()
     box:HighlightText()
-    if scroll.SetVerticalScroll then scroll:SetVerticalScroll(0) end
+    if not again and scroll.SetVerticalScroll then scroll:SetVerticalScroll(0) end
+    if missing and missing > 0 and tries < NAME_TRIES and C_Timer and C_Timer.After then
+        tries = tries + 1
+        local mine = tick
+        C_Timer.After(1, function()
+            if mine == tick and frame:IsShown() and ns.ExportFormat() == format then Fill(true) end
+        end)
+    end
 end
 
 local function PickFormat(owner)
@@ -300,6 +387,7 @@ local function CreateWindow()
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine(L["Format"])
         GameTooltip:AddLine(L["Columns for a spreadsheet, readable lines for notes or chat, or a Markdown table for Notion or Obsidian."], 1, 1, 1, true)
+        GameTooltip:AddLine(L["Items lists everything your characters have, one row per item, for a spreadsheet."], 1, 1, 1, true)
         GameTooltip:Show()
     end)
     fmt:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -342,7 +430,8 @@ local function CreateWindow()
     end)
     f:SetScript("OnHide", function()
         box:ClearFocus()
-        text = nil
+        text, asked = nil, {}
+        tick = tick + 1 -- a refill waiting for names is no longer wanted
         box:SetText("")
         GameTooltip:Hide()
     end)

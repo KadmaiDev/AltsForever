@@ -103,7 +103,7 @@ test("/af export and the overview's button open the export with the text selecte
         choices[#choices + 1] = item.text .. (item.isSelected(item.data) and " *" or "")
     end
     eq(table.concat(choices, "; "), "Spreadsheet (Excel, Google Sheets) *; Text (notes, chat, documents);"
-        .. " Markdown table (Notion, Obsidian)")
+        .. " Markdown table (Notion, Obsidian); Items in bags, bank, mail and worn (spreadsheet)")
     wow.menuItem("Text (notes, chat, documents)").setSelected("text")
     eq(AltsForeverDB.exportFormat, "text")
     eq(f.format:GetText(), "Text")
@@ -220,4 +220,107 @@ test("item names: saved as soon as they arrive, so a name the game drops by logo
     wow.itemNames[4306] = "Silk Cloth"
     wow.fire("GET_ITEM_INFO_RECEIVED", 4306, true)
     eq(AltsForeverDB.itemNames[4306], nil)
+end)
+
+-- The items format: every item each character has, for a spreadsheet (a player's question,
+-- 2026-11-26). Aldric carries Linen Cloth and an unloaded item; Tarn Moon has bags, bank, mail
+-- and worn items; Low has nothing recorded.
+local function itemsStart(realms)
+    local ns = exportStart(realms)
+    ITEM_QUALITY0_DESC, ITEM_QUALITY1_DESC, ITEM_QUALITY2_DESC = "Poor", "Common", "Uncommon"
+    wow.itemNames[2589], wow.itemQuality[2589] = "Linen Cloth", 1
+    wow.itemNames[2318], wow.itemQuality[2318] = "Light Leather", 1
+    wow.itemNames[4306], wow.itemQuality[4306] = "Silk Cloth", 1
+    wow.itemNames[2078], wow.itemQuality[2078] = "Northern Shortsword", 2
+    wow.itemNames[6948], wow.itemQuality[6948] = "Hearthstone", 1
+    wow.itemNames[118], wow.itemQuality[118] = "Minor Healing Potion", 1
+    wow.itemNames[7777] = nil
+    wow.uncached[7777] = true
+    for id in pairs(ns.char.bags) do ns.char.bags[id] = nil end
+    ns.char.bags[2589], ns.char.bags[7777] = 20, 1
+    for id in pairs(ns.char.equip or {}) do ns.char.equip[id] = nil end
+    local tarn = AltsForeverDB.chars["Tarn Moon"]
+    tarn.bags = { [6948] = 1, [4306] = 12, [118] = 5 }
+    tarn.bank = { [2318] = 40 }
+    tarn.mail = { [2078] = 1 }
+    tarn.equip = { [2078] = 1 }
+    return ns
+end
+
+local function rows(text)
+    local out = {}
+    for line in (text .. "\n"):gmatch("(.-)\n") do out[#out + 1] = line end
+    return out
+end
+
+test("items export: a row per character, place and item, by name within each place, for a spreadsheet", function()
+    local ns = itemsStart()
+    wow.itemLoads = nil
+    local text, missing = ns.ExportText("items")
+    local r = rows(text)
+    eq(r[1], "Character\tPlace\tItem\tQuality\tCount\tItem ID")
+    eq(r[2], "Aldric\tBags\tLinen Cloth\tCommon\t20\t2589")
+    eq(r[3], "Aldric\tBags\t\t\t1\t7777", "not loaded yet: blank name, still counted, ID given")
+    eq(r[4], "Tarn Moon\tBags\tHearthstone\tCommon\t1\t6948")
+    eq(r[5], "Tarn Moon\tBags\tMinor Healing Potion\tCommon\t5\t118")
+    eq(r[6], "Tarn Moon\tBags\tSilk Cloth\tCommon\t12\t4306")
+    eq(r[7], "Tarn Moon\tBank\tLight Leather\tCommon\t40\t2318")
+    eq(r[8], "Tarn Moon\tMail\tNorthern Shortsword\tUncommon\t1\t2078")
+    eq(r[9], "Tarn Moon\tWorn\tNorthern Shortsword\tUncommon\t1\t2078")
+    eq(#r, 9, "Low has nothing recorded")
+    eq(missing, 1)
+    eq(table.concat(wow.itemLoads or {}, ","), "7777", "the unloaded item is asked for")
+    assert(not text:find("|", 1, true), "no colour codes")
+
+    -- A name saved by /af itemnames stands in for one the game hasn't loaded.
+    AltsForeverDB.itemNames = { [7777] = "Saved Name" }
+    text, missing = ns.ExportText("items")
+    eq(rows(text)[3], "Aldric\tBags\tSaved Name\t\t1\t7777")
+    eq(missing, 0)
+end)
+
+test("items export: grouped by ruleset and faction as the overview, a Group column first", function()
+    local ns = itemsStart(true)
+    local r = rows((ns.ExportText("items")))
+    eq(r[1], "Group\tCharacter\tPlace\tItem\tQuality\tCount\tItem ID")
+    eq(r[2], "Normal\tAldric\tBags\tLinen Cloth\tCommon\t20\t2589")
+    eq(r[4], "PvP\tTarn Moon\tBags\tHearthstone\tCommon\t1\t6948")
+end)
+
+test("items export in the window: picked from the format menu, filled in again as names load", function()
+    local ns = itemsStart()
+    SlashCmdList.ALTSFOREVER("export")
+    local f, box = AltsForeverExportFrame, AltsForeverExportBox
+    wow.timers = {}
+    f.format.scripts.OnClick(f.format)
+    wow.menuItem("Items in bags, bank, mail and worn (spreadsheet)").setSelected("items")
+    eq(AltsForeverDB.exportFormat, "items")
+    eq(f.format:GetText(), "Items")
+    eq(rows(box:GetText())[3], "Aldric\tBags\t\t\t1\t7777")
+    eq(#wow.timers, 1, "made again a second later while a name is missing")
+
+    -- The name arrives: the next go has it, and nothing more is waited for.
+    wow.itemNames[7777], wow.itemQuality[7777] = "Mystery Box", 2
+    wow.uncached[7777] = nil
+    runTimers()
+    eq(rows(box:GetText())[2], "Aldric\tBags\tLinen Cloth\tCommon\t20\t2589")
+    eq(rows(box:GetText())[3], "Aldric\tBags\tMystery Box\tUncommon\t1\t7777")
+    eq(#wow.timers, 0)
+
+    -- A name that never comes: tried a few times, then left blank.
+    ns.char.bags[8888] = 1
+    wow.uncached[8888] = true
+    f:Hide(); f:Show()
+    local goes = 0
+    while #wow.timers > 0 and goes < 20 do runTimers(); goes = goes + 1 end
+    eq(goes, 5, "five more goes at most")
+    assert(box:GetText():find("\t\t\t1\t8888", 1, true))
+
+    -- Closed: a waiting go does nothing.
+    wow.timers = {}
+    f:Hide(); f:Show()
+    eq(#wow.timers, 1)
+    f:Hide()
+    runTimers()
+    eq(box:GetText(), "", "nothing filled in after closing")
 end)
