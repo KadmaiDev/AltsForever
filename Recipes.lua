@@ -1117,6 +1117,7 @@ local function CreateWindow()
         ok, f = pcall(CreateFrame, "Frame", "AltsForeverCharacterFrame", UIParent, "BasicFrameTemplateWithInset")
         if not ok then f = CreateFrame("Frame", "AltsForeverCharacterFrame", UIParent, "BackdropTemplate") end
     end
+    ns.CloseHides(f.CloseButton or _G.AltsForeverCharacterFrameCloseButton)
     frame = f
     f:SetSize(WIDTH, HEIGHT)
     f:SetFrameStrata("HIGH")
