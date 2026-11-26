@@ -621,7 +621,9 @@ function ns.InitChar(db, name, class, faction, realm)
         db.chars[key] = c
     end
     c.name, c.class = name, class
-    c.faction = faction or c.faction
+    -- An empty or secret faction is unknown, not a faction (kept unknown, it's asked again:
+    -- ns.WatchWorld). One saved as "" before 1.12.2 is dropped here too (Codex review).
+    c.faction = Readable(faction) or Readable(c.faction)
     if realm then
         c.realm = realm
         local ruleset = ns.PlayerRuleset()
@@ -697,8 +699,7 @@ local worldTries = 0
 local function WorldKnown()
     local c = ns.char
     if not c or c.realm and c.faction then return true end
-    local realm, faction = ns.PlayerRealm(), UnitFactionGroup("player")
-    if issecretvalue(faction) or faction == "" then faction = nil end
+    local realm, faction = ns.PlayerRealm(), Readable(UnitFactionGroup("player"))
     if not (realm and not c.realm or faction and not c.faction) then return false end
     ns.InitChar(ns.db, ns.charKey, c.class, faction, realm)
     if ns.InvalidateCache then ns.InvalidateCache() end

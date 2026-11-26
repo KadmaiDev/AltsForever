@@ -345,6 +345,50 @@ local function FoldGoldGroups(db)
     end
 end
 
+-- Gold history kept under a group whose realm or faction wasn't known: before 1.12.2 a
+-- character whose realm didn't read at login added to such a group every session, and may
+-- have claimed the main history for it (Codex review, 2026-11-26). Once this character's
+-- group is known, each such group it fits ("|Alliance" fits "rp|Alliance") joins it, unless
+-- another character still belongs there; the main history moves with it (PickDays then
+-- adds this group's own, whose readings win).
+local function FoldUnknown(db, char)
+    if not (char.realm and char.faction) then return end
+    local mine = GoldGroup(char.realm, char.faction)
+    local ruleset, faction = mine:match("^(.-)|(.*)$")
+    local function Fits(group)
+        local r, f = group:match("^(.-)|(.*)$")
+        if not r or group == mine or (r ~= "" and f ~= "") then return false end
+        if (r ~= "" and r ~= ruleset) or (f ~= "" and f ~= faction) then return false end
+        for _, c in pairs(db.chars) do
+            if c ~= char and GoldGroup(c.realm, c.faction) == group then return false end
+        end
+        return true
+    end
+    if db.goldGroup and Fits(db.goldGroup) then db.goldGroup = mine end
+    local by = db.goldDaysBy
+    if not by then return end
+    local found
+    for group in pairs(by) do
+        if Fits(group) then
+            found = found or {}
+            found[#found + 1] = group
+        end
+    end
+    for _, group in ipairs(found or {}) do
+        local into
+        if db.goldGroup == mine then
+            db.goldDays = db.goldDays or {}
+            into = db.goldDays
+        else
+            by[mine] = by[mine] or {}
+            into = by[mine]
+        end
+        KeepLarger(into, by[group])
+        by[group] = nil
+    end
+    if next(by) == nil then db.goldDaysBy = nil end
+end
+
 -- The gold history this character's group adds to. A group made here while the realm or
 -- faction wasn't known yet is remembered (`guessed`), so it can go once they are; so is
 -- the main history claimed for one (`guessedMain`), so the right group claims it instead.
@@ -390,6 +434,7 @@ function ns.MoneyWorldKnown()
     end
     if guessedMain then ns.db.goldGroup = nil end
     guessed, guessedMain = nil, nil
+    FoldUnknown(ns.db, char)
     PickDays(char)
     if char.money then RecordDay() end
 end
@@ -404,6 +449,7 @@ function ns.StartMoney()
     utc.isdst = date("*t", now).isdst
     dayOffset = now - time(utc)
     FoldGoldGroups(ns.db)
+    FoldUnknown(ns.db, char)
     PickDays(char)
 
     local function Update()
