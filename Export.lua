@@ -200,6 +200,14 @@ local PLACE_WORDS = { bags = L["Bags"], bank = L["Bank"], mail = L["Mail"], equi
 local IsSecret = issecretvalue or function() return false end
 local asked = {} -- items asked for since the window opened, so each is asked for once
 
+-- Asks the game to load an item, once per opening of the window.
+local function Ask(id)
+    if not asked[id] and C_Item.RequestLoadItemDataByID then
+        asked[id] = true
+        C_Item.RequestLoadItemDataByID(id)
+    end
+end
+
 -- An item's name: the game's, else one saved by "Save item names" (/af itemnames); nil while
 -- the game hasn't loaded it, and then it's asked for.
 local function ItemName(id)
@@ -207,17 +215,46 @@ local function ItemName(id)
     if not IsSecret(name) and type(name) == "string" and name ~= "" then return name end
     name = ns.db.itemNames and ns.db.itemNames[id]
     if type(name) == "string" then return name end
-    if not asked[id] and C_Item.RequestLoadItemDataByID then
-        asked[id] = true
-        C_Item.RequestLoadItemDataByID(id)
-    end
+    Ask(id)
 end
 
--- The quality in the game's words ("Uncommon"), blank when unknown.
+-- The quality in the game's words ("Uncommon"): the game's, else one saved with the names;
+-- nil while unknown, and then the item is asked for (Codex review, 2026-11-26).
 local function QualityWord(id)
     local q = C_Item.GetItemQualityByID(id)
-    if IsSecret(q) or type(q) ~= "number" then return nil end
+    if IsSecret(q) or type(q) ~= "number" then
+        q = ns.db.itemQuality and ns.db.itemQuality[id]
+        if type(q) ~= "number" then
+            Ask(id)
+            return nil
+        end
+    end
     return _G["ITEM_QUALITY" .. q .. "_DESC"] or q
+end
+
+-- What a character keeps in a place. The bank adds the bags fitted in its bag slots: they're
+-- owned items, recorded with the bank's layout (layout[tab][0], Scanner.lua BankBags) but
+-- not counted in c.bank, which holds what's inside them (Codex review, 2026-11-26). Carried
+-- bags are already in c.equip. A fresh table only when there are bank bags; saved counts
+-- are never changed.
+local function PlaceItems(c, place)
+    local items = c[place]
+    if place ~= "bank" or type(c.layout) ~= "table" then return items end
+    local merged
+    for i = 2, #ns.BANK_TABS do
+        local slots = c.layout[ns.BANK_TABS[i]]
+        local bag = type(slots) == "table" and slots[0]
+        if type(bag) == "number" and bag > 0 then
+            if not merged then
+                merged = {}
+                if type(items) == "table" then
+                    for id, count in pairs(items) do merged[id] = count end
+                end
+            end
+            merged[bag] = (type(merged[bag]) == "number" and merged[bag] or 0) + 1
+        end
+    end
+    return merged or items
 end
 
 local function ByName(a, b)
@@ -238,19 +275,19 @@ local function ItemsText(keys, chars, split, byRealm, byFaction)
         local c = chars[key]
         local group = split and Cell(ns.GroupLabel(c, byRealm, byFaction))
         for _, place in ipairs(ITEM_PLACES) do
-            local items = c[place]
+            local items = PlaceItems(c, place)
             if type(items) == "table" and next(items) then
                 local list = {}
                 for id, count in pairs(items) do
                     if type(id) == "number" and type(count) == "number" and count > 0 then
-                        local name = ItemName(id)
-                        if not name then missing = missing + 1 end
-                        list[#list + 1] = { id = id, count = count, name = name }
+                        local name, quality = ItemName(id), QualityWord(id)
+                        if not (name and quality) then missing = missing + 1 end
+                        list[#list + 1] = { id = id, count = count, name = name, quality = quality }
                     end
                 end
                 table.sort(list, ByName)
                 for _, e in ipairs(list) do
-                    local out = { Cell(key), PLACE_WORDS[place], Cell(e.name), Cell(QualityWord(e.id)), e.count, e.id }
+                    local out = { Cell(key), PLACE_WORDS[place], Cell(e.name), Cell(e.quality), e.count, e.id }
                     if group then table.insert(out, 1, group) end
                     lines[#lines + 1] = concat(out, TAB)
                 end

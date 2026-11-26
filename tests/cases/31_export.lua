@@ -272,11 +272,41 @@ test("items export: a row per character, place and item, by name within each pla
     eq(table.concat(wow.itemLoads or {}, ","), "7777", "the unloaded item is asked for")
     assert(not text:find("|", 1, true), "no colour codes")
 
-    -- A name saved by /af itemnames stands in for one the game hasn't loaded.
+    -- A name saved by /af itemnames stands in for one the game hasn't loaded; without a saved
+    -- quality the item is still waited for.
     AltsForeverDB.itemNames = { [7777] = "Saved Name" }
     text, missing = ns.ExportText("items")
     eq(rows(text)[3], "Aldric\tBags\tSaved Name\t\t1\t7777")
+    eq(missing, 1, "its quality is still loading")
+    -- Its saved quality too: nothing left to wait for.
+    AltsForeverDB.itemQuality = { [7777] = 2 }
+    text, missing = ns.ExportText("items")
+    eq(rows(text)[3], "Aldric\tBags\tSaved Name\tUncommon\t1\t7777")
     eq(missing, 0)
+end)
+
+test("items export: bags fitted in the bank's bag slots are listed with the bank, with any of the same bag inside it", function()
+    local ns = itemsStart()
+    wow.itemNames[4245], wow.itemQuality[4245] = "Small Silk Pack", 1
+    wow.itemNames[804], wow.itemQuality[804] = "Large Blue Sack", 1
+    local tarn = AltsForeverDB.chars["Tarn Moon"]
+    local tabs = ns.BANK_TABS
+    tarn.layout = {
+        [tabs[1]] = { 2318040 }, -- the bank itself: no bag of its own
+        [tabs[2]] = { [0] = 4245, 0, 0 }, -- an empty Small Silk Pack
+        [tabs[3]] = { [0] = 804, 0 }, -- a Large Blue Sack
+    }
+    tarn.bank = { [2318] = 40, [4245] = 1 } -- another Small Silk Pack lying in the bank
+    local text = ns.ExportText("items")
+    assert(text:find("Tarn Moon\tBank\tSmall Silk Pack\tCommon\t2\t4245", 1, true), text)
+    assert(text:find("Tarn Moon\tBank\tLarge Blue Sack\tCommon\t1\t804", 1, true), text)
+    assert(text:find("Tarn Moon\tBank\tLight Leather\tCommon\t40\t2318", 1, true), text)
+    eq(tarn.bank[4245], 1, "the saved counts are left as they were")
+    eq(tarn.bank[804], nil)
+    -- No bank visit yet, but bags recorded: they're listed on their own.
+    tarn.bank = nil
+    text = ns.ExportText("items")
+    assert(text:find("Tarn Moon\tBank\tSmall Silk Pack\tCommon\t1\t4245", 1, true), text)
 end)
 
 test("items export: grouped by ruleset and faction as the overview, a Group column first", function()
