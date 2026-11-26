@@ -19,7 +19,9 @@ local GREY = "|cff9d9d9d"
 local issecretvalue = issecretvalue or function() return false end
 local SIZE, GAP, PAD = 36, 3, 12
 -- Columns: set by the window's width (resize grip), remembered in db.bagsCols.
-local DEFAULT_COLS, MIN_COLS, MAX_COLS = 14, 10, 30
+-- 8 at the narrowest, the game's own bank width (a player kept their bank sorted in rows
+-- of 8, 2026-11-26; it was 10).
+local DEFAULT_COLS, MIN_COLS, MAX_COLS = 14, 8, 30
 local cols = DEFAULT_COLS
 local TOP, BOTTOM, HEADER, SECTION_GAP = 60, 34, 20, 8
 local NOTE = 30 -- the Mail view's note above its slots (two lines of small text)
@@ -561,14 +563,20 @@ local function Step(dir)
 end
 ns.BagsStep = Step
 
+-- The footer's time line, and the time alone for a narrow window.
 local function Seen(c, now)
     if view == "bank" then
-        return c.bankAt and L["Bank last visited: %s"]:format(ns.FormatAgo(now - c.bankAt)) or ""
+        if not c.bankAt then return "", "" end
+        local ago = ns.FormatAgo(now - c.bankAt)
+        return L["Bank last visited: %s"]:format(ago), ago
     end
     if view == "mail" then
-        return c.mailAt and L["Mailbox last opened: %s"]:format(ns.FormatAgo(now - c.mailAt)) or ""
+        if not c.mailAt then return "", "" end
+        local ago = ns.FormatAgo(now - c.mailAt)
+        return L["Mailbox last opened: %s"]:format(ago), ago
     end
-    return L["Last seen: %s"]:format(ns.SeenText(shownKey, c, now))
+    local ago = ns.SeenText(shownKey, c, now)
+    return L["Last seen: %s"]:format(ago), ago
 end
 
 local MIN_VIEW = 3 * (SIZE + GAP)
@@ -592,20 +600,26 @@ end
 -- the owner's idea, 2026-11-18), each button
 -- sized to its text. The row must fit the window at its narrowest in every language: if
 -- it wouldn't, "By bag" loses its words (the tick box and its tooltip stay), then the
--- character button gives up width, down to WHO_MIN (its name cut short).
-local function Tabs(c)
+-- character button gives up width, down to WHO_MIN (its name cut short), and if that's
+-- still too wide the counts go (the character menu still has them).
+local function ViewButtons(c, counts)
     local need = 0
     for _, v in ipairs(VIEWS) do
         local b = frame[v]
-        local n = LitIn(c[v])
+        local n = counts and LitIn(c[v]) or 0
         local word = v == "bank" and L["Bank"] or v == "mail" and L["Mail"] or L["Bags"]
         b:SetText(n > 0 and (word .. " (" .. n .. ")") or word)
         local w = max(BUTTON_MIN, floor(TextWidth(b.GetFontString and b:GetFontString(), 36) + 20))
         b:SetWidth(w)
         need = need + 4 + w
     end
-    need = need + 4 + TICK
+    return need + 4 + TICK
+end
+
+local function Tabs(c)
     local room = WidthFor(cols) - PAD * 2
+    local need = ViewButtons(c, true)
+    if WHO_MIN + need > room then need = ViewButtons(c, false) end
     local label = frame.split.label
     local words = WHO_WIDTH + need + TICK_GAP + TextWidth(label, 40) <= room
     label:SetShown(words)
@@ -613,6 +627,39 @@ local function Tabs(c)
     frame.who:SetWidth(whoWidth)
     local fs = frame.who.GetFontString and frame.who:GetFontString()
     if fs and fs.SetWidth then fs:SetWidth(whoWidth - 16) end
+end
+
+-- The footer must fit the window at its narrowest too: the free slots or the lit item on
+-- the left, the money on the right, and between them the time line, which shortens to the
+-- time alone, then goes. A lit item's name is cut short ("...") before that.
+local FOOT_GAP = 20
+local function Footer(lighting, seen, ago)
+    local room = WidthFor(cols) - PAD * 2 - 2 - 14
+    local money = TextWidth(frame.money, 0)
+    local left
+    if lighting then
+        local text = frame.clear.text
+        text:SetWidth(0) -- no limit: measure the whole name
+        local w = TextWidth(text, 100)
+        -- The stop cross after it, then the arrows round "1 of 3".
+        local after = 18 + 4 + 20 + 2 + TextWidth(frame.stop, 30) + 2 + 20
+        local most = max(60, room - money - FOOT_GAP - after)
+        if w > most then
+            w = most
+            text:SetWidth(w)
+        end
+        frame.clear:SetWidth(w + 20)
+        left = w + after
+    else
+        left = TextWidth(frame.info, 0)
+    end
+    local space = room - left - money - FOOT_GAP * 2
+    local fs = frame.seen
+    for _, s in ipairs({ seen, ago }) do
+        fs:SetText(s ~= "" and (GREY .. s .. "|r") or "")
+        if s == "" or TextWidth(fs, 0) <= space then return end
+    end
+    fs:SetText("")
 end
 
 -- The tallest the slot area gets before it scrolls: as the player sized it, or by
@@ -766,10 +813,6 @@ function Fill()
     elseif litSet then
         frame.clear.text:SetText(L["Showing everything matching '%s'"]:format(litText or ""))
     end
-    if lighting then
-        local w = frame.clear.text:GetStringWidth()
-        if type(w) == "number" and not issecretvalue(w) then frame.clear:SetWidth(w + 20) end
-    end
     frame.clear:SetShown(lighting)
     frame.info:SetShown(not lighting)
     local n = #Stops()
@@ -780,10 +823,10 @@ function Fill()
     frame.prev:SetShown(arrows)
     frame.next:SetShown(arrows)
     frame.stop:SetShown(lighting)
-    local seen = how or (view == "mail" and c.mail)
-    seen = seen and Seen(c, time()) or ""
-    frame.seen:SetText(seen ~= "" and (GREY .. seen .. "|r") or "")
+    local seen, ago = "", ""
+    if how or (view == "mail" and c.mail) then seen, ago = Seen(c, time()) end
     frame.money:SetText(c.money and GetCoinTextureString(c.money) or "")
+    Footer(lighting, seen, ago)
 end
 
 -- Every character, in the overview's order and, as there, headed by ruleset and faction
@@ -931,7 +974,8 @@ local function CreateWindow()
     clear:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD + 2, 10)
     clear.text = clear:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     clear.text:SetPoint("LEFT")
-    clear.x = clear:CreateTexture(nil, "ARTWORK")
+    clear.text:SetWordWrap(false) -- a name cut to fit ends in "..." (Footer)
+    clear.x =clear:CreateTexture(nil, "ARTWORK")
     clear.x:SetSize(14, 14)
     clear.x:SetPoint("LEFT", clear.text, "RIGHT", 4, 0)
     clear.x:SetTexture("Interface\\Buttons\\UI-StopButton")

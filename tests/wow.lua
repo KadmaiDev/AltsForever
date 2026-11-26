@@ -307,6 +307,7 @@ function M.load(files)
     function frameMethods:SetHeight(h) self.height = h end
     function frameMethods:SetSize(w, h) self.width, self.height = w, h end
     function frameMethods:SetWidth(w) self.width = w end
+    function frameMethods:SetResizeBounds(...) self.resizeBounds = { ... } end
     function frameMethods:SetToplevel(on) self.toplevel = on end
     function frameMethods:Raise() self.raised = (self.raised or 0) + 1 end
     function frameMethods:GetWidth() return self.width or 0 end

@@ -2,6 +2,7 @@
 
 - **Silver back in the overview:** characters with under 100 gold show their gold and silver again ("12g 45s"); from 100 gold it's still whole gold, to keep the window narrow. Thanks to the player who asked.
 - **New characters sorted into their ruleset and faction:** if the game hadn't said which realm a character is on by the time Alts Forever started, the character stayed under "Not sorted yet" in the overview, every session. It's now asked again as the world loads and a few times in the first minute, and the realm's shown name is used if the game gives no other. Thanks to the player who reported it.
+- **Bags window down to 8 slots across:** drag it as narrow as the game's own bank, so a bank sorted in rows of 8 keeps its rows (it stopped at 10). At that width the Bags, Bank and Mail buttons leave out the lit item's count (the character menu still has it), and the footer shortens "Bank last visited: 3d ago" to "3d ago" when space is short. Thanks to the player who asked.
 - **Easier to read reputation bars:** the Reputation page's bars take the game's own reputation colours, darker than before, and the text on them is outlined, so it no longer gets lost on bright yellow and green.
 
 ## Alts Forever 1.12.1
