@@ -1,4 +1,4 @@
-## Alts Forever 1.13.1 (not yet released)
+## Alts Forever 1.13.1
 
 - **New characters sorted again:** since a recent game update the game no longer tells addons which realm a character is on, so every character made since then stayed under "Not sorted yet" in the overview, and could be counted with characters it can't mail. Alts Forever now asks the game which ruleset the character plays under and sorts it by that. Characters already sorted stay as they are, and unsorted ones sort themselves the next time you log into each. Thanks to the player who reported it and ran the checks.
 - **RP-PvP is its own group:** RP-PvP characters were grouped with Roleplaying ones; they now have their own heading, and their own mail and auction house in tooltips.
