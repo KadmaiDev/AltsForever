@@ -300,3 +300,87 @@ test("profession cooldowns: a recipe learned with the window open is watched at 
     wow.fire("NEW_RECIPE_LEARNED", 9001)
     eq(c.cooldowns.Alchemy, nil)
 end)
+
+-- The Salt Shaker (a player's request, 2026-11-27): an item's cooldown, kept with
+-- Leatherworking's.
+local SHAKER = 15846
+
+local function shakerStart(profs)
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.profs = profs or { { "Leatherworking", 250, 300, line = 165 }, { "Skinning", 250, 300, line = 393 } }
+    wow.itemNames[SHAKER] = "Salt Shaker"
+    return ns
+end
+
+test("the Salt Shaker's cooldown: read like the hearthstone, kept with Leatherworking's", function()
+    local ns = shakerStart()
+    -- Used 10 minutes ago (game seconds), 3 days' cooldown.
+    wow.cooldowns[SHAKER] = { wow.gameTime - 600, 3 * DAY }
+    wow.login(overviewAlts())
+    local c = ns.char
+    eq(c.cooldowns.Leatherworking["Salt Shaker"], NOW + 3 * DAY - 600)
+    eq(ns.CooldownCell(c, NOW), "2d 23h")
+    local all = rowLines(ns)
+    assert(all:find("Salt Shaker = ready in 2d 23h", 1, true), all)
+    wow.printed = {}
+    SlashCmdList.ALTSFOREVER("cooldowns")
+    assert(table.concat(wow.printed, "\n"):find("Salt Shaker ready in 2d 23h", 1, true), table.concat(wow.printed, "\n"))
+    -- Opening Leatherworking: its recipes are read, the shaker isn't one of them but stays.
+    wow.tradeskill.prof, wow.tradeskill.line = "Leatherworking", 165
+    wow.tradeskill.recipes = { [4001] = { name = "Rugged Armor Kit", learned = true } }
+    wow.fire("TRADE_SKILL_SHOW")
+    eq(c.cooldowns.Leatherworking["Salt Shaker"], NOW + 3 * DAY - 600, "kept by the window's reading")
+    -- Still kept when its name can't be read for the moment.
+    wow.itemNames[SHAKER] = nil
+    wow.fire("TRADE_SKILL_SHOW")
+    eq(c.cooldowns.Leatherworking["Salt Shaker"], NOW + 3 * DAY - 600, "not dropped on a guess")
+    wow.itemNames[SHAKER] = "Salt Shaker"
+end)
+
+test("the Salt Shaker: used again, the global cooldown, ready, in the bank, secret answers", function()
+    local ns = shakerStart()
+    wow.login(overviewAlts())
+    local c = ns.char
+    eq(c.cooldowns, nil, "never on cooldown: nothing")
+    -- Used: the game says so with BAG_UPDATE_COOLDOWN.
+    wow.cooldowns[SHAKER] = { wow.gameTime, 3 * DAY }
+    local v = ns.version
+    wow.fire("BAG_UPDATE_COOLDOWN")
+    eq(c.cooldowns.Leatherworking["Salt Shaker"], NOW + 3 * DAY)
+    assert(ns.version > v, "tooltips and the overview refresh")
+    -- The global cooldown after another item isn't the shaker's.
+    wow.cooldowns[SHAKER] = { wow.gameTime, 1.5 }
+    wow.fire("BAG_UPDATE_COOLDOWN")
+    eq(c.cooldowns.Leatherworking["Salt Shaker"], NOW + 3 * DAY, "not in the bags: may be the bank's reading, kept")
+    -- No cooldown with the shaker in the bags: ready early.
+    c.bags = c.bags or {}
+    c.bags[SHAKER] = 1
+    wow.cooldowns[SHAKER] = nil
+    wow.fire("BAG_UPDATE_COOLDOWN")
+    eq(c.cooldowns.Leatherworking["Salt Shaker"], NOW, "ready")
+    -- A secret answer is left alone.
+    wow.cooldowns[SHAKER] = { wow.gameTime, 3 * DAY }
+    wow.fire("BAG_UPDATE_COOLDOWN")
+    local get = C_Container.GetItemCooldown
+    C_Container.GetItemCooldown = function() return wow.SECRET, wow.SECRET, 1 end
+    wow.now = NOW + HOUR
+    wow.fire("BAG_UPDATE_COOLDOWN")
+    eq(c.cooldowns.Leatherworking["Salt Shaker"], NOW + 3 * DAY, "kept")
+    C_Container.GetItemCooldown = get
+end)
+
+test("the Salt Shaker: nothing without Leatherworking, or before its name loads", function()
+    local ns = shakerStart({ { "Tailoring", 250, 300, line = 197 } })
+    wow.cooldowns[SHAKER] = { wow.gameTime, 3 * DAY }
+    wow.login(overviewAlts())
+    eq(ns.char.cooldowns, nil, "not a leatherworker")
+    ns = shakerStart()
+    wow.itemNames[SHAKER] = nil
+    wow.cooldowns[SHAKER] = { wow.gameTime, 3 * DAY }
+    wow.login(overviewAlts())
+    eq(ns.char.cooldowns, nil, "no name yet")
+    wow.itemNames[SHAKER] = "Salt Shaker"
+    wow.fire("BAG_UPDATE_COOLDOWN")
+    eq(ns.char.cooldowns.Leatherworking["Salt Shaker"], NOW + 3 * DAY, "read once it loads")
+end)
