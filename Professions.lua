@@ -525,6 +525,36 @@ end
 
 local cdChar, cdProf, cdIDs = nil, nil, {} -- whose window is open: recipe ID -> name
 
+-- Items with a cooldown of their own that goes with a profession's (a player's request,
+-- 2026-11-27): the Salt Shaker, Leatherworking, about 3 days. Not a recipe, so
+-- GetRecipeCooldown can't see it: read as the hearthstone is (C_Container.GetItemCooldown,
+-- Character.lua) and kept with the profession's recipe cooldowns under the item's name.
+-- Item ID -> skill line.
+local ITEM_COOLDOWNS = { [15846] = 165 }
+local itemAsked = {} -- item ID -> true: its name was requested; read again when it arrives
+
+-- The character's own name for the profession on skill line `line`, nil without it.
+local function ProfOnLine(c, line)
+    if type(c.profs) ~= "table" then return nil end
+    for own in pairs(c.profs) do
+        if LineOfName(own) == line then return own end
+    end
+    return nil
+end
+
+-- Whether `name` under c.cooldowns[prof] is an item's rather than a recipe's, so the
+-- profession window's reading leaves it alone. True too while such an item's name can't be
+-- read, so nothing is dropped on a guess.
+local function ItemCooldownName(c, prof, name)
+    for id, line in pairs(ITEM_COOLDOWNS) do
+        if ProfOnLine(c, line) == prof then
+            local n = GetItemNameByID(id)
+            if issecretvalue(n) or n == nil or n == name then return true end
+        end
+    end
+    return false
+end
+
 -- Reads the open window's cooldowns into the character's record; true if anything changed.
 local function ReadCooldowns()
     local get, c, prof = TS.GetRecipeCooldown, cdChar, cdProf
@@ -561,6 +591,7 @@ local function ReadCooldowns()
             for _, n in pairs(cdIDs) do
                 if n == name then still = true break end
             end
+            if not still then still = ItemCooldownName(c, prof, name) end
             if not still then t[name], changed = nil, true end
         end
         if next(t) == nil then
@@ -599,6 +630,50 @@ end
 local function StopCooldowns()
     cdChar, cdProf = nil, nil
     wipe(cdIDs)
+end
+
+-- Reads the item cooldowns (ITEM_COOLDOWNS) of a character with the profession; true if
+-- anything changed. As with recipes, an item shows only once it has been on cooldown. The
+-- game counts in GetTime() seconds, turned into a clock time to keep; 2 seconds or less is
+-- the global cooldown. A reading of none says it's ready only with the item in the bags (one
+-- in the bank may read as none).
+function ns.ScanItemCooldowns(c)
+    local get = C_Container and C_Container.GetItemCooldown
+    if not (get and GetTime and c) then return false end
+    local now, changed = time(), false
+    for id, line in pairs(ITEM_COOLDOWNS) do
+        local prof = ProfOnLine(c, line)
+        local name = prof and GetItemNameByID(id)
+        if issecretvalue(name) or type(name) ~= "string" or name == "" then
+            name = nil
+            if prof and C_Item.RequestLoadItemDataByID then
+                itemAsked[id] = true
+                C_Item.RequestLoadItemDataByID(id)
+            end
+        end
+        local ok, start, duration = false, nil, nil
+        if name then ok, start, duration = pcall(get, id) end
+        if ok and not issecretvalue(start) and not issecretvalue(duration)
+            and type(start) == "number" and type(duration) == "number" then
+            local t = c.cooldowns and c.cooldowns[prof]
+            local had = t and t[name]
+            local ready = 0
+            if start > 0 and duration > 2 then ready = floor(now + start + duration - GetTime() + 0.5) end
+            if ready > now then
+                if not had or had < ready - 60 or had > ready + 60 then
+                    if not t then
+                        c.cooldowns = c.cooldowns or {}
+                        t = {}
+                        c.cooldowns[prof] = t
+                    end
+                    t[name], changed = ready, true
+                end
+            elseif had and had > now and type(c.bags) == "table" and c.bags[id] then
+                t[name], changed = now, true
+            end
+        end
+    end
+    return changed
 end
 
 local DAY, HOUR = 86400, 3600
@@ -738,8 +813,27 @@ function ns.StartProfessions()
         end
     end
 
+    -- Item cooldowns (the Salt Shaker): read when the game says a cooldown in the bags
+    -- changed, at each loading screen, and with the skills (the profession may come later).
+    local function ItemCooldowns()
+        if ns.ScanItemCooldowns(char) then
+            Changed()
+            if ns.RefreshOverview then ns.RefreshOverview() end
+        end
+    end
+    ns.On("BAG_UPDATE_COOLDOWN", ItemCooldowns)
+    ns.On("PLAYER_ENTERING_WORLD", ItemCooldowns)
+    -- A name requested by the scan has arrived: read again (peer review). The event is
+    -- shared with other files, so this stays registered and returns at once otherwise.
+    ns.On("GET_ITEM_INFO_RECEIVED", function(id, ok)
+        if issecretvalue(id) or not itemAsked[id] then return end
+        itemAsked[id] = nil
+        if ok then ItemCooldowns() end
+    end)
+
     ns.On("SKILL_LINES_CHANGED", function()
         ns.ScanSkills(char, true)
+        ItemCooldowns()
         ns.craftVersion = ns.craftVersion + 1 -- skill-up lines depend on skill levels
         Changed()
     end)
@@ -765,6 +859,7 @@ function ns.StartProfessions()
     end)
 
     ns.ScanSkills(char)
+    ns.ScanItemCooldowns(char)
 end
 
 ---------------------------------------------------------------------------
