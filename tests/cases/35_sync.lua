@@ -155,10 +155,13 @@ test("/af sync: hello, then each side asks for what it lacks or has older, and t
         ri = { Tailoring = { ["bolt of linen cloth"] = "75;Bolt of Linen Cloth;2996,2589:2" } }, fn = { [72] = "Stormwind" } })
     syncFrom(ns, "Bob Smith-Realm", { k = "char", key = "New Alt", rs = "pvp",
         c = alt("New Alt", "MAGE", { realm = "Other", faction = "Horde", updated = NOW - HOUR }) })
+    -- A realm whose name doesn't say, on RP-PvP (Codex review, 2026-11-27).
+    syncFrom(ns, "Bob Smith-Realm", { k = "char", key = "Rhea Vale", rs = "rppvp",
+        c = alt("Rhea Vale", "PRIEST", { realm = "Forever-9", faction = "Horde", updated = NOW - HOUR }) })
     syncFrom(ns, "Bob Smith-Realm", { k = "char", key = "Aldric", c = alt("Aldric", "MAGE", { updated = NOW + DAY, money = 1 }) })
     syncFrom(ns, "Bob Smith-Realm", { k = "char", key = "Tarn Moon", c = alt("Tarn Moon", "DRUID", { updated = NOW - 2 * DAY }) })
-    syncFrom(ns, "Bob Smith-Realm", { k = "done", n = 4 })
-    assert(syncPrinted():find("Got 2 characters from Bob Smith.", 1, true), syncPrinted())
+    syncFrom(ns, "Bob Smith-Realm", { k = "done", n = 5 })
+    assert(syncPrinted():find("Got 3 characters from Bob Smith.", 1, true), syncPrinted())
     local window = lockoutWindow()
     assert(window:find("Bob's account | 1/10", 1, true) and window:find("Molten Core | Saved", 1, true), window)
     local bob = ns.db.chars["Bob Smith"]
@@ -170,6 +173,8 @@ test("/af sync: hello, then each side asks for what it lacks or has older, and t
     eq(ns.db.recipeInfo.Tailoring["bolt of linen cloth"], "75;Bolt of Linen Cloth;2996,2589:2")
     eq(ns.db.factions[72], "Stormwind")
     eq(ns.db.rulesets["Other"], "pvp")
+    eq(ns.db.rulesets["Forever-9"], "rppvp", "RP-PvP kept")
+    eq(ns.RulesetLabel("Forever-9"), "RP-PvP")
 
     -- Item tooltips count them now.
     local text = textOf(wow.hover(GameTooltip, 2589))

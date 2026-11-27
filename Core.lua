@@ -547,9 +547,10 @@ function ns.SetOtherGold(on)
     if ns.RefreshOverview then ns.RefreshOverview() end
 end
 
--- One game rule: true or false, nil if it can't be asked.
+-- One game rule: true or false, nil if its answer can't be read (an error or a secret). A rule
+-- this client doesn't list can't be on, so it's false.
 local function RuleOn(rules, active, name)
-    if rules[name] == nil then return nil end
+    if rules[name] == nil then return false end
     local ok, on = pcall(active, rules[name])
     if not ok or issecretvalue(on) then return nil end
     return on and true or false
@@ -563,13 +564,18 @@ function ns.PlayerRuleset()
     local rules = Enum and Enum.GameRule
     local active = C_GameRules and C_GameRules.IsGameRuleActive
     if not rules or not active then return end
+    if rules.HardcoreRuleset == nil and rules.RPRuleset == nil and rules.PvPRuleset == nil then return end
     local hardcore = RuleOn(rules, active, "HardcoreRuleset")
-    local rp, pvp = RuleOn(rules, active, "RPRuleset"), RuleOn(rules, active, "PvPRuleset")
     if hardcore then return "hardcore" end
+    local rp, pvp = RuleOn(rules, active, "RPRuleset"), RuleOn(rules, active, "PvPRuleset")
+    -- Only answers that settle it: RP with PvP unreadable could be RP or RP-PvP, and nothing on
+    -- but one rule unreadable could be anything. Then nil, so nothing is filed on a guess and
+    -- the world is asked again (Codex review, 2026-11-27).
+    if hardcore == nil or rp == nil or pvp == nil then return end
     if rp and pvp then return "rppvp" end
     if rp then return "rp" end
     if pvp then return "pvp" end
-    if hardcore ~= nil or rp ~= nil or pvp ~= nil then return "normal" end
+    return "normal"
 end
 
 -- The ruleset's name, in the player's language; a realm name that doesn't say is shown as

@@ -89,6 +89,31 @@ test("no realm name: a character's saved realm is kept on the same ruleset, repl
     eq(ns.RulesetLabel(ns.char.realm), "RP-PvP")
 end)
 
+-- Codex review, 2026-11-27: one readable "off" made it Normal, whatever the others said.
+test("no realm name, and a rule that can't be read: nothing is filed on a guess, and it's asked again", function()
+    -- Saved on PvP; the PvP rule hidden: the saved realm stays.
+    local ns = wow.load(FILES)
+    wow.player.realm = ""
+    wow.player.ruleset = { HardcoreRuleset = false, RPRuleset = false, PvPRuleset = wow.SECRET }
+    wow.login({ v = 2, chars = { ["Aldric"] = alt("Aldric", "MAGE", { realm = "CAMWOWUS2Realm3PvP" }) } })
+    eq(ns.char.realm, "CAMWOWUS2Realm3PvP", "not turned into Normal")
+    -- New, RP on and PvP failing: RP or RP-PvP? Unknown, then read once the rule answers.
+    ns = wow.load(FILES)
+    wow.player.realm = ""
+    wow.player.ruleset = { HardcoreRuleset = false, RPRuleset = true, PvPRuleset = "error" }
+    wow.login({ v = 2, chars = {} })
+    eq(ns.char.realm, nil, "RP or RP-PvP: not known")
+    wow.player.ruleset = { "RPRuleset", "PvPRuleset" }
+    wow.fire("PLAYER_ENTERING_WORLD", true, false)
+    eq(ns.char.realm, "RPPvP", "asked again")
+    -- Hardcore on settles it, whatever the rest say.
+    ns = wow.load(FILES)
+    wow.player.realm = ""
+    wow.player.ruleset = { HardcoreRuleset = true, RPRuleset = wow.SECRET, PvPRuleset = "error" }
+    wow.login({ v = 2, chars = {} })
+    eq(ns.char.realm, "Hardcore")
+end)
+
 test("RP-PvP: both rules on is its own ruleset, apart from RP and PvP; named realms say so too", function()
     local ns = wow.load(FILES)
     wow.player.realm, wow.player.ruleset = "Forever-9", { "RPRuleset", "PvPRuleset" }

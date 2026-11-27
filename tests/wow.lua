@@ -440,6 +440,12 @@ function M.load(files)
         local r = M.player.ruleset
         if r == M.SECRET then return M.SECRET end
         if type(r) == "table" then
+            for name, v in pairs(r) do
+                if type(name) == "string" and Enum.GameRule[name] == rule then
+                    if v == "error" then error("rule unavailable") end
+                    return v
+                end
+            end
             for _, name in ipairs(r) do if Enum.GameRule[name] == rule then return true end end
             return false
         end
