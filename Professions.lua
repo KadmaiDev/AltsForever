@@ -531,6 +531,7 @@ local cdChar, cdProf, cdIDs = nil, nil, {} -- whose window is open: recipe ID ->
 -- Character.lua) and kept with the profession's recipe cooldowns under the item's name.
 -- Item ID -> skill line.
 local ITEM_COOLDOWNS = { [15846] = 165 }
+local itemAsked = {} -- item ID -> true: its name was requested; read again when it arrives
 
 -- The character's own name for the profession on skill line `line`, nil without it.
 local function ProfOnLine(c, line)
@@ -645,7 +646,10 @@ function ns.ScanItemCooldowns(c)
         local name = prof and GetItemNameByID(id)
         if issecretvalue(name) or type(name) ~= "string" or name == "" then
             name = nil
-            if prof and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(id) end
+            if prof and C_Item.RequestLoadItemDataByID then
+                itemAsked[id] = true
+                C_Item.RequestLoadItemDataByID(id)
+            end
         end
         local ok, start, duration = false, nil, nil
         if name then ok, start, duration = pcall(get, id) end
@@ -819,6 +823,13 @@ function ns.StartProfessions()
     end
     ns.On("BAG_UPDATE_COOLDOWN", ItemCooldowns)
     ns.On("PLAYER_ENTERING_WORLD", ItemCooldowns)
+    -- A name requested by the scan has arrived: read again (peer review). The event is
+    -- shared with other files, so this stays registered and returns at once otherwise.
+    ns.On("GET_ITEM_INFO_RECEIVED", function(id, ok)
+        if issecretvalue(id) or not itemAsked[id] then return end
+        itemAsked[id] = nil
+        if ok then ItemCooldowns() end
+    end)
 
     ns.On("SKILL_LINES_CHANGED", function()
         ns.ScanSkills(char, true)

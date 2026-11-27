@@ -380,7 +380,22 @@ test("the Salt Shaker: nothing without Leatherworking, or before its name loads"
     wow.cooldowns[SHAKER] = { wow.gameTime, 3 * DAY }
     wow.login(overviewAlts())
     eq(ns.char.cooldowns, nil, "no name yet")
+    local asked = false
+    for _, id in ipairs(wow.itemLoads or {}) do asked = asked or id == SHAKER end
+    assert(asked, "its name is requested")
+    -- A failed load reads nothing; the name arriving later reads it, with no other event.
+    wow.fire("GET_ITEM_INFO_RECEIVED", SHAKER, false)
+    eq(ns.char.cooldowns, nil, "failed")
     wow.itemNames[SHAKER] = "Salt Shaker"
+    wow.fire("GET_ITEM_INFO_RECEIVED", SHAKER, true)
+    eq(ns.char.cooldowns, nil, "the failed request was let go: not asked again until the next scan")
+    wow.itemNames[SHAKER] = nil
     wow.fire("BAG_UPDATE_COOLDOWN")
+    wow.itemNames[SHAKER] = "Salt Shaker"
+    local v = ns.version
+    wow.fire("GET_ITEM_INFO_RECEIVED", SHAKER, true)
     eq(ns.char.cooldowns.Leatherworking["Salt Shaker"], NOW + 3 * DAY, "read once it loads")
+    assert(ns.version > v, "and shown")
+    -- Another item arriving does nothing.
+    wow.fire("GET_ITEM_INFO_RECEIVED", 2589, true)
 end)
