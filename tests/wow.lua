@@ -437,8 +437,13 @@ function M.load(files)
     -- from M.player.ruleset is active; a secret answer when M.player.ruleset is M.SECRET.
     Enum.GameRule = { HardcoreRuleset = 101, RPRuleset = 102, PvPRuleset = 103 }
     C_GameRules = { IsGameRuleActive = function(rule)
-        if M.player.ruleset == M.SECRET then return M.SECRET end
-        return Enum.GameRule[M.player.ruleset or ""] == rule
+        local r = M.player.ruleset
+        if r == M.SECRET then return M.SECRET end
+        if type(r) == "table" then
+            for _, name in ipairs(r) do if Enum.GameRule[name] == rule then return true end end
+            return false
+        end
+        return Enum.GameRule[r or ""] == rule
     end }
     ToggleAllBags = function() end
     -- Forever's Gamepad UI (as Blizzard's code behaves, per the WowController guide): the

@@ -1,3 +1,8 @@
+## Alts Forever 1.13.1 (not yet released)
+
+- **New characters sorted again:** since a recent game update the game no longer tells addons which realm a character is on, so every character made since then stayed under "Not sorted yet" in the overview, and could be counted with characters it can't mail. Alts Forever now asks the game which ruleset the character plays under and sorts it by that. Characters already sorted stay as they are, and unsorted ones sort themselves the next time you log into each. Thanks to the player who reported it and ran the checks.
+- **RP-PvP is its own group:** RP-PvP characters were grouped with Roleplaying ones; they now have their own heading, and their own mail and auction house in tooltips.
+
 ## Alts Forever 1.13.0
 
 - **Export your items:** the Export window (the note button in the overview, or `/af export`) has a fourth format, **Items**: every item in each character's bags, bank, mailbox and worn gear, one row per item with the character, where it is, its name, quality, count and item ID, ready to paste into Excel or Google Sheets. Items the game hasn't loaded yet fill in a second or two after the window opens. Thanks to the player who asked.
