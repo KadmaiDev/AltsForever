@@ -545,7 +545,7 @@ local function Package(key, c)
     return { k = "char", key = key, c = copy, ri = ri, fn = fn, rc = rc, pa = pa, rs = c.realm and db.rulesets and db.rulesets[c.realm] }
 end
 
-local RULESETS = { normal = true, pvp = true, rp = true, hardcore = true }
+local RULESETS = { normal = true, pvp = true, rp = true, rppvp = true, hardcore = true }
 
 local function Remember(name)
     ns.db.syncWith = ns.db.syncWith or {}

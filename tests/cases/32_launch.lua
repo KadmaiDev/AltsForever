@@ -153,8 +153,8 @@ test("a live character whose realm couldn't be read at its first login is kept a
     wow.now = LIVE
     wow.player.name, wow.player.realm = "Nova Brightwind", nil
     wow.login(betaSave())
-    eq(ns.char.realm, nil)
-    eq(keys(), "Aldric,Nova Brightwind,Old,Rook Vale,Tarn Moon", "no realm: nothing to go by yet")
+    eq(ns.char.realm, "PvE", "filed by the game's rules")
+    eq(keys(), "Aldric,Nova Brightwind,Old,Rook Vale,Tarn Moon", "no realm name: a stand-in never forgets anyone")
     ns.char.bank = { [2318] = 7 }
     wow.fire("PLAYER_LOGOUT")
     -- Next login, the realm reads.

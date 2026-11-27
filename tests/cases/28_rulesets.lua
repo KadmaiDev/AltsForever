@@ -38,17 +38,106 @@ test("each character's ruleset is recorded at login; a secret or empty one is ig
     wow.player.realm = wow.SECRET
     wow.login({ v = 2, chars = { ["Aldric"] = alt("Aldric", "MAGE", { realm = PVE }) } })
     eq(AltsForeverDB.chars["Aldric"].realm, PVE, "kept")
+    -- Neither the realm name nor the game's rules: nothing.
     wow.load(FILES)
-    wow.player.realm = ""
+    wow.player.realm, wow.player.ruleset = "", wow.SECRET
     wow.login(nil)
     eq(AltsForeverDB.chars["Aldric"].realm, nil)
+end)
+
+-- Since a game update (2026-11-27) the game names no realm at all, on any character.
+test("no realm name: a character is filed under its ruleset from the game's rules, and sorted", function()
+    local cases = {
+        { nil, "PvE", "Normal" },
+        { "PvPRuleset", "PvP", "PvP" },
+        { "RPRuleset", "RP", "Roleplaying" },
+        { { "RPRuleset", "PvPRuleset" }, "RPPvP", "RP-PvP" },
+        { { "HardcoreRuleset", "PvPRuleset" }, "Hardcore", "Hardcore" },
+    }
+    for _, case in ipairs(cases) do
+        local ns = wow.load(FILES)
+        wow.player.realm, wow.player.ruleset = "", case[1]
+        wow.login({ v = 2, chars = {} })
+        eq(ns.char.realm, case[2])
+        eq(AltsForeverDB.chars["Aldric"].realm, case[2], "saved")
+        eq(ns.RulesetLabel(ns.char.realm), case[3])
+        eq(AltsForeverDB.rulesets, nil, "a stand-in needs no record")
+    end
+    -- Sorted with characters saved under real names of the same ruleset: one world.
+    local ns = wow.load(FILES)
+    wow.player.realm, wow.player.ruleset = "", "RPRuleset"
+    wow.login({ v = 2, chars = {
+        ["Ria Old"] = alt("Ria Old", "DRUID", { realm = "CAMWOWUS2Realm10RP" }),
+        ["Pip Other"] = alt("Pip Other", "ROGUE", { realm = "CAMWOWUS2Realm3PvP" }),
+    } })
+    eq(ns.Elsewhere(AltsForeverDB.chars["Ria Old"]), false, "an RP character saved by name")
+    eq(ns.Elsewhere(AltsForeverDB.chars["Pip Other"]), true, "a PvP one")
+    eq(ns.GroupKey(ns.char, true, false), ns.GroupKey(AltsForeverDB.chars["Ria Old"], true, false), "one group")
+end)
+
+test("no realm name: a character's saved realm is kept on the same ruleset, replaced on another", function()
+    local ns = wow.load(FILES)
+    wow.player.realm, wow.player.ruleset = "", nil
+    wow.login({ v = 2, chars = { ["Aldric"] = alt("Aldric", "MAGE", { realm = "CAMWOWAU1Realm1PvE" }) } })
+    eq(ns.char.realm, "CAMWOWAU1Realm1PvE", "kept: also Normal")
+    -- An RP-PvP character that 1.13.0 recorded as RP (both rules on, RP asked first).
+    ns = wow.load(FILES)
+    wow.player.realm, wow.player.ruleset = "", { "RPRuleset", "PvPRuleset" }
+    wow.login({ v = 2, rulesets = { ["CAMWOWUS1Realm4"] = "rp" },
+        chars = { ["Aldric"] = alt("Aldric", "MAGE", { realm = "CAMWOWUS1Realm4" }) } })
+    eq(ns.char.realm, "RPPvP", "the game says RP-PvP now")
+    eq(ns.RulesetLabel(ns.char.realm), "RP-PvP")
+end)
+
+-- Codex review, 2026-11-27: one readable "off" made it Normal, whatever the others said.
+test("no realm name, and a rule that can't be read: nothing is filed on a guess, and it's asked again", function()
+    -- Saved on PvP; the PvP rule hidden: the saved realm stays.
+    local ns = wow.load(FILES)
+    wow.player.realm = ""
+    wow.player.ruleset = { HardcoreRuleset = false, RPRuleset = false, PvPRuleset = wow.SECRET }
+    wow.login({ v = 2, chars = { ["Aldric"] = alt("Aldric", "MAGE", { realm = "CAMWOWUS2Realm3PvP" }) } })
+    eq(ns.char.realm, "CAMWOWUS2Realm3PvP", "not turned into Normal")
+    -- New, RP on and PvP failing: RP or RP-PvP? Unknown, then read once the rule answers.
+    ns = wow.load(FILES)
+    wow.player.realm = ""
+    wow.player.ruleset = { HardcoreRuleset = false, RPRuleset = true, PvPRuleset = "error" }
+    wow.login({ v = 2, chars = {} })
+    eq(ns.char.realm, nil, "RP or RP-PvP: not known")
+    wow.player.ruleset = { "RPRuleset", "PvPRuleset" }
+    wow.fire("PLAYER_ENTERING_WORLD", true, false)
+    eq(ns.char.realm, "RPPvP", "asked again")
+    -- Hardcore on settles it, whatever the rest say.
+    ns = wow.load(FILES)
+    wow.player.realm = ""
+    wow.player.ruleset = { HardcoreRuleset = true, RPRuleset = wow.SECRET, PvPRuleset = "error" }
+    wow.login({ v = 2, chars = {} })
+    eq(ns.char.realm, "Hardcore")
+end)
+
+test("RP-PvP: both rules on is its own ruleset, apart from RP and PvP; named realms say so too", function()
+    local ns = wow.load(FILES)
+    wow.player.realm, wow.player.ruleset = "Forever-9", { "RPRuleset", "PvPRuleset" }
+    wow.login({ v = 2, chars = {
+        ["Ria Old"] = alt("Ria Old", "DRUID", { realm = "CAMWOWUS2Realm10RP" }),
+        ["Pip Other"] = alt("Pip Other", "ROGUE", { realm = "CAMWOWUS2Realm3PvP" }),
+    } })
+    eq(AltsForeverDB.rulesets["Forever-9"], "rppvp")
+    eq(ns.RulesetLabel("Forever-9"), "RP-PvP")
+    eq(ns.Elsewhere(AltsForeverDB.chars["Ria Old"]), true, "RP is another world")
+    eq(ns.Elsewhere(AltsForeverDB.chars["Pip Other"]), true, "so is PvP")
+    eq(ns.RulesetOf("CAMWOWUS2Realm7RPPvP"), "rppvp")
+    eq(ns.RulesetOf("Realm7RP-PvP"), "rppvp")
+    eq(ns.RulesetOf("CAMWOWUS2Realm3PvP"), "pvp", "plain PvP unchanged")
+    -- Recorded as "rp" by 1.13.0, which asked RP first: the name wins.
+    AltsForeverDB.rulesets["CAMWOWUS2Realm8RPPvP"] = "rp"
+    eq(ns.RulesetOf("CAMWOWUS2Realm8RPPvP"), "rppvp")
 end)
 
 -- A player's new characters stayed "Not sorted yet" with no realm saved (2026-11-25).
 test("a realm the game can't name at login is read when the world loads, and the character sorted", function()
     local ns = wow.load(FILES)
     wow.now = NOW
-    wow.player.realm = nil
+    wow.player.realm, wow.player.ruleset = nil, wow.SECRET -- no rules to go by either
     wow.money = 1000
     wow.login(rulesetAlts())
     eq(ns.char.realm, nil, "nothing to read yet")
@@ -67,7 +156,7 @@ end)
 test("a realm still unreadable when the world loads is asked again a few seconds later", function()
     local ns = wow.load(FILES)
     wow.now = NOW
-    wow.player.realm = nil
+    wow.player.realm, wow.player.ruleset = nil, wow.SECRET
     wow.money = 500
     -- Gold history already kept for another group: the guess gets a group of its own.
     wow.login({ v = 2, goldGroup = "rp|Horde", goldDays = {}, chars = {} })

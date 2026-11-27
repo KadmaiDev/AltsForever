@@ -441,7 +441,8 @@ local function Readable(text)
     if type(text) == "string" and text ~= "" then return text end
 end
 
-function ns.PlayerRealm()
+-- The realm's name as the game gives it; nil if it gives none.
+function ns.RealmName()
     local realm = Readable(GetNormalizedRealmName and GetNormalizedRealmName())
     if realm then return realm end
     local shown = Readable(GetRealmName and GetRealmName())
@@ -449,7 +450,23 @@ function ns.PlayerRealm()
     if realm and realm ~= "" then return realm end
 end
 
-local RULESET_NAMES = { normal = L["Normal"], pvp = L["PvP"], rp = L["Roleplaying"], hardcore = L["Hardcore"] }
+-- Since a game update (seen 2026-11-27, by the owner and a player) the game names no realm
+-- at all: both names are empty and GetRealmID() is 0, on new characters and old. A character
+-- is then filed under a stand-in for its ruleset, as the game's rule check reports it; realm
+-- names only ever told rulesets apart, and these say theirs (NamedRuleset).
+local STAND_IN = { normal = "PvE", pvp = "PvP", rp = "RP", rppvp = "RPPvP", hardcore = "Hardcore" }
+local STAND_INS = {}
+for _, name in pairs(STAND_IN) do STAND_INS[name] = true end
+
+function ns.PlayerRealm()
+    local realm = ns.RealmName()
+    if realm then return realm end
+    local ruleset = ns.PlayerRuleset()
+    return ruleset and STAND_IN[ruleset]
+end
+
+local RULESET_NAMES = { normal = L["Normal"], pvp = L["PvP"], rp = L["Roleplaying"],
+    rppvp = L["RP-PvP"], hardcore = L["Hardcore"] }
 
 -- What a realm name says about its ruleset, false if nothing. Kept per name: this is asked
 -- for every character in a tooltip's list.
@@ -459,6 +476,7 @@ local function NamedRuleset(realm)
     if ruleset == nil then
         local r = realm:lower()
         ruleset = r:find("hardcore", 1, true) and "hardcore"
+            or (r:find("rp%-?pvp%d*$") or r:find("roleplay%-?pvp")) and "rppvp"
             or r:find("pvp%d*$") and "pvp"
             or (r:find("rp%d*$") or r:find("roleplay", 1, true)) and "rp"
             or (r:find("pve%d*$") or r:find("normal", 1, true)) and "normal"
@@ -471,11 +489,15 @@ end
 -- A realm's ruleset ("normal", "pvp", "rp", "hardcore"): as the game told us, else from the
 -- name; a realm that doesn't say counts as a world of its own, under its own name. The
 -- game's "normal" only means no rule it was asked about was on, so the name beats that.
+-- RP-PvP: before 1.13.1 the game's answer for it was recorded as "rp" (both rules are on), so
+-- a name that says RP-PvP beats it.
 function ns.RulesetOf(realm)
+    local named = NamedRuleset(realm)
+    if named == "rppvp" then return named end
     local told = ns.db.rulesets and ns.db.rulesets[realm]
     if not RULESET_NAMES[told] then told = nil end
     if told and told ~= "normal" then return told end
-    return NamedRuleset(realm) or told or realm
+    return named or told or realm
 end
 
 -- Out of mail's reach from the character you're on: another ruleset or the other faction
@@ -525,25 +547,35 @@ function ns.SetOtherGold(on)
     if ns.RefreshOverview then ns.RefreshOverview() end
 end
 
--- Which ruleset the game says it's running ("pvp", "rp", "hardcore", "normal"), as Nova
--- Instance Tracker asks it on Forever; nil if it can't be asked. Recorded per realm name at
--- login (db.rulesets), so live realm names that don't say their ruleset still get one.
-local RULES = { { "HardcoreRuleset", "hardcore" }, { "RPRuleset", "rp" }, { "PvPRuleset", "pvp" } }
+-- One game rule: true or false, nil if its answer can't be read (an error or a secret). A rule
+-- this client doesn't list can't be on, so it's false.
+local function RuleOn(rules, active, name)
+    if rules[name] == nil then return false end
+    local ok, on = pcall(active, rules[name])
+    if not ok or issecretvalue(on) then return nil end
+    return on and true or false
+end
+
+-- Which ruleset the game says it's running ("pvp", "rp", "rppvp", "hardcore", "normal"), as
+-- Nova Instance Tracker asks it on Forever; nil if it can't be asked. RP-PvP has both the RP
+-- and the PvP rule on (the owner's RP-PvP character, 2026-11-27; a Normal one has neither).
+-- Recorded per realm name at login (db.rulesets), and the stand-in realm when there's no name.
 function ns.PlayerRuleset()
     local rules = Enum and Enum.GameRule
     local active = C_GameRules and C_GameRules.IsGameRuleActive
     if not rules or not active then return end
-    local asked
-    for _, rule in ipairs(RULES) do
-        if rules[rule[1]] ~= nil then
-            local ok, on = pcall(active, rules[rule[1]])
-            if ok and not issecretvalue(on) then
-                if on then return rule[2] end
-                asked = true
-            end
-        end
-    end
-    return asked and "normal" or nil
+    if rules.HardcoreRuleset == nil and rules.RPRuleset == nil and rules.PvPRuleset == nil then return end
+    local hardcore = RuleOn(rules, active, "HardcoreRuleset")
+    if hardcore then return "hardcore" end
+    local rp, pvp = RuleOn(rules, active, "RPRuleset"), RuleOn(rules, active, "PvPRuleset")
+    -- Only answers that settle it: RP with PvP unreadable could be RP or RP-PvP, and nothing on
+    -- but one rule unreadable could be anything. Then nil, so nothing is filed on a guess and
+    -- the world is asked again (Codex review, 2026-11-27).
+    if hardcore == nil or rp == nil or pvp == nil then return end
+    if rp and pvp then return "rppvp" end
+    if rp then return "rp" end
+    if pvp then return "pvp" end
+    return "normal"
 end
 
 -- The ruleset's name, in the player's language; a realm name that doesn't say is shown as
@@ -656,7 +688,11 @@ function ns.InitChar(db, name, class, faction, realm)
     -- An empty or secret faction is unknown, not a faction (kept unknown, it's asked again:
     -- ns.WatchWorld). One saved as "" before 1.12.2 is dropped here too (Codex review).
     c.faction = Readable(faction) or Readable(c.faction)
-    if realm then
+    if realm and STAND_INS[realm] then
+        -- A stand-in keeps a real name saved earlier on the same ruleset; it replaces one the
+        -- game now says is another (an RP-PvP realm recorded as RP).
+        if not (c.realm and ns.RulesetOf(c.realm) == ns.RulesetOf(realm)) then c.realm = realm end
+    elseif realm then
         c.realm = realm
         local ruleset = ns.PlayerRuleset()
         if ruleset then
@@ -697,7 +733,7 @@ ns.On("PLAYER_LOGIN", function()
     local _, class = UnitClass("player")
     local name = ns.PlayerName()
     ns.AdoptFirstName(ns.db.chars, name, class)
-    local betaGone = ns.LeaveBeta(ns.db, ns.PlayerRealm())
+    local betaGone = ns.LeaveBeta(ns.db, ns.RealmName())
     local newChar = ns.db.chars[name] == nil
     ns.charKey, ns.char = ns.InitChar(ns.db, name, class, UnitFactionGroup("player"), ns.PlayerRealm())
     ns.StartScanner()
