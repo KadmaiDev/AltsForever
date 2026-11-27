@@ -1,4 +1,4 @@
-## Alts Forever 1.14.0 (not yet released)
+## Alts Forever 1.13.2
 
 - **Salt Shaker cooldown:** a leatherworker's Salt Shaker now shows with the profession cooldowns: in the Cooldowns column, the character's tooltip in the overview and `/af cooldowns`, once it has been used. Thanks to the player who suggested it.
 
