@@ -169,6 +169,18 @@ test("a 'Classes:' line and a profession requirement are respected", function()
     eq(upHover(5061, goggles, { "Goggles", "Requires Engineering (100)" }), "[HUNTER]Tarn Moon = Head · ^^^ · empty slot")
 end)
 
+test("a profession requirement is read on clients that number the placeholders (German)", function()
+    local items = upItems()
+    local goggles = upItem(5061, "Goggles", { sub = 1, loc = "INVTYPE_HEAD",
+        stats = { ITEM_MOD_AGILITY_SHORT = 8 } })
+    wow.strings = { ITEM_MIN_SKILL = "Benötigt %1$s (%2$d)" }
+    upStart({
+        ["Tarn Moon"] = upHunter(items, { profs = { Engineering = 120 } }),
+        ["Sly"] = alt("Sly", "ROGUE", { level = 25, gear = {} }),
+    })
+    eq(upHover(5061, goggles, { "Goggles", "Benötigt Engineering (100)" }), "[HUNTER]Tarn Moon = Head · ^^^ · empty slot")
+end)
+
 test("a recipe is judged on the item it makes; one that binds on pickup lists only who can learn it", function()
     local items = upItems()
     local boe = upItem(5070, "Heavy Woolen Cloak", { sub = 1, loc = "INVTYPE_CLOAK", stats = { ITEM_MOD_STAMINA_SHORT = 3 } })
