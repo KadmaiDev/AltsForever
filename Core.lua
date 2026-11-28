@@ -247,7 +247,7 @@ local CHAR_FIELDS = {
     layout = "table", profs = "table", profMax = "table", recipes = "table", crafts = "table",
     reps = "table", duraSlots = "table", saves = "table", saveKills = "table",
     account = "string", runs = "table", recipesAt = "table", links = "table", cooldowns = "table",
-    skills = "table", notLevelling = "table",
+    skills = "table", notLevelling = "table", notLevellingAt = "number",
 }
 local DB_FIELDS = {
     icons = "table", goldDays = "table", goldDaysBy = "table", factions = "table",

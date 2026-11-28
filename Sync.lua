@@ -571,8 +571,15 @@ local function Merge(msg)
     local db = ns.db
     local c = db.chars[key]
     if c then
+        -- Which professions are being levelled is the player's choice, made on either
+        -- account: the later choice wins, whatever the age of the rest. A character online
+        -- on their account is always newer there, and ours never reaches them (Codex
+        -- review, 2026-11-28).
+        local mark, markAt, theirs = c.notLevelling, c.notLevellingAt, inc.notLevellingAt
+        local keepOurs = type(markAt) == "number" and not (type(theirs) == "number" and theirs >= markAt)
         wipe(c)
         for k, v in pairs(inc) do c[k] = v end
+        if keepOurs then c.notLevelling, c.notLevellingAt = mark, markAt end
     else
         db.chars[key] = inc
     end

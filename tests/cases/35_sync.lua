@@ -313,6 +313,37 @@ test("a forgotten character comes back from a sync only if played since", functi
     eq(ns.db.forgotten["Gone Away"], nil)
 end)
 
+-- Codex review, 2026-11-28: a character online on the other account is always newer there,
+-- and a copy of them from here never reaches it, so the whole-record swap lost the mark.
+test("professions marked not levelled: the later choice wins, whatever the age of the rest", function()
+    local ns = syncStart()
+    ns.SetLevelling("Tarn Moon", "Cooking", false)
+    local tarn = ns.db.chars["Tarn Moon"]
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, have = {} })
+    StaticPopupDialogs.ALTSFOREVER_SYNC.OnAccept(nil, wow.popup.data)
+    -- Online on their account: a newer copy without the mark.
+    syncFrom(ns, "Bob Smith", { k = "char", key = "Tarn Moon", c = alt("Tarn Moon", "DRUID", { updated = NOW + HOUR, money = 7 }) })
+    eq(tarn.money, 7, "the rest taken")
+    eq(tarn.notLevelling.Cooking, true, "the mark kept")
+    eq(tarn.notLevellingAt, NOW)
+    -- Ticked again over there, later: theirs wins.
+    syncFrom(ns, "Bob Smith", { k = "char", key = "Tarn Moon", c = alt("Tarn Moon", "DRUID", { updated = NOW + 2 * HOUR, notLevellingAt = NOW + 90 }) })
+    eq(tarn.notLevelling, nil); eq(tarn.notLevellingAt, NOW + 90)
+    -- Unticked over there: taken too.
+    syncFrom(ns, "Bob Smith", { k = "char", key = "Tarn Moon", c = alt("Tarn Moon", "DRUID", { updated = NOW + 3 * HOUR,
+        notLevelling = { Fishing = true }, notLevellingAt = NOW + 100 }) })
+    eq(tarn.notLevelling.Fishing, true)
+    -- Ticked here after that: kept against a newer copy holding their older choice.
+    wow.now = NOW + 200
+    ns.SetLevelling("Tarn Moon", "Fishing", true)
+    eq(tarn.notLevelling, nil); eq(tarn.notLevellingAt, NOW + 200)
+    syncFrom(ns, "Bob Smith", { k = "char", key = "Tarn Moon", c = alt("Tarn Moon", "DRUID", { updated = NOW + 4 * HOUR,
+        notLevelling = { Fishing = true }, notLevellingAt = NOW + 100 }) })
+    eq(tarn.updated, NOW + 4 * HOUR, "the rest taken")
+    eq(tarn.notLevelling, nil, "our later choice kept")
+    eq(tarn.notLevellingAt, NOW + 200)
+end)
+
 test("other addons' messages, other channels and broken pieces are ignored", function()
     local ns = syncStart()
     wow.fire("CHAT_MSG_ADDON", "DBMv4-Ver", "ahello", "WHISPER", "Cara Lin")

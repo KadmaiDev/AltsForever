@@ -473,7 +473,9 @@ end
 
 -- A profession the player isn't levelling on this character (Cooking kept at 20 on every
 -- alt but one; a player's request, 2026-11-28): no skill-up hints for it anywhere.
--- c.notLevelling = { [the character's own profession name] = true }, nil when none.
+-- c.notLevelling = { [the character's own profession name] = true }, nil when none;
+-- c.notLevellingAt = when the player last changed it, so a sync keeps the later choice
+-- (Sync.lua Merge), even against a newer copy of the character from the other account.
 function ns.NotLevelling(c, prof)
     local t = c and c.notLevelling
     return t ~= nil and prof ~= nil and t[prof] == true
@@ -484,14 +486,15 @@ function ns.SetLevelling(key, prof, on)
     local c = ns.db.chars[key]
     if not (c and type(prof) == "string") then return end
     if on then
-        if not c.notLevelling then return end
+        if not (c.notLevelling and c.notLevelling[prof]) then return end
         c.notLevelling[prof] = nil
         if next(c.notLevelling) == nil then c.notLevelling = nil end
     else
         c.notLevelling = c.notLevelling or {}
         c.notLevelling[prof] = true
     end
-    c.changed = time() -- so a sync with another account picks it up
+    c.notLevellingAt = time()
+    c.changed = c.notLevellingAt -- so a sync with another account picks it up
     ns.craftVersion = ns.craftVersion + 1 -- Can craft and Skill-ups are kept per version
     if ns.InvalidateCache then ns.InvalidateCache() end
     if ns.RefreshOverview then ns.RefreshOverview() end

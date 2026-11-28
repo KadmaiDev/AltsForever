@@ -517,6 +517,7 @@ test("a profession not being levelled gets no skill-up hints; the character menu
     menu.items[2].setSelected()
     eq(tarn.notLevelling["First Aid"], true); eq(next(tarn.notLevelling, "First Aid"), nil)
     eq(tarn.changed, NOW, "a sync picks it up")
+    eq(tarn.notLevellingAt, NOW, "and keeps the later choice")
     assert(ns.version > version, "cached tooltips rebuilt")
     eq(menu.items[2].isSelected(), false)
     -- After: no hint anywhere; she can still craft it.
