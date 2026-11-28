@@ -471,10 +471,40 @@ function ns.AtRankCap(c, prof)
     return skill and max and skill >= max or false
 end
 
+-- A profession the player isn't levelling on this character (Cooking kept at 20 on every
+-- alt but one; a player's request, 2026-11-28): no skill-up hints for it anywhere.
+-- c.notLevelling = { [the character's own profession name] = true }, nil when none;
+-- c.notLevellingAt = when the player last changed it, so a sync keeps the later choice
+-- (Sync.lua Merge), even against a newer copy of the character from the other account.
+function ns.NotLevelling(c, prof)
+    local t = c and c.notLevelling
+    return t ~= nil and prof ~= nil and t[prof] == true
+end
+
+-- Marks a character's profession as levelled (on) or not; the overview's character menu.
+function ns.SetLevelling(key, prof, on)
+    local c = ns.db.chars[key]
+    if not (c and type(prof) == "string") then return end
+    if on then
+        if not (c.notLevelling and c.notLevelling[prof]) then return end
+        c.notLevelling[prof] = nil
+        if next(c.notLevelling) == nil then c.notLevelling = nil end
+    else
+        c.notLevelling = c.notLevelling or {}
+        c.notLevelling[prof] = true
+    end
+    c.notLevellingAt = time()
+    c.changed = c.notLevellingAt -- so a sync with another account picks it up
+    ns.craftVersion = ns.craftVersion + 1 -- Can craft and Skill-ups are kept per version
+    if ns.InvalidateCache then ns.InvalidateCache() end
+    if ns.RefreshOverview then ns.RefreshOverview() end
+    if ns.CharacterWindowChanged then ns.CharacterWindowChanged() end -- its Skills page
+end
+
 -- The skill a character would gain from, or nil if nothing can give them a skill-up now.
 local function SkillFor(c, prof)
     local skill = c.profs and c.profs[prof]
-    if skill and not ns.AtRankCap(c, prof) then return skill end
+    if skill and not ns.AtRankCap(c, prof) and not ns.NotLevelling(c, prof) then return skill end
 end
 
 -- True if one of the character's known recipes uses the item and still gives them a
@@ -504,7 +534,7 @@ function ns.SkillupCount(c, prof)
     local known = c.recipes and c.recipes[prof]
     local skill = c.profs and c.profs[prof]
     if not known or not skill then return nil end
-    if ns.AtRankCap(c, prof) then return 0 end
+    if ns.AtRankCap(c, prof) or ns.NotLevelling(c, prof) then return 0 end
     local n = 0
     for lname in pairs(known) do
         local grey = ns.RecipeGrey(prof, lname)

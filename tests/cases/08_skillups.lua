@@ -480,3 +480,77 @@ test("short names: the first name, unless another of your characters shares it (
     assert(far:find("Kuro Far", 1, true), far)
     eq(ns.ShortName("Kuro Don", chars["Kuro Don"]), "[ROGUE]Kuro Don")
 end)
+
+-- A player's request (2026-11-28): Cooking kept at 20 on every alt but one shouldn't fill
+-- the Skill-ups tooltip. A profession marked as not levelled gets no skill-up hints.
+LINEN_BANDAGE = 1251
+
+function bandageRow()
+    for _, row in ipairs(overviewRows()) do
+        row.scripts.OnEnter(row)
+        local text = textOf(GameTooltip.lines)
+        if text:find("First Aid = 40", 1, true) then return text end
+    end
+end
+
+test("a profession not being levelled gets no skill-up hints; the character menu sets it", function()
+    local ns = wow.load(FILES)
+    wow.now = NOW
+    wow.profs = { { "Engineering", 55 } }
+    local saved = reagentAlts()
+    saved.chars["Aldric"] = alt("Aldric", "MAGE", { recipes = { Engineering = { ["rough dynamite"] = true } } })
+    saved.chars["Tarnia Moon"].crafts = { ["First Aid"] = { [LINEN_BANDAGE] = "linen bandage" } }
+    wow.login(saved)
+    local tarn = ns.db.chars["Tarnia Moon"]
+    -- Before: every hint.
+    assert(textOf(wow.hover(GameTooltip, LINEN)):find("[DRUID]Tarnia", 1, true), "Skill-ups lists her")
+    eq(craftLine(wow.hover(GameTooltip, LINEN_BANDAGE)), "[DRUID]Tarnia Moon" .. skillupsTo(80))
+    eq(ns.CanSkillUpWith(tarn, LINEN), true, "the mail arrow's mark")
+    SlashCmdList.ALTSFOREVER("")
+    assert(bandageRow():find("First Aid = 40  " .. G .. "(1 skill-up recipe)|r", 1, true), bandageRow())
+    -- The character menu: a tick per profession, ticked while levelled.
+    ns.ShowCharacterMenu(UIParent, "Tarnia Moon")
+    local menu = wow.menuItem("Skill-ups")
+    eq(menu.items[1].kind, "title"); eq(menu.items[1].text, "Professions being levelled")
+    eq(menu.items[2].text, "First Aid"); eq(menu.items[2].isSelected(), true)
+    local version = ns.version
+    menu.items[2].setSelected()
+    eq(tarn.notLevelling["First Aid"], true); eq(next(tarn.notLevelling, "First Aid"), nil)
+    eq(tarn.changed, NOW, "a sync picks it up")
+    eq(tarn.notLevellingAt, NOW, "and keeps the later choice")
+    assert(ns.version > version, "cached tooltips rebuilt")
+    eq(menu.items[2].isSelected(), false)
+    -- After: no hint anywhere; she can still craft it.
+    local text = textOf(wow.hover(GameTooltip, LINEN))
+    assert(not text:find("Tarnia", 1, true), text)
+    assert(text:find("[MAGE]Aldric", 1, true), "others stay\n" .. text)
+    eq(craftLine(wow.hover(GameTooltip, LINEN_BANDAGE)), "[DRUID]Tarnia Moon", "Can craft stays, without skill-ups")
+    eq(ns.CanSkillUpWith(tarn, LINEN), false)
+    eq(ns.SkillupCount(tarn, "First Aid"), 0)
+    assert(bandageRow():find("First Aid = 40  " .. G .. "(not levelling)|r", 1, true), bandageRow())
+    -- Ticked again: back as before, nothing left stored.
+    ns.ShowCharacterMenu(UIParent, "Tarnia Moon")
+    wow.menuItem("Skill-ups").items[2].setSelected()
+    eq(tarn.notLevelling, nil)
+    assert(textOf(wow.hover(GameTooltip, LINEN)):find("[DRUID]Tarnia", 1, true), "listed again")
+    -- No professions: no submenu.
+    ns.db.chars["Mira Vale"] = alt("Mira Vale", "MAGE", {})
+    ns.ShowCharacterMenu(UIParent, "Mira Vale")
+    eq(wow.menuItem("Skill-ups"), nil)
+end)
+
+test("a damaged not-levelling list keeps only professions marked true", function()
+    local ns = wow.load(FILES)
+    local saved = reagentAlts()
+    saved.chars["Tarnia Moon"].notLevelling = { ["First Aid"] = true, Cooking = "yes", [3] = true, Tailoring = false }
+    saved.chars["Brakka Stone"].notLevelling = "Cooking"
+    wow.login(saved)
+    local kept = ns.db.chars["Tarnia Moon"].notLevelling
+    eq(kept["First Aid"], true); eq(kept.Cooking, nil); eq(kept[3], nil); eq(kept.Tailoring, nil)
+    eq(ns.db.chars["Brakka Stone"].notLevelling, nil)
+    saved = reagentAlts()
+    saved.chars["Tarnia Moon"].notLevelling = { Cooking = false }
+    ns = wow.load(FILES)
+    wow.login(saved)
+    eq(ns.db.chars["Tarnia Moon"].notLevelling, nil, "nothing left: dropped")
+end)

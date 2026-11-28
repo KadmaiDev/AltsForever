@@ -1,3 +1,7 @@
+## Alts Forever 1.14.0 (not yet released)
+
+- **Professions you're not levelling:** untick a profession you're keeping where it is, such as Cooking on every alt but one, on the Skills page of the character window, or from Skill-ups when you right-click a character in the overview. That character then drops out of the Skill-ups list on materials, loses "skill-ups to" under Can craft and the skill-up marks in the mail list, and the overview says "not levelling" beside it. They're still listed under Can craft. Thanks to the player who suggested it.
+
 ## Alts Forever 1.13.2
 
 - **Salt Shaker cooldown:** a leatherworker's Salt Shaker now shows with the profession cooldowns: in the Cooldowns column, the character's tooltip in the overview and `/af cooldowns`, once it has been used. Thanks to the player who suggested it.

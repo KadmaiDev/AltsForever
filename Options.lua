@@ -746,6 +746,18 @@ function ns.ShowCharacterMenu(owner, key)
         -- Their professions, as the game's profession window shows them (Recipes.lua).
         local profs = root:CreateButton(L["Professions"], function() ns.ShowRecipes(key) end)
         if not (c.profs and next(c.profs)) then profs:SetEnabled(false) end
+        -- Which of them they're levelling: the rest get no skill-up hints (Professions.lua).
+        if c.profs and next(c.profs) then
+            local names = {}
+            for name in pairs(c.profs) do names[#names + 1] = name end
+            table.sort(names)
+            local levelling = root:CreateButton(L["Skill-ups"])
+            levelling:CreateTitle(L["Professions being levelled"])
+            for _, name in ipairs(names) do
+                levelling:CreateCheckbox(name, function() return not ns.NotLevelling(c, name) end,
+                    function() ns.SetLevelling(key, name, ns.NotLevelling(c, name)) end)
+            end
+        end
         -- The stats their upgrades are judged by: from talents, or the player's choice.
         local choices = ns.RoleChoices(c)
         if choices then

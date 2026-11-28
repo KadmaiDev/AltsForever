@@ -313,6 +313,77 @@ test("a forgotten character comes back from a sync only if played since", functi
     eq(ns.db.forgotten["Gone Away"], nil)
 end)
 
+-- Codex review, 2026-11-28: a character online on the other account is always newer there,
+-- and a copy of them from here never reaches it, so the whole-record swap lost the mark.
+test("professions marked not levelled: the later choice wins, whatever the age of the rest", function()
+    local ns = syncStart()
+    ns.SetLevelling("Tarn Moon", "Cooking", false)
+    local tarn = ns.db.chars["Tarn Moon"]
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, have = {} })
+    StaticPopupDialogs.ALTSFOREVER_SYNC.OnAccept(nil, wow.popup.data)
+    -- Online on their account: a newer copy without the mark.
+    syncFrom(ns, "Bob Smith", { k = "char", key = "Tarn Moon", c = alt("Tarn Moon", "DRUID", { updated = NOW + HOUR, money = 7 }) })
+    eq(tarn.money, 7, "the rest taken")
+    eq(tarn.notLevelling.Cooking, true, "the mark kept")
+    eq(tarn.notLevellingAt, NOW)
+    -- Ticked again over there, later: theirs wins.
+    syncFrom(ns, "Bob Smith", { k = "char", key = "Tarn Moon", c = alt("Tarn Moon", "DRUID", { updated = NOW + 2 * HOUR, notLevellingAt = NOW + 90 }) })
+    eq(tarn.notLevelling, nil); eq(tarn.notLevellingAt, NOW + 90)
+    -- Unticked over there: taken too.
+    syncFrom(ns, "Bob Smith", { k = "char", key = "Tarn Moon", c = alt("Tarn Moon", "DRUID", { updated = NOW + 3 * HOUR,
+        notLevelling = { Fishing = true }, notLevellingAt = NOW + 100 }) })
+    eq(tarn.notLevelling.Fishing, true)
+    -- Ticked here after that: kept against a newer copy holding their older choice.
+    wow.now = NOW + 200
+    ns.SetLevelling("Tarn Moon", "Fishing", true)
+    eq(tarn.notLevelling, nil); eq(tarn.notLevellingAt, NOW + 200)
+    syncFrom(ns, "Bob Smith", { k = "char", key = "Tarn Moon", c = alt("Tarn Moon", "DRUID", { updated = NOW + 4 * HOUR,
+        notLevelling = { Fishing = true }, notLevellingAt = NOW + 100 }) })
+    eq(tarn.updated, NOW + 4 * HOUR, "the rest taken")
+    eq(tarn.notLevelling, nil, "our later choice kept")
+    eq(tarn.notLevellingAt, NOW + 200)
+end)
+
+-- Codex review, 2026-11-28 (round 2): a choice made for a character logged in on the other
+-- account never reached it with the records, so the choices go with the hello too.
+test("not-levelling choices go with the hello and reach the other side, the character logged in there too", function()
+    local ns = syncStart()
+    ns.SetLevelling("Tarn Moon", "Cooking", false)
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    local hello = syncSent(ns, "Bob Smith")[1]
+    eq(hello.lv["Tarn Moon"].t, NOW); eq(hello.lv["Tarn Moon"].p.Cooking, true)
+    eq(hello.lv["Aldric"], nil, "only characters with a choice")
+    -- Their answer: a choice for the character you're on (never replaced as a whole), an
+    -- older one for Tarn, one for a character we don't have, and junk.
+    local version = ns.version
+    syncFrom(ns, "Bob Smith-Realm", { k = "hello", v = 1, reply = true, have = {}, lv = {
+        Aldric = { t = NOW - 60, p = { Fishing = true, Bad = "yes" } },
+        ["Tarn Moon"] = { t = NOW - 60, p = {} },
+        ["Nobody Here"] = { t = NOW, p = { Cooking = true } },
+        ["Mira Vale"] = "junk" } })
+    eq(ns.char.notLevelling.Fishing, true, "the character you're on takes it")
+    eq(ns.char.notLevelling.Bad, nil)
+    eq(ns.char.notLevellingAt, NOW - 60)
+    assert(ns.version > version, "tooltips rebuilt")
+    eq(ns.db.chars["Tarn Moon"].notLevelling.Cooking, true, "ours is later: kept")
+    eq(ns.db.chars["Nobody Here"], nil, "nothing made up")
+end)
+
+test("not-levelling choices from a hello count only once the swap is accepted", function()
+    local ns = syncStart()
+    ns.SetLevelling("Tarn Moon", "Cooking", false)
+    local lv = { ["Tarn Moon"] = { t = NOW + 5, p = {} } } -- ticked again over there, later
+    syncFrom(ns, "Cy Dee", { k = "hello", v = 1, have = {}, lv = lv })
+    eq(wow.popup.text, "Cy Dee")
+    eq(ns.db.chars["Tarn Moon"].notLevelling.Cooking, true, "not while their player is asked")
+    StaticPopupDialogs.ALTSFOREVER_SYNC.OnCancel(nil, wow.popup.data)
+    eq(ns.db.chars["Tarn Moon"].notLevelling.Cooking, true, "declined: nothing taken")
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, have = {}, lv = lv })
+    StaticPopupDialogs.ALTSFOREVER_SYNC.OnAccept(nil, wow.popup.data)
+    eq(ns.db.chars["Tarn Moon"].notLevelling, nil, "accepted: their later tick taken")
+    eq(ns.db.chars["Tarn Moon"].notLevellingAt, NOW + 5)
+end)
+
 test("other addons' messages, other channels and broken pieces are ignored", function()
     local ns = syncStart()
     wow.fire("CHAT_MSG_ADDON", "DBMv4-Ver", "ahello", "WHISPER", "Cara Lin")
