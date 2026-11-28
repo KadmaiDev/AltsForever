@@ -73,14 +73,14 @@ end
 local function ByName(a, b) return a.name < b.name end
 
 -- The Skills page, as the game's own Skills tab: sections { name, rows }, a row
--- { name, rank, max, untrained, at, weapon }. Main professions, then secondary ones, then
+-- { name, rank, max, untrained, at, weapon, prof (a profession: it has a levelling tick) }. Main professions, then secondary ones, then
 -- weapon skills and armour (Upgrades.lua's ns.CombatSkills). The second value is true
 -- when the weapon skills haven't been read yet (not logged in since they were added).
 function ns.SkillSections(c)
     local out = {}
     local main, second = {}, {}
     for name, skill in pairs(c.profs or {}) do
-        local row = { name = name, rank = skill, max = c.profMax and c.profMax[name] }
+        local row = { name = name, rank = skill, max = c.profMax and c.profMax[name], prof = true }
         if name == c.prof1 or name == c.prof2 then main[#main + 1] = row else second[#second + 1] = row end
     end
     sort(main, ByName)
@@ -139,6 +139,11 @@ local function ListRows(list)
         for _, part in ipairs({ row.headBg, row.headText, row.toggle }) do part:SetShown(head) end
         row.label:SetShown(not head)
         row.bar:SetShown(not head and not e.none)
+        -- A profession's levelling tick; the name moves right to make room.
+        local prof = not head and e.prof ~= nil
+        row.check:SetShown(prof)
+        if prof then row.check:SetChecked(not e.notLevelling) end
+        row.label:SetPoint("LEFT", prof and 34 or 12, 0)
         row:SetHeight(head and HEAD_H or ROW_H)
         if head then
             row.headText:SetText(e.head)
@@ -196,6 +201,26 @@ local function RowClick(row)
         list.collapsed[e.head] = not list.collapsed[e.head] or nil
         Flatten(list)
     end
+end
+
+-- A profession's tick on the Skills page: ticked while it's being levelled; unticked, it's
+-- left out of every skill-up hint (Professions.lua ns.SetLevelling, as the overview's
+-- character menu; a player's request, 2026-11-28).
+local function LevellingClick(check)
+    local row = check:GetParent()
+    local e, page = row.entry, row.list:GetParent()
+    if not (e and e.prof and page.key) then return end
+    ns.SetLevelling(page.key, e.prof, check:GetChecked() and true or false)
+end
+
+local function LevellingEnter(check)
+    local e = check:GetParent().entry
+    if not (e and e.prof) then return end
+    GameTooltip:SetOwner(check, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(e.prof, 1, 1, 1)
+    GameTooltip:AddLine(e.notLevelling and L["Not being levelled: left out of skill-up hints. Tick to bring it back."]
+        or L["Being levelled: shown in skill-up hints. Untick to leave it out."], 1, 0.82, 0, true)
+    GameTooltip:Show()
 end
 
 local function RowEnter(row)
@@ -258,6 +283,15 @@ local function MakeRow(list)
     bar.text = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     bar.text:SetPoint("CENTER")
     row.bar = bar
+    local check = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+    check:SetSize(22, 22)
+    check:SetPoint("LEFT", row, "LEFT", 8, 0)
+    check:SetScript("OnClick", LevellingClick)
+    check:SetScript("OnEnter", LevellingEnter)
+    check:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    check:Hide()
+    if ns.SkinCheck then ns.SkinCheck(check) end
+    row.check = check
     local hl = row:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.05)
@@ -343,6 +377,13 @@ local function FillSkills(page, key, c)
             else
                 e.value, e.max = r.rank, r.max or r.rank
                 e.text = r.max and (r.rank .. " / " .. r.max) or tostring(r.rank)
+            end
+            if r.prof then
+                e.prof, e.notLevelling = r.name, ns.NotLevelling(c, r.name)
+                if e.notLevelling then
+                    e.grey, e.r, e.g, e.b = true, 0.35, 0.35, 0.35
+                    e.text = e.text .. "  " .. L["(not levelling)"]
+                end
             end
             entries[#entries + 1] = e
         end

@@ -498,6 +498,7 @@ function ns.SetLevelling(key, prof, on)
     ns.craftVersion = ns.craftVersion + 1 -- Can craft and Skill-ups are kept per version
     if ns.InvalidateCache then ns.InvalidateCache() end
     if ns.RefreshOverview then ns.RefreshOverview() end
+    if ns.CharacterWindowChanged then ns.CharacterWindowChanged() end -- its Skills page
 end
 
 -- The skill a character would gain from, or nil if nothing can give them a skill-up now.

@@ -93,6 +93,45 @@ test("the Skills page: headings fold away, the list scrolls, untrained armour sa
     eq(table.concat(lines, " | "), "One-Handed Maces | 180 / 220 | 40 below the most for their level")
 end)
 
+-- A player's request (2026-11-28): a profession not being levelled, left out of skill-up hints.
+function skillRow(page, name)
+    for _, row in ipairs(page.list.rows) do
+        if row:IsShown() and row.label:IsShown() and row.label:GetText() == name then return row end
+    end
+end
+
+test("the Skills page has a levelling tick on each profession, the same as the character menu's", function()
+    local ns = cwStart()
+    ns.ShowCharacter("Vesp Ash", "skills")
+    local page = ns.CharacterPage("skills")
+    local cooking = skillRow(page, "Cooking")
+    eq(cooking.check:IsShown(), true); eq(cooking.check:GetChecked(), true)
+    eq(skillRow(page, "Defense").check:IsShown(), false, "weapon skills have none")
+    eq(page.list.rows[1].check:IsShown(), false, "nor headings")
+    cooking.check.scripts.OnEnter(cooking.check)
+    eq(GameTooltip.lines[2][1], "Being levelled: shown in skill-up hints. Untick to leave it out.")
+    -- Unticked (the game ticks the box before OnClick).
+    cooking.check:SetChecked(false)
+    cooking.check.scripts.OnClick(cooking.check)
+    local c = ns.db.chars["Vesp Ash"]
+    eq(c.notLevelling.Cooking, true)
+    assert(sheetRows(page):find("Cooking = 75 / 150  (not levelling)", 1, true), sheetRows(page))
+    cooking = skillRow(page, "Cooking")
+    eq(cooking.check:GetChecked(), false, "the page was filled again")
+    eq(cooking.bar.barColour[1], 0.35, "greyed")
+    cooking.check.scripts.OnEnter(cooking.check)
+    eq(GameTooltip.lines[2][1], "Not being levelled: left out of skill-up hints. Tick to bring it back.")
+    -- The character menu agrees, and ticking there shows here.
+    ns.ShowCharacterMenu(UIParent, "Vesp Ash")
+    local item
+    for _, it in ipairs(wow.menuItem("Skill-ups").items) do if it.text == "Cooking" then item = it end end
+    eq(item.isSelected(), false)
+    item.setSelected()
+    eq(c.notLevelling, nil)
+    eq(skillRow(page, "Cooking").check:GetChecked(), true)
+    assert(sheetRows(page):find("Cooking = 75 / 150 |", 1, true), sheetRows(page))
+end)
+
 test("the Skills page for a character whose weapon skills haven't been read says so", function()
     local ns = cwStart()
     ns.ShowCharacter("Tarn Moon", "skills")
