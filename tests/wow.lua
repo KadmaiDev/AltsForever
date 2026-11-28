@@ -562,6 +562,17 @@ function M.load(files)
         FetchMaxNumBankTabs = function(kind) return kind == 0 and M.bankMax or 0 end,
     }
     GetTime = function() return M.gameTime end
+    -- Spells: M.spellCooldowns[id] = { start, duration } in game seconds, M.spellNames[id],
+    -- M.playerSpells[id] = true/false (nil: IsPlayerSpell answers false).
+    M.spellCooldowns, M.spellNames, M.playerSpells = {}, {}, {}
+    C_Spell = {
+        GetSpellName = function(id) return M.spellNames[id] end,
+        GetSpellCooldown = function(id)
+            local cd = M.spellCooldowns[id]
+            return { startTime = cd and cd[1] or 0, duration = cd and cd[2] or 0, isEnabled = true, modRate = 1 }
+        end,
+    }
+    IsPlayerSpell = function(id) return M.playerSpells[id] == true end
     C_Container = {
         GetItemCooldown = function(id)
             local cd = M.cooldowns[id]

@@ -792,7 +792,12 @@ local function CooldownClick(self, button)
     GameTooltip:Hide()
     local c = ns.db.chars[key]
     local rows = c and ns.CooldownRows(c, time())
-    if rows and ns.ShowRecipes then return ns.ShowRecipes(key, rows[1][4], true) end
+    -- The first that is a profession's (Dedicated Study is kept apart, Professions.lua).
+    if rows and ns.ShowRecipes and type(c.profs) == "table" then
+        for _, r in ipairs(rows) do
+            if c.profs[r[4]] then return ns.ShowRecipes(key, r[4], true) end
+        end
+    end
     ns.ShowGear(key)
 end
 

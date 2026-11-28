@@ -1,3 +1,7 @@
+## Alts Forever 1.15.0 (not yet released)
+
+- **Dedicated Study:** the Legacy talent's 23-hour cooldown now shows with the profession cooldowns: in the Cooldowns column, the character's tooltip in the overview and `/af cooldowns`. Each character appears once they've used it, and it turns to Ready when the cooldown ends, or after a Legacy respec, which resets it. Thanks to the player who suggested it.
+
 ## Alts Forever 1.14.0
 
 - **Professions you're not levelling:** untick a profession you're keeping where it is, such as Cooking on every alt but one, on the Skills page of the character window, or from Skill-ups when you right-click a character in the overview. That character then drops out of the Skill-ups list on materials, loses "skill-ups to" under Can craft and the skill-up marks in the mail list, and the overview says "not levelling" beside it. They're still listed under Can craft. Thanks to the player who suggested it.
