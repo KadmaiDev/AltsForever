@@ -16,8 +16,10 @@ local TS = C_TradeSkillUI
 local RECIPE_CLASS = Enum.ItemClass and Enum.ItemClass.Recipe or 9
 
 -- Turns the game's "Requires %s (%d)" into a pattern capturing profession and skill,
--- so it works in every language.
+-- so it works in every language. Some clients number the placeholders (German:
+-- "Benötigt %1$s (%2$d)"): the numbers go first, so they read as "%s" and "%d".
 local REQUIRES = "^" .. (ITEM_MIN_SKILL or "Requires %s (%d)")
+    :gsub("%%%d+%$", "%%")
     :gsub("[%%%(%)%.%-%+%[%]%^%$%?%*]", "%%%0")
     :gsub("%%%%s", "(.+)")
     :gsub("%%%%d", "(%%d+)") .. "$"

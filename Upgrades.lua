@@ -674,9 +674,10 @@ end
 ---------------------------------------------------------------------------
 -- Who can use an item
 ---------------------------------------------------------------------------
--- "Requires %s (%d)" and "Classes: %s" as patterns, in the client's language.
+-- "Requires %s (%d)" and "Classes: %s" as patterns, in the client's language. Numbered
+-- placeholders (German: "Benötigt %1$s (%2$d)") are read as "%s" and "%d".
 local function Pattern(fmt)
-    return "^" .. fmt:gsub("[%%%(%)%.%-%+%[%]%^%$%?%*]", "%%%0"):gsub("%%%%s", "(.+)"):gsub("%%%%d", "(%%d+)") .. "$"
+    return "^" .. fmt:gsub("%%%d+%$", "%%"):gsub("[%%%(%)%.%-%+%[%]%^%$%?%*]", "%%%0"):gsub("%%%%s", "(.+)"):gsub("%%%%d", "(%%d+)") .. "$"
 end
 local REQUIRES = Pattern(ITEM_MIN_SKILL or "Requires %s (%d)")
 local CLASSES_LINE = Pattern(ITEM_CLASSES_ALLOWED or "Classes: %s")
