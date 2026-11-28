@@ -8,7 +8,7 @@ M.SECRET = SECRET
 
 -- Events this fake client knows; registering anything else throws, like Forever does.
 local KNOWN_EVENTS = {
-    ADDON_LOADED = true, PLAYER_LOGIN = true, PLAYER_LOGOUT = true,
+    ADDON_LOADED = true, GLOBAL_MOUSE_DOWN = true, PLAYER_LOGIN = true, PLAYER_LOGOUT = true,
     BAG_UPDATE = true, BAG_UPDATE_DELAYED = true, BAG_CONTAINER_UPDATE = true,
     PLAYER_EQUIPMENT_CHANGED = true, INSPECT_READY = true,
     BANKFRAME_OPENED = true, BANKFRAME_CLOSED = true, BAG_UPDATE_COOLDOWN = true, BANK_TABS_CHANGED = true, INPUT_DEVICE_INTERFACE_TRANSITION = true,
@@ -406,6 +406,21 @@ function M.load(files)
                 self:GetParent():Hide()
             end
         end
+        -- Forever's coloured bar (Blizzard_SharedXML/Camelot/ProgressBars): a trough, a fill
+        -- tinted with SetVertexColor and cut to the share, and its text.
+        if template == "ColoredProgressBarTemplate" then
+            f.FillArea = newObject("Frame")
+            f.FillArea.width = 188
+            f.Fill = newObject("Texture")
+            f.Text = newObject("FontString")
+            f.Text.font = { "Fonts\\FRIZQT__.TTF", 12 } -- GameFontHighlight
+            function f:SetFillPercent(p)
+                p = math.min(1, math.max(0, p))
+                self.fillPercent = p
+                self.Fill:SetWidth(p * self.FillArea:GetWidth())
+            end
+            function f:SetText(text) self.Text:SetText(text) end
+        end
         if template == "UIPanelCloseButton" or template == "UIPanelCloseButtonDefaultAnchors" then
             BlizzardClose(f)
         elseif template == "BasicFrameTemplateWithInset" or template == "PortraitFrameTemplate" then
@@ -792,13 +807,16 @@ function M.load(files)
         return root
     end }
 
-    -- Reputation: the visible list in order, as { id, name, standing, header? }, and
+    -- Reputation: the visible list in order, as { id, name, standing, header?, child?, headerWithRep? }, and
     -- factions under collapsed headers (not in the list, but readable by ID).
     M.factions, M.hiddenFactions, M.factionReads, M.watched = {}, {}, 0, nil
     local function factionData(f)
         return f and { factionID = f[1], name = f[2], currentStanding = f[3], isHeader = f[4] or false,
-            isHeaderWithRep = false, reaction = 4 }
+            isChild = f[5] or false, isHeaderWithRep = f[6] or false, reaction = 4 }
     end
+    -- The frame under the mouse (M.mouseFocus), as GetMouseFoci's first entry.
+    M.mouseFocus = nil
+    GetMouseFoci = function() return { M.mouseFocus } end
     C_Reputation = {
         GetNumFactions = function() return #M.factions end,
         GetFactionDataByIndex = function(i) M.factionReads = M.factionReads + 1 return factionData(M.factions[i]) end,

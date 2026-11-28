@@ -1230,3 +1230,43 @@ test("a one-time hint that columns can be hidden: shown on the first opening onl
     SlashCmdList.ALTSFOREVER("")
     eq(AltsForeverFrame.hint, nil, "never made for a file that has seen it")
 end)
+
+test("clicking the overview or a window docked to it brings the whole group to the front", function()
+    local ns = wow.load(FILES)
+    wow.login(nil)
+    SlashCmdList.ALTSFOREVER("")
+    local ov = AltsForeverFrame
+    ov.rect = { 100, 1100, 900, 700 }
+    SlashCmdList.ALTSFOREVER("lockouts")
+    local lock = AltsForeverLockoutsFrame
+    eq(lock.point[2], ov, "docked beside the overview")
+    ns.ToggleSync(true)
+    local sync = AltsForeverSyncFrame
+    eq(sync.point[2] == ov, false, "a free window")
+    local function counts() return (ov.raised or 0) .. " " .. (lock.raised or 0) .. " " .. (sync.raised or 0) end
+    ov.raised, lock.raised, sync.raised = 0, 0, 0
+    -- A click on a button in the overview: the docked window comes too, the free one doesn't.
+    wow.mouseFocus = ov.CloseButton or ov
+    wow.fire("GLOBAL_MOUSE_DOWN", "LeftButton")
+    eq(counts(), "1 1 0")
+    -- On the docked window: the overview comes with it.
+    wow.mouseFocus = lock
+    wow.fire("GLOBAL_MOUSE_DOWN", "LeftButton")
+    eq(counts(), "2 2 0")
+    -- On the free window, or nothing of ours: left to the game.
+    wow.mouseFocus = sync
+    wow.fire("GLOBAL_MOUSE_DOWN", "LeftButton")
+    wow.mouseFocus = UIParent
+    wow.fire("GLOBAL_MOUSE_DOWN", "LeftButton")
+    wow.mouseFocus = nil
+    wow.fire("GLOBAL_MOUSE_DOWN", "LeftButton")
+    eq(counts(), "2 2 0")
+    -- /af with the overview already open brings its docked windows too.
+    ns.ToggleOverview(true)
+    eq(counts(), "3 3 0")
+    -- With the overview closed, clicks do nothing.
+    ns.ToggleOverview()
+    wow.mouseFocus = lock
+    wow.fire("GLOBAL_MOUSE_DOWN", "LeftButton")
+    eq(counts(), "3 3 0")
+end)

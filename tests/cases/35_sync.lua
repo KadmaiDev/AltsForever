@@ -369,6 +369,31 @@ test("not-levelling choices go with the hello and reach the other side, the char
     eq(ns.db.chars["Nobody Here"], nil, "nothing made up")
 end)
 
+-- Codex review, 2026-11-28 (rep-bars round 1): marking a profession stamped c.changed, so an
+-- older copy of an alt offline on both accounts looked newest and replaced the newer one.
+test("a not-levelling choice made on the older copy of a character doesn't replace the newer copy", function()
+    local ns = syncStart()
+    wow.now = NOW + 60
+    ns.SetLevelling("Tarn Moon", "Cooking", false)
+    local tarn = ns.db.chars["Tarn Moon"]
+    SlashCmdList.ALTSFOREVER("sync Bob Smith")
+    local hello = syncSent(ns, "Bob Smith")[1]
+    eq(hello.have["Tarn Moon"], NOW - DAY, "still as old as what we saw of her")
+    eq(hello.lv["Tarn Moon"].p.Cooking, true, "the choice goes on its own")
+    wow.sent = {}
+    -- Theirs is newer: we ask for it, and they don't ask for ours.
+    syncFrom(ns, "Bob Smith", { k = "hello", v = 1, reply = true, have = { ["Tarn Moon"] = NOW - HOUR } })
+    syncPump()
+    local sent = syncSent(ns, "Bob Smith")
+    eq(syncKinds(sent), "want")
+    eq(table.concat(sent[1].keys, ","), "Tarn Moon")
+    syncFrom(ns, "Bob Smith", { k = "char", key = "Tarn Moon", c = alt("Tarn Moon", "DRUID",
+        { updated = NOW - HOUR, money = 99, bags = { [2589] = 5 } }) })
+    eq(tarn.money, 99, "their newer observations taken"); eq(tarn.bags[2589], 5)
+    eq(tarn.notLevelling.Cooking, true, "our later choice kept")
+    eq(tarn.notLevellingAt, NOW + 60)
+end)
+
 test("not-levelling choices from a hello count only once the swap is accepted", function()
     local ns = syncStart()
     ns.SetLevelling("Tarn Moon", "Cooking", false)

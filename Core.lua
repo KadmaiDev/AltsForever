@@ -262,6 +262,7 @@ local DB_FIELDS = {
     windows = "table", pinned = "table", hiddenColumns = "table",
     mailRules = "table", mailFillOff = "boolean", mailPackOff = "boolean", weights = "table",
     columnsHintSeen = "boolean", otherCharsOff = "boolean", otherGold = "boolean",
+    factionGroups = "table", factionHeadings = "table",
 }
 
 -- Keeps only entries whose key and value are of these types (value nil = any).
@@ -348,6 +349,8 @@ local function Repair(saved)
     if saved.rulesets then KeepOnly(saved.rulesets, "string", "string") end
     if saved.syncWith then KeepOnly(saved.syncWith, "string", "boolean") end
     if saved.forgotten then KeepOnly(saved.forgotten, "string", "number") end
+    if saved.factionGroups then KeepOnly(saved.factionGroups, "number", "number") end
+    if saved.factionHeadings then KeepOnly(saved.factionHeadings, "number", "number") end
     if saved.goldDaysBy then
         KeepOnly(saved.goldDaysBy, "string", "table")
         for _, days in pairs(saved.goldDaysBy) do KeepOnly(days, "number", "number") end

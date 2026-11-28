@@ -110,6 +110,39 @@ function ns.ReputationRows(c)
     return rows
 end
 
+-- The Reputation page's rows under the game's headings (Reputation.lua files each faction
+-- under the heading it was last listed under): sections { name, rows } in the game's order;
+-- a faction never seen under one goes under "Other" (merged with the game's own Other,
+-- whose name it shares in every language we checked: ours is translated alike). The second
+-- value is true when no faction has a heading at all (then the page shows no headings).
+local function BySection(a, b)
+    if a.at ~= b.at then return a.at < b.at end
+    return a.name < b.name
+end
+
+function ns.ReputationSections(c)
+    local db = ns.db
+    local groups, headings, names = db.factionGroups or {}, db.factionHeadings or {}, db.factions or {}
+    local out, byName, any = {}, {}, false
+    for _, r in ipairs(ns.ReputationRows(c)) do
+        local h = groups[r.id]
+        local name = h and type(names[h]) == "string" and names[h]
+        local at = name and headings[h] or math.huge
+        if name then any = true else name = L["Other"] end
+        local s = byName[name]
+        if not s then
+            s = { name = name, rows = {}, at = at }
+            byName[name] = s
+            out[#out + 1] = s
+        elseif at < s.at then
+            s.at = at
+        end
+        s.rows[#s.rows + 1] = r
+    end
+    sort(out, BySection)
+    return out, not any
+end
+
 ---------------------------------------------------------------------------
 -- A list of bars under collapsible headings (Skills and Reputation), drawn from a pool of
 -- rows as far as the page allows; the mouse wheel and the page arrows scroll it.
@@ -127,6 +160,21 @@ local function HasAtlas(name)
 end
 
 local function Flat() return ns.SkinFlat and ns.SkinFlat() or false end
+
+-- A row's bar: the game's (fill cut to the share and tinted) or our plain one.
+local function FillBar(bar, e)
+    local max, value = e.max and e.max > 0 and e.max or 1, e.value or 0
+    local r, g, b = e.r or 0.15, e.g or 0.4, e.b or 0.9
+    if bar.game then
+        bar:SetFillPercent(value / max)
+        bar.Fill:SetVertexColor(r, g, b)
+    else
+        bar:SetMinMaxValues(0, max)
+        bar:SetValue(value)
+        bar:SetStatusBarColor(r, g, b)
+    end
+    bar.text:SetText(e.text or "")
+end
 
 local function ListRows(list)
     local shown, n = list.shown, 0
@@ -157,13 +205,7 @@ local function ListRows(list)
         else
             row.label:SetText(e.label)
             if e.grey then row.label:SetTextColor(0.5, 0.5, 0.5) else row.label:SetTextColor(1, 1, 1) end
-            if not e.none then
-                local bar = row.bar
-                bar:SetMinMaxValues(0, e.max and e.max > 0 and e.max or 1)
-                bar:SetValue(e.value or 0)
-                bar:SetStatusBarColor(e.r or 0.15, e.g or 0.4, e.b or 0.9)
-                bar.text:SetText(e.text or "")
-            end
+            if not e.none then FillBar(row.bar, e) end
         end
         row:Show()
     end
@@ -239,6 +281,31 @@ local function Outline(fs)
     fs:SetFont(path, size or 10, "OUTLINE")
 end
 
+-- The game's own bar, as Forever's Reputation window draws it (ColoredProgressBarTemplate,
+-- Blizzard_SharedXML/Camelot/ProgressBars: a recessed common-stat-bar-BG trough and a shaded
+-- common-stat-bar-white fill, masked, tinted with the standing's colour; owner's
+-- screenshots, 2026-11-28: ours were flat and brighter beside it). Nil if this client
+-- hasn't got it; the plain bar is drawn then.
+local function GameBar(row)
+    local ok, bar = pcall(CreateFrame, "Frame", nil, row, "ColoredProgressBarTemplate")
+    if not (ok and bar) then return nil end
+    if not (type(bar.Fill) == "table" and type(bar.Text) == "table" and type(bar.FillArea) == "table"
+        and type(bar.SetFillPercent) == "function") then
+        bar:Hide()
+        return nil
+    end
+    -- The trough's art pads the fill by 6 px a side: as wide a fill as the plain bar's.
+    bar:SetSize(BAR_W + 12, ROW_H + GAP)
+    bar:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+    bar.game, bar.text = true, bar.Text
+    -- Its text, centred on the bar, read a little low on ours (owner's screenshot, 2026-11-28):
+    -- up a pixel, still across the whole bar.
+    bar.Text:ClearAllPoints()
+    bar.Text:SetPoint("LEFT", bar, "LEFT", 0, 1)
+    bar.Text:SetPoint("RIGHT", bar, "RIGHT", 0, 1)
+    return bar
+end
+
 local function MakeRow(list)
     local row = CreateFrame("Button", nil, list)
     row:SetWidth(WIDTH - 16 - 44)
@@ -259,29 +326,32 @@ local function MakeRow(list)
     row.label:SetPoint("RIGHT", row, "RIGHT", -BAR_W - 20, 0)
     row.label:SetJustifyH("LEFT")
     row.label:SetWordWrap(false)
-    local bar = CreateFrame("StatusBar", nil, row)
-    bar:SetSize(BAR_W, 18)
-    bar:SetPoint("RIGHT", row, "RIGHT", -8, 0)
-    bar:SetStatusBarTexture(Flat() and "Interface\\Buttons\\WHITE8X8" or "Interface\\TargetingFrame\\UI-StatusBar")
-    local trough = bar:CreateTexture(nil, "BACKGROUND")
-    trough:SetAllPoints()
-    trough:SetColorTexture(0, 0, 0, 0.6)
-    for _, edge in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" } }) do
-        local t = bar:CreateTexture(nil, "OVERLAY")
-        t:SetColorTexture(0.45, 0.45, 0.45, 0.9)
-        t:SetPoint(edge[1])
-        t:SetPoint(edge[2])
-        t:SetHeight(1)
+    local bar = GameBar(row)
+    if not bar then -- our plain bar
+        bar = CreateFrame("StatusBar", nil, row)
+        bar:SetSize(BAR_W, 18)
+        bar:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+        bar:SetStatusBarTexture(Flat() and "Interface\\Buttons\\WHITE8X8" or "Interface\\TargetingFrame\\UI-StatusBar")
+        local trough = bar:CreateTexture(nil, "BACKGROUND")
+        trough:SetAllPoints()
+        trough:SetColorTexture(0, 0, 0, 0.6)
+        for _, edge in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" } }) do
+            local t = bar:CreateTexture(nil, "OVERLAY")
+            t:SetColorTexture(0.45, 0.45, 0.45, 0.9)
+            t:SetPoint(edge[1])
+            t:SetPoint(edge[2])
+            t:SetHeight(1)
+        end
+        for _, edge in ipairs({ { "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
+            local t = bar:CreateTexture(nil, "OVERLAY")
+            t:SetColorTexture(0.45, 0.45, 0.45, 0.9)
+            t:SetPoint(edge[1])
+            t:SetPoint(edge[2])
+            t:SetWidth(1)
+        end
+        bar.text = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        bar.text:SetPoint("CENTER")
     end
-    for _, edge in ipairs({ { "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
-        local t = bar:CreateTexture(nil, "OVERLAY")
-        t:SetColorTexture(0.45, 0.45, 0.45, 0.9)
-        t:SetPoint(edge[1])
-        t:SetPoint(edge[2])
-        t:SetWidth(1)
-    end
-    bar.text = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    bar.text:SetPoint("CENTER")
     row.bar = bar
     local check = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
     check:SetSize(22, 22)
@@ -299,7 +369,7 @@ local function MakeRow(list)
     row:SetScript("OnEnter", RowEnter)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     for _, fs in ipairs({ row.headText, row.label, bar.text }) do ns.SkinText(fs) end
-    Outline(bar.text)
+    if not bar.game then Outline(bar.text) end
     return row
 end
 
@@ -410,16 +480,20 @@ end
 
 local function FillReputation(page, key, c)
     local entries = {}
-    for _, r in ipairs(ns.ReputationRows(c)) do
-        local e = { label = r.name, row = r, tip = RepTip }
-        e.r, e.g, e.b = ns.StandingBarColour(r.level)
-        if r.level < 8 then
-            e.value, e.max = r.value - r.low, r.high - r.low
-            e.text = r.label .. "  " .. (r.value - r.low) .. " / " .. (r.high - r.low)
-        else
-            e.value, e.max, e.text = 1, 1, r.label
+    local sections, flat = ns.ReputationSections(c)
+    for _, s in ipairs(sections) do
+        if not flat then entries[#entries + 1] = { head = s.name } end
+        for _, r in ipairs(s.rows) do
+            local e = { label = r.name, row = r, tip = RepTip }
+            e.r, e.g, e.b = ns.StandingBarColour(r.level)
+            if r.level < 8 then
+                e.value, e.max = r.value - r.low, r.high - r.low
+                e.text = r.label .. "  " .. (r.value - r.low) .. " / " .. (r.high - r.low)
+            else
+                e.value, e.max, e.text = 1, 1, r.label
+            end
+            entries[#entries + 1] = e
         end
-        entries[#entries + 1] = e
     end
     SetEntries(page.list, entries, L["%s has no reputation recorded yet."]:format(c.name or key), page.key == key)
     page.key = key
