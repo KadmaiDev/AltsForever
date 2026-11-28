@@ -128,6 +128,21 @@ end
 
 local function Flat() return ns.SkinFlat and ns.SkinFlat() or false end
 
+-- A row's bar: the game's (fill cut to the share and tinted) or our plain one.
+local function FillBar(bar, e)
+    local max, value = e.max and e.max > 0 and e.max or 1, e.value or 0
+    local r, g, b = e.r or 0.15, e.g or 0.4, e.b or 0.9
+    if bar.game then
+        bar:SetFillPercent(value / max)
+        bar.Fill:SetVertexColor(r, g, b)
+    else
+        bar:SetMinMaxValues(0, max)
+        bar:SetValue(value)
+        bar:SetStatusBarColor(r, g, b)
+    end
+    bar.text:SetText(e.text or "")
+end
+
 local function ListRows(list)
     local shown, n = list.shown, 0
     for i = list.offset + 1, #shown do
@@ -157,13 +172,7 @@ local function ListRows(list)
         else
             row.label:SetText(e.label)
             if e.grey then row.label:SetTextColor(0.5, 0.5, 0.5) else row.label:SetTextColor(1, 1, 1) end
-            if not e.none then
-                local bar = row.bar
-                bar:SetMinMaxValues(0, e.max and e.max > 0 and e.max or 1)
-                bar:SetValue(e.value or 0)
-                bar:SetStatusBarColor(e.r or 0.15, e.g or 0.4, e.b or 0.9)
-                bar.text:SetText(e.text or "")
-            end
+            if not e.none then FillBar(row.bar, e) end
         end
         row:Show()
     end
@@ -239,6 +248,26 @@ local function Outline(fs)
     fs:SetFont(path, size or 10, "OUTLINE")
 end
 
+-- The game's own bar, as Forever's Reputation window draws it (ColoredProgressBarTemplate,
+-- Blizzard_SharedXML/Camelot/ProgressBars: a recessed common-stat-bar-BG trough and a shaded
+-- common-stat-bar-white fill, masked, tinted with the standing's colour; owner's
+-- screenshots, 2026-11-28: ours were flat and brighter beside it). Nil if this client
+-- hasn't got it; the plain bar is drawn then.
+local function GameBar(row)
+    local ok, bar = pcall(CreateFrame, "Frame", nil, row, "ColoredProgressBarTemplate")
+    if not (ok and bar) then return nil end
+    if not (type(bar.Fill) == "table" and type(bar.Text) == "table" and type(bar.FillArea) == "table"
+        and type(bar.SetFillPercent) == "function") then
+        bar:Hide()
+        return nil
+    end
+    -- The trough's art pads the fill by 6 px a side: as wide a fill as the plain bar's.
+    bar:SetSize(BAR_W + 12, ROW_H + GAP)
+    bar:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+    bar.game, bar.text = true, bar.Text
+    return bar
+end
+
 local function MakeRow(list)
     local row = CreateFrame("Button", nil, list)
     row:SetWidth(WIDTH - 16 - 44)
@@ -259,29 +288,32 @@ local function MakeRow(list)
     row.label:SetPoint("RIGHT", row, "RIGHT", -BAR_W - 20, 0)
     row.label:SetJustifyH("LEFT")
     row.label:SetWordWrap(false)
-    local bar = CreateFrame("StatusBar", nil, row)
-    bar:SetSize(BAR_W, 18)
-    bar:SetPoint("RIGHT", row, "RIGHT", -8, 0)
-    bar:SetStatusBarTexture(Flat() and "Interface\\Buttons\\WHITE8X8" or "Interface\\TargetingFrame\\UI-StatusBar")
-    local trough = bar:CreateTexture(nil, "BACKGROUND")
-    trough:SetAllPoints()
-    trough:SetColorTexture(0, 0, 0, 0.6)
-    for _, edge in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" } }) do
-        local t = bar:CreateTexture(nil, "OVERLAY")
-        t:SetColorTexture(0.45, 0.45, 0.45, 0.9)
-        t:SetPoint(edge[1])
-        t:SetPoint(edge[2])
-        t:SetHeight(1)
+    local bar = GameBar(row)
+    if not bar then -- our plain bar
+        bar = CreateFrame("StatusBar", nil, row)
+        bar:SetSize(BAR_W, 18)
+        bar:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+        bar:SetStatusBarTexture(Flat() and "Interface\\Buttons\\WHITE8X8" or "Interface\\TargetingFrame\\UI-StatusBar")
+        local trough = bar:CreateTexture(nil, "BACKGROUND")
+        trough:SetAllPoints()
+        trough:SetColorTexture(0, 0, 0, 0.6)
+        for _, edge in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" } }) do
+            local t = bar:CreateTexture(nil, "OVERLAY")
+            t:SetColorTexture(0.45, 0.45, 0.45, 0.9)
+            t:SetPoint(edge[1])
+            t:SetPoint(edge[2])
+            t:SetHeight(1)
+        end
+        for _, edge in ipairs({ { "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
+            local t = bar:CreateTexture(nil, "OVERLAY")
+            t:SetColorTexture(0.45, 0.45, 0.45, 0.9)
+            t:SetPoint(edge[1])
+            t:SetPoint(edge[2])
+            t:SetWidth(1)
+        end
+        bar.text = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        bar.text:SetPoint("CENTER")
     end
-    for _, edge in ipairs({ { "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
-        local t = bar:CreateTexture(nil, "OVERLAY")
-        t:SetColorTexture(0.45, 0.45, 0.45, 0.9)
-        t:SetPoint(edge[1])
-        t:SetPoint(edge[2])
-        t:SetWidth(1)
-    end
-    bar.text = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    bar.text:SetPoint("CENTER")
     row.bar = bar
     local check = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
     check:SetSize(22, 22)
@@ -299,7 +331,7 @@ local function MakeRow(list)
     row:SetScript("OnEnter", RowEnter)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     for _, fs in ipairs({ row.headText, row.label, bar.text }) do ns.SkinText(fs) end
-    Outline(bar.text)
+    if not bar.game then Outline(bar.text) end
     return row
 end
 

@@ -2,6 +2,11 @@
 -- Reputation and Skills tabs, then one per profession. Loaded by tests/run.lua.
 
 -- The list rows of a Skills or Reputation page as text: "# Heading", "Name = bar text".
+-- A row bar's colour: the game's bar tints its fill; the plain one is a StatusBar.
+function barTint(bar)
+    return bar.game and bar.Fill.tint or bar.barColour
+end
+
 function sheetRows(page)
     local out = {}
     for _, row in ipairs(page.list.rows) do
@@ -118,7 +123,7 @@ test("the Skills page has a levelling tick on each profession, the same as the c
     assert(sheetRows(page):find("Cooking = 75 / 150  (not levelling)", 1, true), sheetRows(page))
     cooking = skillRow(page, "Cooking")
     eq(cooking.check:GetChecked(), false, "the page was filled again")
-    eq(cooking.bar.barColour[1], 0.35, "greyed")
+    eq(barTint(cooking.bar)[1], 0.35, "greyed")
     cooking.check.scripts.OnEnter(cooking.check)
     eq(GameTooltip.lines[2][1], "Not being levelled: left out of skill-up hints. Tick to bring it back.")
     -- The character menu agrees, and ticking there shows here.
@@ -130,6 +135,33 @@ test("the Skills page has a levelling tick on each profession, the same as the c
     eq(c.notLevelling, nil)
     eq(skillRow(page, "Cooking").check:GetChecked(), true)
     assert(sheetRows(page):find("Cooking = 75 / 150 |", 1, true), sheetRows(page))
+end)
+
+-- Owner's screenshots, 2026-11-28: the bars as the game's own Reputation window draws them.
+test("Skills and Reputation bars are the game's own, the fill cut to the share; without it, plain ones", function()
+    local ns = cwStart()
+    ns.ShowCharacter("Vesp Ash", "reputation")
+    local page = ns.CharacterPage("reputation")
+    local bar
+    for _, row in ipairs(page.list.rows) do
+        if row:IsShown() and row.label:GetText() == "Undercity" then bar = row.bar end
+    end
+    eq(bar.template, "ColoredProgressBarTemplate")
+    eq(bar.game, true)
+    eq(bar.fillPercent, 500 / 6000, "Friendly 500 of 6000")
+    eq(bar.Text:GetText(), "Friendly  500 / 6000")
+    -- A client without the template: our plain bar.
+    ns = wow.load(FILES)
+    wow.missingTemplates["ColoredProgressBarTemplate"] = true
+    wow.skills = skMage()
+    wow.login({ v = 2, chars = cwChars(), factions = { [68] = "Undercity" } })
+    ns.ShowCharacter("Vesp Ash", "reputation")
+    page = ns.CharacterPage("reputation")
+    bar = page.list.rows[1].bar
+    eq(bar.game, nil); eq(bar.kind, "StatusBar")
+    assert(sheetRows(page):find("Undercity = Friendly  500 / 6000", 1, true), sheetRows(page))
+    eq(bar.text.font[3], "OUTLINE", "the plain bar's text is outlined")
+    wow.missingTemplates["ColoredProgressBarTemplate"] = nil
 end)
 
 test("the Skills page for a character whose weapon skills haven't been read says so", function()
@@ -150,7 +182,7 @@ test("the Reputation page lists the character's standings by name, coloured by s
     eq(page.list.empty:GetText(), "Tarn Moon has no reputation recorded yet.")
 end)
 
-test("Reputation bars take the game's darker bar colours, and their text is outlined", function()
+test("Reputation bars take the game's darker bar colours; the game's bar text isn't outlined, as the game's", function()
     local ns = cwStart()
     ns.ShowCharacter("Vesp Ash", "reputation")
     local rows = {}
@@ -158,9 +190,9 @@ test("Reputation bars take the game's darker bar colours, and their text is outl
         if row:IsShown() and row.bar:IsShown() then rows[row.label:GetText()] = row.bar end
     end
     -- No FACTION_BAR_COLORS in the fake: retail's values.
-    eq(table.concat(rows["Darkspear Trolls"].barColour, ","), "0.8,0.3,0.22")
-    eq(table.concat(rows["Undercity"].barColour, ","), "0,0.6,0.1")
-    eq(rows["Undercity"].text.font[3], "OUTLINE")
+    eq(table.concat(barTint(rows["Darkspear Trolls"]), ","), "0.8,0.3,0.22")
+    eq(table.concat(barTint(rows["Undercity"]), ","), "0,0.6,0.1")
+    eq(rows["Undercity"].text.font[3], nil)
     -- The game's own table wins when it's there.
     FACTION_BAR_COLORS = { [4] = { r = 0.5, g = 0.4, b = 0.1 } }
     eq(table.concat({ ns.StandingBarColour(4) }, ","), "0.5,0.4,0.1")

@@ -406,6 +406,21 @@ function M.load(files)
                 self:GetParent():Hide()
             end
         end
+        -- Forever's coloured bar (Blizzard_SharedXML/Camelot/ProgressBars): a trough, a fill
+        -- tinted with SetVertexColor and cut to the share, and its text.
+        if template == "ColoredProgressBarTemplate" then
+            f.FillArea = newObject("Frame")
+            f.FillArea.width = 188
+            f.Fill = newObject("Texture")
+            f.Text = newObject("FontString")
+            f.Text.font = { "Fonts\\FRIZQT__.TTF", 12 } -- GameFontHighlight
+            function f:SetFillPercent(p)
+                p = math.min(1, math.max(0, p))
+                self.fillPercent = p
+                self.Fill:SetWidth(p * self.FillArea:GetWidth())
+            end
+            function f:SetText(text) self.Text:SetText(text) end
+        end
         if template == "UIPanelCloseButton" or template == "UIPanelCloseButtonDefaultAnchors" then
             BlizzardClose(f)
         elseif template == "BasicFrameTemplateWithInset" or template == "PortraitFrameTemplate" then
