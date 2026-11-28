@@ -493,8 +493,10 @@ function ns.SetLevelling(key, prof, on)
         c.notLevelling = c.notLevelling or {}
         c.notLevelling[prof] = true
     end
+    -- Not c.changed: that would make this whole copy of the character look newer to a sync,
+    -- and a stale copy could replace the other account's newer one (Codex review,
+    -- 2026-11-28). The choice goes with every sync hello on its own (Sync.lua Levelling).
     c.notLevellingAt = time()
-    c.changed = c.notLevellingAt -- so a sync with another account picks it up
     ns.craftVersion = ns.craftVersion + 1 -- Can craft and Skill-ups are kept per version
     if ns.InvalidateCache then ns.InvalidateCache() end
     if ns.RefreshOverview then ns.RefreshOverview() end
