@@ -17,7 +17,9 @@
 -- (no loadstring: a parser that only builds tables) and sent in pieces of up to 250 bytes,
 -- each led by a marker: "a" whole, "b" first, "c" middle, "d" last.
 --   ping   { k = "ping" }                           anyone there? (at login; see above)
---   hello  { k = "hello", v = PROTOCOL, reply = true|nil, auto = true|nil, have = { [key] = stamp } }
+--   hello  { k = "hello", v = PROTOCOL, reply = true|nil, auto = true|nil, have = { [key] = stamp },
+--            lv = { [key] = { t = when chosen, p = { [profession] = true } } }|nil (professions
+--            not being levelled; taken when later than ours, the logged-in character too) }
 --   want   { k = "want", keys = { key, ... } }      the other side's characters we lack or have older
 --   plan   { k = "plan", n = messages }             how many messages follow, for the progress bar
 --   char   { k = "char", key, c = character, ri = recipe info, fn = faction names, rs = ruleset,
@@ -668,7 +670,53 @@ end
 ---------------------------------------------------------------------------
 -- The conversation
 ---------------------------------------------------------------------------
-local function SendWant(s, name, have)
+-- Professions not being levelled, as chosen on either account (Professions.lua): every
+-- character's choice and when it was made, sent with the hello, so a choice reaches a
+-- character logged in on the other side, whose record is never replaced (Codex review,
+-- 2026-11-28). Only characters with a choice; nil when none.
+local function Levelling()
+    local out
+    for key, c in pairs(ns.db.chars) do
+        local at = c.notLevellingAt
+        if type(at) == "number" then
+            local p = {}
+            for prof, v in pairs(type(c.notLevelling) == "table" and c.notLevelling or p) do
+                if type(prof) == "string" and v == true then p[prof] = true end
+            end
+            out = out or {}
+            out[key] = { t = at, p = p }
+        end
+    end
+    return out
+end
+
+-- Their choices: each one later than ours replaces ours; a character we don't have is left.
+local function TakeLevelling(lv)
+    if type(lv) ~= "table" then return end
+    local changed = false
+    for key, e in pairs(lv) do
+        local c = type(key) == "string" and ns.db.chars[key]
+        local at = type(e) == "table" and e.t
+        if c and type(at) == "number" and type(e.p) == "table"
+            and not (type(c.notLevellingAt) == "number" and c.notLevellingAt >= at) then
+            local marks
+            for prof, v in pairs(e.p) do
+                if type(prof) == "string" and v == true then
+                    marks = marks or {}
+                    marks[prof] = true
+                end
+            end
+            c.notLevelling, c.notLevellingAt, changed = marks, at, true
+        end
+    end
+    if changed then
+        ns.craftVersion = ns.craftVersion + 1
+        Changed()
+    end
+end
+
+local function SendWant(s, name, have, lv)
+    TakeLevelling(lv)
     local keys = {}
     if type(have) == "table" then
         for key, stamp in pairs(have) do
@@ -696,7 +744,7 @@ local function NewSession(name, s)
 end
 
 local function Hello(reply, auto)
-    return { k = "hello", v = PROTOCOL, reply = reply, auto = auto, have = Stamps() }
+    return { k = "hello", v = PROTOCOL, reply = reply, auto = auto, have = Stamps(), lv = Levelling() }
 end
 
 -- Every character is cut into pieces first, so the other side can be told how many to expect.
@@ -726,13 +774,13 @@ local function SendChars(s, name, keys)
 end
 
 -- They asked, and we agreed (or had before): our hello back, and what we want of theirs.
-local function Accept(sender, name, have, quiet)
+local function Accept(sender, name, have, quiet, lv)
     Remember(name)
     local s = NewSession(name, { target = sender, quiet = quiet })
     if not quiet then ns.Print(L["Swapping characters with %s..."]:format(name)) end
     Notify()
     Send(name, sender, Hello(true, quiet))
-    SendWant(s, name, have)
+    SendWant(s, name, have, lv)
 end
 
 -- Starts a swap from this side. `quiet`: nobody asked for it, so nothing is said in chat, and
@@ -786,7 +834,7 @@ local function AskDialog()
         button2 = DECLINE or "Decline",
         OnAccept = function(_, data)
             pending = nil
-            Accept(data.sender, data.name, data.have)
+            Accept(data.sender, data.name, data.have, nil, data.lv)
             ns.ToggleSync(true) -- the player just agreed: show them how it's going
         end,
         OnCancel = function(_, data)
@@ -810,7 +858,7 @@ function handle.hello(msg, sender, name)
         s.answered, s.target, current = true, sender, s
         Remember(name)
         Notify()
-        return SendWant(s, name, msg.have)
+        return SendWant(s, name, msg.have, msg.lv)
     end
     local s = sessions[name]
     if StartedOver(name) then s = nil end
@@ -821,13 +869,13 @@ function handle.hello(msg, sender, name)
             Remember(name)
             Notify()
             Send(name, sender, Hello(true, s.quiet))
-            SendWant(s, name, msg.have)
+            SendWant(s, name, msg.have, msg.lv)
         end
         return
     end
     -- Nobody is here to ask about an automatic hello, so it's never put to the player.
     if msg.auto and not (Trusted(name) and ns.SyncAutoOn()) then return Send(name, sender, { k = "no" }) end
-    if Trusted(name) and not InCombatLockdown() then return Accept(sender, name, msg.have, msg.auto == true) end
+    if Trusted(name) and not InCombatLockdown() then return Accept(sender, name, msg.have, msg.auto == true, msg.lv) end
     if msg.auto then -- trusted, so what stopped it is a fight: it's on us to swap after
         Keep(name, sender)
         afterCombat = true
@@ -835,7 +883,7 @@ function handle.hello(msg, sender, name)
     end
     if declined[name] then return Send(name, sender, { k = "no" }) end
     if pending or InCombatLockdown() then return Send(name, sender, { k = "busy" }) end
-    pending = { sender = sender, name = name, have = msg.have }
+    pending = { sender = sender, name = name, have = msg.have, lv = msg.lv }
     AskDialog()
     StaticPopup_Show("ALTSFOREVER_SYNC", name, nil, pending)
     Send(name, sender, { k = "asking" })
