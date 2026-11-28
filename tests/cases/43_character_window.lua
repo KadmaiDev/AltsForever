@@ -149,6 +149,7 @@ test("Skills and Reputation bars are the game's own, the fill cut to the share; 
     eq(bar.template, "ColoredProgressBarTemplate")
     eq(bar.game, true)
     eq(bar.fillPercent, 500 / 6000, "Friendly 500 of 6000")
+    eq(bar.text.point[5], 1, "its text a pixel up")
     eq(bar.Text:GetText(), "Friendly  500 / 6000")
     -- A client without the template: our plain bar.
     ns = wow.load(FILES)

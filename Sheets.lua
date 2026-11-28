@@ -298,6 +298,11 @@ local function GameBar(row)
     bar:SetSize(BAR_W + 12, ROW_H + GAP)
     bar:SetPoint("RIGHT", row, "RIGHT", -2, 0)
     bar.game, bar.text = true, bar.Text
+    -- Its text, centred on the bar, read a little low on ours (owner's screenshot, 2026-11-28):
+    -- up a pixel, still across the whole bar.
+    bar.Text:ClearAllPoints()
+    bar.Text:SetPoint("LEFT", bar, "LEFT", 0, 1)
+    bar.Text:SetPoint("RIGHT", bar, "RIGHT", 0, 1)
     return bar
 end
 
