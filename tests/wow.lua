@@ -807,12 +807,12 @@ function M.load(files)
         return root
     end }
 
-    -- Reputation: the visible list in order, as { id, name, standing, header? }, and
+    -- Reputation: the visible list in order, as { id, name, standing, header?, child?, headerWithRep? }, and
     -- factions under collapsed headers (not in the list, but readable by ID).
     M.factions, M.hiddenFactions, M.factionReads, M.watched = {}, {}, 0, nil
     local function factionData(f)
         return f and { factionID = f[1], name = f[2], currentStanding = f[3], isHeader = f[4] or false,
-            isHeaderWithRep = false, reaction = 4 }
+            isChild = f[5] or false, isHeaderWithRep = f[6] or false, reaction = 4 }
     end
     C_Reputation = {
         GetNumFactions = function() return #M.factions end,

@@ -139,3 +139,53 @@ test("a sync bringing in newer standings refills an open Reputation panel", func
     eq(ns.db.chars["Tarn Moon"].reps[530], 21000, "merged")
     eq(row.cells[2].text, "|cff00ffccRevered 0%|r", "shown at once")
 end)
+
+-- The game's headings (a player's request via the owner, 2026-11-28): filed by the list's
+-- order, as the game doesn't say which heading a faction is under.
+test("each faction is filed under the heading the game lists it under", function()
+    local ns = wow.load(FILES)
+    FACTION_INACTIVE = "Inactive"
+    wow.factions = {
+        { 1, "Horde", 0, true },
+        { 530, "Darkspear Trolls", 2150 },
+        { 76, "Orgrimmar", 9500 },
+        { 7, "Horde Forces", 3000, true, true, true }, -- a sub-heading with its own bar
+        { 729, "Frostwolf Clan", 500, false, true },
+        { 68, "Undercity", 3000 },                    -- back under Horde
+        { 169, "Steamwheedle Cartel", 0, true },
+        { 21, "Booty Bay", 3000, false, true },
+        { 2, "Other", 0, true },
+        { 87, "Bloodsail Buccaneers", -4000 },
+        { 99, "Inactive", 0, true },
+        { 500, "Old Faction", 100 },
+    }
+    wow.hiddenFactions = { { 600, "Folded Away", 50 } } -- under a heading folded shut
+    wow.login({ v = 2, factionGroups = { [500] = 2, [600] = 169 }, factionHeadings = { [2] = 9 }, chars = {
+        ["Aldric"] = alt("Aldric", "MAGE", { reps = { [600] = 10, [900] = 20 } }) } })
+    runTimers()
+    local g, h = ns.db.factionGroups, ns.db.factionHeadings
+    eq(g[530], 1); eq(g[76], 1); eq(g[68], 1, "after a sub-heading's children: its parent again")
+    eq(g[7], 1, "a sub-heading goes under its parent"); eq(g[729], 7)
+    eq(g[21], 169); eq(g[87], 2)
+    eq(g[500], 2, "the Inactive heading files nothing: kept where it was")
+    eq(g[600], 169, "not listed: kept")
+    eq(g[1], nil, "a top heading is under nothing")
+    eq(h[1], 1); eq(h[7], 2); eq(h[169], 3); eq(h[2], 4); eq(h[99], nil)
+    eq(ns.db.factions[169], "Steamwheedle Cartel", "headings named")
+    eq(ns.char.reps[7], 3000, "a heading with a bar is a faction too")
+    FACTION_INACTIVE = nil
+    -- The Reputation page: the game's headings in its order; one never filed, under Other.
+    ns.db.factions[900] = "Unknown Kin"
+    ns.ShowCharacter("Aldric", "reputation")
+    local rows = sheetRows(ns.CharacterPage("reputation")):gsub(" = [^|]* |", " |"):gsub(" = [^|]*$", "")
+    eq(rows, "# Horde | Darkspear Trolls | Horde Forces | Orgrimmar | Undercity | # Horde Forces | Frostwolf Clan"
+        .. " | # Steamwheedle Cartel | Booty Bay | Folded Away | # Other | Bloodsail Buccaneers | Old Faction | Unknown Kin",
+        "a sub-heading's own bar under its parent")
+end)
+
+test("damaged heading records are dropped at load", function()
+    local ns = wow.load(FILES)
+    wow.login({ v = 2, factionGroups = { [5] = 1, x = 2, [6] = "y" }, factionHeadings = "junk", chars = {} })
+    eq(ns.db.factionGroups[5], 1); eq(ns.db.factionGroups.x, nil); eq(ns.db.factionGroups[6], nil)
+    eq(ns.db.factionHeadings, nil)
+end)

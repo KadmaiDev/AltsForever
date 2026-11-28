@@ -5,7 +5,7 @@ local _, ns = ...
 if ns.disabled then return end -- another copy of Alts Forever is running (Core.lua)
 local L = ns.L
 
-local floor, pairs, ipairs, wipe, sort = math.floor, pairs, ipairs, wipe, table.sort
+local floor, pairs, ipairs, wipe, sort, next, type = math.floor, pairs, ipairs, wipe, table.sort, next, type
 local issecretvalue = issecretvalue or function() return false end
 local R = C_Reputation
 
@@ -95,6 +95,14 @@ end
 -- The visible list is read, and factions this character had before are re-read by ID, so
 -- ones under a collapsed header stay current without touching the player's reputation
 -- window (expanding headers would change it and fire UPDATE_FACTION again).
+--
+-- Headings (the game's categories: Horde, Steamwheedle Cartel, Other...): the game doesn't
+-- say which a faction is under, only the list's order does, so each faction listed is filed
+-- under the nearest heading above it: db.factionGroups = { [factionID] = heading's
+-- factionID }, db.factionHeadings = { [heading's factionID] = its place among the headings },
+-- heading names in db.factions; account-wide (a player's request via the owner, 2026-11-28).
+-- A faction under a heading folded shut isn't listed, so it keeps where it was last seen;
+-- the Inactive heading files nothing (they keep their real heading).
 local seen = {}
 
 local function Record(c, names, d)
@@ -111,10 +119,40 @@ function ns.ScanReputation(c)
     local names = ns.db.factions or {}
     ns.db.factions = names
     wipe(seen)
+    local groups, headings = ns.db.factionGroups or {}, ns.db.factionHeadings or {}
+    ns.db.factionGroups, ns.db.factionHeadings = groups, headings
+    local inactive = _G.FACTION_INACTIVE
+    local top, sub, place = nil, nil, 0 -- the heading and sub-heading being read; nil = none
     for i = 1, R.GetNumFactions() do
         local d = R.GetFactionDataByIndex(i)
-        if d and (not d.isHeader or d.isHeaderWithRep) then Record(c, names, d) end
+        local id = d and d.factionID
+        if d and type(id) == "number" and not issecretvalue(id) then
+            -- Where this one is filed: under the sub-heading only if it's one of its children.
+            local under = d.isChild and sub or top
+            if d.isHeader then
+                local name = d.name
+                if issecretvalue(name) or type(name) ~= "string" or (inactive and name == inactive) then
+                    top, sub = false, nil -- nothing filed until the next heading
+                else
+                    names[id] = name
+                    place = place + 1
+                    headings[id] = place
+                    if d.isChild and top then
+                        under, sub = top, id -- its own bar, if it has one, goes under its parent
+                    else
+                        groups[id] = nil
+                        under, top, sub = nil, id, nil
+                    end
+                end
+            end
+            if not d.isHeader or d.isHeaderWithRep then
+                Record(c, names, d)
+                if under then groups[id] = under end
+            end
+        end
     end
+    if next(groups) == nil then ns.db.factionGroups = nil end
+    if next(headings) == nil then ns.db.factionHeadings = nil end
     if R.GetFactionDataByID then
         for id in pairs(c.reps) do
             if not seen[id] then Record(c, names, R.GetFactionDataByID(id)) end

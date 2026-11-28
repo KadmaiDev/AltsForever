@@ -110,6 +110,39 @@ function ns.ReputationRows(c)
     return rows
 end
 
+-- The Reputation page's rows under the game's headings (Reputation.lua files each faction
+-- under the heading it was last listed under): sections { name, rows } in the game's order;
+-- a faction never seen under one goes under "Other" (merged with the game's own Other,
+-- whose name it shares in every language we checked: ours is translated alike). The second
+-- value is true when no faction has a heading at all (then the page shows no headings).
+local function BySection(a, b)
+    if a.at ~= b.at then return a.at < b.at end
+    return a.name < b.name
+end
+
+function ns.ReputationSections(c)
+    local db = ns.db
+    local groups, headings, names = db.factionGroups or {}, db.factionHeadings or {}, db.factions or {}
+    local out, byName, any = {}, {}, false
+    for _, r in ipairs(ns.ReputationRows(c)) do
+        local h = groups[r.id]
+        local name = h and type(names[h]) == "string" and names[h]
+        local at = name and headings[h] or math.huge
+        if name then any = true else name = L["Other"] end
+        local s = byName[name]
+        if not s then
+            s = { name = name, rows = {}, at = at }
+            byName[name] = s
+            out[#out + 1] = s
+        elseif at < s.at then
+            s.at = at
+        end
+        s.rows[#s.rows + 1] = r
+    end
+    sort(out, BySection)
+    return out, not any
+end
+
 ---------------------------------------------------------------------------
 -- A list of bars under collapsible headings (Skills and Reputation), drawn from a pool of
 -- rows as far as the page allows; the mouse wheel and the page arrows scroll it.
@@ -442,16 +475,20 @@ end
 
 local function FillReputation(page, key, c)
     local entries = {}
-    for _, r in ipairs(ns.ReputationRows(c)) do
-        local e = { label = r.name, row = r, tip = RepTip }
-        e.r, e.g, e.b = ns.StandingBarColour(r.level)
-        if r.level < 8 then
-            e.value, e.max = r.value - r.low, r.high - r.low
-            e.text = r.label .. "  " .. (r.value - r.low) .. " / " .. (r.high - r.low)
-        else
-            e.value, e.max, e.text = 1, 1, r.label
+    local sections, flat = ns.ReputationSections(c)
+    for _, s in ipairs(sections) do
+        if not flat then entries[#entries + 1] = { head = s.name } end
+        for _, r in ipairs(s.rows) do
+            local e = { label = r.name, row = r, tip = RepTip }
+            e.r, e.g, e.b = ns.StandingBarColour(r.level)
+            if r.level < 8 then
+                e.value, e.max = r.value - r.low, r.high - r.low
+                e.text = r.label .. "  " .. (r.value - r.low) .. " / " .. (r.high - r.low)
+            else
+                e.value, e.max, e.text = 1, 1, r.label
+            end
+            entries[#entries + 1] = e
         end
-        entries[#entries + 1] = e
     end
     SetEntries(page.list, entries, L["%s has no reputation recorded yet."]:format(c.name or key), page.key == key)
     page.key = key
