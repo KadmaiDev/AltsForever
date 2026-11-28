@@ -916,7 +916,7 @@ function M.load(files)
     InspectFrame, Constants, UnitGUID = nil, nil, nil
     local betaEnded = M.betaEnded
     M.betaEnded = nil -- for this load only
-    -- The game's strings in another client's wording, e.g. { ITEM_MIN_SKILL = "Benötigt %1$s (%2$d)" }:
+    -- The game's strings in another client's form, e.g. { ITEM_MIN_SKILL = "Requires %1$s (%2$d)" }:
     -- set before the files load, as they read them once; for this load only.
     for k, v in pairs(M.strings or {}) do _G[k] = v end
     M.strings = nil

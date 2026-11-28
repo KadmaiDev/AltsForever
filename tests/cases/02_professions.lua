@@ -235,12 +235,12 @@ test("recipe tooltip: the name is cut at the first colon, ASCII or full-width (C
     eq(wow.hover(GameTooltip, 5103, c)[3][2], "|cff20ff20Known|r", "the ASCII one comes first")
 end)
 
-test("recipe tooltip: works on clients that number the placeholders (German)", function()
-    wow.strings = { ITEM_MIN_SKILL = "Benötigt %1$s (%2$d)" }
+test("recipe tooltip: works on clients that number the placeholders (as German ones do)", function()
+    -- A German client's is "Benötigt %1$s (%2$d)".
+    wow.strings = { ITEM_MIN_SKILL = "Requires %1$s (%2$d)" }
     local ns = wow.load(FILES)
     wow.profs = { { "Engineering", 107 } }
-    local text = wow.recipeItem(5104, "Bauplan: Mechanical Squirrel", "Engineering", 100)
-    text[#text] = "Benötigt Engineering (100)"
+    local text = wow.recipeItem(5104, "Schematic: Mechanical Squirrel", "Engineering", 100)
     wow.login(nil)
     ns.char.recipes = { Engineering = { ["mechanical squirrel"] = true } }
     eq(wow.hover(GameTooltip, 5104, text)[3][2], "|cff20ff20Known|r")
