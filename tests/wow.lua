@@ -773,6 +773,7 @@ function M.load(files)
             function item:CreateRadio(t, sel, set) return add("radio", t, sel, set, self.items) end
             function item:CreateButton(t, fn) return add("button", t, fn, nil, self.items) end
             function item:CreateCheckbox(t, sel, set) return add("checkbox", t, sel, set, self.items) end
+            function item:CreateTitle(t) return add("title", t, nil, nil, self.items) end
             list = list or root.items
             list[#list + 1] = item
             return item

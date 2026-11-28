@@ -592,7 +592,9 @@ local function RowTooltip(row)
             local note = ""
             if skillups then
                 local n = ns.SkillupCount(c, name)
-                if ns.AtRankCap(c, name) then
+                if ns.NotLevelling(c, name) then
+                    note = GREY .. L["(not levelling)"] .. "|r"
+                elseif ns.AtRankCap(c, name) then
                     -- At the final maximum there's nothing to train, so say nothing.
                     if skill < MAX_PROFESSION then note = GREY .. L["(train to skill up)"] .. "|r" end
                 elseif n and (n > 0 or not Gathering()[name]) and next(c.recipes[name]) then
