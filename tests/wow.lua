@@ -8,7 +8,7 @@ M.SECRET = SECRET
 
 -- Events this fake client knows; registering anything else throws, like Forever does.
 local KNOWN_EVENTS = {
-    ADDON_LOADED = true, PLAYER_LOGIN = true, PLAYER_LOGOUT = true,
+    ADDON_LOADED = true, GLOBAL_MOUSE_DOWN = true, PLAYER_LOGIN = true, PLAYER_LOGOUT = true,
     BAG_UPDATE = true, BAG_UPDATE_DELAYED = true, BAG_CONTAINER_UPDATE = true,
     PLAYER_EQUIPMENT_CHANGED = true, INSPECT_READY = true,
     BANKFRAME_OPENED = true, BANKFRAME_CLOSED = true, BAG_UPDATE_COOLDOWN = true, BANK_TABS_CHANGED = true, INPUT_DEVICE_INTERFACE_TRANSITION = true,
@@ -814,6 +814,9 @@ function M.load(files)
         return f and { factionID = f[1], name = f[2], currentStanding = f[3], isHeader = f[4] or false,
             isChild = f[5] or false, isHeaderWithRep = f[6] or false, reaction = 4 }
     end
+    -- The frame under the mouse (M.mouseFocus), as GetMouseFoci's first entry.
+    M.mouseFocus = nil
+    GetMouseFoci = function() return { M.mouseFocus } end
     C_Reputation = {
         GetNumFactions = function() return #M.factions end,
         GetFactionDataByIndex = function(i) M.factionReads = M.factionReads + 1 return factionData(M.factions[i]) end,

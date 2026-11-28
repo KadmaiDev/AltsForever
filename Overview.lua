@@ -1594,6 +1594,46 @@ function ns.DockIfOverview(f)
     Centre(f)
 end
 
+-- The overview and the windows docked to it come to the front together (owner, 2026-11-28:
+-- a free window clicked last sat between the overview and a panel docked under it). Our
+-- windows are toplevel, so the game raises only the one clicked: when a click lands in the
+-- overview or a window anchored to it (directly or through another), the rest of that group
+-- is raised too. Docked windows never overlap each other, so their own order doesn't matter.
+local function Docked(f, overview)
+    return f ~= overview and f:IsShown() and Follows(f, overview)
+end
+
+function ns.RaiseDocked()
+    local overview = AltsForeverFrame
+    if not (overview and overview:IsShown()) then return end
+    for f in pairs(tracked) do
+        if Docked(f, overview) then f:Raise() end
+    end
+    for f in pairs(dockable) do
+        if not tracked[f] and Docked(f, overview) then f:Raise() end
+    end
+end
+
+-- Whether a frame is the overview, a window docked to it, or inside one of them.
+local function InGroup(f, overview)
+    for _ = 1, 30 do
+        if type(f) ~= "table" or f == UIParent or (f.IsForbidden and f:IsForbidden()) then return false end
+        if f == overview or ((tracked[f] or dockable[f]) and Follows(f, overview)) then return true end
+        f = f:GetParent()
+    end
+    return false
+end
+
+-- GLOBAL_MOUSE_DOWN: any click anywhere; nothing is done unless the overview is open.
+local function GroupClicked()
+    local overview = AltsForeverFrame
+    if not (overview and overview:IsShown() and GetMouseFoci) then return end
+    local foci = GetMouseFoci()
+    if not (type(foci) == "table" and InGroup(foci[1], overview)) then return end
+    overview:Raise()
+    ns.RaiseDocked()
+end
+
 local function CreateWindow()
     -- Room for the left inset, every column shown, and the right border.
     local width = Measure()
@@ -1793,8 +1833,10 @@ local function CreateWindow()
     f.credit:SetText(L["Alts Forever by Kadmai"])
 
     ns.SkinWindow(f)
+    ns.On("GLOBAL_MOUSE_DOWN", GroupClicked)
     f:SetScript("OnShow", function(self)
         self:Raise()
+        ns.RaiseDocked()
         ns.PruneSaves(time())
         MarkSort()
         Refresh()
@@ -1878,6 +1920,7 @@ function ns.ToggleOverview(open)
     if frame:IsShown() and not open then return frame:Hide() end
     frame:Show()
     frame:Raise() -- already open: to the front, over other windows
+    ns.RaiseDocked() -- with the windows docked to it
 end
 
 function ns.OverviewShown()
