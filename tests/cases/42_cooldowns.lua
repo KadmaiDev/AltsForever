@@ -399,3 +399,83 @@ test("the Salt Shaker: nothing without Leatherworking, or before its name loads"
     -- Another item arriving does nothing.
     wow.fire("GET_ITEM_INFO_RECEIVED", 2589, true)
 end)
+
+-- Dedicated Study (a Legacy talent; a player's comment, 2026-11-28): a 23 h spell cooldown,
+-- kept apart from the professions' and shown only once seen on cooldown.
+local STUDY = 1225469
+
+local function studyStart()
+    local ns, c = cooldownStart()
+    wow.spellNames[STUDY] = "Dedicated Study"
+    wow.playerSpells[STUDY] = true
+    return ns, c
+end
+
+local function cast(id)
+    wow.spellCooldowns[id] = { wow.gameTime, 23 * HOUR }
+    wow.fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-guid", id)
+end
+
+test("Dedicated Study: shown once cast, counting down, ready after a respec, gone with the talent", function()
+    local ns, c = studyStart()
+    eq(c.cooldowns, nil, "never cast: nothing")
+    wow.timers = {}
+    cast(12345)
+    eq(#wow.timers, 0, "another spell: nothing read")
+    cast(STUDY)
+    eq(c.cooldowns, nil, "read a moment later")
+    runTimers()
+    eq(c.cooldowns.Legacy["Dedicated Study"], NOW + 23 * HOUR)
+    eq(ns.CooldownCell(c, NOW), "23h 0m")
+    local all = rowLines(ns)
+    assert(all:find("Dedicated Study = ready in 23h 0m", 1, true), all)
+    -- With a profession's cooldown too: the cell's click opens the profession, not "Legacy".
+    tailoring(3 * DAY)
+    wow.fire("TRADE_SKILL_CLOSE")
+    c.cooldowns.Alchemy = { ["Transmute: Arcanite"] = NOW + 2 * DAY } -- after Study, before Mooncloth
+    local b = cooldownButton(rowOf("Aldric"))
+    b.scripts.OnClick(b, "LeftButton")
+    eq(AltsForeverCharacterFrame.titleText, "Alchemy", "the first profession's cooldown")
+    c.cooldowns.Alchemy = nil
+    -- The profession window's reading and a skill change leave it alone.
+    wow.tradeskill.recipes[2001].learned = false
+    wow.fire("TRADE_SKILL_SHOW")
+    wow.profs = { { "Alchemy", 250 } }
+    wow.fire("SKILL_LINES_CHANGED")
+    eq(c.cooldowns.Legacy["Dedicated Study"], NOW + 23 * HOUR, "not a profession's")
+    -- A respec resets it (Forever bug tracker #342): ready.
+    wow.spellCooldowns[STUDY] = nil
+    wow.fire("TRADE_SKILL_CLOSE")
+    wow.fire("TRAIT_CONFIG_UPDATED", 1)
+    eq(c.cooldowns.Legacy["Dedicated Study"], NOW)
+    eq(ns.CooldownCell(c, NOW), "|cff20ff20Ready|r")
+    -- Still ready at the next loading screen; the talent given up: gone.
+    wow.fire("PLAYER_ENTERING_WORLD")
+    eq(c.cooldowns.Legacy["Dedicated Study"], NOW)
+    wow.playerSpells[STUDY] = false
+    wow.fire("TRAIT_CONFIG_UPDATED", 1)
+    eq(c.cooldowns, nil)
+end)
+
+test("Dedicated Study: nothing from the global cooldown, a secret, or before its name is known", function()
+    local ns, c = studyStart()
+    wow.gameTime = 100000
+    wow.spellCooldowns[STUDY] = { wow.gameTime, 1.5 }
+    wow.fire("PLAYER_ENTERING_WORLD")
+    eq(c.cooldowns, nil, "the global cooldown")
+    wow.spellCooldowns[STUDY] = { wow.SECRET, 23 * HOUR }
+    wow.fire("PLAYER_ENTERING_WORLD")
+    eq(c.cooldowns, nil, "a secret")
+    wow.spellNames[STUDY] = nil
+    wow.spellCooldowns[STUDY] = { wow.gameTime - 3600, 23 * HOUR }
+    wow.fire("PLAYER_ENTERING_WORLD")
+    eq(c.cooldowns, nil, "no name yet")
+    -- Read at the loading screen once it's known: an hour in.
+    wow.spellNames[STUDY] = "Dedicated Study"
+    wow.fire("PLAYER_ENTERING_WORLD")
+    eq(c.cooldowns.Legacy["Dedicated Study"], NOW + 22 * HOUR)
+    -- A reading a few seconds off changes nothing; an unknown talent with no cooldown never adds one.
+    wow.gameTime = wow.gameTime + 5
+    wow.fire("PLAYER_ENTERING_WORLD")
+    eq(c.cooldowns.Legacy["Dedicated Study"], NOW + 22 * HOUR)
+end)

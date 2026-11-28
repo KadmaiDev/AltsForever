@@ -708,6 +708,68 @@ function ns.ScanItemCooldowns(c)
     return changed
 end
 
+-- Dedicated Study (a Legacy talent in the Professions tree; a player's comment, 2026-11-28):
+-- a 25 s cast with a 23 h cooldown that gives the character's lowest profession a point.
+-- Spell 1225469 is from the Forever spell database (next to Well Rested's 1225478, checked in
+-- game); not yet seen in game. Read with C_Spell.GetSpellCooldown, which gave the Salt
+-- Shaker's spell the same answer as its item (2026-11-28), and kept under
+-- c.cooldowns[STUDY_GROUP][spell name]. As with recipes it shows only once seen on cooldown,
+-- so a wrong ID or a character without the talent shows nothing. Read at each loading
+-- screen, after the player's own cast of it, and when the Legacy tree changes (a respec
+-- resets its cooldown: Forever bug tracker #342). Not cooling down: ready, or dropped when
+-- the game says the spell isn't known (IsPlayerSpell, unchecked for Legacy talents).
+local STUDY, STUDY_GROUP = 1225469, "Legacy" -- the group is a key only, never shown
+ns.STUDY_SPELL = STUDY
+
+local function SpellCooldown(id)
+    local get = C_Spell and C_Spell.GetSpellCooldown
+    if not get then return nil end
+    local ok, a, b = pcall(get, id)
+    if not ok then return nil end
+    if type(a) == "table" then return a.startTime, a.duration end
+    return a, b
+end
+
+-- Reads the character's Dedicated Study cooldown; true if anything changed.
+function ns.ScanStudy(c)
+    if not (c and GetTime) then return false end
+    local start, duration = SpellCooldown(STUDY)
+    if issecretvalue(start) or issecretvalue(duration) or type(start) ~= "number" or type(duration) ~= "number" then
+        return false
+    end
+    local now = time()
+    local t = c.cooldowns and c.cooldowns[STUDY_GROUP]
+    if start > 0 and duration > 2 then -- 2 seconds or less: the global cooldown
+        local ok, name = pcall(C_Spell.GetSpellName, STUDY)
+        if not ok or issecretvalue(name) or type(name) ~= "string" or name == "" then return false end
+        local ready = floor(now + start + duration - GetTime() + 0.5)
+        if ready <= now then return false end
+        local had = t and t[name]
+        if had and had >= ready - 60 and had <= ready + 60 then return false end -- steady readings drift
+        if not t then
+            c.cooldowns = c.cooldowns or {}
+            t = {}
+            c.cooldowns[STUDY_GROUP] = t
+        end
+        wipe(t) -- one entry (a name read in another language replaced)
+        t[name] = ready
+        return true
+    end
+    if not t then return false end
+    local ok, known = false, nil
+    if IsPlayerSpell then ok, known = pcall(IsPlayerSpell, STUDY) end
+    if ok and known == false then -- the talent was given up
+        c.cooldowns[STUDY_GROUP] = nil
+        if next(c.cooldowns) == nil then c.cooldowns = nil end
+        return true
+    end
+    local changed = false
+    for name, at in pairs(t) do
+        if at > now then t[name], changed = now, true end -- ready early (a respec resets it)
+    end
+    return changed
+end
+
 local DAY, HOUR = 86400, 3600
 local READY = "|cff20ff20"
 
@@ -855,6 +917,24 @@ function ns.StartProfessions()
     end
     ns.On("BAG_UPDATE_COOLDOWN", ItemCooldowns)
     ns.On("PLAYER_ENTERING_WORLD", ItemCooldowns)
+
+    -- Dedicated Study: at each loading screen, a moment after the player casts it, and when
+    -- the Legacy tree changes. Its own frame for the cast, as Lockouts.lua stops listening to
+    -- that event on its own.
+    local function Study()
+        if ns.ScanStudy(char) then
+            Changed()
+            if ns.RefreshOverview then ns.RefreshOverview() end
+        end
+    end
+    ns.On("PLAYER_ENTERING_WORLD", Study)
+    ns.On("TRAIT_CONFIG_UPDATED", Study)
+    local casts = CreateFrame("Frame")
+    if pcall(casts.RegisterUnitEvent, casts, "UNIT_SPELLCAST_SUCCEEDED", "player") then
+        casts:SetScript("OnEvent", function(_, _, unit, _, spellID)
+            if unit == "player" and not issecretvalue(spellID) and spellID == STUDY then C_Timer.After(0.5, Study) end
+        end)
+    end
     -- A name requested by the scan has arrived: read again (peer review). The event is
     -- shared with other files, so this stays registered and returns at once otherwise.
     ns.On("GET_ITEM_INFO_RECEIVED", function(id, ok)
